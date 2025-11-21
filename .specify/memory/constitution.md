@@ -1,50 +1,61 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+---
+Sync Impact Report
+---
+- **Version Change**: None → 1.0.0
+- **Summary**: Initialized the project constitution with 10 core principles covering code quality, security, testing, TDD, UX/UI, performance, Git practices, and code standards.
+- **Added Sections**:
+    - Core Principles (I-V)
+    - Development Workflow
+    - Non-Functional Requirements
+    - Governance
+- **Removed Sections**:
+    - All placeholder sections from the initial template.
+- **Templates Requiring Updates**:
+    - ✅ `.specify/templates/plan-template.md` (No changes needed, aligns with new principles)
+    - ✅ `.specify/templates/spec-template.md` (No changes needed, aligns with new principles)
+    - ✅ `.specify/templates/tasks-template.md` (No changes needed, aligns with new principles)
+- **Follow-up TODOs**:
+    - None
+-->
+# Iced Lens Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Code Quality and Functional Programming
+All code must meet high standards of quality, emphasizing clarity, maintainability, and robustness. Where reasonable, functional programming principles (e.g., immutability, pure functions) should be adopted to enhance predictability and reduce side effects.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Security
+Security is a primary concern. All development must follow secure coding practices, including input validation, vulnerability scanning, and proactive mitigation of common threats. Dependencies must be regularly audited.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Comprehensive Testing
+All code must be accompanied by a suite of tests. For Rust projects, this includes unit, integration, and documentation tests (`cargo test`). The testing strategy must ensure correctness, reliability, and regression prevention.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Test-Driven Development (TDD)
+A "test-first" approach is mandatory. For any new feature or bug fix, unit tests must be written first to define the requirements. Code is then developed to make the tests pass. The full cycle is: write failing tests, write code to pass tests, run tests, and refactor as needed.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. User-Centric Design
+All user-facing features must be designed with modern UX/UI best practices in mind. The goal is a clean, elegant, and intuitive interface that prioritizes user needs and workflow efficiency.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Development Workflow
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+**Version Control:** Git usage must follow established best practices. This includes a consistent branching model (e.g., GitFlow or a variant), descriptive commit messages, and regular, small commits.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**Code Verification:** Code must be regularly checked with `cargo check` and `cargo clippy`. Warnings must be addressed; any decision to ignore a warning requires explicit and strong justification.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+**Code Comments:** All code comments must be written in English. They should explain the "why" behind a piece of logic, not the "what." The goal is to provide context that is not apparent from the code itself.
+
+## Non-Functional Requirements
+
+**Performance:** Performance is a critical requirement. Code should be written with efficiency in mind, and performance bottlenecks must be identified and addressed. Performance regressions are to be treated as bugs.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution is the guiding document for all development practices. All code reviews and contributions must ensure compliance with these principles. Deviations are not permitted without a formal amendment to this document.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Versioning Policy:**
+- **MAJOR**: Backward incompatible governance/principle removals or redefinitions.
+- **MINOR**: New principle/section added or materially expanded guidance.
+- **PATCH**: Clarifications, wording, typo fixes, non-semantic refinements.
+
+**Version**: 1.0.0 | **Ratified**: 2025-11-21 | **Last Amended**: 2025-11-21

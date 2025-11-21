@@ -31,7 +31,12 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] **Code Quality & Functional Programming**: Is the design clean, maintainable, and does it leverage functional principles where appropriate?
+- [ ] **Security**: Are security risks (e.g., input validation, authN/Z, dependency vulnerabilities) identified and mitigated in the plan?
+- [ ] **Comprehensive Testing**: Does the plan include a robust testing strategy (unit, integration, e2e)?
+- [ ] **Test-Driven Development (TDD)**: Does the workflow account for writing tests before implementation?
+- [ ] **User-Centric Design**: For UI-related features, is the user experience a central part of the design?
+- [ ] **Performance**: Have performance goals been defined and considered in the technical approach?
 
 ## Project Structure
 
