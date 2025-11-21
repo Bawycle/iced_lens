@@ -1,0 +1,26 @@
+# Rust
+target/
+debug/
+release/
+*.rs.bk
+*.rlib
+
+# Crate-specific
+Cargo.lock
+
+# General
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+*.log
+.env*
+
+# IDEs
+.vscode/
+.idea/
+
+
+# Added by cargo
+
+/target

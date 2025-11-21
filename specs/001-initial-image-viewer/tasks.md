@@ -5,11 +5,11 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Initialize a new binary Rust project using `cargo new iced_lens --vcs git`
-- [ ] T002 Create the `rust-toolchain.toml` file to pin the Rust version (e.g., 1.78)
-- [ ] T003 [P] Add core dependencies to `Cargo.toml`: `iced`, `fluent-rs`, `image`, `resvg`, `toml`, `dirs`, `serde`
-- [ ] T004 [P] Create the source code directory structure as defined in `plan.md` (`src/ui`, `src/i18n`, etc.)
-- [ ] T005 [P] Create the `assets/i18n` directory and add initial `en-US.ftl` and `fr.ftl` translation files.
+- [x] T001 Initialize a new binary Rust project using `cargo new iced_lens --vcs git`
+- [x] T002 Create the `rust-toolchain.toml` file to pin the Rust version (e.g., 1.78)
+- [x] T003 [P] Add core dependencies to `Cargo.toml`: `iced`, `fluent-rs`, `image`, `resvg`, `toml`, `dirs`, `serde`
+- [x] T004 [P] Create the source code directory structure as defined in `plan.md` (`src/ui`, `src/i18n`, etc.)
+- [x] T005 [P] Create the `assets/i18n` directory and add initial `en-US.ftl` and `fr.ftl` translation files.
 
 ---
 
@@ -17,10 +17,10 @@
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented.
 
-- [ ] T006 Create custom error types and result aliases in `src/error.rs`
-- [ ] T007 Implement the basic Iced application structure in `src/main.rs` and `src/app.rs` (state, message enum, view logic)
-- [ ] T008 [P] Implement the user preferences module in `src/config/mod.rs` to load and save `settings.toml`.
-- [ ] T009 [P] Implement the internationalization module in `src/i18n/fluent.rs` to load `.ftl` files and manage the active language.
+- [x] T006 Create custom error types and result aliases in `src/error.rs`
+- [x] T007 Implement the basic Iced application structure in `src/main.rs` and `src/app.rs` (state, message enum, view logic)
+- [x] T008 [P] Implement the user preferences module in `src/config/mod.rs` to load and save `settings.toml`.
+- [x] T009 [P] Implement the internationalization module in `src/i18n/fluent.rs` to load `.ftl` files and manage the active language.
 
 ---
 
@@ -30,15 +30,15 @@
 **Independent Test**: Launching the app with a file path argument should display the image correctly centered at 1:1 size.
 
 ### Tests for User Story 1
-- [ ] T010 [P] [US1] Write unit tests for the image handler in `src/image_handler/mod.rs` for both valid and corrupted image data.
-- [ ] T011 [P] [US1] Write an integration test in `tests/integration/` that simulates opening an image file and verifies the application state.
+- [x] T010 [P] [US1] Write unit tests for the image handler in `src/image_handler/mod.rs` for both valid and corrupted image data.
+- [x] T011 [P] [US1] Write an integration test in `tests/integration/` that simulates opening an image file and verifies the application state.
 
 ### Implementation for User Story 1
-- [ ] T012 [P] [US1] Implement the image loading and decoding logic in `src/image_handler/mod.rs`, using the `image` and `resvg` crates.
-- [ ] T013 [P] [US1] Implement the main image viewer UI component in `src/ui/viewer.rs`.
-- [ ] T014 [US1] Integrate the image handler into the main application state in `src/app.rs` to manage the currently displayed image.
-- [ ] T015 [US1] Handle command-line arguments in `src/main.rs` to open an image on startup.
-- [ ] T016 [US1] Implement the error handling UI to display a dialog for unsupported or corrupted files as per `FR-010`.
+- [x] T012 [P] [US1] Implement the image loading and decoding logic in `src/image_handler/mod.rs`, using the `image` and `resvg` crates.
+- [x] T013 [P] [US1] Implement the main image viewer UI component in `src/ui/viewer.rs`.
+- [x] T014 [US1] Integrate the image handler into the main application state in `src/app.rs` to manage the currently displayed image.
+- [x] T015 [US1] Handle command-line arguments in `src/main.rs` to open an image on startup.
+- [x] T016 [US1] Implement the error handling UI to display a dialog for unsupported or corrupted files as per `FR-010`.
 
 ---
 
@@ -48,11 +48,11 @@
 **Independent Test**: The UI language should correctly follow the priority (CLI > settings > OS > default) and update dynamically.
 
 ### Tests for User Story 2
-- [ ] T017 [P] [US2] Write unit tests for the language resolution logic in `src/i18n/fluent.rs`.
+- [x] T017 [P] [US2] Write unit tests for the language resolution logic in `src/i18n/fluent.rs`.
 - [ ] T018 [P] [US2] Write an integration test in `tests/integration/` to verify the UI language changes when the setting is modified.
 
 ### Implementation for User Story 2
-- [ ] T019 [US2] Implement the language resolution logic in `src/i18n/fluent.rs` (CLI > settings > OS > default).
+- [x] T019 [US2] Implement the language resolution logic in `src/i18n/fluent.rs` (CLI > settings > OS > default).
 - [ ] T020 [US2] Add a 'Settings' or 'Preferences' menu to the UI in `src/app.rs`.
 - [ ] T021 [US2] Implement a language selection submenu that lists available languages.
 - [ ] T022 [US2] Connect the language selection menu to the i18n module to update the UI text at runtime without a restart.
