@@ -20,7 +20,7 @@
 
 use crate::error::{Error, Result};
 use iced::widget::image;
-use image_rs::{DynamicImage, GenericImageView, ImageError};
+use image_rs::{GenericImageView, ImageError};
 use resvg::usvg;
 use std::fs;
 use std::path::Path;

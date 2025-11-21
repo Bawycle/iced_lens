@@ -28,7 +28,6 @@ use iced::{
     Element,
     Length,
 };
-use unic_langid::LanguageIdentifier; // Added
 
 pub fn view_settings(app: &App) -> Element<'_, Message> {
     let title = Text::new(app.i18n.tr("settings-title")).size(30);

@@ -9,11 +9,10 @@ use crate::ui::settings;
 use crate::ui::viewer;
 use iced::{
     executor,
-    widget::{Button, Container, Scrollable, Text},
+    widget::{Button, Container, Text},
     Application, Command, Element, Length, Theme,
 };
 use std::fmt;
-use unic_langid::LanguageIdentifier;
 
 pub struct App {
     image: Option<ImageData>,
