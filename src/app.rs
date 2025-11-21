@@ -5,8 +5,8 @@ use crate::image_handler::{self, ImageData};
 use crate::ui::viewer;
 use iced::{
     executor,
-    widget::{Column, Text},
-    Application, Command, Element, Theme,
+    widget::{Container, Scrollable, Text},
+    Application, Command, Element, Length, Theme,
 };
 use std::fmt;
 
@@ -95,12 +95,18 @@ impl Application for App {
         let content: Element<'_, Message> = if let Some(error_message) = &self.error {
             Text::new(format!("Error: {}", error_message)).into()
         } else if let Some(image_data) = &self.image {
-            viewer::view_image(image_data)
+            let image_viewer = viewer::view_image(image_data);
+            Scrollable::new(image_viewer).into()
         } else {
             Text::new("Hello, world!").into()
         };
 
-        Column::new().push(content).into()
+        Container::new(content)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x()
+            .center_y()
+            .into()
     }
 }
 
