@@ -1,20 +1,17 @@
-use app::{App, Flags};
 use iced::{Application, Settings};
+use iced_lens::app::{App, Flags};
 use pico_args;
-
-pub mod app;
-pub mod config;
-pub mod error;
-pub mod i18n;
-pub mod image_handler;
-pub mod ui;
 
 fn main() -> iced::Result {
     let mut args = pico_args::Arguments::from_env();
 
     let flags = Flags {
         lang: args.opt_value_from_str("--lang").unwrap(),
-        file_path: args.finish().into_iter().next().and_then(|s| s.into_string().ok()),
+        file_path: args
+            .finish()
+            .into_iter()
+            .next()
+            .and_then(|s| s.into_string().ok()),
     };
 
     let mut settings = Settings::with_flags(flags);
