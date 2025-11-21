@@ -5,6 +5,14 @@
 **Status**: Draft
 **Input**: User description: "Développe IcedLens, une application desktop dont la tagline est "Visionner. Éditer. Analyser. Simplement.". Cette première version se concentrera uniquement sur le visionnage des images. Les formats devant être supportés sont jpeg, png, gif, svg, tiff, webp, bmp, ico . Lorsque l'utilisateur ouvre une image à partir de son explorateur de fichier, la visonneuse se lance et affiche l'image dans sa taille d'origine centrée au milieu de la fenêtre. L'application doit être multi-lingue. L'utilisateur doit pouvoir changer de langue à la volée sans redémarrer l'application. En priorité la langue d'affichage est celle passée en argument en ligne de commande, ensuite la préférence de l'utilisateur dans les settings, puis la langue du système d'exploitation et si malgré tout aucune langue n'a pas être déterminée, l'anglais sera la langue pas défaut. Les traductions ne doivent être externes au binaire car il faut permettre à la communauté d'ajouter des langues, d'ajouter/corriger des traductions. L'application doit être livrée avec les fichiers de traductions de l'anglais et du français. Cette première version doit fonctionner sur Linux x86_64, Linux arm64, Windows 10/11. Ultérieurement, l'appllication sera également portée sur d'autres systèmes comme Android ou Macos. Beaucoup de fonctionnalités divers et variées seront développées lors des versions futures, notamment des fonctions d'édition, de lecture vidéo, d'analyse, ... Il faut donc dés ces fondations, appliquer des principes de modularité et de résilience."
 
+## Clarifications
+
+### Session 2025-11-21
+- Q: What format should the external translation files use? → A: Fluent de Mozilla ( https://projectfluent.org ). A separate file for each language.
+- Q: How should user preferences be stored? → A: Store settings in a TOML or JSON file in the standard OS-specific user config directory.
+- Q: How does the user change the language at runtime? → A: Via a menu option (e.g., within 'Settings' or 'Preferences').
+- Q: What level of detail should error messages provide? → A: Specific & User-Friendly by default, but with an option for the user to view more technical details.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - View an Image (Priority: P1)
@@ -37,7 +45,7 @@ As a non-English speaking user, I want the application's interface to be display
 2. **Given** the user's OS language is French, **When** the application is launched with a command-line argument specifying English (e.g., `--lang en`), **Then** all UI text is displayed in English.
 3. **Given** a user setting has been previously saved to use French, but the OS language is English, **When** the application is launched without a command-line argument, **Then** the UI text is displayed in French.
 4. **Given** no language can be determined from the command-line, user settings, or OS locale, **When** the application is launched, **Then** all UI text defaults to English.
-5. **Given** the application is running, **When** the user changes the language in the settings, **Then** the UI text updates immediately to the newly selected language without a restart.
+5. **Given** the application is running, **When** the user changes the language in the settings menu, **Then** the UI text updates immediately to the newly selected language without a restart.
 
 ---
 
@@ -70,17 +78,17 @@ As a community member, I want to be able to add a new language or correct existi
 - **FR-002**: The application MUST display the opened image centered horizontally and vertically within the main window.
 - **FR-003**: The application MUST display the image at its original, 1:1 pixel size by default. If the image dimensions exceed the available screen space, the application window will maximize to screen size, and the image will be pannable via scrollbars.
 - **FR-004**: The application MUST support internationalization for all user-facing UI text.
-- **FR-005**: The application MUST load translation files from an external source (e.g., files on disk) that is not compiled into the binary.
+- **FR-005**: The application MUST load translation files from an external source. These files must use the Fluent syntax (`.ftl`) to support rich, asymmetric localization.
 - **FR-006**: The system MUST be distributed with pre-packaged English and French translation files.
 - **FR-007**: The system MUST determine the UI language based on the following priority order: 1. Command-line argument, 2. User settings, 3. OS locale, 4. English (default).
 - **FR-008**: The application's UI language MUST be changeable at runtime without requiring an application restart.
 - **FR-009**: The application MUST be delivered as a runnable binary for Linux (x86_64, aarch64) and Windows (10/11).
-- **FR-010**: The system MUST display a user-friendly error message in a dialog box if a file is not a supported image format or is corrupted.
+- **FR-010**: The system MUST display a specific and user-friendly error message in a dialog box if a file cannot be opened (e.g., unsupported format, corrupted). The dialog MUST also provide an option (e.g., a "Details" button) to show more technical information about the error.
 
 ### Key Entities *(include if feature involves data)*
 
-- **UserPreferences**: A persistent object or file that stores user-specific settings. At a minimum, it must contain a `language` field (e.g., `"fr"`).
-- **Translation**: An in-memory representation of a language, mapping translation keys (e.g., `"file.open.error"`) to display strings (e.g., `"Error opening file"`), loaded from an external file.
+- **UserPreferences**: A persistent object, stored as a TOML or JSON file (e.g., `settings.toml` or `settings.json`) in the OS-specific user configuration directory, that stores user-specific settings. At a minimum, it must contain a `language` field (e.g., `"fr"`).
+- **Translation**: An in-memory representation of a language's translations, loaded from an external `.ftl` file based on the Fluent (https://projectfluent.org) syntax.
 
 ## Success Criteria *(mandatory)*
 
