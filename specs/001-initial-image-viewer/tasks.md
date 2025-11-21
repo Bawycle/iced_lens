@@ -77,6 +77,8 @@
 - [ ] T027 [P] Create a `tests/data` directory and populate it with sample images for each supported format.
 - [ ] T028 Write the main `README.md` for the project.
 - [ ] T029 Run `cargo clippy` and `cargo fmt` and address all warnings.
+- [ ] T030 [P] Perform security audit of all dependencies using `cargo audit` and report findings.
+- [ ] T031 [P] Create a benchmark test to measure image loading time and ensure it meets the <2s performance goal.
 
 ---
 
