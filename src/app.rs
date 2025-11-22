@@ -10,7 +10,7 @@ use iced::{
     keyboard,
     mouse,
     widget::{button, checkbox, Column, Container, Row, Scrollable, Space, Text},
-    window, Element, Length, Size, Subscription, Task, Theme,
+    window, Element, Length, Point, Rectangle, Subscription, Task, Theme,
 };
 use iced::widget::text_input;
 use iced::widget::scrollable::{AbsoluteOffset, Direction, Scrollbar, Viewport};
@@ -34,8 +34,8 @@ pub struct App {
     modifiers: keyboard::Modifiers,
     viewport_offset: AbsoluteOffset,
     previous_viewport_offset: AbsoluteOffset,
-    viewport_bounds: Option<Size>,
-    fit_zoom_percent: Option<f32>,
+    viewport_bounds: Option<Rectangle>,
+    cursor_position: Option<Point>,
 }
 
 const MIN_ZOOM_PERCENT: f32 = 10.0;
@@ -165,7 +165,7 @@ impl Default for App {
             viewport_offset: default_offset(),
             previous_viewport_offset: default_offset(),
             viewport_bounds: None,
-            fit_zoom_percent: None,
+            cursor_position: None,
         }
     }
 }
@@ -185,7 +185,7 @@ pub enum Message {
     ZoomStepInputChanged(String),
     ZoomStepSubmitted,
     ViewportChanged {
-        bounds: Size,
+        bounds: Rectangle,
         offset: AbsoluteOffset,
     },
     CtrlZoom {
@@ -414,10 +414,8 @@ impl App {
     }
 
     fn refresh_fit_zoom(&mut self) {
-        self.fit_zoom_percent = self.compute_fit_zoom_percent();
-
         if self.fit_to_window {
-            if let Some(fit_zoom) = self.fit_zoom_percent {
+            if let Some(fit_zoom) = self.compute_fit_zoom_percent() {
                 self.update_zoom_display(fit_zoom);
                 self.zoom_input_dirty = false;
                 self.zoom_input_error_key = None;
@@ -427,21 +425,21 @@ impl App {
 
     fn compute_fit_zoom_percent(&self) -> Option<f32> {
         let image = self.image.as_ref()?;
-        let bounds = self.viewport_bounds?;
+        let viewport = self.viewport_bounds?;
 
         if image.width == 0 || image.height == 0 {
             return Some(DEFAULT_ZOOM_PERCENT);
         }
 
-        if bounds.width <= 0.0 || bounds.height <= 0.0 {
+        if viewport.width <= 0.0 || viewport.height <= 0.0 {
             return None;
         }
 
         let image_width = image.width as f32;
         let image_height = image.height as f32;
 
-        let scale_x = bounds.width / image_width;
-        let scale_y = bounds.height / image_height;
+        let scale_x = viewport.width / image_width;
+        let scale_y = viewport.height / image_height;
 
         let scale = scale_x.min(scale_y);
 
@@ -497,7 +495,10 @@ impl App {
                 match window_event {
                     window::Event::Resized(size) => {
                         self.previous_viewport_offset = self.viewport_offset;
-                        self.viewport_bounds = Some(size);
+                        self.viewport_bounds = Some(Rectangle::new(
+                            Point::new(0.0, 0.0),
+                            size,
+                        ));
                         self.refresh_fit_zoom();
                     }
                     _ => {}
@@ -508,6 +509,14 @@ impl App {
                 mouse::Event::WheelScrolled { delta } => {
                     let control = self.modifiers.control();
                     self.handle_ctrl_zoom(delta, control)
+                }
+                mouse::Event::CursorMoved { position } => {
+                    self.cursor_position = Some(position);
+                    Task::none()
+                }
+                mouse::Event::CursorLeft => {
+                    self.cursor_position = None;
+                    Task::none()
                 }
                 _ => Task::none(),
             },
@@ -616,27 +625,16 @@ impl App {
                     let fit_toggle = checkbox(self.i18n.tr("viewer-fit-to-window-toggle"), self.fit_to_window)
                         .on_toggle(Message::SetFitToWindow);
 
-                    let mut zoom_controls_row = Row::new()
+                    let zoom_controls_row = Row::new()
                         .spacing(10)
                         .align_y(Vertical::Center)
                         .push(zoom_label)
                         .push(zoom_input)
-                        .push(Text::new("%"))
                         .push(zoom_out_button)
                         .push(reset_button)
                         .push(zoom_in_button)
                         .push(Space::new(Length::Fixed(16.0), Length::Shrink))
                         .push(fit_toggle);
-
-                    if self.fit_to_window {
-                        if let Some(fit_zoom) = self.fit_zoom_percent {
-                            let label = self.i18n.tr("viewer-fit-percentage-label");
-                            let value = format!("{}: {}%", label, format_number(fit_zoom));
-                            zoom_controls_row = zoom_controls_row
-                                .push(Space::new(Length::Fixed(12.0), Length::Shrink))
-                                .push(Text::new(value));
-                        }
-                    }
 
                     let mut zoom_controls = Column::new().spacing(4).push(zoom_controls_row);
 
@@ -657,7 +655,7 @@ impl App {
                         .on_scroll(|viewport: Viewport| {
                             let bounds = viewport.bounds();
                             Message::ViewportChanged {
-                                bounds: Size::new(bounds.width, bounds.height),
+                                bounds,
                                 offset: viewport.absolute_offset(),
                             }
                         });
@@ -801,8 +799,6 @@ mod tests {
         assert_eq!(app.viewport_offset.y, 0.0);
         assert_eq!(app.previous_viewport_offset.x, 0.0);
         assert_eq!(app.previous_viewport_offset.y, 0.0);
-        assert!(app.viewport_bounds.is_none());
-        assert!(app.fit_zoom_percent.is_none());
 
         assert!(MIN_ZOOM_PERCENT < DEFAULT_ZOOM_PERCENT);
         assert!(MAX_ZOOM_PERCENT > DEFAULT_ZOOM_PERCENT);
@@ -898,7 +894,7 @@ mod tests {
     fn toggling_fit_to_window_updates_zoom() {
         let mut app = App::default();
         app.image = Some(build_image(2000, 1000));
-        let bounds = Size::new(1000.0, 500.0);
+        let bounds = Rectangle::new(Point::new(0.0, 0.0), iced::Size::new(1000.0, 500.0));
         let _ = app.update(Message::ViewportChanged {
             bounds,
             offset: AbsoluteOffset { x: 0.0, y: 0.0 },
@@ -910,8 +906,7 @@ mod tests {
         let _ = app.update(Message::SetFitToWindow(true));
 
         assert!(app.fit_to_window);
-        assert!(app.fit_zoom_percent.is_some());
-        let fit_zoom = app.fit_zoom_percent.unwrap();
+        let fit_zoom = app.compute_fit_zoom_percent().expect("fit zoom should exist");
         assert_eq!(app.zoom_percent, fit_zoom);
         assert!(fit_zoom <= DEFAULT_ZOOM_PERCENT);
         assert_eq!(app.zoom_input, format_number(fit_zoom));
@@ -928,7 +923,7 @@ mod tests {
         let mut app = App::default();
         let first = AbsoluteOffset { x: 10.0, y: 5.0 };
         let second = AbsoluteOffset { x: 4.0, y: 2.0 };
-        let bounds = Size::new(800.0, 600.0);
+        let bounds = Rectangle::new(Point::new(32.0, 48.0), iced::Size::new(800.0, 600.0));
 
         let _ = app.update(Message::ViewportChanged {
             bounds,
