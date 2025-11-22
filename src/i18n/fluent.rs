@@ -58,11 +58,10 @@ impl I18n {
                         if let Some(locale_str) = filename.strip_suffix(".ftl") {
                             if let Ok(locale) = locale_str.parse::<LanguageIdentifier>() {
                                 if let Ok(content) = fs::read_to_string(&path) {
-                                    let res = FluentResource::try_new(content)
-                                        .unwrap_or_else(|_| panic!(
-                                            "Failed to parse FTL file: {}",
-                                            filename
-                                        ));
+                                    let res =
+                                        FluentResource::try_new(content).unwrap_or_else(|_| {
+                                            panic!("Failed to parse FTL file: {}", filename)
+                                        });
                                     let mut bundle = FluentBundle::new(vec![locale.clone()]);
                                     bundle.add_resource(res).expect("Failed to add resource.");
                                     bundles.insert(locale.clone(), bundle);
