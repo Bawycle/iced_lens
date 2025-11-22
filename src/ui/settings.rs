@@ -24,7 +24,7 @@
 use crate::app::{App, Message};
 use iced::{
     alignment::Horizontal,
-    widget::{button, Button, Column, Text},
+    widget::{button, text_input, Button, Column, Row, Space, Text},
     Element, Length,
 };
 
@@ -60,9 +60,39 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
         language_selection_column = language_selection_column.push(button);
     }
 
+    let zoom_step_label = Text::new(app.i18n.tr("settings-zoom-step-label"));
+    let zoom_step_input = text_input(
+        &app.i18n.tr("settings-zoom-step-placeholder"),
+        app.zoom_step_input_value(),
+    )
+    .on_input(Message::ZoomStepInputChanged)
+    .on_submit(Message::ZoomStepSubmitted)
+    .padding(6)
+    .width(Length::Fixed(120.0));
+
+    let zoom_step_input_row = Row::new()
+        .spacing(8)
+        .push(zoom_step_input)
+        .push(Text::new("%"));
+
+    let mut zoom_step_column = Column::new()
+        .spacing(8)
+        .push(zoom_step_label)
+        .push(zoom_step_input_row);
+
+    if let Some(error_key) = app.zoom_step_error_key() {
+        zoom_step_column = zoom_step_column.push(Text::new(app.i18n.tr(error_key)).size(14));
+    } else {
+        zoom_step_column = zoom_step_column.push(
+            Text::new(app.i18n.tr("settings-zoom-step-hint")).size(14),
+        );
+    }
+
     Column::new()
         .push(title)
         .push(language_selection_column)
+        .push(Space::new(Length::Shrink, Length::Fixed(24.0)))
+        .push(zoom_step_column)
         .spacing(20)
         .width(Length::Fill)
         .align_x(Horizontal::Center)

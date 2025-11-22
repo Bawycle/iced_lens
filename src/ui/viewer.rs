@@ -20,7 +20,7 @@
 //! #
 //! // Assume `image_data` is obtained from image_handler::load_image
 //! let image_data = dummy_image_data();
-//! let image_viewer_element: Element<'_, Message> = viewer::view_image(&image_data);
+//! let image_viewer_element: Element<'_, Message> = viewer::view_image(&image_data, 100.0);
 //!
 //! let content = Container::new(image_viewer_element);
 //! // ... add to your application's view
@@ -28,15 +28,22 @@
 
 use crate::image_handler::ImageData;
 use iced::{
-    widget::Image, // Removed Container
+    widget::Image,
     Element,
     Length,
 };
 
-pub fn view_image(image_data: &ImageData) -> Element<'_, super::super::app::Message> {
+pub fn view_image(
+    image_data: &ImageData,
+    zoom_percent: f32,
+) -> Element<'_, super::super::app::Message> {
+    let scale = (zoom_percent / 100.0).max(0.01);
+    let width = (image_data.width as f32 * scale).max(1.0);
+    let height = (image_data.height as f32 * scale).max(1.0);
+
     Image::new(image_data.handle.clone())
-        .width(Length::Fixed(image_data.width as f32))
-        .height(Length::Fixed(image_data.height as f32))
+        .width(Length::Fixed(width))
+        .height(Length::Fixed(height))
         .into()
 }
 
@@ -53,7 +60,7 @@ mod tests {
             height: 1,
         };
 
-        let _element = view_image(&image_data);
+        let _element = view_image(&image_data, 100.0);
         // The assertion is implicit: we simply ensure the helper does not panic and returns.
     }
 }

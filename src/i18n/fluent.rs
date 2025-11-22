@@ -12,7 +12,8 @@
 //! use unic_langid::LanguageIdentifier;
 //!
 //! // Initialize I18n
-//! let config = Config { language: Some("fr".to_string()) };
+//! let mut config = Config::default();
+//! config.language = Some("fr".to_string());
 //! let mut i18n = I18n::new(None, &config);
 //!
 //! // Get a translated string

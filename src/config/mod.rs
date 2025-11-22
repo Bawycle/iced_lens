@@ -34,10 +34,26 @@ use std::path::{Path, PathBuf}; // Added PathBuf back
 const CONFIG_FILE: &str = "settings.toml";
 const APP_NAME: &str = "IcedLens";
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub language: Option<String>,
+    #[serde(default)]
+    pub fit_to_window: Option<bool>,
+    #[serde(default)]
+    pub zoom_step: Option<f32>,
 }
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            language: None,
+            fit_to_window: Some(true),
+            zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
+        }
+    }
+}
+
+pub const DEFAULT_ZOOM_STEP_PERCENT: f32 = 10.0;
 
 fn get_default_config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|mut path| {
@@ -86,6 +102,8 @@ mod tests {
     fn save_and_load_round_trip_preserves_language() {
         let config = Config {
             language: Some("fr".to_string()),
+            fit_to_window: Some(false),
+            zoom_step: Some(5.0),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("nested").join("settings.toml");
@@ -94,6 +112,8 @@ mod tests {
         let loaded = load_from_path(&config_path).expect("failed to load config");
 
         assert_eq!(loaded.language, config.language);
+        assert_eq!(loaded.fit_to_window, config.fit_to_window);
+        assert_eq!(loaded.zoom_step, config.zoom_step);
     }
 
     #[test]
@@ -113,9 +133,18 @@ mod tests {
         let config_path = nested_dir.join("settings.toml");
         let config = Config {
             language: Some("en-US".to_string()),
+            fit_to_window: Some(false),
+            zoom_step: Some(7.5),
         };
 
         save_to_path(&config, &config_path).expect("save should create directories");
         assert!(config_path.exists());
+    }
+
+    #[test]
+    fn default_config_sets_fit_and_zoom_step() {
+        let config = Config::default();
+        assert_eq!(config.fit_to_window, Some(true));
+        assert_eq!(config.zoom_step, Some(DEFAULT_ZOOM_STEP_PERCENT));
     }
 }

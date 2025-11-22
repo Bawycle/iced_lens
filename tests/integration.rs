@@ -1,4 +1,4 @@
-use iced_lens::config::{self, Config};
+use iced_lens::config::{self, Config, DEFAULT_ZOOM_STEP_PERCENT};
 use iced_lens::i18n::fluent::I18n;
 use tempfile::tempdir;
 
@@ -18,6 +18,8 @@ fn test_language_change_via_config() {
     // 1. Initial config: en-US
     let initial_config = Config {
         language: Some("en-US".to_string()),
+        fit_to_window: Some(true),
+        zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
     };
     config::save_to_path(&initial_config, &temp_config_file_path)
         .expect("Failed to write initial config file");
@@ -31,6 +33,8 @@ fn test_language_change_via_config() {
     // 2. Change config to fr
     let french_config = Config {
         language: Some("fr".to_string()),
+        fit_to_window: Some(true),
+        zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
     };
     config::save_to_path(&french_config, &temp_config_file_path)
         .expect("Failed to write french config file");
