@@ -91,6 +91,7 @@ USAGE:
 OPTIONS:
 	-h, --help        Show help text
 			--lang <id>   Set locale (en-US, fr)
+			--i18n-dir <path> Override translation directory (defaults to assets/i18n/)
 
 ARGS:
 	<IMAGE_PATH>     Path to image file to open
@@ -110,6 +111,7 @@ Localization powered by [Fluent](https://projectfluent.org/).
 - Runtime language switching updates UI without restart.
 - Current locales: `en-US`, `fr`.
 To contribute a new locale, see `CONTRIBUTING.md` (translation workflow section).
+Override directory: pass `--i18n-dir /custom/translations` to load `.ftl` files from an alternate location. If the path is invalid, the application falls back to the built‑in `assets/i18n/` directory.
 
 ## 8. Zoom & Viewing Model
 - Manual zoom retains last chosen level when toggling fit‑to‑window off.

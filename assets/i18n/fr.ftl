@@ -37,3 +37,4 @@ help-example-1 = iced_lens ./photo.png
 help-example-2 = iced_lens --lang fr ./image.jpg
 help-example-3 = iced_lens --help
 help-description = IcedLens – Visionneuse d'images
+help-line-option-i18n-dir =     --i18n-dir <chemin>  Charger les traductions depuis un dossier

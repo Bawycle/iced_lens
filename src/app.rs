@@ -218,6 +218,7 @@ pub enum Message {
 pub struct Flags {
     pub lang: Option<String>,
     pub file_path: Option<String>,
+    pub i18n_dir: Option<String>,
 }
 
 pub const MIN_WINDOW_HEIGHT: u32 = 480; // Provide comfortable viewport area
@@ -244,7 +245,7 @@ fn compute_min_window_width(i18n: &I18n) -> u32 {
 
 pub fn window_settings_with_locale(flags: &Flags) -> window::Settings {
     let config = crate::config::load().unwrap_or_default();
-    let i18n = I18n::new(flags.lang.clone(), &config);
+    let i18n = I18n::new(flags.lang.clone(), flags.i18n_dir.clone(), &config);
     let computed_width = compute_min_window_width(&i18n);
     let icon = crate::icon::load_window_icon();
     window::Settings {
@@ -266,7 +267,7 @@ pub fn run(flags: Flags) -> iced::Result {
 impl App {
     fn new(flags: Flags) -> (Self, Task<Message>) {
         let config = config::load().unwrap_or_default();
-        let i18n = I18n::new(flags.lang, &config);
+        let i18n = I18n::new(flags.lang.clone(), flags.i18n_dir.clone(), &config);
 
         let task = if let Some(path) = flags.file_path {
             Task::perform(
@@ -898,6 +899,7 @@ mod tests {
             let (app, _command) = App::new(Flags {
                 lang: None,
                 file_path: None,
+                i18n_dir: None,
             });
             assert_eq!(app.mode, AppMode::Viewer);
             assert!(app.image.is_none());
@@ -1264,11 +1266,11 @@ mod tests {
 
     #[test]
     fn dynamic_min_width_french_not_smaller_than_english() {
-        let english_flags = Flags { lang: Some("en-US".into()), file_path: None };
+        let english_flags = Flags { lang: Some("en-US".into()), file_path: None, i18n_dir: None };
         let ws_en = window_settings_with_locale(&english_flags);
         let min_en = ws_en.min_size.expect("min size en").width;
 
-        let french_flags = Flags { lang: Some("fr".into()), file_path: None };
+        let french_flags = Flags { lang: Some("fr".into()), file_path: None, i18n_dir: None };
         let ws_fr = window_settings_with_locale(&french_flags);
         let min_fr = ws_fr.min_size.expect("min size fr").width;
 

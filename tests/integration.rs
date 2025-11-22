@@ -28,7 +28,7 @@ fn test_language_change_via_config() {
     // Load i18n with initial config
     let loaded_initial_config = config::load_from_path(&temp_config_file_path)
         .expect("Failed to load initial config from path");
-    let i18n_en = I18n::new(None, &loaded_initial_config);
+    let i18n_en = I18n::new(None, None, &loaded_initial_config);
     assert_eq!(i18n_en.current_locale().to_string(), "en-US");
 
     // 2. Change config to fr
@@ -43,7 +43,7 @@ fn test_language_change_via_config() {
     // Load i18n with french config
     let loaded_french_config = config::load_from_path(&temp_config_file_path)
         .expect("Failed to load french config from path");
-    let i18n_fr = I18n::new(None, &loaded_french_config);
+    let i18n_fr = I18n::new(None, None, &loaded_french_config);
     assert_eq!(i18n_fr.current_locale().to_string(), "fr");
 
     // Clean up temporary directory

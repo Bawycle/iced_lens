@@ -15,7 +15,7 @@
 //! // Initialize I18n
 //! let mut config = Config::default();
 //! config.language = Some("fr".to_string());
-//! let mut i18n = I18n::new(None, &config);
+//! let mut i18n = I18n::new(None, None, &config);
 //!
 //! // Get a translated string
 //! let welcome_message = i18n.tr("window-title");
@@ -41,18 +41,30 @@ pub struct I18n {
 
 impl Default for I18n {
     fn default() -> Self {
-        Self::new(None, &Config::default())
+        Self::new(None, None, &Config::default())
     }
 }
 
 const TRANSLATIONS_DIR: &str = "assets/i18n/";
 
+fn pick_dir(override_dir: Option<String>) -> String {
+    if let Some(dir) = override_dir {
+        if std::path::Path::new(&dir).is_dir() {
+            return dir;
+        } else {
+            eprintln!("Provided i18n directory does not exist or is not a directory: {}", dir);
+        }
+    }
+    TRANSLATIONS_DIR.to_string()
+}
+
 impl I18n {
-    pub fn new(cli_lang: Option<String>, config: &Config) -> Self {
+    pub fn new(cli_lang: Option<String>, cli_dir: Option<String>, config: &Config) -> Self {
         let mut bundles = HashMap::new();
         let mut available_locales = Vec::new();
 
-        if let Ok(entries) = fs::read_dir(TRANSLATIONS_DIR) {
+        let dir = pick_dir(cli_dir);
+        if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.filter_map(|e| e.ok()) {
                 let path = entry.path();
                 if path.is_file() {
@@ -79,17 +91,14 @@ impl I18n {
                 }
             }
         } else {
-            eprintln!(
-                "Failed to read translations directory: {}",
-                TRANSLATIONS_DIR
-            );
+            eprintln!("Failed to read translations directory: {}", dir);
         }
 
         available_locales.sort_by_key(|a| a.to_string());
 
         let default_locale: LanguageIdentifier = "en-US".parse().unwrap();
-        let current_locale =
-            resolve_locale(cli_lang, config, &available_locales).unwrap_or(default_locale);
+        let current_locale = resolve_locale(cli_lang, config, &available_locales)
+            .unwrap_or(default_locale);
 
         Self {
             bundles,
@@ -200,14 +209,14 @@ mod tests {
     #[test]
     fn test_tr_returns_missing_for_unknown_key() {
         let config = Config::default();
-        let i18n = I18n::new(None, &config);
+        let i18n = I18n::new(None, None, &config);
         let missing = i18n.tr("non-existent-key");
         assert!(missing.starts_with("MISSING:"));
     }
 
     #[test]
     fn test_set_locale_ignores_unknown_language() {
-        let mut i18n = I18n::new(None, &Config::default());
+        let mut i18n = I18n::new(None, None, &Config::default());
         let original = i18n.current_locale().clone();
         let unknown_locale: LanguageIdentifier = "es-ES".parse().unwrap();
         i18n.set_locale(unknown_locale);
