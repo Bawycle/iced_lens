@@ -166,6 +166,9 @@ Key concepts (informative only):
 - Includes a limited patent grant; no trademark rights.
 SPDX: `MPL-2.0`
 
+### Icon Asset Exception
+The application icon (`assets/icons/iced_lens.svg` and its PNG exports) is **not** covered by MPL-2.0. It uses a restricted license allowing only unmodified redistribution to represent IcedLens. See [`ICON_LICENSE.md`](ICON_LICENSE.md). SPDX reference: `LicenseRef-IcedLens-Icon`.
+
 ## 16. FAQ
 **Why not GPL or MIT?** MPL offers balanced file‑level reciprocity without imposing network or full project copyleft.
 **Does it support Windows/macOS?** Yes, via Iced's cross‑platform backends; primary development on Linux.
