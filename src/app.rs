@@ -220,15 +220,23 @@ pub struct Flags {
     pub file_path: Option<String>,
 }
 
-pub fn run(flags: Flags) -> iced::Result {
+pub const MIN_WINDOW_WIDTH: u32 = 760; // Ensure single-line controls row
+pub const MIN_WINDOW_HEIGHT: u32 = 480; // Provide comfortable viewport area
+
+pub fn window_settings() -> window::Settings {
     let icon = crate::icon::load_window_icon();
+    window::Settings {
+        size: iced::Size::new(800.0, 600.0),
+        min_size: Some(iced::Size::new(MIN_WINDOW_WIDTH as f32, MIN_WINDOW_HEIGHT as f32)),
+        icon,
+        ..window::Settings::default()
+    }
+}
+
+pub fn run(flags: Flags) -> iced::Result {
     iced::application(|state: &App| state.title(), App::update, App::view)
         .theme(App::theme)
-        .window(window::Settings {
-            size: iced::Size::new(800.0, 600.0),
-            icon,
-            ..window::Settings::default()
-        })
+        .window(window_settings())
         .subscription(App::subscription)
         .run_with(move || App::new(flags))
 }
@@ -1230,5 +1238,13 @@ mod tests {
         let mut app = App::default();
         app.mode = AppMode::Settings;
         let _ = app.view();
+    }
+
+    #[test]
+    fn window_settings_has_min_size_constraints() {
+        let ws = window_settings();
+        let min = ws.min_size.expect("min_size should be set");
+        assert!(min.width >= MIN_WINDOW_WIDTH as f32);
+        assert!(min.height >= MIN_WINDOW_HEIGHT as f32);
     }
 }

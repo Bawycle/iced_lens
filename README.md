@@ -76,8 +76,23 @@ Specify language:
 iced_lens --lang fr /path/to/image.jpg
 ```
 
-### Command-Line Help (Planned)
-Future iterations may expose `--help` output describing flags. Track in roadmap.
+### Command-Line Help
+Display usage information:
+```bash
+iced_lens --help
+```
+Output includes syntax:
+```
+USAGE:
+	iced_lens [OPTIONS] [IMAGE_PATH]
+
+OPTIONS:
+	-h, --help        Show help text
+			--lang <id>   Set locale (en-US, fr)
+
+ARGS:
+	<IMAGE_PATH>     Path to image file to open
+```
 
 ## 6. Configuration & Preferences
 User config is stored in a platform‑appropriate directory (implementation detail: uses a TOML file). Currently persisted:
@@ -143,7 +158,7 @@ Planned / aspirational items (subject to change):
 - Basic image metadata panel (EXIF)
 - Overlay HUD
 - Configurable background theme
-- CLI help & richer argument parsing
+- Richer argument parsing (additional flags)
 - Packaging (AppImage / Flatpack)
 
 ## 14. Contributing
