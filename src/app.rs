@@ -5,18 +5,47 @@ use crate::image_handler::{self, ImageData};
 use crate::ui::settings;
 use crate::ui::viewer;
 use iced::{
-    widget::{button, Container, Scrollable, Text},
-    window,
-    Element, Length, Task, Theme,
+    widget::{button, Column, Container, Scrollable, Text},
+    window, Element, Length, Task, Theme,
 };
 use iced_widget::scrollable::Direction;
 use std::fmt;
 
 pub struct App {
     image: Option<ImageData>,
-    error: Option<String>,
+    error: Option<ErrorState>,
     pub i18n: I18n, // Made public
     mode: AppMode,
+}
+
+#[derive(Debug, Clone)]
+struct ErrorState {
+    friendly_key: &'static str,
+    friendly_text: String,
+    details: String,
+    show_details: bool,
+}
+
+impl ErrorState {
+    fn from_error(error: &Error, i18n: &I18n) -> Self {
+        let friendly_key = match error {
+            Error::Io(_) => "error-load-image-io",
+            Error::Svg(_) => "error-load-image-svg",
+            #[allow(unreachable_patterns)]
+            _ => "error-load-image-general",
+        };
+
+        Self {
+            friendly_key,
+            friendly_text: i18n.tr(friendly_key),
+            details: error.to_string(),
+            show_details: false,
+        }
+    }
+
+    fn refresh_translation(&mut self, i18n: &I18n) {
+        self.friendly_text = i18n.tr(self.friendly_key);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +81,7 @@ pub enum Message {
     ImageLoaded(Result<ImageData, Error>),
     SwitchMode(AppMode),
     LanguageSelected(unic_langid::LanguageIdentifier),
+    ToggleErrorDetails,
 }
 
 #[derive(Debug, Default)]
@@ -108,9 +138,9 @@ impl App {
                 self.error = None;
                 Task::none()
             }
-            Message::ImageLoaded(Err(e)) => {
+            Message::ImageLoaded(Err(error)) => {
                 self.image = None;
-                self.error = Some(e.to_string());
+                self.error = Some(ErrorState::from_error(&error, &self.i18n));
                 Task::none()
             }
             Message::SwitchMode(mode) => {
@@ -127,6 +157,16 @@ impl App {
                     eprintln!("Failed to save config: {:?}", e);
                 }
 
+                if let Some(error_state) = &mut self.error {
+                    error_state.refresh_translation(&self.i18n);
+                }
+
+                Task::none()
+            }
+            Message::ToggleErrorDetails => {
+                if let Some(error_state) = &mut self.error {
+                    error_state.show_details = !error_state.show_details;
+                }
                 Task::none()
             }
         }
@@ -135,8 +175,69 @@ impl App {
     fn view(&self) -> Element<'_, Message> {
         let current_view: Element<'_, Message> = match self.mode {
             AppMode::Viewer => {
-                if let Some(error_message) = &self.error {
-                    Text::new(format!("Error: {}", error_message)).into()
+                if let Some(error_state) = &self.error {
+                    let heading = Container::new(
+                        Text::new(self.i18n.tr("error-load-image-heading")).size(24),
+                    )
+                    .width(Length::Fill)
+                    .align_x(iced::alignment::Horizontal::Center);
+
+                    let summary = Container::new(
+                        Text::new(error_state.friendly_text.clone()).width(Length::Fill),
+                    )
+                    .width(Length::Fill)
+                    .align_x(iced::alignment::Horizontal::Center);
+
+                    let toggle_label = if error_state.show_details {
+                        self.i18n.tr("error-details-hide")
+                    } else {
+                        self.i18n.tr("error-details-show")
+                    };
+
+                    let toggle_button = Container::new(
+                        button(Text::new(toggle_label)).on_press(Message::ToggleErrorDetails),
+                    )
+                    .align_x(iced::alignment::Horizontal::Center);
+
+                    let mut error_content = Column::new()
+                        .spacing(12)
+                        .width(Length::Fill)
+                        .align_x(iced::alignment::Horizontal::Center)
+                        .push(heading)
+                        .push(summary)
+                        .push(toggle_button);
+
+                    if error_state.show_details {
+                        let details_heading = Container::new(
+                            Text::new(self.i18n.tr("error-details-technical-heading")).size(16),
+                        )
+                        .width(Length::Fill)
+                        .align_x(iced::alignment::Horizontal::Center);
+
+                        let details_body = Container::new(
+                            Text::new(error_state.details.clone()).width(Length::Fill),
+                        )
+                        .width(Length::Fill)
+                        .align_x(iced::alignment::Horizontal::Left);
+
+                        let details_column = Column::new()
+                            .spacing(8)
+                            .width(Length::Fill)
+                            .push(details_heading)
+                            .push(details_body);
+
+                        error_content = error_content.push(
+                            Container::new(details_column)
+                                .width(Length::Fill)
+                                .padding(16),
+                        );
+                    }
+
+                    Container::new(error_content)
+                        .width(Length::Fill)
+                        .align_x(iced::alignment::Horizontal::Center)
+                        .align_y(iced::alignment::Vertical::Center)
+                        .into()
                 } else if let Some(image_data) = &self.image {
                     let image_viewer = viewer::view_image(image_data);
 
@@ -263,7 +364,11 @@ mod tests {
         let _ = app.update(Message::ImageLoaded(Err(Error::Io("boom".into()))));
 
         assert!(app.image.is_none());
-        assert!(app.error.as_ref().unwrap().contains("boom"));
+        assert!(app
+            .error
+            .as_ref()
+            .map(|state| state.details.contains("boom"))
+            .unwrap_or(false));
     }
 
     #[test]
@@ -299,7 +404,8 @@ mod tests {
     #[test]
     fn view_renders_error_message_when_present() {
         let mut app = App::default();
-        app.error = Some("failure".into());
+        let error = Error::Io("failure".into());
+        app.error = Some(ErrorState::from_error(&error, &app.i18n));
         let _ = app.view();
     }
 

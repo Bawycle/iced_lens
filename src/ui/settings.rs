@@ -25,8 +25,7 @@ use crate::app::{App, Message};
 use iced::{
     alignment::Horizontal,
     widget::{button, Button, Column, Text},
-    Element,
-    Length,
+    Element, Length,
 };
 
 pub fn view_settings(app: &App) -> Element<'_, Message> {
