@@ -406,9 +406,9 @@ impl App {
 
     fn disable_fit_to_window(&mut self) {
         self.fit_to_window = false;
-        let manual = clamp_zoom(self.manual_zoom_percent);
-        self.manual_zoom_percent = manual;
-        self.update_zoom_display(manual);
+        let current = clamp_zoom(self.zoom_percent);
+        self.manual_zoom_percent = current;
+        self.update_zoom_display(current);
         self.zoom_input_dirty = false;
         self.zoom_input_error_key = None;
     }
@@ -914,8 +914,9 @@ mod tests {
         let _ = app.update(Message::SetFitToWindow(false));
 
         assert!(!app.fit_to_window);
-        assert_eq!(app.zoom_percent, app.manual_zoom_percent);
-        assert_eq!(app.zoom_percent, 160.0);
+        assert_eq!(app.zoom_percent, fit_zoom);
+        assert_eq!(app.manual_zoom_percent, fit_zoom);
+        assert_eq!(app.zoom_input, format_number(fit_zoom));
     }
 
     #[test]
