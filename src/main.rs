@@ -3,17 +3,15 @@ use iced_lens::app::{self, Flags};
 
 /// Application run mode derived from CLI arguments.
 pub enum RunMode {
-    /// Normal execution with parsed flags.
     Normal(Flags),
-    /// Help requested; print usage and exit.
-    Help,
+    Help(Option<String>),
 }
 
 fn parse_run_mode(mut args: pico_args::Arguments) -> Result<RunMode, pico_args::Error> {
-    if args.contains("--help") || args.contains("-h") {
-        return Ok(RunMode::Help);
-    }
     let lang = args.opt_value_from_str("--lang")?;
+    if args.contains("--help") || args.contains("-h") {
+        return Ok(RunMode::Help(lang));
+    }
     let file_path = args
         .finish()
         .into_iter()
@@ -25,17 +23,31 @@ fn parse_run_mode(mut args: pico_args::Arguments) -> Result<RunMode, pico_args::
 fn main() -> iced::Result {
     let args = pico_args::Arguments::from_env();
     match parse_run_mode(args).expect("failed to parse CLI arguments") {
-        RunMode::Help => {
-            println!("{}", help_text());
+        RunMode::Help(lang) => {
+            // Load config for fallback language resolution.
+            let config = iced_lens::config::load().unwrap_or_default();
+            let i18n = iced_lens::i18n::fluent::I18n::new(lang, &config);
+            println!("{}", help_text(&i18n));
             Ok(())
         }
         RunMode::Normal(flags) => app::run(flags),
     }
 }
-
-fn help_text() -> &'static str {
-    // Keep simple, human-readable. Extend with localized help if needed.
-    "IcedLens – Image Viewer\n\nUSAGE:\n  iced_lens [OPTIONS] [IMAGE_PATH]\n\nOPTIONS:\n  -h, --help        Show this help text\n      --lang <id>   Set locale (e.g. en-US, fr)\n\nARGS:\n  <IMAGE_PATH>     Path to an image file to open\n\nEXAMPLES:\n  iced_lens ./photo.png\n  iced_lens --lang fr ./image.jpg\n  iced_lens --help\n"
+fn help_text(i18n: &iced_lens::i18n::fluent::I18n) -> String {
+    format!(
+        "{desc}\n\n{usage}\n  iced_lens [OPTIONS] [IMAGE_PATH]\n\n{opts}\n  {line_help}\n  {line_lang}\n\n{args}\n  {arg_path}\n\n{examples}\n  {ex1}\n  {ex2}\n  {ex3}\n",
+        desc = i18n.tr("help-description"),
+        usage = i18n.tr("help-usage-heading"),
+        opts = i18n.tr("help-options-heading"),
+        line_help = i18n.tr("help-line-option-help"),
+        line_lang = i18n.tr("help-line-option-lang"),
+        args = i18n.tr("help-args-heading"),
+        arg_path = i18n.tr("help-arg-image-path"),
+        examples = i18n.tr("help-examples-heading"),
+        ex1 = i18n.tr("help-example-1"),
+        ex2 = i18n.tr("help-example-2"),
+        ex3 = i18n.tr("help-example-3"),
+    )
 }
 
 #[cfg(test)]
@@ -77,12 +89,22 @@ mod tests {
     fn parse_run_mode_help_flag_triggers_help() {
         let args = vec![OsString::from("--help")];
         let mode = parse_run_mode(pico_args::Arguments::from_vec(args)).expect("parse should work");
-        matches!(mode, RunMode::Help);
+        match mode { RunMode::Help(_) => {}, _ => panic!("expected Help mode") }
     }
 
     #[test]
-    fn help_text_contains_usage_header() {
-        assert!(help_text().contains("USAGE:"));
-        assert!(help_text().contains("OPTIONS:"));
+    fn help_text_localized_french() {
+        let args = vec![OsString::from("--help"), OsString::from("--lang"), OsString::from("fr")];
+        let mode = parse_run_mode(pico_args::Arguments::from_vec(args)).expect("parse should work");
+        match mode {
+            RunMode::Help(lang) => {
+                let config = iced_lens::config::load().unwrap_or_default();
+                let i18n = iced_lens::i18n::fluent::I18n::new(lang, &config);
+                let text = help_text(&i18n);
+                assert!(text.contains("UTILISATION"));
+                assert!(text.contains("OPTIONS"));
+            }
+            _ => panic!("expected Help mode"),
+        }
     }
 }

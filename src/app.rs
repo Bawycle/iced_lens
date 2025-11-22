@@ -220,14 +220,40 @@ pub struct Flags {
     pub file_path: Option<String>,
 }
 
-pub const MIN_WINDOW_WIDTH: u32 = 760; // Ensure single-line controls row
+pub const BASE_MIN_WINDOW_WIDTH: u32 = 760; // Baseline safeguard
 pub const MIN_WINDOW_HEIGHT: u32 = 480; // Provide comfortable viewport area
 
-pub fn window_settings() -> window::Settings {
+fn compute_min_window_width(i18n: &I18n) -> u32 {
+    // Approximate monospace-equivalent width per character for UI font.
+    const CHAR_W: f32 = 8.0;
+    // Fixed width elements.
+    let zoom_input_w = 90.0;
+    // Labels & buttons text.
+    let parts = [
+        i18n.tr("viewer-zoom-label"),
+        i18n.tr("viewer-zoom-out-button"),
+        i18n.tr("viewer-zoom-reset-button"),
+        i18n.tr("viewer-zoom-in-button"),
+        i18n.tr("viewer-fit-to-window-toggle"),
+    ];
+    let text_total: f32 = parts.iter().map(|s| s.len() as f32 * CHAR_W).sum();
+    // Button horizontal padding estimate (6 left/right * 4 buttons) plus label spacing.
+    let padding =  (6.0 * 2.0) * 4.0 + 12.0; // 12 for label + checkbox overhead
+    // Spacing between components (Row spacing and manual spaces): 10 * number gaps.
+    let gaps = 10.0 * 6.0; // zoom label, input, 3 buttons, toggle
+    let total = text_total + zoom_input_w + padding + gaps + 40.0; // extra breathing room
+    let candidate = total.ceil() as u32;
+    candidate.max(BASE_MIN_WINDOW_WIDTH)
+}
+
+pub fn window_settings_with_locale(flags: &Flags) -> window::Settings {
+    let config = crate::config::load().unwrap_or_default();
+    let i18n = I18n::new(flags.lang.clone(), &config);
+    let computed_width = compute_min_window_width(&i18n);
     let icon = crate::icon::load_window_icon();
     window::Settings {
-        size: iced::Size::new(800.0, 600.0),
-        min_size: Some(iced::Size::new(MIN_WINDOW_WIDTH as f32, MIN_WINDOW_HEIGHT as f32)),
+        size: iced::Size::new(computed_width.max(800) as f32, 600.0),
+        min_size: Some(iced::Size::new(computed_width as f32, MIN_WINDOW_HEIGHT as f32)),
         icon,
         ..window::Settings::default()
     }
@@ -236,7 +262,7 @@ pub fn window_settings() -> window::Settings {
 pub fn run(flags: Flags) -> iced::Result {
     iced::application(|state: &App| state.title(), App::update, App::view)
         .theme(App::theme)
-        .window(window_settings())
+        .window(window_settings_with_locale(&flags))
         .subscription(App::subscription)
         .run_with(move || App::new(flags))
 }
@@ -1241,10 +1267,16 @@ mod tests {
     }
 
     #[test]
-    fn window_settings_has_min_size_constraints() {
-        let ws = window_settings();
-        let min = ws.min_size.expect("min_size should be set");
-        assert!(min.width >= MIN_WINDOW_WIDTH as f32);
-        assert!(min.height >= MIN_WINDOW_HEIGHT as f32);
+    fn dynamic_min_width_french_not_smaller_than_english() {
+        let english_flags = Flags { lang: Some("en-US".into()), file_path: None };
+        let ws_en = window_settings_with_locale(&english_flags);
+        let min_en = ws_en.min_size.expect("min size en").width;
+
+        let french_flags = Flags { lang: Some("fr".into()), file_path: None };
+        let ws_fr = window_settings_with_locale(&french_flags);
+        let min_fr = ws_fr.min_size.expect("min size fr").width;
+
+        assert!(min_fr >= min_en);
+        assert!(min_en >= BASE_MIN_WINDOW_WIDTH as f32);
     }
 }
