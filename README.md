@@ -1,5 +1,3 @@
-<div align="center">
-
 # IcedLens
 
 Lightweight, internationalized image viewer powered by the [Iced](https://iced.rs/) GUI toolkit.

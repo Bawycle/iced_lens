@@ -221,10 +221,12 @@ pub struct Flags {
 }
 
 pub fn run(flags: Flags) -> iced::Result {
+    let icon = crate::icon::load_window_icon();
     iced::application(|state: &App| state.title(), App::update, App::view)
         .theme(App::theme)
         .window(window::Settings {
             size: iced::Size::new(800.0, 600.0),
+            icon,
             ..window::Settings::default()
         })
         .subscription(App::subscription)
