@@ -192,4 +192,29 @@ mod tests {
             assert!(available.contains(&l));
         }
     }
+
+    #[test]
+    fn test_tr_returns_missing_for_unknown_key() {
+        let config = Config::default();
+        let i18n = I18n::new(None, &config);
+        let missing = i18n.tr("non-existent-key");
+        assert!(missing.starts_with("MISSING:"));
+    }
+
+    #[test]
+    fn test_set_locale_ignores_unknown_language() {
+        let mut i18n = I18n::new(None, &Config::default());
+        let original = i18n.current_locale().clone();
+        let unknown_locale: LanguageIdentifier = "es-ES".parse().unwrap();
+        i18n.set_locale(unknown_locale);
+        assert_eq!(i18n.current_locale(), &original);
+    }
+
+    #[test]
+    fn test_resolve_locale_returns_none_when_no_available_locales() {
+        let config = Config::default();
+        let available: Vec<LanguageIdentifier> = Vec::new();
+        let lang = resolve_locale(Some("fr".to_string()), &config, &available);
+        assert!(lang.is_none());
+    }
 }

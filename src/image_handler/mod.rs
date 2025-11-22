@@ -93,8 +93,8 @@ impl From<String> for Error {
 mod tests {
     use super::*;
     use crate::error::Error;
-    use image_rs::{Rgba, RgbaImage};
-    use std::fs;
+    use image_rs::{ImageError, Rgba, RgbaImage};
+    use std::{fs, io};
     use tempfile::tempdir;
 
     #[test]
@@ -136,6 +136,41 @@ mod tests {
         match load_image(&missing_path) {
             Err(Error::Io(_)) => {}
             other => panic!("expected Io error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn load_invalid_png_bytes_returns_io_error() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let bad_path = temp_dir.path().join("invalid.png");
+        fs::write(&bad_path, b"not a png").expect("failed to write invalid data");
+
+        match load_image(&bad_path) {
+            Err(Error::Io(message)) => assert!(!message.is_empty()),
+            other => panic!("expected Io error for invalid png, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn load_invalid_svg_returns_svg_error() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let bad_svg_path = temp_dir.path().join("broken.svg");
+        fs::write(&bad_svg_path, "<svg>oops").expect("failed to write invalid svg");
+
+        match load_image(&bad_svg_path) {
+            Err(Error::Svg(message)) => assert!(!message.is_empty()),
+            other => panic!("expected Svg error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn image_error_conversion_returns_io_variant() {
+        let io_err = io::Error::new(io::ErrorKind::Other, "decode failed");
+        let image_error = ImageError::IoError(io_err);
+        let error: Error = image_error.into();
+        match error {
+            Error::Io(message) => assert!(message.contains("decode failed")),
+            other => panic!("expected Io variant from ImageError, got {:?}", other),
         }
     }
 }
