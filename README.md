@@ -6,7 +6,7 @@ Lightweight, internationalized image viewer powered by the [Iced](https://iced.r
 <!-- Example GitHub Actions badge (uncomment once CI is configured) -->
 <!-- [![Build](https://github.com/<ORG>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<ORG>/<REPO>/actions) -->
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
-![MSRV](https://img.shields.io/badge/Rust-1.78%2B-blue)
+[![MSRV](https://img.shields.io/badge/Rust-1.78%2B-blue)](https://www.rust-lang.org)
 ![Locales](https://img.shields.io/badge/i18n-en--US|fr-green)
 ![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)
 <!-- Optional future crates.io badge -->
