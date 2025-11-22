@@ -27,11 +27,7 @@
 //! ```
 
 use crate::image_handler::ImageData;
-use iced::{
-    widget::Image,
-    Element,
-    Length,
-};
+use iced::{widget::Image, Element, Length};
 
 pub fn view_image(
     image_data: &ImageData,

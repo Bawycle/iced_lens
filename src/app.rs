@@ -4,16 +4,14 @@ use crate::i18n::fluent::I18n;
 use crate::image_handler::{self, ImageData};
 use crate::ui::settings;
 use crate::ui::viewer;
+use iced::widget::scrollable::{AbsoluteOffset, Direction, Scrollbar, Viewport};
+use iced::widget::text_input;
 use iced::{
     alignment::{Horizontal, Vertical},
-    event,
-    keyboard,
-    mouse,
+    event, keyboard, mouse,
     widget::{button, checkbox, Column, Container, Row, Scrollable, Space, Text},
     window, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
 };
-use iced::widget::text_input;
-use iced::widget::scrollable::{AbsoluteOffset, Direction, Scrollbar, Viewport};
 use std::fmt;
 
 pub struct App {
@@ -57,7 +55,10 @@ fn format_number(value: f32) -> String {
     if (value.fract()).abs() < f32::EPSILON {
         format!("{value:.0}")
     } else {
-        format!("{value:.2}").trim_end_matches('0').trim_end_matches('.').to_string()
+        format!("{value:.2}")
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string()
     }
 }
 
@@ -89,6 +90,22 @@ fn clamp_zoom(value: f32) -> f32 {
 
 fn clamp_zoom_step(value: f32) -> f32 {
     value.clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT)
+}
+
+fn intersect_rectangles(a: Rectangle, b: Rectangle) -> Option<Rectangle> {
+    let left = a.x.max(b.x);
+    let top = a.y.max(b.y);
+    let right = (a.x + a.width).min(b.x + b.width);
+    let bottom = (a.y + a.height).min(b.y + b.height);
+
+    if right <= left || bottom <= top {
+        None
+    } else {
+        Some(Rectangle::new(
+            Point::new(left, top),
+            iced::Size::new(right - left, bottom - top),
+        ))
+    }
 }
 
 fn scroll_steps(delta: &mouse::ScrollDelta) -> f32 {
@@ -378,9 +395,7 @@ impl App {
                 self.refresh_fit_zoom();
                 Task::none()
             }
-            Message::CtrlZoom { delta, control } => {
-                self.handle_ctrl_zoom(delta, control)
-            }
+            Message::CtrlZoom { delta, control } => self.handle_ctrl_zoom(delta, control),
             Message::RawEvent(event) => self.handle_raw_event(event),
         }
     }
@@ -460,36 +475,37 @@ impl App {
         Some(iced::Size::new(width, height))
     }
 
-    fn image_bounds_in_window(&self) -> Option<Rectangle> {
-        let viewport = self.viewport_bounds?;
-        let size = self.scaled_image_size()?;
+    fn compute_padding(viewport: Rectangle, size: iced::Size) -> Padding {
+        let horizontal = ((viewport.width - size.width) / 2.0).max(0.0);
+        let vertical = ((viewport.height - size.height) / 2.0).max(0.0);
 
-        let content_width = size.width.max(viewport.width);
-        let content_height = size.height.max(viewport.height);
-
-        let padding_x = (content_width - size.width) / 2.0;
-        let padding_y = (content_height - size.height) / 2.0;
-
-        let left = viewport.x - self.viewport_offset.x + padding_x;
-        let top = viewport.y - self.viewport_offset.y + padding_y;
-
-        Some(Rectangle::new(Point::new(left, top), size))
+        Padding {
+            top: vertical,
+            right: horizontal,
+            bottom: vertical,
+            left: horizontal,
+        }
     }
 
     fn image_padding(&self) -> Padding {
-        if let (Some(viewport), Some(size)) = (self.viewport_bounds, self.scaled_image_size()) {
-            let horizontal = ((viewport.width - size.width) / 2.0).max(0.0);
-            let vertical = ((viewport.height - size.height) / 2.0).max(0.0);
-
-            Padding {
-                top: vertical,
-                right: horizontal,
-                bottom: vertical,
-                left: horizontal,
-            }
-        } else {
-            Padding::default()
+        match (self.viewport_bounds, self.scaled_image_size()) {
+            (Some(viewport), Some(size)) => Self::compute_padding(viewport, size),
+            _ => Padding::default(),
         }
+    }
+
+    fn image_bounds_in_window(&self) -> Option<Rectangle> {
+        let viewport = self.viewport_bounds?;
+        let size = self.scaled_image_size()?;
+        let padding = Self::compute_padding(viewport, size);
+
+        let content_origin_x = viewport.x - self.viewport_offset.x;
+        let content_origin_y = viewport.y - self.viewport_offset.y;
+
+        let left = content_origin_x + padding.left;
+        let top = content_origin_y + padding.top;
+
+        Some(Rectangle::new(Point::new(left, top), size))
     }
 
     fn is_cursor_over_image(&self) -> bool {
@@ -508,17 +524,39 @@ impl App {
             None => return false,
         };
 
-        let mut hitbox = match self.image_bounds_in_window() {
+        let image_bounds = match self.image_bounds_in_window() {
             Some(bounds) => bounds,
             None => return false,
         };
 
+        let viewport_rect = Rectangle::new(
+            Point::new(viewport.x, viewport.y),
+            iced::Size::new(viewport.width, viewport.height),
+        );
+
+        if !viewport_rect.contains(cursor) {
+            return false;
+        }
+
+        let mut hitbox = match intersect_rectangles(image_bounds, viewport_rect) {
+            Some(intersection) => intersection,
+            None => return false,
+        };
+
         if size.height > viewport.height {
-            hitbox.width = (hitbox.width - SCROLLBAR_GUTTER).max(0.0);
+            if hitbox.width <= SCROLLBAR_GUTTER {
+                return false;
+            }
+
+            hitbox.width -= SCROLLBAR_GUTTER;
         }
 
         if size.width > viewport.width {
-            hitbox.height = (hitbox.height - SCROLLBAR_GUTTER).max(0.0);
+            if hitbox.height <= SCROLLBAR_GUTTER {
+                return false;
+            }
+
+            hitbox.height -= SCROLLBAR_GUTTER;
         }
 
         hitbox.contains(cursor)
@@ -569,10 +607,7 @@ impl App {
                 match window_event {
                     window::Event::Resized(size) => {
                         self.previous_viewport_offset = self.viewport_offset;
-                        self.viewport_bounds = Some(Rectangle::new(
-                            Point::new(0.0, 0.0),
-                            size,
-                        ));
+                        self.viewport_bounds = Some(Rectangle::new(Point::new(0.0, 0.0), size));
                         self.refresh_fit_zoom();
                     }
                     _ => {}
@@ -615,13 +650,13 @@ impl App {
                         Text::new(self.i18n.tr("error-load-image-heading")).size(24),
                     )
                     .width(Length::Fill)
-                        .align_x(Horizontal::Center);
+                    .align_x(Horizontal::Center);
 
                     let summary = Container::new(
                         Text::new(error_state.friendly_text.clone()).width(Length::Fill),
                     )
                     .width(Length::Fill)
-                        .align_x(Horizontal::Center);
+                    .align_x(Horizontal::Center);
 
                     let toggle_label = if error_state.show_details {
                         self.i18n.tr("error-details-hide")
@@ -632,7 +667,7 @@ impl App {
                     let toggle_button = Container::new(
                         button(Text::new(toggle_label)).on_press(Message::ToggleErrorDetails),
                     )
-                        .align_x(Horizontal::Center);
+                    .align_x(Horizontal::Center);
 
                     let mut error_content = Column::new()
                         .spacing(12)
@@ -647,13 +682,13 @@ impl App {
                             Text::new(self.i18n.tr("error-details-technical-heading")).size(16),
                         )
                         .width(Length::Fill)
-                            .align_x(Horizontal::Center);
+                        .align_x(Horizontal::Center);
 
                         let details_body = Container::new(
                             Text::new(error_state.details.clone()).width(Length::Fill),
                         )
                         .width(Length::Fill)
-                            .align_x(Horizontal::Left);
+                        .align_x(Horizontal::Left);
 
                         let details_column = Column::new()
                             .spacing(8)
@@ -670,8 +705,8 @@ impl App {
 
                     Container::new(error_content)
                         .width(Length::Fill)
-                            .align_x(Horizontal::Center)
-                            .align_y(Vertical::Center)
+                        .align_x(Horizontal::Center)
+                        .align_y(Vertical::Center)
                         .into()
                 } else if let Some(image_data) = &self.image {
                     let zoom_placeholder = self.i18n.tr("viewer-zoom-input-placeholder");
@@ -696,8 +731,11 @@ impl App {
                         .on_press(Message::ZoomIn)
                         .padding([6, 12]);
 
-                    let fit_toggle = checkbox(self.i18n.tr("viewer-fit-to-window-toggle"), self.fit_to_window)
-                        .on_toggle(Message::SetFitToWindow);
+                    let fit_toggle = checkbox(
+                        self.i18n.tr("viewer-fit-to-window-toggle"),
+                        self.fit_to_window,
+                    )
+                    .on_toggle(Message::SetFitToWindow);
 
                     let zoom_controls_row = Row::new()
                         .spacing(10)
@@ -863,7 +901,10 @@ mod tests {
         assert!(app.zoom_input_error_key.is_none());
 
         assert_eq!(app.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
-        assert_eq!(app.zoom_step_input, format_number(DEFAULT_ZOOM_STEP_PERCENT));
+        assert_eq!(
+            app.zoom_step_input,
+            format_number(DEFAULT_ZOOM_STEP_PERCENT)
+        );
         assert!(!app.zoom_step_input_dirty);
         assert!(app.zoom_step_error_key.is_none());
         assert!(MIN_ZOOM_STEP_PERCENT <= app.zoom_step_percent);
@@ -982,7 +1023,9 @@ mod tests {
         let _ = app.update(Message::SetFitToWindow(true));
 
         assert!(app.fit_to_window);
-        let fit_zoom = app.compute_fit_zoom_percent().expect("fit zoom should exist");
+        let fit_zoom = app
+            .compute_fit_zoom_percent()
+            .expect("fit zoom should exist");
         assert_eq!(app.zoom_percent, fit_zoom);
         assert!(fit_zoom <= DEFAULT_ZOOM_PERCENT);
         assert_eq!(app.zoom_input, format_number(fit_zoom));
@@ -1083,6 +1126,32 @@ mod tests {
 
         assert_eq!(app.zoom_percent, 150.0);
         assert_eq!(app.manual_zoom_percent, 150.0);
+        assert!(!app.fit_to_window);
+    }
+
+    #[test]
+    fn ctrl_scroll_ignored_when_cursor_over_vertical_scrollbar_area() {
+        let mut app = App::default();
+        app.zoom_step_percent = 10.0;
+        app.zoom_percent = 120.0;
+        app.manual_zoom_percent = 120.0;
+        app.fit_to_window = false;
+        app.image = Some(build_image(1600, 2000));
+
+        let viewport = Rectangle::new(Point::new(0.0, 0.0), iced::Size::new(400.0, 300.0));
+        app.viewport_bounds = Some(viewport);
+        app.cursor_position = Some(Point::new(
+            viewport.x + viewport.width - 1.0,
+            viewport.y + viewport.height / 2.0,
+        ));
+
+        let _ = app.update(Message::CtrlZoom {
+            delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
+            control: true,
+        });
+
+        assert_eq!(app.zoom_percent, 120.0);
+        assert_eq!(app.manual_zoom_percent, 120.0);
         assert!(!app.fit_to_window);
     }
 

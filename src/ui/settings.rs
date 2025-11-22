@@ -72,7 +72,8 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
 
     let zoom_step_input_row = Row::new()
         .spacing(8)
-        .push(zoom_step_input);
+        .push(zoom_step_input)
+        .push(Text::new("%"));
 
     let mut zoom_step_column = Column::new()
         .spacing(8)
@@ -82,9 +83,8 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
     if let Some(error_key) = app.zoom_step_error_key() {
         zoom_step_column = zoom_step_column.push(Text::new(app.i18n.tr(error_key)).size(14));
     } else {
-        zoom_step_column = zoom_step_column.push(
-            Text::new(app.i18n.tr("settings-zoom-step-hint")).size(14),
-        );
+        zoom_step_column =
+            zoom_step_column.push(Text::new(app.i18n.tr("settings-zoom-step-hint")).size(14));
     }
 
     Column::new()

@@ -23,6 +23,6 @@ viewer-fit-percentage-label = Zoom d'adaptation
 viewer-zoom-input-error-invalid = Veuillez saisir un nombre valide.
 viewer-zoom-step-error-invalid = L'incrément de zoom doit être un nombre.
 viewer-zoom-step-error-range = L'incrément de zoom doit être compris entre 1 % et 200 %.
-settings-zoom-step-label = Incrément de zoom (%)
+settings-zoom-step-label = Incrément de zoom
 settings-zoom-step-placeholder = 10
 settings-zoom-step-hint = Définissez la variation appliquée lors des contrôles de zoom (de 1 % à 200 %).
