@@ -20,6 +20,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Gemini cli
+.gemini/
+GEMINI.md
 
 # Added by cargo
 /target
