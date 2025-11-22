@@ -7,7 +7,8 @@ use crate::ui::viewer;
 use iced::{
     executor,
     widget::{Button, Container, Scrollable, Text},
-    Application, Command, Element, Length, Theme, window::{self, Id},
+    window::{self, Id},
+    Application, Command, Element, Length, Theme,
 };
 use iced_widget::scrollable::Direction;
 use std::fmt;
@@ -173,10 +174,140 @@ impl Application for App {
                     .height(Length::Fill)
             ]
             .width(Length::Fill)
-            .height(Length::Fill)
+            .height(Length::Fill),
         )
         .width(Length::Fill)
         .height(Length::Fill);
         final_layout.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::image_handler::ImageData;
+    use iced::widget::image::Handle;
+    use std::fs;
+    use std::sync::{Mutex, OnceLock};
+    use tempfile::tempdir;
+    use unic_langid::LanguageIdentifier;
+
+    fn config_env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn with_temp_config_dir<F>(test: F)
+    where
+        F: FnOnce(&std::path::Path),
+    {
+        let _guard = config_env_lock().lock().expect("failed to lock mutex");
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let previous = std::env::var("XDG_CONFIG_HOME").ok();
+        std::env::set_var("XDG_CONFIG_HOME", temp_dir.path());
+
+        test(temp_dir.path());
+
+        if let Some(value) = previous {
+            std::env::set_var("XDG_CONFIG_HOME", value);
+        } else {
+            std::env::remove_var("XDG_CONFIG_HOME");
+        }
+    }
+
+    fn sample_image_data() -> ImageData {
+        let pixels = vec![255_u8; 4];
+        ImageData {
+            handle: Handle::from_pixels(1, 1, pixels),
+            width: 1,
+            height: 1,
+        }
+    }
+
+    #[test]
+    fn new_starts_in_viewer_mode_without_image() {
+        with_temp_config_dir(|_| {
+            let (app, _command) = App::new(Flags {
+                lang: None,
+                file_path: None,
+            });
+            assert_eq!(app.mode, AppMode::Viewer);
+            assert!(app.image.is_none());
+            assert!(app.error.is_none());
+        });
+    }
+
+    #[test]
+    fn update_image_loaded_ok_sets_state() {
+        let mut app = App::default();
+        let data = sample_image_data();
+
+        let _ = app.update(Message::ImageLoaded(Ok(data.clone())));
+
+        assert!(app.image.is_some());
+        assert!(app.error.is_none());
+        assert_eq!(app.image.as_ref().unwrap().width, data.width);
+    }
+
+    #[test]
+    fn update_image_loaded_err_clears_image_and_sets_error() {
+        let mut app = App::default();
+        app.image = Some(sample_image_data());
+
+        let _ = app.update(Message::ImageLoaded(Err(Error::Io("boom".into()))));
+
+        assert!(app.image.is_none());
+        assert!(app.error.as_ref().unwrap().contains("boom"));
+    }
+
+    #[test]
+    fn switch_mode_changes_active_view() {
+        let mut app = App::default();
+        app.mode = AppMode::Viewer;
+
+        let _ = app.update(Message::SwitchMode(AppMode::Settings));
+        assert_eq!(app.mode, AppMode::Settings);
+    }
+
+    #[test]
+    fn language_selected_updates_config_file() {
+        with_temp_config_dir(|config_root| {
+            let mut app = App::default();
+            let target_locale: LanguageIdentifier = app
+                .i18n
+                .available_locales
+                .iter()
+                .find(|locale| locale.to_string() == "fr")
+                .cloned()
+                .unwrap_or_else(|| app.i18n.current_locale().clone());
+
+            let _ = app.update(Message::LanguageSelected(target_locale.clone()));
+
+            let config_path = config_root.join("IcedLens").join("settings.toml");
+            assert!(config_path.exists());
+            let contents = fs::read_to_string(config_path).expect("config should be readable");
+            assert!(contents.contains(&target_locale.to_string()));
+        });
+    }
+
+    #[test]
+    fn view_renders_error_message_when_present() {
+        let mut app = App::default();
+        app.error = Some("failure".into());
+        let _ = app.view();
+    }
+
+    #[test]
+    fn view_renders_image_when_available() {
+        let mut app = App::default();
+        app.image = Some(sample_image_data());
+        let _ = app.view();
+    }
+
+    #[test]
+    fn view_renders_settings_when_in_settings_mode() {
+        let mut app = App::default();
+        app.mode = AppMode::Settings;
+        let _ = app.view();
     }
 }

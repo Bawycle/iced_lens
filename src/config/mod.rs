@@ -76,3 +76,46 @@ pub fn save_to_path(config: &Config, path: &Path) -> Result<()> {
     fs::write(path, content)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn save_and_load_round_trip_preserves_language() {
+        let config = Config {
+            language: Some("fr".to_string()),
+        };
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let config_path = temp_dir.path().join("nested").join("settings.toml");
+
+        save_to_path(&config, &config_path).expect("failed to save config");
+        let loaded = load_from_path(&config_path).expect("failed to load config");
+
+        assert_eq!(loaded.language, config.language);
+    }
+
+    #[test]
+    fn load_from_path_returns_default_on_invalid_toml() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let config_path = temp_dir.path().join("settings.toml");
+        fs::write(&config_path, "not = valid = toml").expect("failed to write invalid toml");
+
+        let loaded = load_from_path(&config_path).expect("load should not error");
+        assert!(loaded.language.is_none());
+    }
+
+    #[test]
+    fn save_to_path_creates_parent_directories() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let nested_dir = temp_dir.path().join("deep").join("path");
+        let config_path = nested_dir.join("settings.toml");
+        let config = Config {
+            language: Some("en-US".to_string()),
+        };
+
+        save_to_path(&config, &config_path).expect("save should create directories");
+        assert!(config_path.exists());
+    }
+}

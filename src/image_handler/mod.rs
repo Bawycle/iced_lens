@@ -41,22 +41,14 @@ pub fn load_image<P: AsRef<Path>>(path: P) -> Result<ImageData> {
         "svg" => {
             let svg_data = fs::read(path)?;
             let tree = usvg::Tree::from_data(&svg_data, &usvg::Options::default())
-                .map_err(|e| {
-                    Error::Svg(e.to_string())
-                })?;
+                .map_err(|e| Error::Svg(e.to_string()))?;
 
             let pixmap_size = tree.size().to_int_size();
             let mut pixmap =
                 tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).unwrap();
-            resvg::render(
-                &tree,
-                tiny_skia::Transform::default(),
-                &mut pixmap.as_mut(),
-            );
+            resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
 
-            let png_data = pixmap.encode_png().map_err(|e| {
-                Error::Svg(e.to_string())
-            })?;
+            let png_data = pixmap.encode_png().map_err(|e| Error::Svg(e.to_string()))?;
             let handle = image::Handle::from_memory(png_data);
             Ok(ImageData {
                 handle,
@@ -65,13 +57,10 @@ pub fn load_image<P: AsRef<Path>>(path: P) -> Result<ImageData> {
             })
         }
         _ => {
-            let img_bytes = fs::read(path).map_err(|e| {
-                Error::Io(e.to_string())
-            })?;
+            let img_bytes = fs::read(path).map_err(|e| Error::Io(e.to_string()))?;
 
-            let img = image_rs::load_from_memory(&img_bytes).map_err(|e| {
-                Error::Io(e.to_string())
-            })?;
+            let img =
+                image_rs::load_from_memory(&img_bytes).map_err(|e| Error::Io(e.to_string()))?;
 
             let (width, height) = img.dimensions();
 
@@ -102,9 +91,51 @@ impl From<String> for Error {
 
 #[cfg(test)]
 mod tests {
-    // Tests will be updated later when we have sample data
+    use super::*;
+    use crate::error::Error;
+    use image_rs::{Rgba, RgbaImage};
+    use std::fs;
+    use tempfile::tempdir;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn load_png_image_returns_expected_dimensions() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let image_path = temp_dir.path().join("sample.png");
+
+        let image = RgbaImage::from_pixel(4, 2, Rgba([255, 0, 0, 255]));
+        image
+            .save(&image_path)
+            .expect("failed to write temporary png");
+
+        let data = load_image(&image_path).expect("png should load successfully");
+        assert_eq!(data.width, 4);
+        assert_eq!(data.height, 2);
+    }
+
+    #[test]
+    fn load_svg_image_rasterizes_successfully() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let svg_path = temp_dir.path().join("sample.svg");
+        let svg_content = r#"
+            <svg xmlns="http://www.w3.org/2000/svg" width="6" height="3">
+                <rect width="6" height="3" fill="blue" />
+            </svg>
+        "#;
+        fs::write(&svg_path, svg_content.trim()).expect("failed to write svg");
+
+        let data = load_image(&svg_path).expect("svg should load successfully");
+        assert_eq!(data.width, 6);
+        assert_eq!(data.height, 3);
+    }
+
+    #[test]
+    fn load_missing_image_returns_io_error() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let missing_path = temp_dir.path().join("does_not_exist.png");
+
+        match load_image(&missing_path) {
+            Err(Error::Io(_)) => {}
+            other => panic!("expected Io error, got {:?}", other),
+        }
     }
 }

@@ -69,3 +69,15 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
         .align_items(iced::alignment::Horizontal::Center.into())
         .into()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn view_settings_returns_element() {
+        let app = App::default();
+        let _element = view_settings(&app);
+        // Smoke test to ensure the view renders without panicking.
+    }
+}

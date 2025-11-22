@@ -23,3 +23,33 @@ impl From<std::io::Error> for Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_formats_io_error() {
+        let err = Error::Io("disk failure".to_string());
+        assert_eq!(format!("{}", err), "I/O Error: disk failure");
+    }
+
+    #[test]
+    fn from_io_error_produces_io_variant() {
+        let io_error = std::io::Error::new(std::io::ErrorKind::Other, "boom");
+        let err: Error = io_error.into();
+        match err {
+            Error::Io(message) => assert!(message.contains("boom")),
+            _ => panic!("expected Io variant"),
+        }
+    }
+
+    #[test]
+    fn svg_error_from_string() {
+        let err: Error = "invalid svg data".to_string().into();
+        match err {
+            Error::Svg(message) => assert!(message.contains("invalid svg")),
+            _ => panic!("expected Svg variant"),
+        }
+    }
+}

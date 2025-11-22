@@ -28,8 +28,9 @@
 
 use crate::image_handler::ImageData;
 use iced::{
-    widget::{Image}, // Removed Container
-    Element, Length,
+    widget::Image, // Removed Container
+    Element,
+    Length,
 };
 
 pub fn view_image(image_data: &ImageData) -> Element<'_, super::super::app::Message> {
@@ -37,4 +38,22 @@ pub fn view_image(image_data: &ImageData) -> Element<'_, super::super::app::Mess
         .width(Length::Fixed(image_data.width as f32))
         .height(Length::Fixed(image_data.height as f32))
         .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn view_image_produces_element() {
+        let pixels = vec![0_u8, 0, 0, 255];
+        let image_data = ImageData {
+            handle: iced::widget::image::Handle::from_pixels(1, 1, pixels),
+            width: 1,
+            height: 1,
+        };
+
+        let _element = view_image(&image_data);
+        // The assertion is implicit: we simply ensure the helper does not panic and returns.
+    }
 }
