@@ -6,13 +6,11 @@ use crate::ui::settings;
 use crate::ui::viewer;
 use iced::{
     executor,
-    widget::{Button, Container, Scrollable, Space, Text}, // Added Button, Container, Space
-    Application, Command, Element, Length, Theme, window::{self, Id}, // Removed Alignment, Vertical
+    widget::{Button, Container, Scrollable, Text},
+    Application, Command, Element, Length, Theme, window::{self, Id},
 };
-// ...existing code...
 use iced_widget::scrollable::Direction;
 use std::fmt;
-use unic_langid::LanguageIdentifier;
 
 pub struct App {
     image: Option<ImageData>,
@@ -133,15 +131,29 @@ impl Application for App {
                 if let Some(error_message) = &self.error {
                     Text::new(format!("Error: {}", error_message)).into()
                 } else if let Some(image_data) = &self.image {
+                    eprintln!("[DEBUG] === Starting view render ===");
+                    eprintln!("[DEBUG] Image data: width={}, height={}", image_data.width, image_data.height);
+                    
                     let image_viewer = viewer::view_image(image_data);
-                    Scrollable::new(image_viewer)
-                        .width(Length::Fill)
-                        .height(Length::Fill)
+                    eprintln!("[DEBUG] Image viewer created");
+
+                    let scrollable = Scrollable::new(image_viewer)
+                        .width(Length::Shrink)
+                        .height(Length::Shrink)
                         .direction(Direction::Both {
                             vertical: Default::default(),
                             horizontal: Default::default(),
-                        })
-                        .into()
+                        });
+                    eprintln!("[DEBUG] Scrollable sized to image");
+
+                    let centered = Container::new(scrollable)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .center_x()
+                        .center_y();
+                    eprintln!("[DEBUG] Centering container created");
+                    eprintln!("[DEBUG] === End view render ===");
+                    centered.into()
                 } else {
                     Text::new(self.i18n.tr("hello-message")).into()
                 }
@@ -157,7 +169,9 @@ impl Application for App {
                 .on_press(Message::SwitchMode(AppMode::Viewer))
         };
 
-        Container::new(
+        eprintln!("[DEBUG] current_view created, now wrapping in column with button");
+        
+        let final_layout = Container::new(
             iced::widget::column![
                 Container::new(switch_button)
                     .width(Length::Shrink)
@@ -171,7 +185,11 @@ impl Application for App {
             .height(Length::Fill)
         )
         .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+        .height(Length::Fill);
+        
+        eprintln!("[DEBUG] Final layout: Container(Column[Button(Shrink), Container(current_view(Fill/Fill))])");
+        eprintln!("[DEBUG] All containers width=Fill, height=Fill");
+        
+        final_layout.into()
     }
 }
