@@ -23,7 +23,7 @@
 
 use crate::app::{App, Message};
 use iced::{
-    alignment::Horizontal,
+    alignment::{Horizontal, Vertical},
     widget::{button, text_input, Button, Column, Row, Space, Text},
     Element, Length,
 };
@@ -72,6 +72,7 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
 
     let zoom_step_input_row = Row::new()
         .spacing(8)
+        .align_y(Vertical::Center)
         .push(zoom_step_input)
         .push(Text::new("%"));
 
