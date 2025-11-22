@@ -72,8 +72,7 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
 
     let zoom_step_input_row = Row::new()
         .spacing(8)
-        .push(zoom_step_input)
-        .push(Text::new("%"));
+        .push(zoom_step_input);
 
     let mut zoom_step_column = Column::new()
         .spacing(8)

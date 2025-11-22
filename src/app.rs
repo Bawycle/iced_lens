@@ -10,7 +10,7 @@ use iced::{
     keyboard,
     mouse,
     widget::{button, checkbox, Column, Container, Row, Scrollable, Space, Text},
-    window, Element, Length, Point, Rectangle, Subscription, Task, Theme,
+    window, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
 };
 use iced::widget::text_input;
 use iced::widget::scrollable::{AbsoluteOffset, Direction, Scrollbar, Viewport};
@@ -43,6 +43,7 @@ const MAX_ZOOM_PERCENT: f32 = 800.0;
 const DEFAULT_ZOOM_PERCENT: f32 = 100.0;
 const MIN_ZOOM_STEP_PERCENT: f32 = 1.0;
 const MAX_ZOOM_STEP_PERCENT: f32 = 200.0;
+const SCROLLBAR_GUTTER: f32 = 16.0;
 
 const ZOOM_INPUT_INVALID_KEY: &str = "viewer-zoom-input-error-invalid";
 const ZOOM_STEP_INVALID_KEY: &str = "viewer-zoom-step-error-invalid";
@@ -345,7 +346,8 @@ impl App {
                 self.persist_zoom_preferences()
             }
             Message::ZoomStepInputChanged(value) => {
-                self.zoom_step_input = value;
+                let sanitized = value.replace('%', "").trim().to_string();
+                self.zoom_step_input = sanitized;
                 self.zoom_step_input_dirty = true;
                 self.zoom_step_error_key = None;
                 Task::none()
@@ -354,15 +356,15 @@ impl App {
                 self.zoom_step_input_dirty = false;
 
                 if let Some(value) = parse_number(&self.zoom_step_input) {
-                    if value < MIN_ZOOM_STEP_PERCENT || value > MAX_ZOOM_STEP_PERCENT {
+                    let clamped = clamp_zoom_step(value);
+                    self.zoom_step_percent = clamped;
+                    self.zoom_step_input = format_number(clamped);
+                    if (clamped - value).abs() > f32::EPSILON {
                         self.zoom_step_error_key = Some(ZOOM_STEP_RANGE_KEY);
                     } else {
-                        let clamped = clamp_zoom_step(value);
-                        self.zoom_step_percent = clamped;
-                        self.zoom_step_input = format_number(clamped);
                         self.zoom_step_error_key = None;
-                        return self.persist_zoom_preferences();
                     }
+                    return self.persist_zoom_preferences();
                 } else {
                     self.zoom_step_error_key = Some(ZOOM_STEP_INVALID_KEY);
                 }
@@ -450,6 +452,78 @@ impl App {
         Some(clamp_zoom(scale * 100.0))
     }
 
+    fn scaled_image_size(&self) -> Option<iced::Size> {
+        let image = self.image.as_ref()?;
+        let scale = (self.zoom_percent / 100.0).max(0.01);
+        let width = (image.width as f32 * scale).max(1.0);
+        let height = (image.height as f32 * scale).max(1.0);
+        Some(iced::Size::new(width, height))
+    }
+
+    fn image_bounds_in_window(&self) -> Option<Rectangle> {
+        let viewport = self.viewport_bounds?;
+        let size = self.scaled_image_size()?;
+
+        let content_width = size.width.max(viewport.width);
+        let content_height = size.height.max(viewport.height);
+
+        let padding_x = (content_width - size.width) / 2.0;
+        let padding_y = (content_height - size.height) / 2.0;
+
+        let left = viewport.x - self.viewport_offset.x + padding_x;
+        let top = viewport.y - self.viewport_offset.y + padding_y;
+
+        Some(Rectangle::new(Point::new(left, top), size))
+    }
+
+    fn image_padding(&self) -> Padding {
+        if let (Some(viewport), Some(size)) = (self.viewport_bounds, self.scaled_image_size()) {
+            let horizontal = ((viewport.width - size.width) / 2.0).max(0.0);
+            let vertical = ((viewport.height - size.height) / 2.0).max(0.0);
+
+            Padding {
+                top: vertical,
+                right: horizontal,
+                bottom: vertical,
+                left: horizontal,
+            }
+        } else {
+            Padding::default()
+        }
+    }
+
+    fn is_cursor_over_image(&self) -> bool {
+        let cursor = match self.cursor_position {
+            Some(position) => position,
+            None => return false,
+        };
+
+        let viewport = match self.viewport_bounds {
+            Some(bounds) => bounds,
+            None => return false,
+        };
+
+        let size = match self.scaled_image_size() {
+            Some(dimensions) => dimensions,
+            None => return false,
+        };
+
+        let mut hitbox = match self.image_bounds_in_window() {
+            Some(bounds) => bounds,
+            None => return false,
+        };
+
+        if size.height > viewport.height {
+            hitbox.width = (hitbox.width - SCROLLBAR_GUTTER).max(0.0);
+        }
+
+        if size.width > viewport.width {
+            hitbox.height = (hitbox.height - SCROLLBAR_GUTTER).max(0.0);
+        }
+
+        hitbox.contains(cursor)
+    }
+
     fn persist_zoom_preferences(&self) -> Task<Message> {
         if cfg!(test) {
             return Task::none();
@@ -475,7 +549,7 @@ impl App {
     }
 
     fn handle_ctrl_zoom(&mut self, delta: mouse::ScrollDelta, control: bool) -> Task<Message> {
-        if !control {
+        if !control || !self.is_cursor_over_image() {
             return Task::none();
         }
 
@@ -644,8 +718,10 @@ impl App {
                     }
 
                     let image_viewer = viewer::view_image(image_data, self.zoom_percent);
+                    let padding = self.image_padding();
+                    let image_container = Container::new(image_viewer).padding(padding);
 
-                    let scrollable = Scrollable::new(image_viewer)
+                    let scrollable = Scrollable::new(image_container)
                         .width(Length::Fill)
                         .height(Length::Fill)
                         .direction(Direction::Both {
@@ -945,6 +1021,12 @@ mod tests {
         let mut app = App::default();
         app.zoom_step_percent = 15.0;
         app.zoom_percent = 100.0;
+        app.image = Some(build_image(800, 600));
+        app.viewport_bounds = Some(Rectangle::new(
+            Point::new(10.0, 10.0),
+            iced::Size::new(400.0, 300.0),
+        ));
+        app.cursor_position = Some(Point::new(210.0, 160.0));
 
         let _ = app.update(Message::CtrlZoom {
             delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
@@ -961,6 +1043,14 @@ mod tests {
         let mut app = App::default();
         app.zoom_step_percent = 25.0;
         app.zoom_percent = 125.0;
+        app.manual_zoom_percent = 125.0;
+        app.fit_to_window = false;
+        app.image = Some(build_image(800, 600));
+        app.viewport_bounds = Some(Rectangle::new(
+            Point::new(0.0, 0.0),
+            iced::Size::new(400.0, 300.0),
+        ));
+        app.cursor_position = Some(Point::new(200.0, 150.0));
 
         let _ = app.update(Message::CtrlZoom {
             delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
@@ -968,8 +1058,32 @@ mod tests {
         });
 
         assert_eq!(app.zoom_percent, 125.0);
-        assert_eq!(app.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
-        assert!(app.fit_to_window);
+        assert_eq!(app.manual_zoom_percent, 125.0);
+        assert!(!app.fit_to_window);
+    }
+
+    #[test]
+    fn ctrl_scroll_ignored_when_cursor_not_over_image() {
+        let mut app = App::default();
+        app.zoom_step_percent = 20.0;
+        app.zoom_percent = 150.0;
+        app.manual_zoom_percent = 150.0;
+        app.fit_to_window = false;
+        app.image = Some(build_image(800, 600));
+        app.viewport_bounds = Some(Rectangle::new(
+            Point::new(0.0, 0.0),
+            iced::Size::new(400.0, 300.0),
+        ));
+        app.cursor_position = Some(Point::new(1000.0, 1000.0));
+
+        let _ = app.update(Message::CtrlZoom {
+            delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
+            control: true,
+        });
+
+        assert_eq!(app.zoom_percent, 150.0);
+        assert_eq!(app.manual_zoom_percent, 150.0);
+        assert!(!app.fit_to_window);
     }
 
     #[test]
@@ -991,7 +1105,8 @@ mod tests {
 
         let _ = app.update(Message::ZoomStepSubmitted);
 
-        assert_eq!(app.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
+        assert_eq!(app.zoom_step_percent, MIN_ZOOM_STEP_PERCENT);
+        assert_eq!(app.zoom_step_input, format_number(MIN_ZOOM_STEP_PERCENT));
         assert_eq!(app.zoom_step_error_key, Some(ZOOM_STEP_RANGE_KEY));
 
         app.zoom_step_input = "abc".into();
