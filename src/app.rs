@@ -220,15 +220,12 @@ pub struct Flags {
     pub file_path: Option<String>,
 }
 
-pub const BASE_MIN_WINDOW_WIDTH: u32 = 760; // Baseline safeguard
 pub const MIN_WINDOW_HEIGHT: u32 = 480; // Provide comfortable viewport area
 
 fn compute_min_window_width(i18n: &I18n) -> u32 {
-    // Approximate monospace-equivalent width per character for UI font.
+    // Approximate average character width for UI font.
     const CHAR_W: f32 = 8.0;
-    // Fixed width elements.
-    let zoom_input_w = 90.0;
-    // Labels & buttons text.
+    let zoom_input_w = 90.0; // fixed text input width
     let parts = [
         i18n.tr("viewer-zoom-label"),
         i18n.tr("viewer-zoom-out-button"),
@@ -237,13 +234,12 @@ fn compute_min_window_width(i18n: &I18n) -> u32 {
         i18n.tr("viewer-fit-to-window-toggle"),
     ];
     let text_total: f32 = parts.iter().map(|s| s.len() as f32 * CHAR_W).sum();
-    // Button horizontal padding estimate (6 left/right * 4 buttons) plus label spacing.
-    let padding =  (6.0 * 2.0) * 4.0 + 12.0; // 12 for label + checkbox overhead
-    // Spacing between components (Row spacing and manual spaces): 10 * number gaps.
-    let gaps = 10.0 * 6.0; // zoom label, input, 3 buttons, toggle
-    let total = text_total + zoom_input_w + padding + gaps + 40.0; // extra breathing room
-    let candidate = total.ceil() as u32;
-    candidate.max(BASE_MIN_WINDOW_WIDTH)
+    let button_padding = (6.0 * 2.0) * 4.0; // each of 4 buttons
+    let extra_label_padding = 12.0; // label + checkbox overhead
+    let gaps = 10.0 * 6.0; // spacing between 6 joins
+    let breathing_room = 40.0; // avoid cramped layout
+    let total = text_total + zoom_input_w + button_padding + extra_label_padding + gaps + breathing_room;
+    total.ceil() as u32
 }
 
 pub fn window_settings_with_locale(flags: &Flags) -> window::Settings {
@@ -252,7 +248,7 @@ pub fn window_settings_with_locale(flags: &Flags) -> window::Settings {
     let computed_width = compute_min_window_width(&i18n);
     let icon = crate::icon::load_window_icon();
     window::Settings {
-        size: iced::Size::new(computed_width.max(800) as f32, 600.0),
+        size: iced::Size::new(computed_width as f32, 600.0),
         min_size: Some(iced::Size::new(computed_width as f32, MIN_WINDOW_HEIGHT as f32)),
         icon,
         ..window::Settings::default()
@@ -1277,6 +1273,5 @@ mod tests {
         let min_fr = ws_fr.min_size.expect("min size fr").width;
 
         assert!(min_fr >= min_en);
-        assert!(min_en >= BASE_MIN_WINDOW_WIDTH as f32);
     }
 }
