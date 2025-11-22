@@ -33,7 +33,6 @@ use iced::{
 };
 
 pub fn view_image(image_data: &ImageData) -> Element<'_, super::super::app::Message> {
-    eprintln!("[DEBUG viewer] Creating image widget with width={}, height={}", image_data.width, image_data.height);
     Image::new(image_data.handle.clone())
         .width(Length::Fixed(image_data.width as f32))
         .height(Length::Fixed(image_data.height as f32))

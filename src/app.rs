@@ -131,11 +131,7 @@ impl Application for App {
                 if let Some(error_message) = &self.error {
                     Text::new(format!("Error: {}", error_message)).into()
                 } else if let Some(image_data) = &self.image {
-                    eprintln!("[DEBUG] === Starting view render ===");
-                    eprintln!("[DEBUG] Image data: width={}, height={}", image_data.width, image_data.height);
-                    
                     let image_viewer = viewer::view_image(image_data);
-                    eprintln!("[DEBUG] Image viewer created");
 
                     let scrollable = Scrollable::new(image_viewer)
                         .width(Length::Shrink)
@@ -144,15 +140,12 @@ impl Application for App {
                             vertical: Default::default(),
                             horizontal: Default::default(),
                         });
-                    eprintln!("[DEBUG] Scrollable sized to image");
 
                     let centered = Container::new(scrollable)
                         .width(Length::Fill)
                         .height(Length::Fill)
                         .center_x()
                         .center_y();
-                    eprintln!("[DEBUG] Centering container created");
-                    eprintln!("[DEBUG] === End view render ===");
                     centered.into()
                 } else {
                     Text::new(self.i18n.tr("hello-message")).into()
@@ -169,8 +162,6 @@ impl Application for App {
                 .on_press(Message::SwitchMode(AppMode::Viewer))
         };
 
-        eprintln!("[DEBUG] current_view created, now wrapping in column with button");
-        
         let final_layout = Container::new(
             iced::widget::column![
                 Container::new(switch_button)
@@ -186,10 +177,6 @@ impl Application for App {
         )
         .width(Length::Fill)
         .height(Length::Fill);
-        
-        eprintln!("[DEBUG] Final layout: Container(Column[Button(Shrink), Container(current_view(Fill/Fill))])");
-        eprintln!("[DEBUG] All containers width=Fill, height=Fill");
-        
         final_layout.into()
     }
 }
