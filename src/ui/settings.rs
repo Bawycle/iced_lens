@@ -23,8 +23,8 @@
 
 use crate::app::{App, Message};
 use iced::{
-    theme, // Added
-    widget::{Button, Column, Text},
+    alignment::Horizontal,
+    widget::{button, Button, Column, Text},
     Element,
     Length,
 };
@@ -53,9 +53,9 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
             Button::new(Text::new(button_text)).on_press(Message::LanguageSelected(locale.clone()));
 
         if is_current_locale {
-            button = button.style(theme::Button::Primary); // Highlight current language
+            button = button.style(button::primary); // Highlight current language
         } else {
-            button = button.style(theme::Button::Secondary);
+            button = button.style(button::secondary);
         }
 
         language_selection_column = language_selection_column.push(button);
@@ -66,7 +66,7 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
         .push(language_selection_column)
         .spacing(20)
         .width(Length::Fill)
-        .align_items(iced::alignment::Horizontal::Center.into())
+        .align_x(Horizontal::Center)
         .into()
 }
 

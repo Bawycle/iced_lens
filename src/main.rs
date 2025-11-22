@@ -1,5 +1,4 @@
-use iced::{Application, Settings};
-use iced_lens::app::{App, Flags};
+use iced_lens::app::{self, Flags};
 
 fn parse_flags(mut args: pico_args::Arguments) -> Result<Flags, pico_args::Error> {
     let lang = args.opt_value_from_str("--lang")?;
@@ -16,9 +15,7 @@ fn main() -> iced::Result {
     let args = pico_args::Arguments::from_env();
     let flags = parse_flags(args).expect("failed to parse CLI arguments");
 
-    let mut settings = Settings::with_flags(flags);
-    settings.window.size = [800.0, 600.0].into();
-    App::run(settings)
+    app::run(flags)
 }
 
 #[cfg(test)]

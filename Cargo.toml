@@ -7,7 +7,7 @@ edition = "2021"
 dirs = "6.0.0"
 fluent-bundle = "0.16.0"
 fluent-syntax = "0.12.0"
-iced = { version = "0.12", features = ["tokio", "svg", "image"] }
+iced = { version = "0.13.1", features = ["tokio", "svg", "image"] }
 image_rs = { package = "image", version = "0.24", features = ["jpeg", "png", "gif", "tiff", "webp", "bmp", "ico"] }
 pico-args = "0.5.0"
 resvg = "0.45.1"
@@ -17,8 +17,8 @@ sys-locale = "0.3.2"
 tiny-skia = "0.11.4"
 toml = "0.9.8"
 unic-langid = "0.9.6"
-iced_core = "0.12"
-iced_widget = "0.12"
+iced_core = "0.13.1"
+iced_widget = "0.13.1"
 
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["html_reports"] }

@@ -22,5 +22,7 @@ Thumbs.db
 
 
 # Added by cargo
-
 /target
+
+# External documentation
+.ext_doc/

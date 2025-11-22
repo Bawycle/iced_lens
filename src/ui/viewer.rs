@@ -48,7 +48,7 @@ mod tests {
     fn view_image_produces_element() {
         let pixels = vec![0_u8, 0, 0, 255];
         let image_data = ImageData {
-            handle: iced::widget::image::Handle::from_pixels(1, 1, pixels),
+            handle: iced::widget::image::Handle::from_rgba(1, 1, pixels),
             width: 1,
             height: 1,
         };

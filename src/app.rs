@@ -5,10 +5,9 @@ use crate::image_handler::{self, ImageData};
 use crate::ui::settings;
 use crate::ui::viewer;
 use iced::{
-    executor,
-    widget::{Button, Container, Scrollable, Text},
-    window::{self, Id},
-    Application, Command, Element, Length, Theme,
+    widget::{button, Container, Scrollable, Text},
+    window,
+    Element, Length, Task, Theme,
 };
 use iced_widget::scrollable::Direction;
 use std::fmt;
@@ -53,7 +52,6 @@ pub enum Message {
     ImageLoaded(Result<ImageData, Error>),
     SwitchMode(AppMode),
     LanguageSelected(unic_langid::LanguageIdentifier),
-    WindowMaximized, // New message
 }
 
 #[derive(Debug, Default)]
@@ -62,23 +60,28 @@ pub struct Flags {
     pub file_path: Option<String>,
 }
 
-impl Application for App {
-    type Executor = executor::Default;
-    type Message = Message;
-    type Theme = Theme;
-    type Flags = Flags;
+pub fn run(flags: Flags) -> iced::Result {
+    iced::application(|state: &App| state.title(), App::update, App::view)
+        .theme(App::theme)
+        .window(window::Settings {
+            size: iced::Size::new(800.0, 600.0),
+            ..window::Settings::default()
+        })
+        .run_with(move || App::new(flags))
+}
 
-    fn new(flags: Self::Flags) -> (Self, Command<Message>) {
+impl App {
+    fn new(flags: Flags) -> (Self, Task<Message>) {
         let config = config::load().unwrap_or_default();
         let i18n = I18n::new(flags.lang, &config);
 
-        let command = if let Some(path) = flags.file_path {
-            Command::perform(
+        let task = if let Some(path) = flags.file_path {
+            Task::perform(
                 async move { image_handler::load_image(&path) },
                 Message::ImageLoaded,
             )
         } else {
-            Command::none()
+            Task::none()
         };
 
         let app = App {
@@ -87,42 +90,45 @@ impl Application for App {
             ..Self::default()
         };
 
-        (app, command)
+        (app, task)
     }
 
     fn title(&self) -> String {
         self.i18n.tr("window-title")
     }
 
-    fn update(&mut self, message: Message) -> Command<Message> {
+    fn theme(&self) -> Theme {
+        Theme::default()
+    }
+
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ImageLoaded(Ok(image_data)) => {
                 self.image = Some(image_data);
                 self.error = None;
-                Command::batch(vec![
-                    window::maximize(Id::MAIN, true).map(|_: ()| Message::WindowMaximized)
-                ])
+                Task::none()
             }
             Message::ImageLoaded(Err(e)) => {
                 self.image = None;
                 self.error = Some(e.to_string());
-                Command::none()
+                Task::none()
             }
             Message::SwitchMode(mode) => {
                 self.mode = mode;
-                Command::none()
+                Task::none()
             }
             Message::LanguageSelected(locale) => {
                 self.i18n.set_locale(locale.clone());
 
                 let mut config = config::load().unwrap_or_default();
                 config.language = Some(locale.to_string());
+
                 if let Err(e) = config::save(&config) {
                     eprintln!("Failed to save config: {:?}", e);
                 }
-                Command::none()
+
+                Task::none()
             }
-            Message::WindowMaximized => Command::none(), // New match arm
         }
     }
 
@@ -145,8 +151,8 @@ impl Application for App {
                     let centered = Container::new(scrollable)
                         .width(Length::Fill)
                         .height(Length::Fill)
-                        .center_x()
-                        .center_y();
+                        .align_x(iced::alignment::Horizontal::Center)
+                        .align_y(iced::alignment::Vertical::Center);
                     centered.into()
                 } else {
                     Text::new(self.i18n.tr("hello-message")).into()
@@ -156,10 +162,10 @@ impl Application for App {
         };
 
         let switch_button = if self.mode == AppMode::Viewer {
-            Button::new(Text::new(self.i18n.tr("open-settings-button")))
+            button(Text::new(self.i18n.tr("open-settings-button")))
                 .on_press(Message::SwitchMode(AppMode::Settings))
         } else {
-            Button::new(Text::new(self.i18n.tr("back-to-viewer-button")))
+            button(Text::new(self.i18n.tr("back-to-viewer-button")))
                 .on_press(Message::SwitchMode(AppMode::Viewer))
         };
 
@@ -218,7 +224,7 @@ mod tests {
     fn sample_image_data() -> ImageData {
         let pixels = vec![255_u8; 4];
         ImageData {
-            handle: Handle::from_pixels(1, 1, pixels),
+            handle: Handle::from_rgba(1, 1, pixels),
             width: 1,
             height: 1,
         }
