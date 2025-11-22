@@ -604,13 +604,10 @@ impl App {
     fn handle_raw_event(&mut self, event: event::Event) -> Task<Message> {
         match event {
             event::Event::Window(window_event) => {
-                match window_event {
-                    window::Event::Resized(size) => {
-                        self.previous_viewport_offset = self.viewport_offset;
-                        self.viewport_bounds = Some(Rectangle::new(Point::new(0.0, 0.0), size));
-                        self.refresh_fit_zoom();
-                    }
-                    _ => {}
+                if let window::Event::Resized(size) = window_event {
+                    self.previous_viewport_offset = self.viewport_offset;
+                    self.viewport_bounds = Some(Rectangle::new(Point::new(0.0, 0.0), size));
+                    self.refresh_fit_zoom();
                 }
                 Task::none()
             }
@@ -630,11 +627,8 @@ impl App {
                 _ => Task::none(),
             },
             event::Event::Keyboard(keyboard_event) => {
-                match keyboard_event {
-                    keyboard::Event::ModifiersChanged(modifiers) => {
-                        self.modifiers = modifiers;
-                    }
-                    _ => {}
+                if let keyboard::Event::ModifiersChanged(modifiers) = keyboard_event {
+                    self.modifiers = modifiers;
                 }
                 Task::none()
             }
