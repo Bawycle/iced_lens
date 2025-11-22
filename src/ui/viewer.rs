@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 //! This module defines the UI component responsible for displaying images within
 //! the IcedLens application. It takes processed `ImageData` and renders it
 //! using Iced's `Image` widget.

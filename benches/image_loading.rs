@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 use criterion::{criterion_group, criterion_main, Criterion};
 use iced_lens::image_handler;
 use std::hint::black_box; // Use std::hint::black_box

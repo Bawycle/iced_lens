@@ -70,5 +70,12 @@ We welcome contributions! Please see our [CONTRIBUTING.md](./CONTRIBUTING.md) fi
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE) (if there is a LICENSE file). If not, it falls under the typical open-source practices for Rust projects.
-(Note: A `LICENSE` file should be added if not already present, with specific license details.)
+This project is distributed under the terms of the **Mozilla Public License 2.0 (MPL-2.0)**. See the full text in the [`LICENSE`](./LICENSE) file.
+
+Key points (informative, not a substitute for the license):
+- You may use, modify, and redistribute the code, including in proprietary applications.
+- If you distribute modified versions, any files you changed must remain available under MPL-2.0.
+- Unmodified files may be combined with code under other licenses without forcing that code to be open.
+- The license provides a limited patent grant; no trademark rights are granted.
+
+SPDX identifier: `MPL-2.0`

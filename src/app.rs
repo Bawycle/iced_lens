@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 use crate::config::{self, DEFAULT_ZOOM_STEP_PERCENT};
 use crate::error::Error;
 use crate::i18n::fluent::I18n;

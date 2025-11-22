@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 use iced_lens::config::{self, Config, DEFAULT_ZOOM_STEP_PERCENT};
 use iced_lens::i18n::fluent::I18n;
 use tempfile::tempdir;

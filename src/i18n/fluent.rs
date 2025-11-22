@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 //! This module provides internationalization (i18n) capabilities for the application
 //! using the Fluent localization system. It dynamically discovers and loads `.ftl`
 //! translation files from the `assets/i18n/` directory, resolves the active locale

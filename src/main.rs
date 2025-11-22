@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 use iced_lens::app::{self, Flags};
 
 fn parse_flags(mut args: pico_args::Arguments) -> Result<Flags, pico_args::Error> {

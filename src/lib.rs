@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 //! `iced_lens` is a simple image viewer built with the Iced GUI framework.
 //!
 //! It provides basic image viewing capabilities and demonstrates internationalization

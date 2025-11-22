@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 //! This module is responsible for loading and decoding image files from various
 //! formats (e.g., PNG, JPEG, GIF, SVG). It provides a unified `ImageData`
 //! structure that can be used by the UI to display images.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 //! This module handles the application's configuration, including loading and saving
 //! user preferences to a `settings.toml` file.
 //!
