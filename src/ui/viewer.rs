@@ -28,19 +28,13 @@
 
 use crate::image_handler::ImageData;
 use iced::{
-    widget::{Container, Image},
+    widget::{Image}, // Removed Container
     Element, Length,
 };
 
 pub fn view_image(image_data: &ImageData) -> Element<'_, super::super::app::Message> {
-    Container::new(
-        Image::new(image_data.handle.clone())
-            .width(Length::Fixed(image_data.width as f32))
-            .height(Length::Fixed(image_data.height as f32)),
-    )
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .center_x()
-    .center_y()
-    .into()
+    Image::new(image_data.handle.clone())
+        .width(Length::Fixed(image_data.width as f32))
+        .height(Length::Fixed(image_data.height as f32))
+        .into() // Convert to Element
 }

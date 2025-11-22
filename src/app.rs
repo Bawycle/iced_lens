@@ -1,6 +1,3 @@
-//! This module defines the main application logic and UI state for IcedLens.
-//! It handles messages, updates the application state, and renders the main view.
-
 use crate::config;
 use crate::error::Error;
 use crate::i18n::fluent::I18n;
@@ -9,10 +6,13 @@ use crate::ui::settings;
 use crate::ui::viewer;
 use iced::{
     executor,
-    widget::{Button, Container, Text},
-    Application, Command, Element, Length, Theme,
+    widget::{Button, Container, Scrollable, Space, Text}, // Added Button, Container, Space
+    Application, Command, Element, Length, Theme, window::{self, Id}, // Removed Alignment, Vertical
 };
+// ...existing code...
+use iced_widget::scrollable::Direction;
 use std::fmt;
+use unic_langid::LanguageIdentifier;
 
 pub struct App {
     image: Option<ImageData>,
@@ -54,6 +54,7 @@ pub enum Message {
     ImageLoaded(Result<ImageData, Error>),
     SwitchMode(AppMode),
     LanguageSelected(unic_langid::LanguageIdentifier),
+    WindowMaximized, // New message
 }
 
 #[derive(Debug, Default)]
@@ -99,13 +100,18 @@ impl Application for App {
             Message::ImageLoaded(Ok(image_data)) => {
                 self.image = Some(image_data);
                 self.error = None;
+                Command::batch(vec![
+                    window::maximize(Id::MAIN, true).map(|_: ()| Message::WindowMaximized)
+                ])
             }
             Message::ImageLoaded(Err(e)) => {
                 self.image = None;
                 self.error = Some(e.to_string());
+                Command::none()
             }
             Message::SwitchMode(mode) => {
                 self.mode = mode;
+                Command::none()
             }
             Message::LanguageSelected(locale) => {
                 self.i18n.set_locale(locale.clone());
@@ -115,9 +121,10 @@ impl Application for App {
                 if let Err(e) = config::save(&config) {
                     eprintln!("Failed to save config: {:?}", e);
                 }
+                Command::none()
             }
+            Message::WindowMaximized => Command::none(), // New match arm
         }
-        Command::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -127,7 +134,14 @@ impl Application for App {
                     Text::new(format!("Error: {}", error_message)).into()
                 } else if let Some(image_data) = &self.image {
                     let image_viewer = viewer::view_image(image_data);
-                    image_viewer
+                    Scrollable::new(image_viewer)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .direction(Direction::Both {
+                            vertical: Default::default(),
+                            horizontal: Default::default(),
+                        })
+                        .into()
                 } else {
                     Text::new(self.i18n.tr("hello-message")).into()
                 }
@@ -143,11 +157,21 @@ impl Application for App {
                 .on_press(Message::SwitchMode(AppMode::Viewer))
         };
 
-        Container::new(iced::widget::column![switch_button, current_view])
+        Container::new(
+            iced::widget::column![
+                Container::new(switch_button)
+                    .width(Length::Shrink)
+                    .padding(10)
+                    .align_x(iced::alignment::Horizontal::Left),
+                Container::new(current_view)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+            ]
             .width(Length::Fill)
             .height(Length::Fill)
-            .center_x()
-            .center_y()
-            .into()
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
     }
 }
