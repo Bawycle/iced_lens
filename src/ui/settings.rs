@@ -29,8 +29,8 @@ use crate::app::{App, Message};
 use crate::config::BackgroundTheme;
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{button, text_input, Button, Column, Row, Space, Text},
-    Element, Length,
+    widget::{button, text, text_input, Button, Column, Row, Space, Text},
+    Color, Element, Length,
 };
 
 pub fn view_settings(app: &App) -> Element<'_, Message> {
@@ -81,17 +81,25 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
         .push(zoom_step_input)
         .push(Text::new("%"));
 
-    let mut zoom_step_column = Column::new()
-        .spacing(8)
-        .push(zoom_step_label)
-        .push(zoom_step_input_row);
+    let zoom_input_element: Element<'_, Message> = zoom_step_input_row.into();
+    let mut helper_text: Element<'_, Message> = Text::new(app.i18n.tr("settings-zoom-step-hint"))
+        .size(14)
+        .into();
 
     if let Some(error_key) = app.zoom_step_error_key() {
-        zoom_step_column = zoom_step_column.push(Text::new(app.i18n.tr(error_key)).size(14));
-    } else {
-        zoom_step_column =
-            zoom_step_column.push(Text::new(app.i18n.tr("settings-zoom-step-hint")).size(14));
+        let error_color = Color::from_rgb8(229, 57, 53);
+        helper_text = Text::new(app.i18n.tr(error_key))
+            .size(14)
+            .style(move |_theme: &iced::Theme| text::Style {
+                color: Some(error_color),
+                ..Default::default()
+            })
+            .into();
     }
+
+    let mut zoom_step_column = Column::new().spacing(8).push(zoom_step_label);
+
+    zoom_step_column = zoom_step_column.push(zoom_input_element).push(helper_text);
 
     let background_label = Text::new(app.i18n.tr("settings-background-label"));
     let mut background_row = Row::new().spacing(8);
