@@ -29,16 +29,14 @@ use crate::app::{App, Message};
 use crate::config::BackgroundTheme;
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{button, text, text_input, Button, Column, Row, Space, Text},
-    Color, Element, Length,
+    widget::{button, text, text_input, Button, Column, Container, Row, Text},
+    Background, Color, Element, Length, Theme,
 };
 
 pub fn view_settings(app: &App) -> Element<'_, Message> {
     let title = Text::new(app.i18n.tr("settings-title")).size(30);
 
-    let mut language_selection_column = Column::new()
-        .push(Text::new(app.i18n.tr("select-language-label")))
-        .spacing(10);
+    let mut language_selection_column = Column::new().spacing(10);
 
     for locale in &app.i18n.available_locales {
         let display_name = locale.to_string(); // Fallback to string representation
@@ -97,9 +95,11 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
             .into();
     }
 
-    let mut zoom_step_column = Column::new().spacing(8).push(zoom_step_label);
-
-    zoom_step_column = zoom_step_column.push(zoom_input_element).push(helper_text);
+    let zoom_content = Column::new()
+        .spacing(8)
+        .push(zoom_step_label)
+        .push(zoom_input_element)
+        .push(helper_text);
 
     let background_label = Text::new(app.i18n.tr("settings-background-label"));
     let mut background_row = Row::new().spacing(8);
@@ -121,21 +121,68 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
         background_row = background_row.push(button);
     }
 
-    let background_column = Column::new()
-        .spacing(8)
-        .push(background_label)
-        .push(background_row);
+    let section_style = |theme: &Theme| {
+        let palette = theme.extended_palette();
+        let base = palette.background.base.color;
+        let luminance = base.r + base.g + base.b;
+        let (r, g, b) = if luminance < 1.5 {
+            (
+                (base.r + 0.10).min(1.0),
+                (base.g + 0.10).min(1.0),
+                (base.b + 0.10).min(1.0),
+            )
+        } else {
+            (
+                (base.r - 0.06).max(0.0),
+                (base.g - 0.06).max(0.0),
+                (base.b - 0.06).max(0.0),
+            )
+        };
+
+        iced::widget::container::Style {
+            background: Some(Background::Color(Color::from_rgba(r, g, b, 0.95))),
+            border: iced::Border {
+                radius: 12.0.into(),
+                width: 0.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    };
+
+    let language_section = Container::new(
+        Column::new()
+            .spacing(12)
+            .push(Text::new(app.i18n.tr("select-language-label")).size(18))
+            .push(language_selection_column),
+    )
+    .padding(16)
+    .width(Length::Fill)
+    .style(section_style);
+
+    let zoom_section = Container::new(zoom_content)
+        .padding(16)
+        .width(Length::Fill)
+        .style(section_style);
+
+    let background_section = Container::new(
+        Column::new()
+            .spacing(12)
+            .push(background_label)
+            .push(background_row),
+    )
+    .padding(16)
+    .width(Length::Fill)
+    .style(section_style);
 
     Column::new()
-        .push(title)
-        .push(language_selection_column)
-        .push(Space::new(Length::Shrink, Length::Fixed(24.0)))
-        .push(zoom_step_column)
-        .push(Space::new(Length::Shrink, Length::Fixed(16.0)))
-        .push(background_column)
-        .spacing(20)
         .width(Length::Fill)
-        .align_x(Horizontal::Center)
+        .spacing(24)
+        .align_x(Horizontal::Left)
+        .push(title)
+        .push(language_section)
+        .push(zoom_section)
+        .push(background_section)
         .into()
 }
 
