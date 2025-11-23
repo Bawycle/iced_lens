@@ -26,6 +26,7 @@
 //! ```
 
 use crate::app::{App, Message};
+use crate::config::BackgroundTheme;
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{button, text_input, Button, Column, Row, Space, Text},
@@ -92,11 +93,38 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
             zoom_step_column.push(Text::new(app.i18n.tr("settings-zoom-step-hint")).size(14));
     }
 
+    let background_label = Text::new(app.i18n.tr("settings-background-label"));
+    let mut background_row = Row::new().spacing(8);
+    for (theme, key) in [
+        (BackgroundTheme::Light, "settings-background-light"),
+        (BackgroundTheme::Dark, "settings-background-dark"),
+        (
+            BackgroundTheme::Checkerboard,
+            "settings-background-checkerboard",
+        ),
+    ] {
+        let mut button = Button::new(Text::new(app.i18n.tr(key)))
+            .on_press(Message::BackgroundThemeSelected(theme));
+        if app.background_theme() == theme {
+            button = button.style(button::primary);
+        } else {
+            button = button.style(button::secondary);
+        }
+        background_row = background_row.push(button);
+    }
+
+    let background_column = Column::new()
+        .spacing(8)
+        .push(background_label)
+        .push(background_row);
+
     Column::new()
         .push(title)
         .push(language_selection_column)
         .push(Space::new(Length::Shrink, Length::Fixed(24.0)))
         .push(zoom_step_column)
+        .push(Space::new(Length::Shrink, Length::Fixed(16.0)))
+        .push(background_column)
         .spacing(20)
         .width(Length::Fill)
         .align_x(Horizontal::Center)

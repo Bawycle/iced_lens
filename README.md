@@ -42,6 +42,7 @@ IcedLens aims to provide a simple, privacy‑friendly viewer focusing on respons
 - Simple grab‑to‑pan navigation for large images
 - Persistent preferences (language, zoom step, fit mode)
 - Internationalization with Fluent (currently `en-US` and `fr`)
+- Configurable viewer background (light, dark, checkerboard)
 
 ## 3. Screenshots
 Screenshots will be added once UI stabilizes. Feel free to open an issue and propose layout improvements.
@@ -173,7 +174,6 @@ Planned / aspirational items (subject to change):
 - Animated GIF/WebP frame playback
 - Basic image metadata panel (EXIF)
 - Overlay HUD
-- Configurable background theme
 - Richer argument parsing (additional flags)
 - Packaging (AppImage / Flatpack)
 

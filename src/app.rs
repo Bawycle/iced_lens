@@ -7,6 +7,7 @@ use crate::ui::settings;
 use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer;
 use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
+use iced::widget::canvas;
 use iced::widget::scrollable::{
     self, AbsoluteOffset, Direction, Id, RelativeOffset, Scrollbar, Viewport,
 };
@@ -29,6 +30,7 @@ pub struct App {
     zoom: ZoomState,
     viewport: ViewportState,
     drag: DragState,
+    background_theme: config::BackgroundTheme,
     modifiers: keyboard::Modifiers,
     cursor_position: Option<Point>,
 }
@@ -167,6 +169,7 @@ impl Default for App {
             zoom: ZoomState::default(),
             viewport: ViewportState::default(),
             drag: DragState::default(),
+            background_theme: config::BackgroundTheme::default(),
             modifiers: keyboard::Modifiers::default(),
             cursor_position: None,
         }
@@ -187,6 +190,7 @@ pub enum Message {
     SetFitToWindow(bool),
     ZoomStepInputChanged(String),
     ZoomStepSubmitted,
+    BackgroundThemeSelected(config::BackgroundTheme),
     ViewportChanged {
         bounds: Rectangle,
         offset: AbsoluteOffset,
@@ -292,6 +296,10 @@ impl App {
             app.zoom.zoom_step_input = format_number(clamped);
         }
 
+        if let Some(theme) = config.background_theme {
+            app.background_theme = theme;
+        }
+
         if app.zoom.fit_to_window {
             app.refresh_fit_zoom();
         } else {
@@ -380,7 +388,7 @@ impl App {
 
                 if let Some(value) = parse_number(&self.zoom.zoom_input) {
                     self.zoom.apply_manual_zoom(value);
-                    return self.persist_zoom_preferences();
+                    return self.persist_preferences();
                 } else {
                     self.zoom.zoom_input_error_key = Some(ZOOM_INPUT_INVALID_KEY);
                 }
@@ -389,17 +397,17 @@ impl App {
             }
             Message::ResetZoom => {
                 self.zoom.apply_manual_zoom(DEFAULT_ZOOM_PERCENT);
-                self.persist_zoom_preferences()
+                self.persist_preferences()
             }
             Message::ZoomIn => {
                 self.zoom
                     .apply_manual_zoom(self.zoom.zoom_percent + self.zoom.zoom_step_percent);
-                self.persist_zoom_preferences()
+                self.persist_preferences()
             }
             Message::ZoomOut => {
                 self.zoom
                     .apply_manual_zoom(self.zoom.zoom_percent - self.zoom.zoom_step_percent);
-                self.persist_zoom_preferences()
+                self.persist_preferences()
             }
             Message::SetFitToWindow(fit) => {
                 if fit {
@@ -408,7 +416,7 @@ impl App {
                 } else {
                     self.zoom.disable_fit_to_window();
                 }
-                self.persist_zoom_preferences()
+                self.persist_preferences()
             }
             Message::ZoomStepInputChanged(value) => {
                 let sanitized = value.replace('%', "").trim().to_string();
@@ -429,11 +437,18 @@ impl App {
                     } else {
                         self.zoom.zoom_step_error_key = None;
                     }
-                    return self.persist_zoom_preferences();
+                    return self.persist_preferences();
                 } else {
                     self.zoom.zoom_step_error_key = Some(ZOOM_STEP_INVALID_KEY);
                 }
 
+                Task::none()
+            }
+            Message::BackgroundThemeSelected(theme) => {
+                if self.background_theme != theme {
+                    self.background_theme = theme;
+                    return self.persist_preferences();
+                }
                 Task::none()
             }
             Message::ViewportChanged { bounds, offset } => {
@@ -591,7 +606,7 @@ impl App {
         hitbox.contains(cursor)
     }
 
-    fn persist_zoom_preferences(&self) -> Task<Message> {
+    fn persist_preferences(&self) -> Task<Message> {
         if cfg!(test) {
             return Task::none();
         }
@@ -599,6 +614,7 @@ impl App {
         let mut config = config::load().unwrap_or_default();
         config.fit_to_window = Some(self.zoom.fit_to_window);
         config.zoom_step = Some(self.zoom.zoom_step_percent);
+        config.background_theme = Some(self.background_theme);
 
         if let Err(error) = config::save(&config) {
             eprintln!("Failed to save config: {:?}", error);
@@ -613,6 +629,10 @@ impl App {
 
     pub(crate) fn zoom_step_error_key(&self) -> Option<&'static str> {
         self.zoom.zoom_step_error_key
+    }
+
+    pub(crate) fn background_theme(&self) -> config::BackgroundTheme {
+        self.background_theme
     }
 
     fn handle_mouse_button_pressed(
@@ -687,7 +707,7 @@ impl App {
 
         let new_zoom = self.zoom.zoom_percent + steps * self.zoom.zoom_step_percent;
         self.zoom.apply_manual_zoom(new_zoom);
-        self.persist_zoom_preferences()
+        self.persist_preferences()
     }
 
     fn handle_raw_event(&mut self, event: event::Event) -> Task<Message> {
@@ -897,6 +917,35 @@ impl App {
                         .align_x(iced::alignment::Horizontal::Center)
                         .align_y(iced::alignment::Vertical::Center);
 
+                    let viewer_surface: Element<'_, Message> = match self.background_theme {
+                        config::BackgroundTheme::Light => {
+                            let color = Color::from_rgb8(245, 245, 245);
+                            scrollable_container
+                                .style(move |_theme: &Theme| iced::widget::container::Style {
+                                    background: Some(iced::Background::Color(color)),
+                                    ..Default::default()
+                                })
+                                .into()
+                        }
+                        config::BackgroundTheme::Dark => {
+                            let color = Color::from_rgb8(32, 33, 36);
+                            scrollable_container
+                                .style(move |_theme: &Theme| iced::widget::container::Style {
+                                    background: Some(iced::Background::Color(color)),
+                                    ..Default::default()
+                                })
+                                .into()
+                        }
+                        config::BackgroundTheme::Checkerboard => Stack::new()
+                            .push(
+                                canvas::Canvas::new(CheckerboardBackground)
+                                    .width(Length::Fill)
+                                    .height(Length::Fill),
+                            )
+                            .push(scrollable_container)
+                            .into(),
+                    };
+
                     // Add position indicator if scrolling is active
                     let viewer_content: Element<'_, Message> =
                         if let Some((px, py)) = self.scroll_position_percentage() {
@@ -917,7 +966,7 @@ impl App {
                                 });
 
                             Stack::new()
-                                .push(scrollable_container)
+                                .push(viewer_surface)
                                 .push(
                                     Container::new(indicator)
                                         .width(Length::Fill)
@@ -928,7 +977,7 @@ impl App {
                                 )
                                 .into()
                         } else {
-                            scrollable_container.into()
+                            viewer_surface
                         };
 
                     let mut viewer_column = Column::new()
@@ -971,6 +1020,49 @@ impl App {
         .width(Length::Fill)
         .height(Length::Fill);
         final_layout.into()
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct CheckerboardBackground;
+
+impl CheckerboardBackground {
+    const TILE: f32 = 20.0;
+}
+
+impl canvas::Program<Message> for CheckerboardBackground {
+    type State = ();
+
+    fn draw(
+        &self,
+        _state: &Self::State,
+        renderer: &iced::Renderer,
+        _theme: &Theme,
+        bounds: Rectangle,
+        _cursor: mouse::Cursor,
+    ) -> Vec<canvas::Geometry> {
+        let mut frame = canvas::Frame::new(renderer, bounds.size());
+        let tile = Self::TILE;
+        let light = Color::from_rgb(0.85, 0.85, 0.85);
+        let dark = Color::from_rgb(0.75, 0.75, 0.75);
+
+        let cols = ((bounds.width / tile).ceil() as i32).max(1);
+        let rows = ((bounds.height / tile).ceil() as i32).max(1);
+
+        for row in 0..rows {
+            for col in 0..cols {
+                let color = if (row + col) % 2 == 0 { light } else { dark };
+                let x = col as f32 * tile;
+                let y = row as f32 * tile;
+                let path = canvas::Path::rectangle(
+                    Point::new(x, y),
+                    iced::Size::new(tile + 0.5, tile + 0.5),
+                );
+                frame.fill(&path, color);
+            }
+        }
+
+        vec![frame.into_geometry()]
     }
 }
 
@@ -1074,6 +1166,7 @@ mod tests {
 
         assert!(MIN_ZOOM_PERCENT < DEFAULT_ZOOM_PERCENT);
         assert!(MAX_ZOOM_PERCENT > DEFAULT_ZOOM_PERCENT);
+        assert_eq!(app.background_theme, config::BackgroundTheme::default());
     }
 
     #[test]

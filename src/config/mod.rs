@@ -35,6 +35,20 @@ use std::path::{Path, PathBuf}; // Added PathBuf back
 const CONFIG_FILE: &str = "settings.toml";
 const APP_NAME: &str = "IcedLens";
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum BackgroundTheme {
+    Light,
+    Dark,
+    Checkerboard,
+}
+
+impl Default for BackgroundTheme {
+    fn default() -> Self {
+        BackgroundTheme::Dark
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub language: Option<String>,
@@ -42,6 +56,8 @@ pub struct Config {
     pub fit_to_window: Option<bool>,
     #[serde(default)]
     pub zoom_step: Option<f32>,
+    #[serde(default)]
+    pub background_theme: Option<BackgroundTheme>,
 }
 
 impl Default for Config {
@@ -50,6 +66,7 @@ impl Default for Config {
             language: None,
             fit_to_window: Some(true),
             zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
+            background_theme: Some(BackgroundTheme::default()),
         }
     }
 }
@@ -105,6 +122,7 @@ mod tests {
             language: Some("fr".to_string()),
             fit_to_window: Some(false),
             zoom_step: Some(5.0),
+            background_theme: Some(BackgroundTheme::Light),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("nested").join("settings.toml");
@@ -136,6 +154,7 @@ mod tests {
             language: Some("en-US".to_string()),
             fit_to_window: Some(false),
             zoom_step: Some(7.5),
+            background_theme: Some(BackgroundTheme::Checkerboard),
         };
 
         save_to_path(&config, &config_path).expect("save should create directories");
@@ -147,5 +166,6 @@ mod tests {
         let config = Config::default();
         assert_eq!(config.fit_to_window, Some(true));
         assert_eq!(config.zoom_step, Some(DEFAULT_ZOOM_STEP_PERCENT));
+        assert_eq!(config.background_theme, Some(BackgroundTheme::default()));
     }
 }
