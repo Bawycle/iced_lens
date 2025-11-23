@@ -215,10 +215,6 @@ pub enum Message {
         bounds: Rectangle,
         offset: AbsoluteOffset,
     },
-    CtrlZoom {
-        delta: mouse::ScrollDelta,
-        control: bool,
-    },
     MouseButtonPressed {
         button: mouse::Button,
         position: Point,
@@ -334,7 +330,21 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        event::listen().map(Message::RawEvent)
+        event::listen_with(|event, status, _window| {
+            // Capture all wheel scroll events to prevent Scrollable from processing them
+            // We handle wheel events ourselves for zoom only
+            if matches!(event, event::Event::Mouse(mouse::Event::WheelScrolled { .. })) {
+                // Always capture wheel events, regardless of status
+                // This prevents the Scrollable widget from receiving them
+                return Some(Message::RawEvent(event.clone()));
+            }
+
+            // For other events, only process if not already handled
+            match status {
+                event::Status::Ignored => Some(Message::RawEvent(event.clone())),
+                event::Status::Captured => None,
+            }
+        })
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -447,7 +457,6 @@ impl App {
                 self.refresh_fit_zoom();
                 Task::none()
             }
-            Message::CtrlZoom { delta, control } => self.handle_ctrl_zoom(delta, control),
             Message::MouseButtonPressed { button, position } => {
                 self.handle_mouse_button_pressed(button, position)
             }
@@ -750,8 +759,9 @@ impl App {
         }
     }
 
-    fn handle_ctrl_zoom(&mut self, delta: mouse::ScrollDelta, control: bool) -> Task<Message> {
-        if !control || !self.is_cursor_over_image() {
+    fn handle_wheel_zoom(&mut self, delta: mouse::ScrollDelta) -> Task<Message> {
+        // Zoom only when cursor is over the image
+        if !self.is_cursor_over_image() {
             return Task::none();
         }
 
@@ -777,8 +787,36 @@ impl App {
             }
             event::Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::WheelScrolled { delta } => {
-                    let control = self.modifiers.control();
-                    self.handle_ctrl_zoom(delta, control)
+                    // Mouse wheel is now used for zoom (not scroll)
+                    // After handling zoom, reset scrollable position to prevent any scroll
+                    let zoom_task = self.handle_wheel_zoom(delta);
+
+                    // Immediately snap back to current offset to counter any scroll the Scrollable might do
+                    if let (Some(viewport), Some(size)) = (self.viewport_bounds, self.scaled_image_size()) {
+                        let max_offset_x = (size.width - viewport.width).max(0.0);
+                        let max_offset_y = (size.height - viewport.height).max(0.0);
+
+                        let relative_x = if max_offset_x > 0.0 {
+                            (self.viewport_offset.x / max_offset_x).clamp(0.0, 1.0)
+                        } else {
+                            0.0
+                        };
+
+                        let relative_y = if max_offset_y > 0.0 {
+                            (self.viewport_offset.y / max_offset_y).clamp(0.0, 1.0)
+                        } else {
+                            0.0
+                        };
+
+                        let snap_task = scrollable::snap_to(
+                            Id::new(VIEWER_SCROLLABLE_ID),
+                            RelativeOffset { x: relative_x, y: relative_y },
+                        );
+
+                        Task::batch(vec![zoom_task, snap_task])
+                    } else {
+                        zoom_task
+                    }
                 }
                 mouse::Event::ButtonPressed(button) => {
                     if let Some(position) = self.cursor_position {
@@ -1295,7 +1333,7 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_scroll_applies_zoom_step_when_control_pressed() {
+    fn wheel_scroll_applies_zoom_step_when_over_image() {
         let mut app = App::default();
         app.zoom_step_percent = 15.0;
         app.zoom_percent = 100.0;
@@ -1306,10 +1344,9 @@ mod tests {
         ));
         app.cursor_position = Some(Point::new(210.0, 160.0));
 
-        let _ = app.update(Message::CtrlZoom {
-            delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
-            control: true,
-        });
+        // Simulate wheel scroll (no Ctrl needed anymore)
+        let delta = mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 };
+        let _ = app.handle_wheel_zoom(delta);
 
         assert_eq!(app.zoom_percent, 115.0);
         assert_eq!(app.manual_zoom_percent, 115.0);
@@ -1317,31 +1354,7 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_scroll_ignored_without_control() {
-        let mut app = App::default();
-        app.zoom_step_percent = 25.0;
-        app.zoom_percent = 125.0;
-        app.manual_zoom_percent = 125.0;
-        app.fit_to_window = false;
-        app.image = Some(build_image(800, 600));
-        app.viewport_bounds = Some(Rectangle::new(
-            Point::new(0.0, 0.0),
-            iced::Size::new(400.0, 300.0),
-        ));
-        app.cursor_position = Some(Point::new(200.0, 150.0));
-
-        let _ = app.update(Message::CtrlZoom {
-            delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
-            control: false,
-        });
-
-        assert_eq!(app.zoom_percent, 125.0);
-        assert_eq!(app.manual_zoom_percent, 125.0);
-        assert!(!app.fit_to_window);
-    }
-
-    #[test]
-    fn ctrl_scroll_ignored_when_cursor_not_over_image() {
+    fn wheel_scroll_ignored_when_cursor_not_over_image() {
         let mut app = App::default();
         app.zoom_step_percent = 20.0;
         app.zoom_percent = 150.0;
@@ -1354,10 +1367,8 @@ mod tests {
         ));
         app.cursor_position = Some(Point::new(1000.0, 1000.0));
 
-        let _ = app.update(Message::CtrlZoom {
-            delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
-            control: true,
-        });
+        let delta = mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 };
+        let _ = app.handle_wheel_zoom(delta);
 
         assert_eq!(app.zoom_percent, 150.0);
         assert_eq!(app.manual_zoom_percent, 150.0);
@@ -1365,7 +1376,7 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_scroll_ignored_when_cursor_over_vertical_scrollbar_area() {
+    fn wheel_scroll_ignored_when_cursor_over_scrollbar_area() {
         let mut app = App::default();
         app.zoom_step_percent = 10.0;
         app.zoom_percent = 120.0;
@@ -1380,10 +1391,8 @@ mod tests {
             viewport.y + viewport.height / 2.0,
         ));
 
-        let _ = app.update(Message::CtrlZoom {
-            delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
-            control: true,
-        });
+        let delta = mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 };
+        let _ = app.handle_wheel_zoom(delta);
 
         assert_eq!(app.zoom_percent, 120.0);
         assert_eq!(app.manual_zoom_percent, 120.0);

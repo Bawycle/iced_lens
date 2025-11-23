@@ -39,8 +39,12 @@ IcedLens aims to provide a simple, privacy‑friendly viewer focusing on respons
 - Image formats: JPEG, PNG, GIF (static), TIFF, WebP, BMP, ICO
 - SVG rasterization for scalable assets
 - Fit‑to‑window vs manual zoom retention
-- Cursor‑aware Ctrl+Scroll zoom (only when hovering the image)
+- **Grab-and-drag navigation**: Click and drag with left mouse button to pan large images
+- **Position indicator**: Visual overlay showing current scroll position as percentage
+- **Mouse wheel zoom**: Scroll to zoom in/out (only when hovering the image)
+- Intuitive cursor feedback: grab/grabbing cursors when hovering/dragging images
 - Centered image with dynamic padding when smaller than viewport
+- Hidden scrollbars for clean interface while maintaining full navigation
 - Persistent preferences (language, zoom step, fit toggle) via TOML config
 - Fluent‑based runtime language switching (English, French initial set)
 - Modular architecture prepared for future extensions (e.g. editing, video, annotations)
@@ -97,6 +101,21 @@ ARGS:
 	<IMAGE_PATH>     Path to image file to open
 ```
 
+### Navigation Controls
+**Image Navigation:**
+- **Left-click + Drag**: Pan/scroll through large images (grab-and-drag)
+- **Position indicator**: Automatically appears in bottom-right corner showing scroll position (e.g., "Position: 45% x 60%")
+
+**Zoom Controls:**
+- **Mouse wheel**: Zoom in/out (only when cursor is over the image)
+- **Zoom buttons**: Use the UI controls in the top toolbar
+- **Fit to window**: Toggle to automatically scale image to fit viewport
+
+**Visual Feedback:**
+- Cursor changes to **grab hand** (open) when hovering over image
+- Cursor changes to **grabbing hand** (closed) while dragging
+- Scrollbars are hidden for clean interface
+
 ## 6. Configuration & Preferences
 User config is stored in a platform‑appropriate directory (implementation detail: uses a TOML file). Currently persisted:
 - `language`
@@ -114,11 +133,15 @@ To contribute a new locale, see `CONTRIBUTING.md` (translation workflow section)
 Override directory: pass `--i18n-dir /custom/translations` to load `.ftl` files from an alternate location. If the path is invalid, the application falls back to the built‑in `assets/i18n/` directory.
 
 ## 8. Zoom & Viewing Model
+- **Grab-and-drag navigation**: Primary method for panning through large images; left-click and drag to scroll smoothly in any direction.
+- **Mouse wheel zoom**: Scroll wheel zooms in/out when cursor is over the image (no modifier key required).
+- **Position awareness**: Visual indicator displays current scroll position as percentages when image exceeds viewport.
 - Manual zoom retains last chosen level when toggling fit‑to‑window off.
 - Fit zoom recalculates dynamically based on viewport rectangle (not cached stale dimensions).
-- Ctrl+Scroll zoom input gated: only active if pointer overlaps the image (prevents scroll conflicts with sidebars or gutters).
+- Zoom input gated: only active if pointer overlaps the image (prevents conflicts with UI controls).
 - Padding ensures small images remain visually centered.
 - Zoom step is clamped to a reasonable range to avoid extreme jumps.
+- **Clean interface**: Scrollbars are hidden while maintaining full navigation via grab-and-drag.
 
 ## 9. Performance & Benchmarks
 Criterion benchmarks: see `benches/image_loading.rs`.
