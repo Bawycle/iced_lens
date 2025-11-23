@@ -11,9 +11,8 @@ pub mod config;
 pub mod error;
 pub mod i18n;
 pub mod image_handler;
-pub mod ui; // app module itself will be part of the library
+pub mod ui;
 pub mod icon;
-mod widgets;
 
 #[cfg(test)]
 mod tests {

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
-use crate::config::{self, DEFAULT_ZOOM_STEP_PERCENT};
+use crate::config;
 use crate::error::Error;
 use crate::i18n::fluent::I18n;
 use crate::image_handler::{self, ImageData};
 use crate::ui::settings;
+use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer;
-use crate::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
+use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
 use iced::widget::scrollable::{self, AbsoluteOffset, Direction, Id, RelativeOffset, Scrollbar, Viewport};
 use iced::widget::text_input;
 use iced::{
@@ -21,24 +22,11 @@ pub struct App {
     error: Option<ErrorState>,
     pub i18n: I18n, // Made public
     mode: AppMode,
-    fit_to_window: bool,
-    zoom_percent: f32,
-    zoom_input: String,
-    zoom_input_dirty: bool,
-    zoom_input_error_key: Option<&'static str>,
-    zoom_step_percent: f32,
-    zoom_step_input: String,
-    zoom_step_input_dirty: bool,
-    zoom_step_error_key: Option<&'static str>,
-    manual_zoom_percent: f32,
+    zoom: ZoomState,
+    viewport: ViewportState,
+    drag: DragState,
     modifiers: keyboard::Modifiers,
-    viewport_offset: AbsoluteOffset,
-    previous_viewport_offset: AbsoluteOffset,
-    viewport_bounds: Option<Rectangle>,
     cursor_position: Option<Point>,
-    is_dragging: bool,
-    drag_start_position: Option<Point>,
-    drag_start_offset: Option<AbsoluteOffset>,
 }
 
 const MIN_ZOOM_PERCENT: f32 = 10.0;
@@ -53,10 +41,6 @@ const ZOOM_STEP_INVALID_KEY: &str = "viewer-zoom-step-error-invalid";
 const ZOOM_STEP_RANGE_KEY: &str = "viewer-zoom-step-error-range";
 
 const VIEWER_SCROLLABLE_ID: &str = "viewer-image-scrollable";
-
-fn default_offset() -> AbsoluteOffset {
-    AbsoluteOffset { x: 0.0, y: 0.0 }
-}
 
 fn format_number(value: f32) -> String {
     if (value.fract()).abs() < f32::EPSILON {
@@ -176,24 +160,11 @@ impl Default for App {
             error: None,
             i18n: I18n::default(),
             mode: AppMode::Viewer,
-            fit_to_window: true,
-            zoom_percent: DEFAULT_ZOOM_PERCENT,
-            zoom_input: format_number(DEFAULT_ZOOM_PERCENT),
-            zoom_input_dirty: false,
-            zoom_input_error_key: None,
-            zoom_step_percent: DEFAULT_ZOOM_STEP_PERCENT,
-            zoom_step_input: format_number(DEFAULT_ZOOM_STEP_PERCENT),
-            zoom_step_input_dirty: false,
-            zoom_step_error_key: None,
-            manual_zoom_percent: DEFAULT_ZOOM_PERCENT,
+            zoom: ZoomState::default(),
+            viewport: ViewportState::default(),
+            drag: DragState::default(),
             modifiers: keyboard::Modifiers::default(),
-            viewport_offset: default_offset(),
-            previous_viewport_offset: default_offset(),
-            viewport_bounds: None,
             cursor_position: None,
-            is_dragging: false,
-            drag_start_position: None,
-            drag_start_offset: None,
         }
     }
 }
@@ -301,22 +272,22 @@ impl App {
 
         if let Some(fit) = config.fit_to_window {
             if fit {
-                app.enable_fit_to_window();
+                app.zoom.enable_fit_to_window();
             } else {
-                app.disable_fit_to_window();
+                app.zoom.disable_fit_to_window();
             }
         }
 
         if let Some(step) = config.zoom_step {
             let clamped = clamp_zoom_step(step);
-            app.zoom_step_percent = clamped;
-            app.zoom_step_input = format_number(clamped);
+            app.zoom.zoom_step_percent = clamped;
+            app.zoom.zoom_step_input = format_number(clamped);
         }
 
-        if app.fit_to_window {
+        if app.zoom.fit_to_window {
             app.refresh_fit_zoom();
         } else {
-            app.disable_fit_to_window();
+            app.zoom.disable_fit_to_window();
         }
 
         (app, task)
@@ -388,73 +359,72 @@ impl App {
                 Task::none()
             }
             Message::ZoomInputChanged(value) => {
-                self.zoom_input = value;
-                self.zoom_input_dirty = true;
-                self.zoom_input_error_key = None;
+                self.zoom.zoom_input = value;
+                self.zoom.zoom_input_dirty = true;
+                self.zoom.zoom_input_error_key = None;
                 Task::none()
             }
             Message::ZoomInputSubmitted => {
-                self.zoom_input_dirty = false;
+                self.zoom.zoom_input_dirty = false;
 
-                if let Some(value) = parse_number(&self.zoom_input) {
-                    self.apply_manual_zoom(value);
+                if let Some(value) = parse_number(&self.zoom.zoom_input) {
+                    self.zoom.apply_manual_zoom(value);
                     return self.persist_zoom_preferences();
                 } else {
-                    self.zoom_input_error_key = Some(ZOOM_INPUT_INVALID_KEY);
+                    self.zoom.zoom_input_error_key = Some(ZOOM_INPUT_INVALID_KEY);
                 }
 
                 Task::none()
             }
             Message::ResetZoom => {
-                self.apply_manual_zoom(DEFAULT_ZOOM_PERCENT);
+                self.zoom.apply_manual_zoom(DEFAULT_ZOOM_PERCENT);
                 self.persist_zoom_preferences()
             }
             Message::ZoomIn => {
-                self.apply_manual_zoom(self.zoom_percent + self.zoom_step_percent);
+                self.zoom.apply_manual_zoom(self.zoom.zoom_percent + self.zoom.zoom_step_percent);
                 self.persist_zoom_preferences()
             }
             Message::ZoomOut => {
-                self.apply_manual_zoom(self.zoom_percent - self.zoom_step_percent);
+                self.zoom.apply_manual_zoom(self.zoom.zoom_percent - self.zoom.zoom_step_percent);
                 self.persist_zoom_preferences()
             }
             Message::SetFitToWindow(fit) => {
                 if fit {
-                    self.enable_fit_to_window();
+                    self.zoom.enable_fit_to_window();
+                    self.refresh_fit_zoom();
                 } else {
-                    self.disable_fit_to_window();
+                    self.zoom.disable_fit_to_window();
                 }
                 self.persist_zoom_preferences()
             }
             Message::ZoomStepInputChanged(value) => {
                 let sanitized = value.replace('%', "").trim().to_string();
-                self.zoom_step_input = sanitized;
-                self.zoom_step_input_dirty = true;
-                self.zoom_step_error_key = None;
+                self.zoom.zoom_step_input = sanitized;
+                self.zoom.zoom_step_input_dirty = true;
+                self.zoom.zoom_step_error_key = None;
                 Task::none()
             }
             Message::ZoomStepSubmitted => {
-                self.zoom_step_input_dirty = false;
+                self.zoom.zoom_step_input_dirty = false;
 
-                if let Some(value) = parse_number(&self.zoom_step_input) {
+                if let Some(value) = parse_number(&self.zoom.zoom_step_input) {
                     let clamped = clamp_zoom_step(value);
-                    self.zoom_step_percent = clamped;
-                    self.zoom_step_input = format_number(clamped);
+                    self.zoom.zoom_step_percent = clamped;
+                    self.zoom.zoom_step_input = format_number(clamped);
                     if (clamped - value).abs() > f32::EPSILON {
-                        self.zoom_step_error_key = Some(ZOOM_STEP_RANGE_KEY);
+                        self.zoom.zoom_step_error_key = Some(ZOOM_STEP_RANGE_KEY);
                     } else {
-                        self.zoom_step_error_key = None;
+                        self.zoom.zoom_step_error_key = None;
                     }
                     return self.persist_zoom_preferences();
                 } else {
-                    self.zoom_step_error_key = Some(ZOOM_STEP_INVALID_KEY);
+                    self.zoom.zoom_step_error_key = Some(ZOOM_STEP_INVALID_KEY);
                 }
 
                 Task::none()
             }
             Message::ViewportChanged { bounds, offset } => {
-                self.previous_viewport_offset = self.viewport_offset;
-                self.viewport_offset = offset;
-                self.viewport_bounds = Some(bounds);
+                self.viewport.update(bounds, offset);
                 self.refresh_fit_zoom();
                 Task::none()
             }
@@ -471,49 +441,19 @@ impl App {
         }
     }
 
-    fn update_zoom_display(&mut self, percent: f32) {
-        self.zoom_percent = percent;
-        self.zoom_input = format_number(percent);
-    }
-
-    fn apply_manual_zoom(&mut self, percent: f32) {
-        let clamped = clamp_zoom(percent);
-        self.manual_zoom_percent = clamped;
-        self.update_zoom_display(clamped);
-        self.zoom_input_dirty = false;
-        self.zoom_input_error_key = None;
-        self.fit_to_window = false;
-    }
-
-    fn enable_fit_to_window(&mut self) {
-        self.fit_to_window = true;
-        self.zoom_input_dirty = false;
-        self.zoom_input_error_key = None;
-        self.refresh_fit_zoom();
-    }
-
-    fn disable_fit_to_window(&mut self) {
-        self.fit_to_window = false;
-        let current = clamp_zoom(self.zoom_percent);
-        self.manual_zoom_percent = current;
-        self.update_zoom_display(current);
-        self.zoom_input_dirty = false;
-        self.zoom_input_error_key = None;
-    }
-
     fn refresh_fit_zoom(&mut self) {
-        if self.fit_to_window {
+        if self.zoom.fit_to_window {
             if let Some(fit_zoom) = self.compute_fit_zoom_percent() {
-                self.update_zoom_display(fit_zoom);
-                self.zoom_input_dirty = false;
-                self.zoom_input_error_key = None;
+                self.zoom.update_zoom_display(fit_zoom);
+                self.zoom.zoom_input_dirty = false;
+                self.zoom.zoom_input_error_key = None;
             }
         }
     }
 
     fn compute_fit_zoom_percent(&self) -> Option<f32> {
         let image = self.image.as_ref()?;
-        let viewport = self.viewport_bounds?;
+        let viewport = self.viewport.bounds?;
 
         if image.width == 0 || image.height == 0 {
             return Some(DEFAULT_ZOOM_PERCENT);
@@ -540,7 +480,7 @@ impl App {
 
     fn scaled_image_size(&self) -> Option<iced::Size> {
         let image = self.image.as_ref()?;
-        let scale = (self.zoom_percent / 100.0).max(0.01);
+        let scale = (self.zoom.zoom_percent / 100.0).max(0.01);
         let width = (image.width as f32 * scale).max(1.0);
         let height = (image.height as f32 * scale).max(1.0);
         Some(iced::Size::new(width, height))
@@ -559,7 +499,7 @@ impl App {
     }
 
     fn image_padding(&self) -> Padding {
-        match (self.viewport_bounds, self.scaled_image_size()) {
+        match (self.viewport.bounds, self.scaled_image_size()) {
             (Some(viewport), Some(size)) => Self::compute_padding(viewport, size),
             _ => Padding::default(),
         }
@@ -567,39 +507,17 @@ impl App {
 
     fn scroll_position_percentage(&self) -> Option<(f32, f32)> {
         // Calculate scroll position as percentage (0-100% for both axes)
-        let viewport = self.viewport_bounds?;
         let size = self.scaled_image_size()?;
-
-        // If image is smaller than viewport, no scrolling needed
-        if size.width <= viewport.width && size.height <= viewport.height {
-            return None;
-        }
-
-        let max_offset_x = (size.width - viewport.width).max(0.0);
-        let max_offset_y = (size.height - viewport.height).max(0.0);
-
-        let percent_x = if max_offset_x > 0.0 {
-            (self.viewport_offset.x / max_offset_x * 100.0).min(100.0)
-        } else {
-            0.0
-        };
-
-        let percent_y = if max_offset_y > 0.0 {
-            (self.viewport_offset.y / max_offset_y * 100.0).min(100.0)
-        } else {
-            0.0
-        };
-
-        Some((percent_x, percent_y))
+        self.viewport.scroll_position_percentage(size.width, size.height)
     }
 
     fn image_bounds_in_window(&self) -> Option<Rectangle> {
-        let viewport = self.viewport_bounds?;
+        let viewport = self.viewport.bounds?;
         let size = self.scaled_image_size()?;
         let padding = Self::compute_padding(viewport, size);
 
-        let content_origin_x = viewport.x - self.viewport_offset.x;
-        let content_origin_y = viewport.y - self.viewport_offset.y;
+        let content_origin_x = viewport.x - self.viewport.offset.x;
+        let content_origin_y = viewport.y - self.viewport.offset.y;
 
         let left = content_origin_x + padding.left;
         let top = content_origin_y + padding.top;
@@ -613,7 +531,7 @@ impl App {
             None => return false,
         };
 
-        let viewport = match self.viewport_bounds {
+        let viewport = match self.viewport.bounds {
             Some(bounds) => bounds,
             None => return false,
         };
@@ -667,8 +585,8 @@ impl App {
         }
 
         let mut config = config::load().unwrap_or_default();
-        config.fit_to_window = Some(self.fit_to_window);
-        config.zoom_step = Some(self.zoom_step_percent);
+        config.fit_to_window = Some(self.zoom.fit_to_window);
+        config.zoom_step = Some(self.zoom.zoom_step_percent);
 
         if let Err(error) = config::save(&config) {
             eprintln!("Failed to save config: {:?}", error);
@@ -678,19 +596,17 @@ impl App {
     }
 
     pub(crate) fn zoom_step_input_value(&self) -> &str {
-        &self.zoom_step_input
+        &self.zoom.zoom_step_input
     }
 
     pub(crate) fn zoom_step_error_key(&self) -> Option<&'static str> {
-        self.zoom_step_error_key
+        self.zoom.zoom_step_error_key
     }
 
     fn handle_mouse_button_pressed(&mut self, button: mouse::Button, position: Point) -> Task<Message> {
         // Only start drag on left button press over the image
         if button == mouse::Button::Left && self.is_cursor_over_image() {
-            self.is_dragging = true;
-            self.drag_start_position = Some(position);
-            self.drag_start_offset = Some(self.viewport_offset);
+            self.drag.start(position, self.viewport.offset);
         }
         Task::none()
     }
@@ -698,43 +614,22 @@ impl App {
     fn handle_mouse_button_released(&mut self, button: mouse::Button) -> Task<Message> {
         // Stop dragging on left button release
         if button == mouse::Button::Left {
-            self.is_dragging = false;
-            self.drag_start_position = None;
-            self.drag_start_offset = None;
+            self.drag.stop();
         }
         Task::none()
     }
 
     fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Task<Message> {
         // Only update offset if currently dragging
-        if !self.is_dragging {
-            return Task::none();
-        }
-
-        let start_pos = match self.drag_start_position {
-            Some(pos) => pos,
-            None => return Task::none(),
-        };
-
-        let start_offset = match self.drag_start_offset {
+        let new_offset = match self.drag.calculate_offset(position) {
             Some(offset) => offset,
             None => return Task::none(),
         };
 
-        // Calculate delta: how much the cursor has moved
-        let delta_x = position.x - start_pos.x;
-        let delta_y = position.y - start_pos.y;
-
-        // Calculate new viewport offset (inverse direction: moving cursor right scrolls content left)
-        let new_offset = AbsoluteOffset {
-            x: (start_offset.x - delta_x).max(0.0),
-            y: (start_offset.y - delta_y).max(0.0),
-        };
-
-        self.viewport_offset = new_offset;
+        self.viewport.offset = new_offset;
 
         // Convert absolute offset to relative offset (0.0-1.0 range)
-        if let (Some(viewport), Some(size)) = (self.viewport_bounds, self.scaled_image_size()) {
+        if let (Some(viewport), Some(size)) = (self.viewport.bounds, self.scaled_image_size()) {
             let max_offset_x = (size.width - viewport.width).max(0.0);
             let max_offset_y = (size.height - viewport.height).max(0.0);
 
@@ -771,8 +666,8 @@ impl App {
             return Task::none();
         }
 
-        let new_zoom = self.zoom_percent + steps * self.zoom_step_percent;
-        self.apply_manual_zoom(new_zoom);
+        let new_zoom = self.zoom.zoom_percent + steps * self.zoom.zoom_step_percent;
+        self.zoom.apply_manual_zoom(new_zoom);
         self.persist_zoom_preferences()
     }
 
@@ -780,8 +675,8 @@ impl App {
         match event {
             event::Event::Window(window_event) => {
                 if let window::Event::Resized(size) = window_event {
-                    self.previous_viewport_offset = self.viewport_offset;
-                    self.viewport_bounds = Some(Rectangle::new(Point::new(0.0, 0.0), size));
+                    let bounds = Rectangle::new(Point::new(0.0, 0.0), size);
+                    self.viewport.update(bounds, self.viewport.offset);
                     self.refresh_fit_zoom();
                 }
                 Task::none()
@@ -804,7 +699,7 @@ impl App {
                 }
                 mouse::Event::CursorMoved { position } => {
                     self.cursor_position = Some(position);
-                    if self.is_dragging {
+                    if self.drag.is_dragging {
                         self.handle_cursor_moved_during_drag(position)
                     } else {
                         Task::none()
@@ -813,10 +708,8 @@ impl App {
                 mouse::Event::CursorLeft => {
                     self.cursor_position = None;
                     // Stop dragging if cursor leaves window
-                    if self.is_dragging {
-                        self.is_dragging = false;
-                        self.drag_start_position = None;
-                        self.drag_start_offset = None;
+                    if self.drag.is_dragging {
+                        self.drag.stop();
                     }
                     Task::none()
                 }
@@ -902,7 +795,7 @@ impl App {
                     let zoom_placeholder = self.i18n.tr("viewer-zoom-input-placeholder");
                     let zoom_label = Text::new(self.i18n.tr("viewer-zoom-label"));
 
-                    let zoom_input = text_input(&zoom_placeholder, &self.zoom_input)
+                    let zoom_input = text_input(&zoom_placeholder, &self.zoom.zoom_input)
                         .on_input(Message::ZoomInputChanged)
                         .on_submit(Message::ZoomInputSubmitted)
                         .padding(6)
@@ -923,7 +816,7 @@ impl App {
 
                     let fit_toggle = checkbox(
                         self.i18n.tr("viewer-fit-to-window-toggle"),
-                        self.fit_to_window,
+                        self.zoom.fit_to_window,
                     )
                     .on_toggle(Message::SetFitToWindow);
 
@@ -940,12 +833,12 @@ impl App {
 
                     let mut zoom_controls = Column::new().spacing(4).push(zoom_controls_row);
 
-                    if let Some(error_key) = self.zoom_input_error_key {
+                    if let Some(error_key) = self.zoom.zoom_input_error_key {
                         let error_text = Text::new(self.i18n.tr(error_key)).size(14);
                         zoom_controls = zoom_controls.push(error_text);
                     }
 
-                    let image_viewer = viewer::view_image(image_data, self.zoom_percent);
+                    let image_viewer = viewer::view_image(image_data, self.zoom.zoom_percent);
                     let padding = self.image_padding();
                     let image_container = Container::new(image_viewer).padding(padding);
 
@@ -973,7 +866,7 @@ impl App {
                     let wheel_blocked_scrollable = wheel_blocking_scrollable(scrollable);
 
                     // Wrap in mouse_area to control cursor
-                    let cursor_interaction = if self.is_dragging {
+                    let cursor_interaction = if self.drag.is_dragging {
                         mouse::Interaction::Grabbing
                     } else if self.is_cursor_over_image() {
                         mouse::Interaction::Grab
@@ -1075,6 +968,7 @@ impl App {
 #[allow(clippy::assertions_on_constants)]
 mod tests {
     use super::*;
+    use crate::config::DEFAULT_ZOOM_STEP_PERCENT;
     use crate::image_handler::ImageData;
     use iced::widget::image::Handle;
     use std::fs;
@@ -1144,28 +1038,28 @@ mod tests {
     fn default_zoom_state_is_consistent() {
         let app = App::default();
 
-        assert!(app.fit_to_window);
-        assert_eq!(app.zoom_percent, DEFAULT_ZOOM_PERCENT);
-        assert_eq!(app.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));
-        assert!(!app.zoom_input_dirty);
-        assert!(app.zoom_input_error_key.is_none());
+        assert!(app.zoom.fit_to_window);
+        assert_eq!(app.zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert_eq!(app.zoom.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));
+        assert!(!app.zoom.zoom_input_dirty);
+        assert!(app.zoom.zoom_input_error_key.is_none());
 
-        assert_eq!(app.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
+        assert_eq!(app.zoom.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
         assert_eq!(
-            app.zoom_step_input,
+            app.zoom.zoom_step_input,
             format_number(DEFAULT_ZOOM_STEP_PERCENT)
         );
-        assert!(!app.zoom_step_input_dirty);
-        assert!(app.zoom_step_error_key.is_none());
-        assert!(MIN_ZOOM_STEP_PERCENT <= app.zoom_step_percent);
-        assert!(MAX_ZOOM_STEP_PERCENT >= app.zoom_step_percent);
-        assert_eq!(app.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert!(!app.zoom.zoom_step_input_dirty);
+        assert!(app.zoom.zoom_step_error_key.is_none());
+        assert!(MIN_ZOOM_STEP_PERCENT <= app.zoom.zoom_step_percent);
+        assert!(MAX_ZOOM_STEP_PERCENT >= app.zoom.zoom_step_percent);
+        assert_eq!(app.zoom.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert_eq!(app.modifiers, keyboard::Modifiers::default());
 
-        assert_eq!(app.viewport_offset.x, 0.0);
-        assert_eq!(app.viewport_offset.y, 0.0);
-        assert_eq!(app.previous_viewport_offset.x, 0.0);
-        assert_eq!(app.previous_viewport_offset.y, 0.0);
+        assert_eq!(app.viewport.offset.x, 0.0);
+        assert_eq!(app.viewport.offset.y, 0.0);
+        assert_eq!(app.viewport.previous_offset.x, 0.0);
+        assert_eq!(app.viewport.previous_offset.y, 0.0);
 
         assert!(MIN_ZOOM_PERCENT < DEFAULT_ZOOM_PERCENT);
         assert!(MAX_ZOOM_PERCENT > DEFAULT_ZOOM_PERCENT);
@@ -1199,62 +1093,62 @@ mod tests {
     #[test]
     fn submitting_valid_zoom_input_updates_zoom() {
         let mut app = App::default();
-        app.zoom_input = "150".into();
-        app.fit_to_window = true;
+        app.zoom.zoom_input = "150".into();
+        app.zoom.fit_to_window = true;
 
         let _ = app.update(Message::ZoomInputSubmitted);
 
-        assert_eq!(app.zoom_percent, 150.0);
-        assert_eq!(app.manual_zoom_percent, 150.0);
-        assert_eq!(app.zoom_input, format_number(150.0));
-        assert!(!app.fit_to_window);
-        assert!(app.zoom_input_error_key.is_none());
-        assert!(!app.zoom_input_dirty);
+        assert_eq!(app.zoom.zoom_percent, 150.0);
+        assert_eq!(app.zoom.manual_zoom_percent, 150.0);
+        assert_eq!(app.zoom.zoom_input, format_number(150.0));
+        assert!(!app.zoom.fit_to_window);
+        assert!(app.zoom.zoom_input_error_key.is_none());
+        assert!(!app.zoom.zoom_input_dirty);
     }
 
     #[test]
     fn submitting_out_of_range_zoom_clamps_value() {
         let mut app = App::default();
-        app.zoom_input = "9999".into();
+        app.zoom.zoom_input = "9999".into();
 
         let _ = app.update(Message::ZoomInputSubmitted);
 
-        assert_eq!(app.zoom_percent, MAX_ZOOM_PERCENT);
-        assert_eq!(app.zoom_input, format_number(MAX_ZOOM_PERCENT));
-        assert_eq!(app.manual_zoom_percent, MAX_ZOOM_PERCENT);
-        assert!(!app.fit_to_window);
-        assert!(app.zoom_input_error_key.is_none());
+        assert_eq!(app.zoom.zoom_percent, MAX_ZOOM_PERCENT);
+        assert_eq!(app.zoom.zoom_input, format_number(MAX_ZOOM_PERCENT));
+        assert_eq!(app.zoom.manual_zoom_percent, MAX_ZOOM_PERCENT);
+        assert!(!app.zoom.fit_to_window);
+        assert!(app.zoom.zoom_input_error_key.is_none());
     }
 
     #[test]
     fn submitting_invalid_zoom_sets_error() {
         let mut app = App::default();
-        app.fit_to_window = true;
-        app.zoom_input = "oops".into();
+        app.zoom.fit_to_window = true;
+        app.zoom.zoom_input = "oops".into();
 
         let _ = app.update(Message::ZoomInputSubmitted);
 
-        assert_eq!(app.zoom_percent, DEFAULT_ZOOM_PERCENT);
-        assert!(app.fit_to_window);
-        assert_eq!(app.zoom_input_error_key, Some(ZOOM_INPUT_INVALID_KEY));
-        assert!(!app.zoom_input_dirty);
+        assert_eq!(app.zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert!(app.zoom.fit_to_window);
+        assert_eq!(app.zoom.zoom_input_error_key, Some(ZOOM_INPUT_INVALID_KEY));
+        assert!(!app.zoom.zoom_input_dirty);
     }
 
     #[test]
     fn reset_zoom_restores_defaults() {
         let mut app = App::default();
-        app.zoom_percent = 250.0;
-        app.manual_zoom_percent = 250.0;
-        app.fit_to_window = false;
-        app.zoom_input = "250".into();
+        app.zoom.zoom_percent = 250.0;
+        app.zoom.manual_zoom_percent = 250.0;
+        app.zoom.fit_to_window = false;
+        app.zoom.zoom_input = "250".into();
 
         let _ = app.update(Message::ResetZoom);
 
-        assert_eq!(app.zoom_percent, DEFAULT_ZOOM_PERCENT);
-        assert_eq!(app.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
-        assert_eq!(app.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));
-        assert!(!app.fit_to_window);
-        assert!(app.zoom_input_error_key.is_none());
+        assert_eq!(app.zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert_eq!(app.zoom.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert_eq!(app.zoom.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));
+        assert!(!app.zoom.fit_to_window);
+        assert!(app.zoom.zoom_input_error_key.is_none());
     }
 
     #[test]
@@ -1267,25 +1161,25 @@ mod tests {
             offset: AbsoluteOffset { x: 0.0, y: 0.0 },
         });
 
-        app.fit_to_window = false;
-        app.manual_zoom_percent = 160.0;
+        app.zoom.fit_to_window = false;
+        app.zoom.manual_zoom_percent = 160.0;
 
         let _ = app.update(Message::SetFitToWindow(true));
 
-        assert!(app.fit_to_window);
+        assert!(app.zoom.fit_to_window);
         let fit_zoom = app
             .compute_fit_zoom_percent()
             .expect("fit zoom should exist");
-        assert_eq!(app.zoom_percent, fit_zoom);
+        assert_eq!(app.zoom.zoom_percent, fit_zoom);
         assert!(fit_zoom <= DEFAULT_ZOOM_PERCENT);
-        assert_eq!(app.zoom_input, format_number(fit_zoom));
+        assert_eq!(app.zoom.zoom_input, format_number(fit_zoom));
 
         let _ = app.update(Message::SetFitToWindow(false));
 
-        assert!(!app.fit_to_window);
-        assert_eq!(app.zoom_percent, fit_zoom);
-        assert_eq!(app.manual_zoom_percent, fit_zoom);
-        assert_eq!(app.zoom_input, format_number(fit_zoom));
+        assert!(!app.zoom.fit_to_window);
+        assert_eq!(app.zoom.zoom_percent, fit_zoom);
+        assert_eq!(app.zoom.manual_zoom_percent, fit_zoom);
+        assert_eq!(app.zoom.zoom_input, format_number(fit_zoom));
     }
 
     #[test]
@@ -1304,18 +1198,18 @@ mod tests {
             offset: second,
         });
 
-        assert_eq!(app.previous_viewport_offset, first);
-        assert_eq!(app.viewport_offset, second);
-        assert_eq!(app.viewport_bounds, Some(bounds));
+        assert_eq!(app.viewport.previous_offset, first);
+        assert_eq!(app.viewport.offset, second);
+        assert_eq!(app.viewport.bounds, Some(bounds));
     }
 
     #[test]
     fn wheel_scroll_applies_zoom_step_when_over_image() {
         let mut app = App::default();
-        app.zoom_step_percent = 15.0;
-        app.zoom_percent = 100.0;
+        app.zoom.zoom_step_percent = 15.0;
+        app.zoom.zoom_percent = 100.0;
         app.image = Some(build_image(800, 600));
-        app.viewport_bounds = Some(Rectangle::new(
+        app.viewport.bounds = Some(Rectangle::new(
             Point::new(10.0, 10.0),
             iced::Size::new(400.0, 300.0),
         ));
@@ -1325,20 +1219,20 @@ mod tests {
         let delta = mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 };
         let _ = app.handle_wheel_zoom(delta);
 
-        assert_eq!(app.zoom_percent, 115.0);
-        assert_eq!(app.manual_zoom_percent, 115.0);
-        assert!(!app.fit_to_window);
+        assert_eq!(app.zoom.zoom_percent, 115.0);
+        assert_eq!(app.zoom.manual_zoom_percent, 115.0);
+        assert!(!app.zoom.fit_to_window);
     }
 
     #[test]
     fn wheel_scroll_ignored_when_cursor_not_over_image() {
         let mut app = App::default();
-        app.zoom_step_percent = 20.0;
-        app.zoom_percent = 150.0;
-        app.manual_zoom_percent = 150.0;
-        app.fit_to_window = false;
+        app.zoom.zoom_step_percent = 20.0;
+        app.zoom.zoom_percent = 150.0;
+        app.zoom.manual_zoom_percent = 150.0;
+        app.zoom.fit_to_window = false;
         app.image = Some(build_image(800, 600));
-        app.viewport_bounds = Some(Rectangle::new(
+        app.viewport.bounds = Some(Rectangle::new(
             Point::new(0.0, 0.0),
             iced::Size::new(400.0, 300.0),
         ));
@@ -1347,22 +1241,22 @@ mod tests {
         let delta = mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 };
         let _ = app.handle_wheel_zoom(delta);
 
-        assert_eq!(app.zoom_percent, 150.0);
-        assert_eq!(app.manual_zoom_percent, 150.0);
-        assert!(!app.fit_to_window);
+        assert_eq!(app.zoom.zoom_percent, 150.0);
+        assert_eq!(app.zoom.manual_zoom_percent, 150.0);
+        assert!(!app.zoom.fit_to_window);
     }
 
     #[test]
     fn wheel_scroll_ignored_when_cursor_over_scrollbar_area() {
         let mut app = App::default();
-        app.zoom_step_percent = 10.0;
-        app.zoom_percent = 120.0;
-        app.manual_zoom_percent = 120.0;
-        app.fit_to_window = false;
+        app.zoom.zoom_step_percent = 10.0;
+        app.zoom.zoom_percent = 120.0;
+        app.zoom.manual_zoom_percent = 120.0;
+        app.zoom.fit_to_window = false;
         app.image = Some(build_image(1600, 2000));
 
         let viewport = Rectangle::new(Point::new(0.0, 0.0), iced::Size::new(400.0, 300.0));
-        app.viewport_bounds = Some(viewport);
+        app.viewport.bounds = Some(viewport);
         app.cursor_position = Some(Point::new(
             viewport.x + viewport.width - 1.0,
             viewport.y + viewport.height / 2.0,
@@ -1371,37 +1265,37 @@ mod tests {
         let delta = mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 };
         let _ = app.handle_wheel_zoom(delta);
 
-        assert_eq!(app.zoom_percent, 120.0);
-        assert_eq!(app.manual_zoom_percent, 120.0);
-        assert!(!app.fit_to_window);
+        assert_eq!(app.zoom.zoom_percent, 120.0);
+        assert_eq!(app.zoom.manual_zoom_percent, 120.0);
+        assert!(!app.zoom.fit_to_window);
     }
 
     #[test]
     fn zoom_step_submission_updates_config() {
         let mut app = App::default();
-        app.zoom_step_input = "5".into();
+        app.zoom.zoom_step_input = "5".into();
 
         let _ = app.update(Message::ZoomStepSubmitted);
 
-        assert_eq!(app.zoom_step_percent, 5.0);
-        assert_eq!(app.zoom_step_input, "5");
-        assert!(app.zoom_step_error_key.is_none());
+        assert_eq!(app.zoom.zoom_step_percent, 5.0);
+        assert_eq!(app.zoom.zoom_step_input, "5");
+        assert!(app.zoom.zoom_step_error_key.is_none());
     }
 
     #[test]
     fn zoom_step_submission_rejects_invalid() {
         let mut app = App::default();
-        app.zoom_step_input = "0".into();
+        app.zoom.zoom_step_input = "0".into();
 
         let _ = app.update(Message::ZoomStepSubmitted);
 
-        assert_eq!(app.zoom_step_percent, MIN_ZOOM_STEP_PERCENT);
-        assert_eq!(app.zoom_step_input, format_number(MIN_ZOOM_STEP_PERCENT));
-        assert_eq!(app.zoom_step_error_key, Some(ZOOM_STEP_RANGE_KEY));
+        assert_eq!(app.zoom.zoom_step_percent, MIN_ZOOM_STEP_PERCENT);
+        assert_eq!(app.zoom.zoom_step_input, format_number(MIN_ZOOM_STEP_PERCENT));
+        assert_eq!(app.zoom.zoom_step_error_key, Some(ZOOM_STEP_RANGE_KEY));
 
-        app.zoom_step_input = "abc".into();
+        app.zoom.zoom_step_input = "abc".into();
         let _ = app.update(Message::ZoomStepSubmitted);
-        assert_eq!(app.zoom_step_error_key, Some(ZOOM_STEP_INVALID_KEY));
+        assert_eq!(app.zoom.zoom_step_error_key, Some(ZOOM_STEP_INVALID_KEY));
     }
 
     #[test]
@@ -1472,37 +1366,37 @@ mod tests {
     #[test]
     fn grab_and_drag_state_defaults_to_not_dragging() {
         let app = App::default();
-        assert!(!app.is_dragging);
-        assert!(app.drag_start_position.is_none());
-        assert!(app.drag_start_offset.is_none());
+        assert!(!app.drag.is_dragging);
+        assert!(app.drag.start_position.is_none());
+        assert!(app.drag.start_offset.is_none());
     }
 
     #[test]
     fn left_mouse_button_press_over_image_starts_drag() {
         let mut app = App::default();
         app.image = Some(build_image(800, 600));
-        app.viewport_bounds = Some(Rectangle::new(
+        app.viewport.bounds = Some(Rectangle::new(
             Point::new(0.0, 0.0),
             iced::Size::new(400.0, 300.0),
         ));
         app.cursor_position = Some(Point::new(200.0, 150.0));
-        app.viewport_offset = AbsoluteOffset { x: 50.0, y: 30.0 };
+        app.viewport.offset = AbsoluteOffset { x: 50.0, y: 30.0 };
 
         let _ = app.update(Message::MouseButtonPressed {
             button: mouse::Button::Left,
             position: Point::new(200.0, 150.0),
         });
 
-        assert!(app.is_dragging);
-        assert_eq!(app.drag_start_position, Some(Point::new(200.0, 150.0)));
-        assert_eq!(app.drag_start_offset, Some(AbsoluteOffset { x: 50.0, y: 30.0 }));
+        assert!(app.drag.is_dragging);
+        assert_eq!(app.drag.start_position, Some(Point::new(200.0, 150.0)));
+        assert_eq!(app.drag.start_offset, Some(AbsoluteOffset { x: 50.0, y: 30.0 }));
     }
 
     #[test]
     fn left_mouse_button_press_outside_image_does_not_start_drag() {
         let mut app = App::default();
         app.image = Some(build_image(100, 100));
-        app.viewport_bounds = Some(Rectangle::new(
+        app.viewport.bounds = Some(Rectangle::new(
             Point::new(0.0, 0.0),
             iced::Size::new(400.0, 300.0),
         ));
@@ -1513,21 +1407,21 @@ mod tests {
             position: Point::new(500.0, 500.0),
         });
 
-        assert!(!app.is_dragging);
-        assert!(app.drag_start_position.is_none());
+        assert!(!app.drag.is_dragging);
+        assert!(app.drag.start_position.is_none());
     }
 
     #[test]
     fn cursor_moved_while_dragging_updates_viewport_offset() {
         let mut app = App::default();
         app.image = Some(build_image(800, 600));
-        app.viewport_bounds = Some(Rectangle::new(
+        app.viewport.bounds = Some(Rectangle::new(
             Point::new(0.0, 0.0),
             iced::Size::new(400.0, 300.0),
         ));
-        app.is_dragging = true;
-        app.drag_start_position = Some(Point::new(200.0, 150.0));
-        app.drag_start_offset = Some(AbsoluteOffset { x: 50.0, y: 30.0 });
+        app.drag.is_dragging = true;
+        app.drag.start_position = Some(Point::new(200.0, 150.0));
+        app.drag.start_offset = Some(AbsoluteOffset { x: 50.0, y: 30.0 });
 
         let _ = app.update(Message::CursorMovedDuringDrag {
             position: Point::new(180.0, 130.0),
@@ -1536,43 +1430,43 @@ mod tests {
         // Cursor moved left/up: (200,150) -> (180,130), delta = (-20, -20)
         // In grab-and-drag, cursor moving left means dragging image right, so offset should increase
         // New offset: 50 - (-20) = 70, 30 - (-20) = 50
-        assert_eq!(app.viewport_offset.x, 70.0);
-        assert_eq!(app.viewport_offset.y, 50.0);
+        assert_eq!(app.viewport.offset.x, 70.0);
+        assert_eq!(app.viewport.offset.y, 50.0);
     }
 
     #[test]
     fn mouse_button_release_stops_dragging() {
         let mut app = App::default();
-        app.is_dragging = true;
-        app.drag_start_position = Some(Point::new(200.0, 150.0));
-        app.drag_start_offset = Some(AbsoluteOffset { x: 50.0, y: 30.0 });
+        app.drag.is_dragging = true;
+        app.drag.start_position = Some(Point::new(200.0, 150.0));
+        app.drag.start_offset = Some(AbsoluteOffset { x: 50.0, y: 30.0 });
 
         let _ = app.update(Message::MouseButtonReleased {
             button: mouse::Button::Left,
         });
 
-        assert!(!app.is_dragging);
-        assert!(app.drag_start_position.is_none());
-        assert!(app.drag_start_offset.is_none());
+        assert!(!app.drag.is_dragging);
+        assert!(app.drag.start_position.is_none());
+        assert!(app.drag.start_offset.is_none());
     }
 
     #[test]
     fn cursor_moved_while_not_dragging_does_not_update_offset() {
         let mut app = App::default();
         app.image = Some(build_image(800, 600));
-        app.viewport_bounds = Some(Rectangle::new(
+        app.viewport.bounds = Some(Rectangle::new(
             Point::new(0.0, 0.0),
             iced::Size::new(400.0, 300.0),
         ));
-        app.viewport_offset = AbsoluteOffset { x: 50.0, y: 30.0 };
-        app.is_dragging = false;
+        app.viewport.offset = AbsoluteOffset { x: 50.0, y: 30.0 };
+        app.drag.is_dragging = false;
 
-        let initial_offset = app.viewport_offset;
+        let initial_offset = app.viewport.offset;
 
         let _ = app.update(Message::CursorMovedDuringDrag {
             position: Point::new(180.0, 130.0),
         });
 
-        assert_eq!(app.viewport_offset, initial_offset);
+        assert_eq!(app.viewport.offset, initial_offset);
     }
 }
