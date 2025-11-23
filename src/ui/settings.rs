@@ -36,7 +36,7 @@ use iced::{
 pub fn view_settings(app: &App) -> Element<'_, Message> {
     let title = Text::new(app.i18n.tr("settings-title")).size(30);
 
-    let mut language_selection_column = Column::new().spacing(10);
+    let mut language_selection_row = Row::new().spacing(10).align_y(Vertical::Center);
 
     for locale in &app.i18n.available_locales {
         let display_name = locale.to_string(); // Fallback to string representation
@@ -60,7 +60,7 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
             button = button.style(button::secondary);
         }
 
-        language_selection_column = language_selection_column.push(button);
+        language_selection_row = language_selection_row.push(button);
     }
 
     let zoom_step_label = Text::new(app.i18n.tr("settings-zoom-step-label"));
@@ -154,7 +154,7 @@ pub fn view_settings(app: &App) -> Element<'_, Message> {
         Column::new()
             .spacing(12)
             .push(Text::new(app.i18n.tr("select-language-label")).size(18))
-            .push(language_selection_column),
+            .push(language_selection_row),
     )
     .padding(16)
     .width(Length::Fill)
