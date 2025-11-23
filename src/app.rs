@@ -5,6 +5,7 @@ use crate::i18n::fluent::I18n;
 use crate::image_handler::{self, ImageData};
 use crate::ui::settings;
 use crate::ui::viewer;
+use crate::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
 use iced::widget::scrollable::{self, AbsoluteOffset, Direction, Id, RelativeOffset, Scrollbar, Viewport};
 use iced::widget::text_input;
 use iced::{
@@ -788,35 +789,8 @@ impl App {
             event::Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::WheelScrolled { delta } => {
                     // Mouse wheel is now used for zoom (not scroll)
-                    // After handling zoom, reset scrollable position to prevent any scroll
-                    let zoom_task = self.handle_wheel_zoom(delta);
-
-                    // Immediately snap back to current offset to counter any scroll the Scrollable might do
-                    if let (Some(viewport), Some(size)) = (self.viewport_bounds, self.scaled_image_size()) {
-                        let max_offset_x = (size.width - viewport.width).max(0.0);
-                        let max_offset_y = (size.height - viewport.height).max(0.0);
-
-                        let relative_x = if max_offset_x > 0.0 {
-                            (self.viewport_offset.x / max_offset_x).clamp(0.0, 1.0)
-                        } else {
-                            0.0
-                        };
-
-                        let relative_y = if max_offset_y > 0.0 {
-                            (self.viewport_offset.y / max_offset_y).clamp(0.0, 1.0)
-                        } else {
-                            0.0
-                        };
-
-                        let snap_task = scrollable::snap_to(
-                            Id::new(VIEWER_SCROLLABLE_ID),
-                            RelativeOffset { x: relative_x, y: relative_y },
-                        );
-
-                        Task::batch(vec![zoom_task, snap_task])
-                    } else {
-                        zoom_task
-                    }
+                    // The Scrollable is wrapped in a wheel-blocking widget, so it won't receive this event
+                    self.handle_wheel_zoom(delta)
                 }
                 mouse::Event::ButtonPressed(button) => {
                     if let Some(position) = self.cursor_position {
@@ -995,7 +969,10 @@ impl App {
                             }
                         });
 
-                    // Wrap scrollable in mouse_area to control cursor
+                    // Wrap scrollable with wheel-blocking widget to prevent wheel scroll
+                    let wheel_blocked_scrollable = wheel_blocking_scrollable(scrollable);
+
+                    // Wrap in mouse_area to control cursor
                     let cursor_interaction = if self.is_dragging {
                         mouse::Interaction::Grabbing
                     } else if self.is_cursor_over_image() {
@@ -1004,7 +981,7 @@ impl App {
                         mouse::Interaction::default()
                     };
 
-                    let scrollable_with_cursor = mouse_area(scrollable)
+                    let scrollable_with_cursor = mouse_area(wheel_blocked_scrollable)
                         .interaction(cursor_interaction);
 
                     // Create scrollable container with position indicator overlay
