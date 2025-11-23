@@ -5,13 +5,13 @@ use crate::i18n::fluent::I18n;
 use crate::image_handler::{self, ImageData};
 use crate::ui::settings;
 use crate::ui::viewer;
-use iced::widget::scrollable::{AbsoluteOffset, Direction, Scrollbar, Viewport};
+use iced::widget::scrollable::{self, AbsoluteOffset, Direction, Id, RelativeOffset, Scrollbar, Viewport};
 use iced::widget::text_input;
 use iced::{
     alignment::{Horizontal, Vertical},
     event, keyboard, mouse,
-    widget::{button, checkbox, Column, Container, Row, Scrollable, Space, Text},
-    window, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
+    widget::{button, checkbox, mouse_area, Column, Container, Row, Scrollable, Space, Stack, Text},
+    window, Border, Color, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
 };
 use std::fmt;
 
@@ -35,6 +35,9 @@ pub struct App {
     previous_viewport_offset: AbsoluteOffset,
     viewport_bounds: Option<Rectangle>,
     cursor_position: Option<Point>,
+    is_dragging: bool,
+    drag_start_position: Option<Point>,
+    drag_start_offset: Option<AbsoluteOffset>,
 }
 
 const MIN_ZOOM_PERCENT: f32 = 10.0;
@@ -47,6 +50,8 @@ const SCROLLBAR_GUTTER: f32 = 16.0;
 const ZOOM_INPUT_INVALID_KEY: &str = "viewer-zoom-input-error-invalid";
 const ZOOM_STEP_INVALID_KEY: &str = "viewer-zoom-step-error-invalid";
 const ZOOM_STEP_RANGE_KEY: &str = "viewer-zoom-step-error-range";
+
+const VIEWER_SCROLLABLE_ID: &str = "viewer-image-scrollable";
 
 fn default_offset() -> AbsoluteOffset {
     AbsoluteOffset { x: 0.0, y: 0.0 }
@@ -185,6 +190,9 @@ impl Default for App {
             previous_viewport_offset: default_offset(),
             viewport_bounds: None,
             cursor_position: None,
+            is_dragging: false,
+            drag_start_position: None,
+            drag_start_offset: None,
         }
     }
 }
@@ -210,6 +218,16 @@ pub enum Message {
     CtrlZoom {
         delta: mouse::ScrollDelta,
         control: bool,
+    },
+    MouseButtonPressed {
+        button: mouse::Button,
+        position: Point,
+    },
+    MouseButtonReleased {
+        button: mouse::Button,
+    },
+    CursorMovedDuringDrag {
+        position: Point,
     },
     RawEvent(event::Event),
 }
@@ -430,6 +448,15 @@ impl App {
                 Task::none()
             }
             Message::CtrlZoom { delta, control } => self.handle_ctrl_zoom(delta, control),
+            Message::MouseButtonPressed { button, position } => {
+                self.handle_mouse_button_pressed(button, position)
+            }
+            Message::MouseButtonReleased { button } => {
+                self.handle_mouse_button_released(button)
+            }
+            Message::CursorMovedDuringDrag { position } => {
+                self.handle_cursor_moved_during_drag(position)
+            }
             Message::RawEvent(event) => self.handle_raw_event(event),
         }
     }
@@ -528,6 +555,34 @@ impl App {
         }
     }
 
+    fn scroll_position_percentage(&self) -> Option<(f32, f32)> {
+        // Calculate scroll position as percentage (0-100% for both axes)
+        let viewport = self.viewport_bounds?;
+        let size = self.scaled_image_size()?;
+
+        // If image is smaller than viewport, no scrolling needed
+        if size.width <= viewport.width && size.height <= viewport.height {
+            return None;
+        }
+
+        let max_offset_x = (size.width - viewport.width).max(0.0);
+        let max_offset_y = (size.height - viewport.height).max(0.0);
+
+        let percent_x = if max_offset_x > 0.0 {
+            (self.viewport_offset.x / max_offset_x * 100.0).min(100.0)
+        } else {
+            0.0
+        };
+
+        let percent_y = if max_offset_y > 0.0 {
+            (self.viewport_offset.y / max_offset_y * 100.0).min(100.0)
+        } else {
+            0.0
+        };
+
+        Some((percent_x, percent_y))
+    }
+
     fn image_bounds_in_window(&self) -> Option<Rectangle> {
         let viewport = self.viewport_bounds?;
         let size = self.scaled_image_size()?;
@@ -620,6 +675,81 @@ impl App {
         self.zoom_step_error_key
     }
 
+    fn handle_mouse_button_pressed(&mut self, button: mouse::Button, position: Point) -> Task<Message> {
+        // Only start drag on left button press over the image
+        if button == mouse::Button::Left && self.is_cursor_over_image() {
+            self.is_dragging = true;
+            self.drag_start_position = Some(position);
+            self.drag_start_offset = Some(self.viewport_offset);
+        }
+        Task::none()
+    }
+
+    fn handle_mouse_button_released(&mut self, button: mouse::Button) -> Task<Message> {
+        // Stop dragging on left button release
+        if button == mouse::Button::Left {
+            self.is_dragging = false;
+            self.drag_start_position = None;
+            self.drag_start_offset = None;
+        }
+        Task::none()
+    }
+
+    fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Task<Message> {
+        // Only update offset if currently dragging
+        if !self.is_dragging {
+            return Task::none();
+        }
+
+        let start_pos = match self.drag_start_position {
+            Some(pos) => pos,
+            None => return Task::none(),
+        };
+
+        let start_offset = match self.drag_start_offset {
+            Some(offset) => offset,
+            None => return Task::none(),
+        };
+
+        // Calculate delta: how much the cursor has moved
+        let delta_x = position.x - start_pos.x;
+        let delta_y = position.y - start_pos.y;
+
+        // Calculate new viewport offset (inverse direction: moving cursor right scrolls content left)
+        let new_offset = AbsoluteOffset {
+            x: (start_offset.x - delta_x).max(0.0),
+            y: (start_offset.y - delta_y).max(0.0),
+        };
+
+        self.viewport_offset = new_offset;
+
+        // Convert absolute offset to relative offset (0.0-1.0 range)
+        if let (Some(viewport), Some(size)) = (self.viewport_bounds, self.scaled_image_size()) {
+            let max_offset_x = (size.width - viewport.width).max(0.0);
+            let max_offset_y = (size.height - viewport.height).max(0.0);
+
+            let relative_x = if max_offset_x > 0.0 {
+                (new_offset.x / max_offset_x).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+
+            let relative_y = if max_offset_y > 0.0 {
+                (new_offset.y / max_offset_y).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+
+            // Snap scrollable to the new offset
+            scrollable::snap_to(
+                Id::new(VIEWER_SCROLLABLE_ID),
+                RelativeOffset { x: relative_x, y: relative_y },
+            )
+        } else {
+            Task::none()
+        }
+    }
+
     fn handle_ctrl_zoom(&mut self, delta: mouse::ScrollDelta, control: bool) -> Task<Message> {
         if !control || !self.is_cursor_over_image() {
             return Task::none();
@@ -650,12 +780,32 @@ impl App {
                     let control = self.modifiers.control();
                     self.handle_ctrl_zoom(delta, control)
                 }
+                mouse::Event::ButtonPressed(button) => {
+                    if let Some(position) = self.cursor_position {
+                        self.handle_mouse_button_pressed(button, position)
+                    } else {
+                        Task::none()
+                    }
+                }
+                mouse::Event::ButtonReleased(button) => {
+                    self.handle_mouse_button_released(button)
+                }
                 mouse::Event::CursorMoved { position } => {
                     self.cursor_position = Some(position);
-                    Task::none()
+                    if self.is_dragging {
+                        self.handle_cursor_moved_during_drag(position)
+                    } else {
+                        Task::none()
+                    }
                 }
                 mouse::Event::CursorLeft => {
                     self.cursor_position = None;
+                    // Stop dragging if cursor leaves window
+                    if self.is_dragging {
+                        self.is_dragging = false;
+                        self.drag_start_position = None;
+                        self.drag_start_offset = None;
+                    }
                     Task::none()
                 }
                 _ => Task::none(),
@@ -788,11 +938,16 @@ impl App {
                     let image_container = Container::new(image_viewer).padding(padding);
 
                     let scrollable = Scrollable::new(image_container)
+                        .id(Id::new(VIEWER_SCROLLABLE_ID))
                         .width(Length::Fill)
                         .height(Length::Fill)
                         .direction(Direction::Both {
-                            vertical: Scrollbar::new(),
-                            horizontal: Scrollbar::new(),
+                            vertical: Scrollbar::new()
+                                .width(0)
+                                .scroller_width(0),
+                            horizontal: Scrollbar::new()
+                                .width(0)
+                                .scroller_width(0),
                         })
                         .on_scroll(|viewport: Viewport| {
                             let bounds = viewport.bounds();
@@ -802,19 +957,68 @@ impl App {
                             }
                         });
 
+                    // Wrap scrollable in mouse_area to control cursor
+                    let cursor_interaction = if self.is_dragging {
+                        mouse::Interaction::Grabbing
+                    } else if self.is_cursor_over_image() {
+                        mouse::Interaction::Grab
+                    } else {
+                        mouse::Interaction::default()
+                    };
+
+                    let scrollable_with_cursor = mouse_area(scrollable)
+                        .interaction(cursor_interaction);
+
+                    // Create scrollable container with position indicator overlay
+                    let scrollable_container = Container::new(scrollable_with_cursor)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .align_x(iced::alignment::Horizontal::Center)
+                        .align_y(iced::alignment::Vertical::Center);
+
+                    // Add position indicator if scrolling is active
+                    let viewer_content: Element<'_, Message> = if let Some((px, py)) = self.scroll_position_percentage() {
+                        let indicator_text = format!("Position: {:.0}% x {:.0}%", px, py);
+                        let indicator = Container::new(
+                            Text::new(indicator_text)
+                                .size(12)
+                        )
+                        .padding(6)
+                        .style(|_theme: &Theme| {
+                            iced::widget::container::Style {
+                                background: Some(iced::Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.7))),
+                                text_color: Some(Color::WHITE),
+                                border: Border {
+                                    color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
+                                    width: 1.0,
+                                    radius: 4.0.into(),
+                                },
+                                ..Default::default()
+                            }
+                        });
+
+                        Stack::new()
+                            .push(scrollable_container)
+                            .push(
+                                Container::new(indicator)
+                                    .width(Length::Fill)
+                                    .height(Length::Fill)
+                                    .padding(10)
+                                    .align_x(Horizontal::Right)
+                                    .align_y(Vertical::Bottom),
+                            )
+                            .into()
+                    } else {
+                        scrollable_container.into()
+                    };
+
                     let mut viewer_column = Column::new()
                         .spacing(16)
                         .width(Length::Fill)
                         .height(Length::Fill)
                         .push(zoom_controls);
 
-                    viewer_column = viewer_column.push(
-                        Container::new(scrollable)
-                            .width(Length::Fill)
-                            .height(Length::Fill)
-                            .align_x(iced::alignment::Horizontal::Center)
-                            .align_y(iced::alignment::Vertical::Center),
-                    );
+                    viewer_column = viewer_column.push(viewer_content);
 
                     viewer_column.into()
                 } else {
@@ -852,6 +1056,8 @@ impl App {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
+#[allow(clippy::assertions_on_constants)]
 mod tests {
     use super::*;
     use crate::image_handler::ImageData;
@@ -1275,5 +1481,112 @@ mod tests {
         let min_fr = ws_fr.min_size.expect("min size fr").width;
 
         assert!(min_fr >= min_en);
+    }
+
+    #[test]
+    fn grab_and_drag_state_defaults_to_not_dragging() {
+        let app = App::default();
+        assert!(!app.is_dragging);
+        assert!(app.drag_start_position.is_none());
+        assert!(app.drag_start_offset.is_none());
+    }
+
+    #[test]
+    fn left_mouse_button_press_over_image_starts_drag() {
+        let mut app = App::default();
+        app.image = Some(build_image(800, 600));
+        app.viewport_bounds = Some(Rectangle::new(
+            Point::new(0.0, 0.0),
+            iced::Size::new(400.0, 300.0),
+        ));
+        app.cursor_position = Some(Point::new(200.0, 150.0));
+        app.viewport_offset = AbsoluteOffset { x: 50.0, y: 30.0 };
+
+        let _ = app.update(Message::MouseButtonPressed {
+            button: mouse::Button::Left,
+            position: Point::new(200.0, 150.0),
+        });
+
+        assert!(app.is_dragging);
+        assert_eq!(app.drag_start_position, Some(Point::new(200.0, 150.0)));
+        assert_eq!(app.drag_start_offset, Some(AbsoluteOffset { x: 50.0, y: 30.0 }));
+    }
+
+    #[test]
+    fn left_mouse_button_press_outside_image_does_not_start_drag() {
+        let mut app = App::default();
+        app.image = Some(build_image(100, 100));
+        app.viewport_bounds = Some(Rectangle::new(
+            Point::new(0.0, 0.0),
+            iced::Size::new(400.0, 300.0),
+        ));
+        app.cursor_position = Some(Point::new(500.0, 500.0));
+
+        let _ = app.update(Message::MouseButtonPressed {
+            button: mouse::Button::Left,
+            position: Point::new(500.0, 500.0),
+        });
+
+        assert!(!app.is_dragging);
+        assert!(app.drag_start_position.is_none());
+    }
+
+    #[test]
+    fn cursor_moved_while_dragging_updates_viewport_offset() {
+        let mut app = App::default();
+        app.image = Some(build_image(800, 600));
+        app.viewport_bounds = Some(Rectangle::new(
+            Point::new(0.0, 0.0),
+            iced::Size::new(400.0, 300.0),
+        ));
+        app.is_dragging = true;
+        app.drag_start_position = Some(Point::new(200.0, 150.0));
+        app.drag_start_offset = Some(AbsoluteOffset { x: 50.0, y: 30.0 });
+
+        let _ = app.update(Message::CursorMovedDuringDrag {
+            position: Point::new(180.0, 130.0),
+        });
+
+        // Cursor moved left/up: (200,150) -> (180,130), delta = (-20, -20)
+        // In grab-and-drag, cursor moving left means dragging image right, so offset should increase
+        // New offset: 50 - (-20) = 70, 30 - (-20) = 50
+        assert_eq!(app.viewport_offset.x, 70.0);
+        assert_eq!(app.viewport_offset.y, 50.0);
+    }
+
+    #[test]
+    fn mouse_button_release_stops_dragging() {
+        let mut app = App::default();
+        app.is_dragging = true;
+        app.drag_start_position = Some(Point::new(200.0, 150.0));
+        app.drag_start_offset = Some(AbsoluteOffset { x: 50.0, y: 30.0 });
+
+        let _ = app.update(Message::MouseButtonReleased {
+            button: mouse::Button::Left,
+        });
+
+        assert!(!app.is_dragging);
+        assert!(app.drag_start_position.is_none());
+        assert!(app.drag_start_offset.is_none());
+    }
+
+    #[test]
+    fn cursor_moved_while_not_dragging_does_not_update_offset() {
+        let mut app = App::default();
+        app.image = Some(build_image(800, 600));
+        app.viewport_bounds = Some(Rectangle::new(
+            Point::new(0.0, 0.0),
+            iced::Size::new(400.0, 300.0),
+        ));
+        app.viewport_offset = AbsoluteOffset { x: 50.0, y: 30.0 };
+        app.is_dragging = false;
+
+        let initial_offset = app.viewport_offset;
+
+        let _ = app.update(Message::CursorMovedDuringDrag {
+            position: Point::new(180.0, 130.0),
+        });
+
+        assert_eq!(app.viewport_offset, initial_offset);
     }
 }

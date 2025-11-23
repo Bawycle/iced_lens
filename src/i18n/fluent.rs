@@ -185,8 +185,10 @@ mod tests {
 
     #[test]
     fn test_resolve_locale_config() {
-        let mut config = Config::default();
-        config.language = Some("fr".to_string());
+        let config = Config {
+            language: Some("fr".to_string()),
+            ..Default::default()
+        };
         let available: Vec<LanguageIdentifier> =
             vec!["en-US".parse().unwrap(), "fr".parse().unwrap()];
         let lang = resolve_locale(None, &config, &available);

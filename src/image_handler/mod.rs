@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn image_error_conversion_returns_io_variant() {
-        let io_err = io::Error::new(io::ErrorKind::Other, "decode failed");
+        let io_err = io::Error::other("decode failed");
         let image_error = ImageError::IoError(io_err);
         let error: Error = image_error.into();
         match error {

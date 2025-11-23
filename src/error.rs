@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn from_io_error_produces_io_variant() {
-        let io_error = std::io::Error::new(std::io::ErrorKind::Other, "boom");
+        let io_error = std::io::Error::other("boom");
         let err: Error = io_error.into();
         match err {
             Error::Io(message) => assert!(message.contains("boom")),

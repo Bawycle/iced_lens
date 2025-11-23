@@ -4,6 +4,7 @@ use iced_lens::i18n::fluent::I18n;
 use tempfile::tempdir;
 
 #[test]
+#[allow(clippy::assertions_on_constants)]
 fn test_open_image_updates_state() {
     // This will require the full application state and image loading to be implemented.
     // For now, this is a placeholder.

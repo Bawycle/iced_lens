@@ -25,10 +25,7 @@ pub fn load_window_icon() -> Option<Icon> {
     let scale_y = target as f32 / orig_size.height();
     let transform = tiny_skia::Transform::from_scale(scale_x, scale_y);
 
-    let mut pixmap = match tiny_skia::Pixmap::new(target, target) {
-        Some(p) => p,
-        None => return None,
-    };
+    let mut pixmap = tiny_skia::Pixmap::new(target, target)?;
 
     resvg::render(&tree, transform, &mut pixmap.as_mut());
 
