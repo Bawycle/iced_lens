@@ -352,6 +352,19 @@ impl App {
                 Task::none()
             }
             Message::SwitchMode(mode) => {
+                if matches!(mode, AppMode::Viewer) && self.zoom.zoom_step_input_dirty {
+                    match self.apply_zoom_step_input() {
+                        Ok(task) => {
+                            self.mode = mode;
+                            return task;
+                        }
+                        Err(_) => {
+                            self.mode = AppMode::Settings;
+                            return Task::none();
+                        }
+                    }
+                }
+
                 self.mode = mode;
                 Task::none()
             }
@@ -425,25 +438,10 @@ impl App {
                 self.zoom.zoom_step_error_key = None;
                 Task::none()
             }
-            Message::ZoomStepSubmitted => {
-                self.zoom.zoom_step_input_dirty = false;
-
-                if let Some(value) = parse_number(&self.zoom.zoom_step_input) {
-                    let clamped = clamp_zoom_step(value);
-                    self.zoom.zoom_step_percent = clamped;
-                    self.zoom.zoom_step_input = format_number(clamped);
-                    if (clamped - value).abs() > f32::EPSILON {
-                        self.zoom.zoom_step_error_key = Some(ZOOM_STEP_RANGE_KEY);
-                    } else {
-                        self.zoom.zoom_step_error_key = None;
-                    }
-                    return self.persist_preferences();
-                } else {
-                    self.zoom.zoom_step_error_key = Some(ZOOM_STEP_INVALID_KEY);
-                }
-
-                Task::none()
-            }
+            Message::ZoomStepSubmitted => match self.apply_zoom_step_input() {
+                Ok(task) => task,
+                Err(_) => Task::none(),
+            },
             Message::BackgroundThemeSelected(theme) => {
                 if self.background_theme != theme {
                     self.background_theme = theme;
@@ -633,6 +631,26 @@ impl App {
 
     pub(crate) fn background_theme(&self) -> config::BackgroundTheme {
         self.background_theme
+    }
+
+    fn apply_zoom_step_input(&mut self) -> Result<Task<Message>, ()> {
+        if let Some(value) = parse_number(&self.zoom.zoom_step_input) {
+            if value < MIN_ZOOM_STEP_PERCENT || value > MAX_ZOOM_STEP_PERCENT {
+                self.zoom.zoom_step_error_key = Some(ZOOM_STEP_RANGE_KEY);
+                self.zoom.zoom_step_input_dirty = true;
+                return Err(());
+            }
+
+            self.zoom.zoom_step_percent = value;
+            self.zoom.zoom_step_input = format_number(value);
+            self.zoom.zoom_step_input_dirty = false;
+            self.zoom.zoom_step_error_key = None;
+            Ok(self.persist_preferences())
+        } else {
+            self.zoom.zoom_step_error_key = Some(ZOOM_STEP_INVALID_KEY);
+            self.zoom.zoom_step_input_dirty = true;
+            Err(())
+        }
     }
 
     fn handle_mouse_button_pressed(
@@ -1170,6 +1188,58 @@ mod tests {
     }
 
     #[test]
+    fn zoom_step_changes_commit_when_leaving_settings() {
+        with_temp_config_dir(|_| {
+            let mut app = App::default();
+            app.mode = AppMode::Settings;
+            app.zoom.zoom_step_input = "25".into();
+            app.zoom.zoom_step_input_dirty = true;
+
+            let _ = app.update(Message::SwitchMode(AppMode::Viewer));
+
+            assert_eq!(app.mode, AppMode::Viewer);
+            assert_eq!(app.zoom.zoom_step_percent, 25.0);
+            assert_eq!(app.zoom.zoom_step_input, "25");
+            assert!(!app.zoom.zoom_step_input_dirty);
+            assert!(app.zoom.zoom_step_error_key.is_none());
+        });
+    }
+
+    #[test]
+    fn invalid_zoom_step_prevents_leaving_settings() {
+        with_temp_config_dir(|_| {
+            let mut app = App::default();
+            app.mode = AppMode::Settings;
+            app.zoom.zoom_step_input = "not-a-number".into();
+            app.zoom.zoom_step_input_dirty = true;
+
+            let _ = app.update(Message::SwitchMode(AppMode::Viewer));
+
+            assert_eq!(app.mode, AppMode::Settings);
+            assert!(app.zoom.zoom_step_error_key.is_some());
+            assert!(app.zoom.zoom_step_input_dirty);
+            assert_eq!(app.zoom.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
+        });
+    }
+
+    #[test]
+    fn out_of_range_zoom_step_shows_error_and_stays_in_settings() {
+        with_temp_config_dir(|_| {
+            let mut app = App::default();
+            app.mode = AppMode::Settings;
+            app.zoom.zoom_step_input = "500".into();
+            app.zoom.zoom_step_input_dirty = true;
+
+            let _ = app.update(Message::SwitchMode(AppMode::Viewer));
+
+            assert_eq!(app.mode, AppMode::Settings);
+            assert_eq!(app.zoom.zoom_step_error_key, Some(ZOOM_STEP_RANGE_KEY));
+            assert!(app.zoom.zoom_step_input_dirty);
+            assert_eq!(app.zoom.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
+        });
+    }
+
+    #[test]
     fn update_image_loaded_err_clears_image_and_sets_error() {
         let mut app = App::default();
         app.image = Some(sample_image_data());
@@ -1389,15 +1459,13 @@ mod tests {
     #[test]
     fn zoom_step_submission_rejects_invalid() {
         let mut app = App::default();
+        let original = app.zoom.zoom_step_percent;
         app.zoom.zoom_step_input = "0".into();
 
         let _ = app.update(Message::ZoomStepSubmitted);
 
-        assert_eq!(app.zoom.zoom_step_percent, MIN_ZOOM_STEP_PERCENT);
-        assert_eq!(
-            app.zoom.zoom_step_input,
-            format_number(MIN_ZOOM_STEP_PERCENT)
-        );
+        assert_eq!(app.zoom.zoom_step_percent, original);
+        assert_eq!(app.zoom.zoom_step_input, "0");
         assert_eq!(app.zoom.zoom_step_error_key, Some(ZOOM_STEP_RANGE_KEY));
 
         app.zoom.zoom_step_input = "abc".into();
