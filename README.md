@@ -36,18 +36,12 @@ Lightweight, internationalized image viewer powered by the [Iced](https://iced.r
 IcedLens aims to provide a simple, privacy‑friendly viewer focusing on responsive zoom ergonomics, clean layout, and multilingual support—without bundling heavy editing logic. It is designed as a foundation that can evolve toward a minimal asset inspector or media desk utility.
 
 ## 2. Features
-- Image formats: JPEG, PNG, GIF (static), TIFF, WebP, BMP, ICO
+- Common image formats: JPEG, PNG, GIF (static), TIFF, WebP, BMP, ICO
 - SVG rasterization for scalable assets
-- Fit‑to‑window vs manual zoom retention
-- **Grab-and-drag navigation**: Click and drag with left mouse button to pan large images
-- **Position indicator**: Visual overlay showing current scroll position as percentage
-- **Mouse wheel zoom**: Scroll to zoom in/out (only when hovering the image)
-- Intuitive cursor feedback: grab/grabbing cursors when hovering/dragging images
-- Centered image with dynamic padding when smaller than viewport
-- Hidden scrollbars for clean interface while maintaining full navigation
-- Persistent preferences (language, zoom step, fit toggle) via TOML config
-- Fluent‑based runtime language switching (English, French initial set)
-- Modular architecture prepared for future extensions (e.g. editing, video, annotations)
+- Fit‑to‑window and manual zoom with wheel and toolbar controls
+- Simple grab‑to‑pan navigation for large images
+- Persistent preferences (language, zoom step, fit mode)
+- Internationalization with Fluent (currently `en-US` and `fr`)
 
 ## 3. Screenshots
 Screenshots will be added once UI stabilizes. Feel free to open an issue and propose layout improvements.
@@ -133,15 +127,10 @@ To contribute a new locale, see `CONTRIBUTING.md` (translation workflow section)
 Override directory: pass `--i18n-dir /custom/translations` to load `.ftl` files from an alternate location. If the path is invalid, the application falls back to the built‑in `assets/i18n/` directory.
 
 ## 8. Zoom & Viewing Model
-- **Grab-and-drag navigation**: Primary method for panning through large images; left-click and drag to scroll smoothly in any direction.
-- **Mouse wheel zoom**: Scroll wheel zooms in/out when cursor is over the image (no modifier key required).
-- **Position awareness**: Visual indicator displays current scroll position as percentages when image exceeds viewport.
-- Manual zoom retains last chosen level when toggling fit‑to‑window off.
-- Fit zoom recalculates dynamically based on viewport rectangle (not cached stale dimensions).
-- Zoom input gated: only active if pointer overlaps the image (prevents conflicts with UI controls).
-- Padding ensures small images remain visually centered.
-- Zoom step is clamped to a reasonable range to avoid extreme jumps.
-- **Clean interface**: Scrollbars are hidden while maintaining full navigation via grab-and-drag.
+- Mouse wheel zoom in/out when the cursor is over the image
+- Optional fit‑to‑window mode or manual zoom level
+- Grab‑and‑drag panning for oversized images
+- Reasonable zoom step limits to avoid extreme jumps
 
 ## 9. Performance & Benchmarks
 Criterion benchmarks: see `benches/image_loading.rs`.
