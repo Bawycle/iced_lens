@@ -873,7 +873,8 @@ impl App {
                         self.i18n.tr("viewer-fit-to-window-toggle"),
                         self.zoom.fit_to_window,
                     )
-                    .on_toggle(Message::SetFitToWindow);
+                    .on_toggle(Message::SetFitToWindow)
+                    .text_wrapping(iced::widget::text::Wrapping::Word);
 
                     let zoom_controls_row = Row::new()
                         .spacing(10)
