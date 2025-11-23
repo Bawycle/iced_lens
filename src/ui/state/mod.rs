@@ -4,11 +4,11 @@
 //! This module contains all the UI state logic separated from the main App struct,
 //! following the principle of separation of concerns.
 
-pub mod zoom;
-pub mod viewport;
 pub mod drag;
+pub mod viewport;
+pub mod zoom;
 
 // Re-export commonly used types for convenience
-pub use zoom::ZoomState;
-pub use viewport::ViewportState;
 pub use drag::DragState;
+pub use viewport::ViewportState;
+pub use zoom::ZoomState;

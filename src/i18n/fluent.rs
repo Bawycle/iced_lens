@@ -52,7 +52,10 @@ fn pick_dir(override_dir: Option<String>) -> String {
         if std::path::Path::new(&dir).is_dir() {
             return dir;
         } else {
-            eprintln!("Provided i18n directory does not exist or is not a directory: {}", dir);
+            eprintln!(
+                "Provided i18n directory does not exist or is not a directory: {}",
+                dir
+            );
         }
     }
     TRANSLATIONS_DIR.to_string()
@@ -97,8 +100,8 @@ impl I18n {
         available_locales.sort_by_key(|a| a.to_string());
 
         let default_locale: LanguageIdentifier = "en-US".parse().unwrap();
-        let current_locale = resolve_locale(cli_lang, config, &available_locales)
-            .unwrap_or(default_locale);
+        let current_locale =
+            resolve_locale(cli_lang, config, &available_locales).unwrap_or(default_locale);
 
         Self {
             bundles,

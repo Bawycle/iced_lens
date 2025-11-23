@@ -7,12 +7,16 @@ use crate::ui::settings;
 use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer;
 use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
-use iced::widget::scrollable::{self, AbsoluteOffset, Direction, Id, RelativeOffset, Scrollbar, Viewport};
+use iced::widget::scrollable::{
+    self, AbsoluteOffset, Direction, Id, RelativeOffset, Scrollbar, Viewport,
+};
 use iced::widget::text_input;
 use iced::{
     alignment::{Horizontal, Vertical},
     event, keyboard, mouse,
-    widget::{button, checkbox, mouse_area, Column, Container, Row, Scrollable, Space, Stack, Text},
+    widget::{
+        button, checkbox, mouse_area, Column, Container, Row, Scrollable, Space, Stack, Text,
+    },
     window, Border, Color, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
 };
 use std::fmt;
@@ -225,7 +229,8 @@ fn compute_min_window_width(i18n: &I18n) -> u32 {
     let extra_label_padding = 12.0; // label + checkbox overhead
     let gaps = 10.0 * 6.0; // spacing between 6 joins
     let breathing_room = 40.0; // avoid cramped layout
-    let total = text_total + zoom_input_w + button_padding + extra_label_padding + gaps + breathing_room;
+    let total =
+        text_total + zoom_input_w + button_padding + extra_label_padding + gaps + breathing_room;
     total.ceil() as u32
 }
 
@@ -236,7 +241,10 @@ pub fn window_settings_with_locale(flags: &Flags) -> window::Settings {
     let icon = crate::icon::load_window_icon();
     window::Settings {
         size: iced::Size::new(computed_width as f32, 600.0),
-        min_size: Some(iced::Size::new(computed_width as f32, MIN_WINDOW_HEIGHT as f32)),
+        min_size: Some(iced::Size::new(
+            computed_width as f32,
+            MIN_WINDOW_HEIGHT as f32,
+        )),
         icon,
         ..window::Settings::default()
     }
@@ -305,7 +313,10 @@ impl App {
         event::listen_with(|event, status, _window| {
             // Capture all wheel scroll events to prevent Scrollable from processing them
             // We handle wheel events ourselves for zoom only
-            if matches!(event, event::Event::Mouse(mouse::Event::WheelScrolled { .. })) {
+            if matches!(
+                event,
+                event::Event::Mouse(mouse::Event::WheelScrolled { .. })
+            ) {
                 // Always capture wheel events, regardless of status
                 // This prevents the Scrollable widget from receiving them
                 return Some(Message::RawEvent(event.clone()));
@@ -381,11 +392,13 @@ impl App {
                 self.persist_zoom_preferences()
             }
             Message::ZoomIn => {
-                self.zoom.apply_manual_zoom(self.zoom.zoom_percent + self.zoom.zoom_step_percent);
+                self.zoom
+                    .apply_manual_zoom(self.zoom.zoom_percent + self.zoom.zoom_step_percent);
                 self.persist_zoom_preferences()
             }
             Message::ZoomOut => {
-                self.zoom.apply_manual_zoom(self.zoom.zoom_percent - self.zoom.zoom_step_percent);
+                self.zoom
+                    .apply_manual_zoom(self.zoom.zoom_percent - self.zoom.zoom_step_percent);
                 self.persist_zoom_preferences()
             }
             Message::SetFitToWindow(fit) => {
@@ -431,9 +444,7 @@ impl App {
             Message::MouseButtonPressed { button, position } => {
                 self.handle_mouse_button_pressed(button, position)
             }
-            Message::MouseButtonReleased { button } => {
-                self.handle_mouse_button_released(button)
-            }
+            Message::MouseButtonReleased { button } => self.handle_mouse_button_released(button),
             Message::CursorMovedDuringDrag { position } => {
                 self.handle_cursor_moved_during_drag(position)
             }
@@ -508,7 +519,8 @@ impl App {
     fn scroll_position_percentage(&self) -> Option<(f32, f32)> {
         // Calculate scroll position as percentage (0-100% for both axes)
         let size = self.scaled_image_size()?;
-        self.viewport.scroll_position_percentage(size.width, size.height)
+        self.viewport
+            .scroll_position_percentage(size.width, size.height)
     }
 
     fn image_bounds_in_window(&self) -> Option<Rectangle> {
@@ -603,7 +615,11 @@ impl App {
         self.zoom.zoom_step_error_key
     }
 
-    fn handle_mouse_button_pressed(&mut self, button: mouse::Button, position: Point) -> Task<Message> {
+    fn handle_mouse_button_pressed(
+        &mut self,
+        button: mouse::Button,
+        position: Point,
+    ) -> Task<Message> {
         // Only start drag on left button press over the image
         if button == mouse::Button::Left && self.is_cursor_over_image() {
             self.drag.start(position, self.viewport.offset);
@@ -648,7 +664,10 @@ impl App {
             // Snap scrollable to the new offset
             scrollable::snap_to(
                 Id::new(VIEWER_SCROLLABLE_ID),
-                RelativeOffset { x: relative_x, y: relative_y },
+                RelativeOffset {
+                    x: relative_x,
+                    y: relative_y,
+                },
             )
         } else {
             Task::none()
@@ -694,9 +713,7 @@ impl App {
                         Task::none()
                     }
                 }
-                mouse::Event::ButtonReleased(button) => {
-                    self.handle_mouse_button_released(button)
-                }
+                mouse::Event::ButtonReleased(button) => self.handle_mouse_button_released(button),
                 mouse::Event::CursorMoved { position } => {
                     self.cursor_position = Some(position);
                     if self.drag.is_dragging {
@@ -847,12 +864,8 @@ impl App {
                         .width(Length::Fill)
                         .height(Length::Fill)
                         .direction(Direction::Both {
-                            vertical: Scrollbar::new()
-                                .width(0)
-                                .scroller_width(0),
-                            horizontal: Scrollbar::new()
-                                .width(0)
-                                .scroller_width(0),
+                            vertical: Scrollbar::new().width(0).scroller_width(0),
+                            horizontal: Scrollbar::new().width(0).scroller_width(0),
                         })
                         .on_scroll(|viewport: Viewport| {
                             let bounds = viewport.bounds();
@@ -874,8 +887,8 @@ impl App {
                         mouse::Interaction::default()
                     };
 
-                    let scrollable_with_cursor = mouse_area(wheel_blocked_scrollable)
-                        .interaction(cursor_interaction);
+                    let scrollable_with_cursor =
+                        mouse_area(wheel_blocked_scrollable).interaction(cursor_interaction);
 
                     // Create scrollable container with position indicator overlay
                     let scrollable_container = Container::new(scrollable_with_cursor)
@@ -885,40 +898,38 @@ impl App {
                         .align_y(iced::alignment::Vertical::Center);
 
                     // Add position indicator if scrolling is active
-                    let viewer_content: Element<'_, Message> = if let Some((px, py)) = self.scroll_position_percentage() {
-                        let indicator_text = format!("Position: {:.0}% x {:.0}%", px, py);
-                        let indicator = Container::new(
-                            Text::new(indicator_text)
-                                .size(12)
-                        )
-                        .padding(6)
-                        .style(|_theme: &Theme| {
-                            iced::widget::container::Style {
-                                background: Some(iced::Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.7))),
-                                text_color: Some(Color::WHITE),
-                                border: Border {
-                                    color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
-                                    width: 1.0,
-                                    radius: 4.0.into(),
-                                },
-                                ..Default::default()
-                            }
-                        });
+                    let viewer_content: Element<'_, Message> =
+                        if let Some((px, py)) = self.scroll_position_percentage() {
+                            let indicator_text = format!("Position: {:.0}% x {:.0}%", px, py);
+                            let indicator = Container::new(Text::new(indicator_text).size(12))
+                                .padding(6)
+                                .style(|_theme: &Theme| iced::widget::container::Style {
+                                    background: Some(iced::Background::Color(Color::from_rgba(
+                                        0.0, 0.0, 0.0, 0.7,
+                                    ))),
+                                    text_color: Some(Color::WHITE),
+                                    border: Border {
+                                        color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
+                                        width: 1.0,
+                                        radius: 4.0.into(),
+                                    },
+                                    ..Default::default()
+                                });
 
-                        Stack::new()
-                            .push(scrollable_container)
-                            .push(
-                                Container::new(indicator)
-                                    .width(Length::Fill)
-                                    .height(Length::Fill)
-                                    .padding(10)
-                                    .align_x(Horizontal::Right)
-                                    .align_y(Vertical::Bottom),
-                            )
-                            .into()
-                    } else {
-                        scrollable_container.into()
-                    };
+                            Stack::new()
+                                .push(scrollable_container)
+                                .push(
+                                    Container::new(indicator)
+                                        .width(Length::Fill)
+                                        .height(Length::Fill)
+                                        .padding(10)
+                                        .align_x(Horizontal::Right)
+                                        .align_y(Vertical::Bottom),
+                                )
+                                .into()
+                        } else {
+                            scrollable_container.into()
+                        };
 
                     let mut viewer_column = Column::new()
                         .spacing(16)
@@ -1290,7 +1301,10 @@ mod tests {
         let _ = app.update(Message::ZoomStepSubmitted);
 
         assert_eq!(app.zoom.zoom_step_percent, MIN_ZOOM_STEP_PERCENT);
-        assert_eq!(app.zoom.zoom_step_input, format_number(MIN_ZOOM_STEP_PERCENT));
+        assert_eq!(
+            app.zoom.zoom_step_input,
+            format_number(MIN_ZOOM_STEP_PERCENT)
+        );
         assert_eq!(app.zoom.zoom_step_error_key, Some(ZOOM_STEP_RANGE_KEY));
 
         app.zoom.zoom_step_input = "abc".into();
@@ -1352,11 +1366,19 @@ mod tests {
 
     #[test]
     fn dynamic_min_width_french_not_smaller_than_english() {
-        let english_flags = Flags { lang: Some("en-US".into()), file_path: None, i18n_dir: None };
+        let english_flags = Flags {
+            lang: Some("en-US".into()),
+            file_path: None,
+            i18n_dir: None,
+        };
         let ws_en = window_settings_with_locale(&english_flags);
         let min_en = ws_en.min_size.expect("min size en").width;
 
-        let french_flags = Flags { lang: Some("fr".into()), file_path: None, i18n_dir: None };
+        let french_flags = Flags {
+            lang: Some("fr".into()),
+            file_path: None,
+            i18n_dir: None,
+        };
         let ws_fr = window_settings_with_locale(&french_flags);
         let min_fr = ws_fr.min_size.expect("min size fr").width;
 
@@ -1389,7 +1411,10 @@ mod tests {
 
         assert!(app.drag.is_dragging);
         assert_eq!(app.drag.start_position, Some(Point::new(200.0, 150.0)));
-        assert_eq!(app.drag.start_offset, Some(AbsoluteOffset { x: 50.0, y: 30.0 }));
+        assert_eq!(
+            app.drag.start_offset,
+            Some(AbsoluteOffset { x: 50.0, y: 30.0 })
+        );
     }
 
     #[test]

@@ -18,7 +18,11 @@ fn parse_run_mode(mut args: pico_args::Arguments) -> Result<RunMode, pico_args::
         .into_iter()
         .next()
         .and_then(|s| s.into_string().ok());
-    Ok(RunMode::Normal(Flags { lang, file_path, i18n_dir }))
+    Ok(RunMode::Normal(Flags {
+        lang,
+        file_path,
+        i18n_dir,
+    }))
 }
 
 fn main() -> iced::Result {
@@ -94,12 +98,21 @@ mod tests {
     fn parse_run_mode_help_flag_triggers_help() {
         let args = vec![OsString::from("--help")];
         let mode = parse_run_mode(pico_args::Arguments::from_vec(args)).expect("parse should work");
-        match mode { RunMode::Help(_, _) => {}, _ => panic!("expected Help mode") }
+        match mode {
+            RunMode::Help(_, _) => {}
+            _ => panic!("expected Help mode"),
+        }
     }
 
     #[test]
     fn help_text_localized_french() {
-        let args = vec![OsString::from("--help"), OsString::from("--lang"), OsString::from("fr"), OsString::from("--i18n-dir"), OsString::from("custom")];
+        let args = vec![
+            OsString::from("--help"),
+            OsString::from("--lang"),
+            OsString::from("fr"),
+            OsString::from("--i18n-dir"),
+            OsString::from("custom"),
+        ];
         let mode = parse_run_mode(pico_args::Arguments::from_vec(args)).expect("parse should work");
         match mode {
             RunMode::Help(lang, dir) => {

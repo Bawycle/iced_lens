@@ -3,8 +3,8 @@
 //!
 //! Handles grab-and-drag interaction state for panning through images.
 
-use iced::Point;
 use iced::widget::scrollable::AbsoluteOffset;
+use iced::Point;
 
 /// Manages grab-and-drag state
 #[derive(Debug, Clone, Default)]
@@ -74,7 +74,10 @@ mod tests {
 
         assert!(state.is_dragging);
         assert_eq!(state.start_position, Some(Point::new(100.0, 50.0)));
-        assert_eq!(state.start_offset, Some(AbsoluteOffset { x: 20.0, y: 10.0 }));
+        assert_eq!(
+            state.start_offset,
+            Some(AbsoluteOffset { x: 20.0, y: 10.0 })
+        );
     }
 
     #[test]
@@ -98,7 +101,10 @@ mod tests {
     #[test]
     fn calculate_offset_works_correctly() {
         let mut state = DragState::default();
-        state.start(Point::new(200.0, 150.0), AbsoluteOffset { x: 50.0, y: 30.0 });
+        state.start(
+            Point::new(200.0, 150.0),
+            AbsoluteOffset { x: 50.0, y: 30.0 },
+        );
 
         // Move cursor to (180, 130) - moved left/up by 20 pixels
         let new_offset = state.calculate_offset(Point::new(180.0, 130.0));

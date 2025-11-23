@@ -3,8 +3,8 @@
 //!
 //! Handles the scrollable viewport state including bounds and scroll offset.
 
-use iced::Rectangle;
 use iced::widget::scrollable::AbsoluteOffset;
+use iced::Rectangle;
 
 /// Manages viewport and scroll state
 #[derive(Debug, Clone)]
@@ -38,7 +38,11 @@ impl ViewportState {
     }
 
     /// Calculates the scroll position as percentage (0-100%)
-    pub fn scroll_position_percentage(&self, image_width: f32, image_height: f32) -> Option<(f32, f32)> {
+    pub fn scroll_position_percentage(
+        &self,
+        image_width: f32,
+        image_height: f32,
+    ) -> Option<(f32, f32)> {
         let viewport = self.bounds?;
 
         // If image is smaller than viewport, no scrolling needed
@@ -95,7 +99,10 @@ mod tests {
     #[test]
     fn scroll_percentage_returns_none_when_image_fits() {
         let mut state = ViewportState::default();
-        state.bounds = Some(Rectangle::new(Point::new(0.0, 0.0), Size::new(800.0, 600.0)));
+        state.bounds = Some(Rectangle::new(
+            Point::new(0.0, 0.0),
+            Size::new(800.0, 600.0),
+        ));
 
         // Image smaller than viewport
         let result = state.scroll_position_percentage(400.0, 300.0);
@@ -105,7 +112,10 @@ mod tests {
     #[test]
     fn scroll_percentage_calculates_correctly() {
         let mut state = ViewportState::default();
-        state.bounds = Some(Rectangle::new(Point::new(0.0, 0.0), Size::new(400.0, 300.0)));
+        state.bounds = Some(Rectangle::new(
+            Point::new(0.0, 0.0),
+            Size::new(400.0, 300.0),
+        ));
         state.offset = AbsoluteOffset { x: 200.0, y: 150.0 };
 
         // Image: 800x600, Viewport: 400x300

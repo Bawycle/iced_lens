@@ -39,11 +39,9 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        self.content.as_widget().layout(
-            &mut tree.children[0],
-            renderer,
-            limits,
-        )
+        self.content
+            .as_widget()
+            .layout(&mut tree.children[0], renderer, limits)
     }
 
     fn children(&self) -> Vec<widget::Tree> {
@@ -128,12 +126,9 @@ where
         renderer: &Renderer,
         operation: &mut dyn widget::Operation<()>,
     ) {
-        self.content.as_widget().operate(
-            &mut tree.children[0],
-            layout,
-            renderer,
-            operation,
-        );
+        self.content
+            .as_widget()
+            .operate(&mut tree.children[0], layout, renderer, operation);
     }
 
     fn overlay<'b>(
@@ -143,12 +138,9 @@ where
         renderer: &Renderer,
         translation: iced::Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        self.content.as_widget_mut().overlay(
-            &mut tree.children[0],
-            layout,
-            renderer,
-            translation,
-        )
+        self.content
+            .as_widget_mut()
+            .overlay(&mut tree.children[0], layout, renderer, translation)
     }
 }
 
