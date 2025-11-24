@@ -8,8 +8,11 @@
 // TODO: Remove this once editor features are fully implemented
 #![allow(dead_code)]
 
+mod transform;
+
 use crate::image_handler::ImageData;
 use iced::Rectangle;
+use image_rs::DynamicImage;
 use std::path::PathBuf;
 
 /// Contextual data needed to render the editor view.
@@ -18,14 +21,16 @@ pub struct ViewContext<'a> {
 }
 
 /// Local UI state for the editor screen.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct State {
     /// Path to the image being edited
     image_path: PathBuf,
-    /// Original unmodified image data
+    /// Original unmodified image data (for display)
     original_image: ImageData,
-    /// Current edited image (after applying transformations)
+    /// Current edited image (after applying transformations, for display)
     current_image: ImageData,
+    /// Working image for transformations (DynamicImage from image_rs crate)
+    working_image: DynamicImage,
     /// Currently active editing tool
     active_tool: Option<EditorTool>,
     /// History of transformations for undo/redo
@@ -40,6 +45,18 @@ pub struct State {
     crop_ratio: CropRatio,
     /// Resize state
     resize_state: ResizeState,
+}
+
+impl std::fmt::Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("State")
+            .field("image_path", &self.image_path)
+            .field("active_tool", &self.active_tool)
+            .field("transformation_history", &self.transformation_history)
+            .field("history_index", &self.history_index)
+            .field("sidebar_expanded", &self.sidebar_expanded)
+            .finish()
+    }
 }
 
 /// Available editing tools.
@@ -283,7 +300,7 @@ impl State {
 
         sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
 
-        // Action buttons (Cancel/Save)
+        // Action buttons (Cancel/Save/Save As)
         let cancel_btn = button(text(ctx.i18n.tr("editor-cancel")).size(16))
             .on_press(Message::Cancel)
             .padding(12)
@@ -296,8 +313,15 @@ impl State {
             .width(Length::Fill)
             .style(iced::widget::button::primary);
 
+        let save_as_btn = button(text(ctx.i18n.tr("editor-save-as")).size(16))
+            .on_press(Message::SaveAs)
+            .padding(12)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary);
+
         sidebar_content = sidebar_content.push(cancel_btn);
         sidebar_content = sidebar_content.push(save_btn);
+        sidebar_content = sidebar_content.push(save_as_btn);
 
         // Container with background
         container(sidebar_content)
@@ -376,15 +400,19 @@ impl State {
             Message::NavigateNext => Event::NavigateNext,
             Message::NavigatePrevious => Event::NavigatePrevious,
             Message::Save => {
-                // TODO: Implement save logic with confirmation
+                // Save overwrites the original file (confirmation may be added later)
                 Event::SaveRequested {
                     path: self.image_path.clone(),
                     overwrite: true,
                 }
             }
             Message::SaveAs => {
-                // TODO: Implement save as dialog
-                Event::None
+                // TODO: Implement file picker dialog for save location
+                // For now, emit event with overwrite: false to signal "save as" intent
+                Event::SaveRequested {
+                    path: self.image_path.clone(),
+                    overwrite: false,
+                }
             }
             Message::Cancel => Event::ExitEditor,
         }
