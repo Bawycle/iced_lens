@@ -199,14 +199,9 @@ impl State {
             zoom: &self.zoom,
             pane_context: pane::ViewContext {
                 background_theme: env.background_theme,
-                scroll_indicator: geometry_state.scroll_position_percentage().map(|(px, py)| {
-                    format!(
-                        "{}: {:.0}% x {:.0}%",
-                        env.i18n.tr("viewer-position-label"),
-                        px,
-                        py
-                    )
-                }),
+                scroll_indicator: geometry_state
+                    .scroll_position_percentage()
+                    .map(|(px, py)| format_scroll_indicator(env.i18n, px, py)),
                 scrollable_id: SCROLLABLE_ID,
             },
             pane_model: pane::ViewModel {
@@ -486,5 +481,28 @@ fn scroll_steps(delta: &mouse::ScrollDelta) -> f32 {
     match delta {
         mouse::ScrollDelta::Lines { y, .. } => *y,
         mouse::ScrollDelta::Pixels { y, .. } => *y / 120.0,
+    }
+}
+
+fn format_scroll_indicator(i18n: &I18n, px: f32, py: f32) -> String {
+    format!(
+        "{}: {:.0}% x {:.0}%",
+        i18n.tr("viewer-position-label"),
+        px,
+        py
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scroll_indicator_uses_translation() {
+        let i18n = I18n::default();
+        let text = format_scroll_indicator(&i18n, 12.4, 56.7);
+        assert!(text.starts_with(&i18n.tr("viewer-position-label")));
+        assert!(text.contains("12%"));
+        assert!(text.contains("57%"));
     }
 }

@@ -172,6 +172,19 @@ mod tests {
     }
 
     #[test]
+    fn load_svg_with_zero_dimensions_errors() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let svg_path = temp_dir.path().join("zero.svg");
+        let svg = r#"<svg xmlns='http://www.w3.org/2000/svg' width='0' height='10'></svg>"#;
+        fs::write(&svg_path, svg).expect("write svg");
+
+        match load_image(&svg_path) {
+            Err(Error::Svg(_)) => {}
+            other => panic!("expected Svg error, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn image_error_conversion_returns_io_variant() {
         let io_err = io::Error::other("decode failed");
         let image_error = ImageError::IoError(io_err);

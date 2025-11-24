@@ -204,6 +204,8 @@ fn resolve_locale(
 mod tests {
     use super::*;
     use crate::config::Config;
+    use std::io::Write;
+    use tempfile::tempdir;
     use unic_langid::LanguageIdentifier;
 
     #[test]
@@ -263,5 +265,29 @@ mod tests {
         let available: Vec<LanguageIdentifier> = Vec::new();
         let lang = resolve_locale(Some("fr".to_string()), &config, &available);
         assert!(lang.is_none());
+    }
+
+    #[test]
+    fn invalid_custom_ftl_is_skipped() {
+        let dir = tempdir().expect("temp dir");
+        let valid_path = dir.path().join("en-US.ftl");
+        let mut valid_file = std::fs::File::create(&valid_path).expect("valid file");
+        writeln!(valid_file, "window-title = Test").expect("write valid");
+
+        let invalid_path = dir.path().join("broken.ftl");
+        std::fs::write(&invalid_path, "{ invalid").expect("write invalid");
+
+        let i18n = I18n::new(
+            None,
+            Some(dir.path().display().to_string()),
+            &Config::default(),
+        );
+        let locales: Vec<String> = i18n
+            .available_locales
+            .iter()
+            .map(|l| l.to_string())
+            .collect();
+        assert_eq!(locales, vec!["en-US".to_string()]);
+        assert_eq!(i18n.tr("window-title"), "Test");
     }
 }

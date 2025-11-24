@@ -709,4 +709,21 @@ mod tests {
 
         assert!(min_fr >= min_en);
     }
+
+    #[test]
+    fn persist_preferences_handles_save_errors() {
+        with_temp_config_dir(|config_root| {
+            let app = App::default();
+            let settings_dir = config_root.join("IcedLens");
+            fs::create_dir_all(&settings_dir).expect("dir");
+            let mut perms = fs::metadata(&settings_dir).expect("meta").permissions();
+            perms.set_readonly(true);
+            fs::set_permissions(&settings_dir, perms.clone()).expect("set readonly");
+
+            let _ = app.persist_preferences();
+
+            perms.set_readonly(false);
+            fs::set_permissions(&settings_dir, perms).expect("restore perms");
+        });
+    }
 }

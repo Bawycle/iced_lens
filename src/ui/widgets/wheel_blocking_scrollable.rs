@@ -84,8 +84,7 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) -> event::Status {
-        // Block all wheel scroll events from reaching the content
-        if matches!(event, Event::Mouse(mouse::Event::WheelScrolled { .. })) {
+        if is_wheel_event(&event) {
             return event::Status::Captured;
         }
 
@@ -164,4 +163,33 @@ where
     Renderer: renderer::Renderer,
 {
     WheelBlockingScrollable::new(content)
+}
+
+fn is_wheel_event(event: &Event) -> bool {
+    matches!(event, Event::Mouse(mouse::Event::WheelScrolled { .. }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wheel_event_is_detected() {
+        let event = Event::Mouse(mouse::Event::WheelScrolled {
+            delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
+        });
+        assert!(is_wheel_event(&event));
+    }
+
+    #[test]
+    fn other_mouse_events_are_not_detected() {
+        let event = Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left));
+        assert!(!is_wheel_event(&event));
+    }
+
+    #[test]
+    fn window_events_are_not_detected() {
+        let event = Event::Window(iced::window::Event::Resized(Size::new(100.0, 50.0)));
+        assert!(!is_wheel_event(&event));
+    }
 }
