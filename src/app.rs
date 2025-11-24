@@ -29,6 +29,8 @@ pub struct App {
     mode: AppMode,
     settings: SettingsState,
     viewer: component::State,
+    fullscreen: bool,
+    window_id: Option<window::Id>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,6 +138,8 @@ impl Default for App {
             mode: AppMode::Viewer,
             settings: SettingsState::default(),
             viewer: component::State::new(),
+            fullscreen: false,
+            window_id: None,
         }
     }
 }
@@ -185,18 +189,22 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        event::listen_with(|event, status, _window| {
+        event::listen_with(|event, status, window_id| {
             if matches!(
                 event,
                 event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
             ) {
-                return Some(Message::Viewer(component::Message::RawEvent(event.clone())));
+                return Some(Message::Viewer(component::Message::RawEvent {
+                    window: window_id,
+                    event: event.clone(),
+                }));
             }
 
             match status {
-                event::Status::Ignored => {
-                    Some(Message::Viewer(component::Message::RawEvent(event.clone())))
-                }
+                event::Status::Ignored => Some(Message::Viewer(component::Message::RawEvent {
+                    window: window_id,
+                    event: event.clone(),
+                })),
                 event::Status::Captured => None,
             }
         })
@@ -211,13 +219,19 @@ impl App {
     }
 
     fn handle_viewer_message(&mut self, message: component::Message) -> Task<Message> {
+        if let component::Message::RawEvent { window, .. } = &message {
+            self.window_id = Some(*window);
+        }
+
         let (effect, task) = self.viewer.handle_message(message, &self.i18n);
         let viewer_task = task.map(Message::Viewer);
-        let persist = match effect {
+        let side_effect = match effect {
             component::Effect::PersistPreferences => self.persist_preferences(),
+            component::Effect::ToggleFullscreen => self.toggle_fullscreen_task(),
+            component::Effect::ExitFullscreen => self.update_fullscreen_mode(false),
             component::Effect::None => Task::none(),
         };
-        Task::batch([viewer_task, persist])
+        Task::batch([viewer_task, side_effect])
     }
 
     fn handle_mode_switch(&mut self, mode: AppMode) -> Task<Message> {
@@ -292,6 +306,28 @@ impl App {
         Task::none()
     }
 
+    fn toggle_fullscreen_task(&mut self) -> Task<Message> {
+        self.update_fullscreen_mode(!self.fullscreen)
+    }
+
+    fn update_fullscreen_mode(&mut self, desired: bool) -> Task<Message> {
+        if self.fullscreen == desired {
+            return Task::none();
+        }
+
+        let Some(window_id) = self.window_id else {
+            return Task::none();
+        };
+
+        self.fullscreen = desired;
+        let mode = if desired {
+            window::Mode::Fullscreen
+        } else {
+            window::Mode::Windowed
+        };
+        window::change_mode::<Message>(window_id, mode)
+    }
+
     fn view(&self) -> Element<'_, Message> {
         let current_view: Element<'_, Message> = match self.mode {
             AppMode::Viewer => self
@@ -299,6 +335,7 @@ impl App {
                 .view(component::ViewEnv {
                     i18n: &self.i18n,
                     background_theme: self.settings.background_theme(),
+                    show_controls: !self.fullscreen,
                 })
                 .map(Message::Viewer),
             AppMode::Settings => self
@@ -347,7 +384,7 @@ mod tests {
     use crate::ui::viewer::controls;
     use iced::widget::image::Handle;
     use iced::widget::scrollable::AbsoluteOffset;
-    use iced::{event, mouse, Point, Rectangle, Size};
+    use iced::{event, mouse, window, Point, Rectangle, Size};
     use std::fs;
     use std::sync::{Mutex, OnceLock};
     use tempfile::tempdir;
@@ -663,11 +700,12 @@ mod tests {
         app.viewer
             .set_cursor_position(Some(Point::new(210.0, 160.0)));
 
-        let _ = app.update(Message::Viewer(component::Message::RawEvent(
-            event::Event::Mouse(mouse::Event::WheelScrolled {
+        let _ = app.update(Message::Viewer(component::Message::RawEvent {
+            window: window::Id::unique(),
+            event: event::Event::Mouse(mouse::Event::WheelScrolled {
                 delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
             }),
-        )));
+        }));
 
         let zoom = app.viewer.zoom_state();
         assert_eq!(zoom.zoom_percent, 115.0);
@@ -694,11 +732,12 @@ mod tests {
         app.viewer
             .set_cursor_position(Some(Point::new(1000.0, 1000.0)));
 
-        let _ = app.update(Message::Viewer(component::Message::RawEvent(
-            event::Event::Mouse(mouse::Event::WheelScrolled {
+        let _ = app.update(Message::Viewer(component::Message::RawEvent {
+            window: window::Id::unique(),
+            event: event::Event::Mouse(mouse::Event::WheelScrolled {
                 delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
             }),
-        )));
+        }));
 
         let zoom = app.viewer.zoom_state();
         assert_eq!(zoom.zoom_percent, 150.0);

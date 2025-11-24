@@ -8,9 +8,11 @@ use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer::{self, controls, pane, state as geometry};
 use iced::widget::scrollable::{self, AbsoluteOffset, Id, RelativeOffset};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
+use std::time::{Duration, Instant};
 
 /// Identifier used for the viewer scrollable widget.
 pub const SCROLLABLE_ID: &str = "viewer-image-scrollable";
+const DOUBLE_CLICK_THRESHOLD: Duration = Duration::from_millis(350);
 
 /// Messages emitted by viewer-related widgets.
 #[derive(Debug, Clone)]
@@ -22,7 +24,10 @@ pub enum Message {
         bounds: Rectangle,
         offset: AbsoluteOffset,
     },
-    RawEvent(event::Event),
+    RawEvent {
+        window: window::Id,
+        event: event::Event,
+    },
 }
 
 /// Side effects the application should perform after handling a viewer message.
@@ -30,6 +35,8 @@ pub enum Message {
 pub enum Effect {
     None,
     PersistPreferences,
+    ToggleFullscreen,
+    ExitFullscreen,
 }
 
 #[derive(Debug, Clone)]
@@ -70,6 +77,7 @@ impl ErrorState {
 pub struct ViewEnv<'a> {
     pub i18n: &'a I18n,
     pub background_theme: crate::config::BackgroundTheme,
+    pub show_controls: bool,
 }
 
 #[derive(Default)]
@@ -81,6 +89,7 @@ pub struct State {
     pub viewport: ViewportState,
     pub drag: DragState,
     cursor_position: Option<Point>,
+    last_click: Option<Instant>,
 }
 
 impl State {
@@ -181,7 +190,7 @@ impl State {
                 self.refresh_fit_zoom();
                 (Effect::None, Task::none())
             }
-            Message::RawEvent(event) => self.handle_raw_event(event),
+            Message::RawEvent { event, .. } => self.handle_raw_event(event),
         }
     }
 
@@ -227,6 +236,7 @@ impl State {
                 is_dragging: self.drag.is_dragging,
                 cursor_over_image: geometry_state.is_cursor_over_image(),
             },
+            controls_visible: env.show_controls,
         });
 
         viewer::view(viewer::ViewContext {
@@ -282,6 +292,7 @@ impl State {
                 }
                 (Effect::PersistPreferences, Task::none())
             }
+            ToggleFullscreen => (Effect::ToggleFullscreen, Task::none()),
         }
     }
 
@@ -305,10 +316,12 @@ impl State {
                     (effect, Task::none())
                 }
                 mouse::Event::ButtonPressed(button) => {
-                    if let Some(position) = self.cursor_position {
-                        self.handle_mouse_button_pressed(button, position);
-                    }
-                    (Effect::None, Task::none())
+                    let effect = if let Some(position) = self.cursor_position {
+                        self.handle_mouse_button_pressed(button, position)
+                    } else {
+                        Effect::None
+                    };
+                    (effect, Task::none())
                 }
                 mouse::Event::ButtonReleased(button) => {
                     self.handle_mouse_button_released(button);
@@ -332,22 +345,48 @@ impl State {
                 }
                 _ => (Effect::None, Task::none()),
             },
-            event::Event::Keyboard(keyboard_event) => {
-                if let keyboard::Event::ModifiersChanged(modifiers) = keyboard_event {
+            event::Event::Keyboard(keyboard_event) => match keyboard_event {
+                keyboard::Event::KeyPressed { key, .. }
+                    if matches!(key, keyboard::Key::Named(keyboard::key::Named::F11)) =>
+                {
+                    (Effect::ToggleFullscreen, Task::none())
+                }
+                keyboard::Event::KeyPressed { key, .. }
+                    if matches!(key, keyboard::Key::Named(keyboard::key::Named::Escape)) =>
+                {
+                    (Effect::ExitFullscreen, Task::none())
+                }
+                keyboard::Event::ModifiersChanged(modifiers) => {
                     if modifiers.command() {
                         // no-op currently, but keep placeholder for shortcut support
                     }
+                    (Effect::None, Task::none())
                 }
-                (Effect::None, Task::none())
-            }
+                _ => (Effect::None, Task::none()),
+            },
             _ => (Effect::None, Task::none()),
         }
     }
 
-    fn handle_mouse_button_pressed(&mut self, button: mouse::Button, position: Point) {
-        if button == mouse::Button::Left && self.geometry_state().is_cursor_over_image() {
-            self.drag.start(position, self.viewport.offset);
+    fn handle_mouse_button_pressed(&mut self, button: mouse::Button, position: Point) -> Effect {
+        if button == mouse::Button::Left {
+            let now = Instant::now();
+            let double_click = self
+                .last_click
+                .map(|instant| now.duration_since(instant) <= DOUBLE_CLICK_THRESHOLD)
+                .unwrap_or(false);
+            self.last_click = Some(now);
+
+            if self.geometry_state().is_cursor_over_image() {
+                if double_click {
+                    return Effect::ToggleFullscreen;
+                }
+
+                self.drag.start(position, self.viewport.offset);
+            }
         }
+
+        Effect::None
     }
 
     fn handle_mouse_button_released(&mut self, button: mouse::Button) {

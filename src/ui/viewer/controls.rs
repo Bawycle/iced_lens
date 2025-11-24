@@ -22,6 +22,7 @@ pub enum Message {
     ZoomIn,
     ZoomOut,
     SetFitToWindow(bool),
+    ToggleFullscreen,
 }
 
 pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Message> {
@@ -54,6 +55,10 @@ pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Messag
     .on_toggle(Message::SetFitToWindow)
     .text_wrapping(iced::widget::text::Wrapping::Word);
 
+    let fullscreen_button = button(Text::new("⛶"))
+        .on_press(Message::ToggleFullscreen)
+        .padding([6, 10]);
+
     let zoom_controls_row = Row::new()
         .spacing(10)
         .align_y(Vertical::Center)
@@ -63,7 +68,8 @@ pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Messag
         .push(reset_button)
         .push(zoom_in_button)
         .push(Space::new(Length::Fixed(16.0), Length::Shrink))
-        .push(fit_toggle);
+        .push(fit_toggle)
+        .push(fullscreen_button);
 
     let mut zoom_controls = Column::new().spacing(4).push(zoom_controls_row);
 

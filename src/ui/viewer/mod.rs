@@ -41,6 +41,7 @@ pub struct ImageContext<'a> {
     pub zoom: &'a ZoomState,
     pub pane_context: pane::ViewContext,
     pub pane_model: pane::ViewModel<'a>,
+    pub controls_visible: bool,
 }
 
 pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
@@ -113,17 +114,19 @@ fn error_view<'a>(i18n: &'a I18n, error: ErrorContext<'a>) -> Element<'a, Messag
 }
 
 fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
-    let controls_view = controls::view(ctx.controls_context, ctx.zoom).map(Message::Controls);
-
     let pane_view = pane::view(ctx.pane_context, ctx.pane_model);
 
-    Column::new()
+    let mut column = Column::new()
         .spacing(16)
         .width(Length::Fill)
-        .height(Length::Fill)
-        .push(controls_view)
-        .push(pane_view)
-        .into()
+        .height(Length::Fill);
+
+    if ctx.controls_visible {
+        let controls_view = controls::view(ctx.controls_context, ctx.zoom).map(Message::Controls);
+        column = column.push(controls_view);
+    }
+
+    column.push(pane_view).into()
 }
 
 #[cfg(test)]
