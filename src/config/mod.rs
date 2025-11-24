@@ -35,18 +35,13 @@ use std::path::{Path, PathBuf}; // Added PathBuf back
 const CONFIG_FILE: &str = "settings.toml";
 const APP_NAME: &str = "IcedLens";
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum BackgroundTheme {
     Light,
+    #[default]
     Dark,
     Checkerboard,
-}
-
-impl Default for BackgroundTheme {
-    fn default() -> Self {
-        BackgroundTheme::Dark
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

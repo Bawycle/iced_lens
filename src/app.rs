@@ -134,7 +134,7 @@ impl App {
 
         let theme = config
             .background_theme
-            .unwrap_or_else(config::BackgroundTheme::default);
+            .unwrap_or_default();
         app.settings = SettingsState::new(app.viewer.zoom_step_percent(), theme);
 
         let task = if let Some(path) = flags.file_path {

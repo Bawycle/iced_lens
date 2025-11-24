@@ -72,6 +72,7 @@ pub struct ViewEnv<'a> {
     pub background_theme: crate::config::BackgroundTheme,
 }
 
+#[derive(Default)]
 /// Complete viewer component state.
 pub struct State {
     image: Option<ImageData>,
@@ -80,19 +81,6 @@ pub struct State {
     pub viewport: ViewportState,
     pub drag: DragState,
     cursor_position: Option<Point>,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            image: None,
-            error: None,
-            zoom: ZoomState::default(),
-            viewport: ViewportState::default(),
-            drag: DragState::default(),
-            cursor_position: None,
-        }
-    }
 }
 
 impl State {

@@ -52,6 +52,12 @@ pub enum Event {
     BackgroundThemeSelected(BackgroundTheme),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ZoomStepError {
+    InvalidInput,
+    OutOfRange,
+}
+
 impl Default for State {
     fn default() -> Self {
         Self::new(DEFAULT_ZOOM_STEP_PERCENT, BackgroundTheme::default())
@@ -145,7 +151,6 @@ impl State {
                 .size(14)
                 .style(move |_theme: &iced::Theme| text::Style {
                     color: Some(error_color),
-                    ..Default::default()
                 })
                 .into();
         }
@@ -268,7 +273,9 @@ impl State {
     }
 
     /// Ensures any pending zoom step edits are validated before leaving the screen.
-    pub fn ensure_zoom_step_committed(&mut self) -> Result<Option<f32>, ()> {
+    pub(crate) fn ensure_zoom_step_committed(
+        &mut self,
+    ) -> Result<Option<f32>, ZoomStepError> {
         if self.zoom_step_input_dirty {
             self.commit_zoom_step().map(Some)
         } else {
@@ -276,12 +283,12 @@ impl State {
         }
     }
 
-    fn commit_zoom_step(&mut self) -> Result<f32, ()> {
+    fn commit_zoom_step(&mut self) -> Result<f32, ZoomStepError> {
         if let Some(value) = parse_number(&self.zoom_step_input) {
             if !(MIN_ZOOM_STEP_PERCENT..=MAX_ZOOM_STEP_PERCENT).contains(&value) {
                 self.zoom_step_error_key = Some(ZOOM_STEP_RANGE_KEY);
                 self.zoom_step_input_dirty = true;
-                return Err(());
+                return Err(ZoomStepError::OutOfRange);
             }
 
             self.zoom_step_percent = value;
@@ -292,7 +299,7 @@ impl State {
         } else {
             self.zoom_step_error_key = Some(ZOOM_STEP_INVALID_KEY);
             self.zoom_step_input_dirty = true;
-            Err(())
+            Err(ZoomStepError::InvalidInput)
         }
     }
 }
@@ -340,7 +347,7 @@ mod tests {
     fn commit_zoom_step_rejects_invalid_input() {
         let mut state = State::default();
         state.zoom_step_input = "".into();
-        assert!(state.commit_zoom_step().is_err());
+        assert_eq!(state.commit_zoom_step(), Err(ZoomStepError::InvalidInput));
         assert_eq!(state.zoom_step_error_key, Some(ZOOM_STEP_INVALID_KEY));
     }
 
