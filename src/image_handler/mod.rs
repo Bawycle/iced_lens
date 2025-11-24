@@ -56,9 +56,7 @@ pub fn load_image<P: AsRef<Path>>(path: P) -> Result<ImageData> {
 
             resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
 
-            let png_data = pixmap
-                .encode_png()
-                .map_err(|e| Error::Svg(e.to_string()))?;
+            let png_data = pixmap.encode_png().map_err(|e| Error::Svg(e.to_string()))?;
             let handle = image::Handle::from_bytes(png_data);
             Ok(ImageData {
                 handle,

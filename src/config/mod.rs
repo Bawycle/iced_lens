@@ -82,11 +82,7 @@ pub fn load() -> Result<Config> {
             match load_from_path(&path) {
                 Ok(config) => return Ok(config),
                 Err(err) => {
-                    eprintln!(
-                        "Failed to load config from {}: {}",
-                        path.display(),
-                        err
-                    );
+                    eprintln!("Failed to load config from {}: {}", path.display(), err);
                     return Err(err);
                 }
             }

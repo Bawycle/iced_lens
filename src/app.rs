@@ -132,9 +132,7 @@ impl App {
             Some(false) => app.viewer.disable_fit_to_window(),
         }
 
-        let theme = config
-            .background_theme
-            .unwrap_or_default();
+        let theme = config.background_theme.unwrap_or_default();
         app.settings = SettingsState::new(app.viewer.zoom_step_percent(), theme);
 
         let task = if let Some(path) = flags.file_path {

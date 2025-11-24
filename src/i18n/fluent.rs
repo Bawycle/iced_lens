@@ -83,10 +83,7 @@ impl I18n {
                     Some(locale_str) => match locale_str.parse::<LanguageIdentifier>() {
                         Ok(locale) => locale,
                         Err(_) => {
-                            eprintln!(
-                                "Invalid locale in FTL filename '{}'; skipping",
-                                filename
-                            );
+                            eprintln!("Invalid locale in FTL filename '{}'; skipping", filename);
                             continue;
                         }
                     },
@@ -96,11 +93,7 @@ impl I18n {
                 let content = match fs::read_to_string(&path) {
                     Ok(content) => content,
                     Err(err) => {
-                        eprintln!(
-                            "Failed to read FTL file '{}': {}",
-                            path.display(),
-                            err
-                        );
+                        eprintln!("Failed to read FTL file '{}': {}", path.display(), err);
                         continue;
                     }
                 };
@@ -121,8 +114,7 @@ impl I18n {
                 if let Err(errors) = bundle.add_resource(resource) {
                     eprintln!(
                         "Failed to add resource for locale '{}': {:?}",
-                        locale,
-                        errors
+                        locale, errors
                     );
                     continue;
                 }

@@ -273,9 +273,7 @@ impl State {
     }
 
     /// Ensures any pending zoom step edits are validated before leaving the screen.
-    pub(crate) fn ensure_zoom_step_committed(
-        &mut self,
-    ) -> Result<Option<f32>, ZoomStepError> {
+    pub(crate) fn ensure_zoom_step_committed(&mut self) -> Result<Option<f32>, ZoomStepError> {
         if self.zoom_step_input_dirty {
             self.commit_zoom_step().map(Some)
         } else {
