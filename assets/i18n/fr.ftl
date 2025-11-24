@@ -14,6 +14,7 @@ error-details-show = Afficher les détails
 error-details-hide = Masquer les détails
 error-details-technical-heading = Détails techniques
 viewer-zoom-label = Zoom
+viewer-zoom-indicator-label = Zoom
 viewer-zoom-input-placeholder = 100
 viewer-zoom-out-button = Zoom arrière
 viewer-zoom-reset-button = Réinitialiser
