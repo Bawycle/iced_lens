@@ -346,16 +346,14 @@ impl State {
                 _ => (Effect::None, Task::none()),
             },
             event::Event::Keyboard(keyboard_event) => match keyboard_event {
-                keyboard::Event::KeyPressed { key, .. }
-                    if matches!(key, keyboard::Key::Named(keyboard::key::Named::F11)) =>
-                {
-                    (Effect::ToggleFullscreen, Task::none())
-                }
-                keyboard::Event::KeyPressed { key, .. }
-                    if matches!(key, keyboard::Key::Named(keyboard::key::Named::Escape)) =>
-                {
-                    (Effect::ExitFullscreen, Task::none())
-                }
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::F11),
+                    ..
+                } => (Effect::ToggleFullscreen, Task::none()),
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::Escape),
+                    ..
+                } => (Effect::ExitFullscreen, Task::none()),
                 keyboard::Event::ModifiersChanged(modifiers) => {
                     if modifiers.command() {
                         // no-op currently, but keep placeholder for shortcut support
