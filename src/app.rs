@@ -12,16 +12,12 @@ use crate::ui::state::zoom::{
 };
 use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer::{self, controls as viewer_controls};
-use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
-use iced::widget::canvas;
-use iced::widget::scrollable::{
-    self, AbsoluteOffset, Direction, Id, RelativeOffset, Scrollbar, Viewport,
-};
+use iced::widget::scrollable::{self, AbsoluteOffset, Id, RelativeOffset};
 use iced::{
     alignment::{Horizontal, Vertical},
     event, keyboard, mouse,
-    widget::{button, mouse_area, Column, Container, Scrollable, Stack, Text},
-    window, Border, Color, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
+    widget::{button, Column, Container, Text},
+    window, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
 };
 use std::fmt;
 use unic_langid::LanguageIdentifier;
@@ -808,119 +804,27 @@ impl App {
                     )
                     .map(Message::ViewerControls);
 
-                    let image_viewer = viewer::view_image(image_data, self.zoom.zoom_percent);
-                    let padding = self.image_padding();
-                    let image_container = Container::new(image_viewer).padding(padding);
+                    let viewer_content = viewer::pane::view(
+                        viewer::pane::ViewContext {
+                            background_theme: self.settings.background_theme(),
+                            scroll_position: self.scroll_position_percentage(),
+                            scrollable_id: VIEWER_SCROLLABLE_ID,
+                        },
+                        viewer::pane::ViewModel {
+                            image: image_data,
+                            zoom_percent: self.zoom.zoom_percent,
+                            padding: self.image_padding(),
+                            is_dragging: self.drag.is_dragging,
+                            cursor_over_image: self.is_cursor_over_image(),
+                        },
+                    );
 
-                    let scrollable = Scrollable::new(image_container)
-                        .id(Id::new(VIEWER_SCROLLABLE_ID))
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .direction(Direction::Both {
-                            vertical: Scrollbar::new().width(0).scroller_width(0),
-                            horizontal: Scrollbar::new().width(0).scroller_width(0),
-                        })
-                        .on_scroll(|viewport: Viewport| {
-                            let bounds = viewport.bounds();
-                            Message::ViewportChanged {
-                                bounds,
-                                offset: viewport.absolute_offset(),
-                            }
-                        });
-
-                    // Wrap scrollable with wheel-blocking widget to prevent wheel scroll
-                    let wheel_blocked_scrollable = wheel_blocking_scrollable(scrollable);
-
-                    // Wrap in mouse_area to control cursor
-                    let cursor_interaction = if self.drag.is_dragging {
-                        mouse::Interaction::Grabbing
-                    } else if self.is_cursor_over_image() {
-                        mouse::Interaction::Grab
-                    } else {
-                        mouse::Interaction::default()
-                    };
-
-                    let scrollable_with_cursor =
-                        mouse_area(wheel_blocked_scrollable).interaction(cursor_interaction);
-
-                    // Create scrollable container with position indicator overlay
-                    let scrollable_container = Container::new(scrollable_with_cursor)
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .align_x(iced::alignment::Horizontal::Center)
-                        .align_y(iced::alignment::Vertical::Center);
-
-                    let viewer_surface: Element<'_, Message> =
-                        match self.settings.background_theme() {
-                            config::BackgroundTheme::Light => {
-                                let color = Color::from_rgb8(245, 245, 245);
-                                scrollable_container
-                                    .style(move |_theme: &Theme| iced::widget::container::Style {
-                                        background: Some(iced::Background::Color(color)),
-                                        ..Default::default()
-                                    })
-                                    .into()
-                            }
-                            config::BackgroundTheme::Dark => {
-                                let color = Color::from_rgb8(32, 33, 36);
-                                scrollable_container
-                                    .style(move |_theme: &Theme| iced::widget::container::Style {
-                                        background: Some(iced::Background::Color(color)),
-                                        ..Default::default()
-                                    })
-                                    .into()
-                            }
-                            config::BackgroundTheme::Checkerboard => Stack::new()
-                                .push(
-                                    canvas::Canvas::new(CheckerboardBackground)
-                                        .width(Length::Fill)
-                                        .height(Length::Fill),
-                                )
-                                .push(scrollable_container)
-                                .into(),
-                        };
-
-                    // Add position indicator if scrolling is active
-                    let viewer_content: Element<'_, Message> =
-                        if let Some((px, py)) = self.scroll_position_percentage() {
-                            let indicator_text = format!("Position: {:.0}% x {:.0}%", px, py);
-                            let indicator = Container::new(Text::new(indicator_text).size(12))
-                                .padding(6)
-                                .style(|_theme: &Theme| iced::widget::container::Style {
-                                    background: Some(iced::Background::Color(Color::from_rgba(
-                                        0.0, 0.0, 0.0, 0.7,
-                                    ))),
-                                    text_color: Some(Color::WHITE),
-                                    border: Border {
-                                        color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
-                                        width: 1.0,
-                                        radius: 4.0.into(),
-                                    },
-                                    ..Default::default()
-                                });
-
-                            Stack::new()
-                                .push(viewer_surface)
-                                .push(
-                                    Container::new(indicator)
-                                        .width(Length::Fill)
-                                        .height(Length::Fill)
-                                        .padding(10)
-                                        .align_x(Horizontal::Right)
-                                        .align_y(Vertical::Bottom),
-                                )
-                                .into()
-                        } else {
-                            viewer_surface
-                        };
-
-                    let mut viewer_column = Column::new()
+                    let viewer_column = Column::new()
                         .spacing(16)
                         .width(Length::Fill)
                         .height(Length::Fill)
-                        .push(controls_view);
-
-                    viewer_column = viewer_column.push(viewer_content);
+                        .push(controls_view)
+                        .push(viewer_content);
 
                     viewer_column.into()
                 } else {
@@ -957,49 +861,6 @@ impl App {
         .width(Length::Fill)
         .height(Length::Fill);
         final_layout.into()
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct CheckerboardBackground;
-
-impl CheckerboardBackground {
-    const TILE: f32 = 20.0;
-}
-
-impl canvas::Program<Message> for CheckerboardBackground {
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &Self::State,
-        renderer: &iced::Renderer,
-        _theme: &Theme,
-        bounds: Rectangle,
-        _cursor: mouse::Cursor,
-    ) -> Vec<canvas::Geometry> {
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-        let tile = Self::TILE;
-        let light = Color::from_rgb(0.85, 0.85, 0.85);
-        let dark = Color::from_rgb(0.75, 0.75, 0.75);
-
-        let cols = ((bounds.width / tile).ceil() as i32).max(1);
-        let rows = ((bounds.height / tile).ceil() as i32).max(1);
-
-        for row in 0..rows {
-            for col in 0..cols {
-                let color = if (row + col) % 2 == 0 { light } else { dark };
-                let x = col as f32 * tile;
-                let y = row as f32 * tile;
-                let path = canvas::Path::rectangle(
-                    Point::new(x, y),
-                    iced::Size::new(tile + 0.5, tile + 0.5),
-                );
-                frame.fill(&path, color);
-            }
-        }
-
-        vec![frame.into_geometry()]
     }
 }
 

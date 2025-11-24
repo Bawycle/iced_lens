@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Image viewer module responsible for rendering loaded images.
+//! Image viewer module responsible for rendering loaded images and related UI.
 
 pub mod controls;
+pub mod pane;
 
 use crate::image_handler::ImageData;
 use iced::{widget::Image, Element, Length};
