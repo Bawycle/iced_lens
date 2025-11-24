@@ -7,8 +7,7 @@ use crate::ui::settings::{
     self, Event as SettingsEvent, State as SettingsState, ViewContext as SettingsViewContext,
 };
 use crate::ui::state::zoom::{
-    DEFAULT_ZOOM_PERCENT, MAX_ZOOM_PERCENT, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_PERCENT,
-    MIN_ZOOM_STEP_PERCENT, ZOOM_INPUT_INVALID_KEY,
+    DEFAULT_ZOOM_PERCENT, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT, ZOOM_INPUT_INVALID_KEY,
 };
 use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer::{self, controls as viewer_controls};
@@ -17,7 +16,7 @@ use iced::{
     alignment::{Horizontal, Vertical},
     event, keyboard, mouse,
     widget::{button, Column, Container, Text},
-    window, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
+    window, Element, Length, Point, Rectangle, Subscription, Task, Theme,
 };
 use std::fmt;
 use unic_langid::LanguageIdentifier;
@@ -34,8 +33,6 @@ pub struct App {
     modifiers: keyboard::Modifiers,
     cursor_position: Option<Point>,
 }
-
-const SCROLLBAR_GUTTER: f32 = 16.0;
 
 const VIEWER_SCROLLABLE_ID: &str = "viewer-image-scrollable";
 
@@ -61,28 +58,8 @@ fn parse_number(input: &str) -> Option<f32> {
     Some(value)
 }
 
-fn clamp_zoom(value: f32) -> f32 {
-    value.clamp(MIN_ZOOM_PERCENT, MAX_ZOOM_PERCENT)
-}
-
 fn clamp_zoom_step(value: f32) -> f32 {
     value.clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT)
-}
-
-fn intersect_rectangles(a: Rectangle, b: Rectangle) -> Option<Rectangle> {
-    let left = a.x.max(b.x);
-    let top = a.y.max(b.y);
-    let right = (a.x + a.width).min(b.x + b.width);
-    let bottom = (a.y + a.height).min(b.y + b.height);
-
-    if right <= left || bottom <= top {
-        None
-    } else {
-        Some(Rectangle::new(
-            Point::new(left, top),
-            iced::Size::new(right - left, bottom - top),
-        ))
-    }
 }
 
 fn scroll_steps(delta: &mouse::ScrollDelta) -> f32 {
@@ -450,7 +427,7 @@ impl App {
 
     fn refresh_fit_zoom(&mut self) {
         if self.zoom.fit_to_window {
-            if let Some(fit_zoom) = self.compute_fit_zoom_percent() {
+            if let Some(fit_zoom) = self.viewer_state().compute_fit_zoom_percent() {
                 self.zoom.update_zoom_display(fit_zoom);
                 self.zoom.zoom_input_dirty = false;
                 self.zoom.zoom_input_error_key = None;
@@ -458,133 +435,13 @@ impl App {
         }
     }
 
-    fn compute_fit_zoom_percent(&self) -> Option<f32> {
-        let image = self.image.as_ref()?;
-        let viewport = self.viewport.bounds?;
-
-        if image.width == 0 || image.height == 0 {
-            return Some(DEFAULT_ZOOM_PERCENT);
-        }
-
-        if viewport.width <= 0.0 || viewport.height <= 0.0 {
-            return None;
-        }
-
-        let image_width = image.width as f32;
-        let image_height = image.height as f32;
-
-        let scale_x = viewport.width / image_width;
-        let scale_y = viewport.height / image_height;
-
-        let scale = scale_x.min(scale_y);
-
-        if !scale.is_finite() || scale <= 0.0 {
-            return Some(DEFAULT_ZOOM_PERCENT);
-        }
-
-        Some(clamp_zoom(scale * 100.0))
-    }
-
-    fn scaled_image_size(&self) -> Option<iced::Size> {
-        let image = self.image.as_ref()?;
-        let scale = (self.zoom.zoom_percent / 100.0).max(0.01);
-        let width = (image.width as f32 * scale).max(1.0);
-        let height = (image.height as f32 * scale).max(1.0);
-        Some(iced::Size::new(width, height))
-    }
-
-    fn compute_padding(viewport: Rectangle, size: iced::Size) -> Padding {
-        let horizontal = ((viewport.width - size.width) / 2.0).max(0.0);
-        let vertical = ((viewport.height - size.height) / 2.0).max(0.0);
-
-        Padding {
-            top: vertical,
-            right: horizontal,
-            bottom: vertical,
-            left: horizontal,
-        }
-    }
-
-    fn image_padding(&self) -> Padding {
-        match (self.viewport.bounds, self.scaled_image_size()) {
-            (Some(viewport), Some(size)) => Self::compute_padding(viewport, size),
-            _ => Padding::default(),
-        }
-    }
-
-    fn scroll_position_percentage(&self) -> Option<(f32, f32)> {
-        // Calculate scroll position as percentage (0-100% for both axes)
-        let size = self.scaled_image_size()?;
-        self.viewport
-            .scroll_position_percentage(size.width, size.height)
-    }
-
-    fn image_bounds_in_window(&self) -> Option<Rectangle> {
-        let viewport = self.viewport.bounds?;
-        let size = self.scaled_image_size()?;
-        let padding = Self::compute_padding(viewport, size);
-
-        let content_origin_x = viewport.x - self.viewport.offset.x;
-        let content_origin_y = viewport.y - self.viewport.offset.y;
-
-        let left = content_origin_x + padding.left;
-        let top = content_origin_y + padding.top;
-
-        Some(Rectangle::new(Point::new(left, top), size))
-    }
-
-    fn is_cursor_over_image(&self) -> bool {
-        let cursor = match self.cursor_position {
-            Some(position) => position,
-            None => return false,
-        };
-
-        let viewport = match self.viewport.bounds {
-            Some(bounds) => bounds,
-            None => return false,
-        };
-
-        let size = match self.scaled_image_size() {
-            Some(dimensions) => dimensions,
-            None => return false,
-        };
-
-        let image_bounds = match self.image_bounds_in_window() {
-            Some(bounds) => bounds,
-            None => return false,
-        };
-
-        let viewport_rect = Rectangle::new(
-            Point::new(viewport.x, viewport.y),
-            iced::Size::new(viewport.width, viewport.height),
-        );
-
-        if !viewport_rect.contains(cursor) {
-            return false;
-        }
-
-        let mut hitbox = match intersect_rectangles(image_bounds, viewport_rect) {
-            Some(intersection) => intersection,
-            None => return false,
-        };
-
-        if size.height > viewport.height {
-            if hitbox.width <= SCROLLBAR_GUTTER {
-                return false;
-            }
-
-            hitbox.width -= SCROLLBAR_GUTTER;
-        }
-
-        if size.width > viewport.width {
-            if hitbox.height <= SCROLLBAR_GUTTER {
-                return false;
-            }
-
-            hitbox.height -= SCROLLBAR_GUTTER;
-        }
-
-        hitbox.contains(cursor)
+    fn viewer_state(&self) -> viewer::state::ViewerState<'_> {
+        viewer::state::ViewerState::new(
+            self.image.as_ref(),
+            &self.viewport,
+            self.zoom.zoom_percent,
+            self.cursor_position,
+        )
     }
 
     fn persist_preferences(&self) -> Task<Message> {
@@ -610,7 +467,7 @@ impl App {
         position: Point,
     ) -> Task<Message> {
         // Only start drag on left button press over the image
-        if button == mouse::Button::Left && self.is_cursor_over_image() {
+        if button == mouse::Button::Left && self.viewer_state().is_cursor_over_image() {
             self.drag.start(position, self.viewport.offset);
         }
         Task::none()
@@ -634,7 +491,8 @@ impl App {
         self.viewport.offset = new_offset;
 
         // Convert absolute offset to relative offset (0.0-1.0 range)
-        if let (Some(viewport), Some(size)) = (self.viewport.bounds, self.scaled_image_size()) {
+        let viewer_state = self.viewer_state();
+        if let (Some(viewport), Some(size)) = (self.viewport.bounds, viewer_state.scaled_image_size()) {
             let max_offset_x = (size.width - viewport.width).max(0.0);
             let max_offset_y = (size.height - viewport.height).max(0.0);
 
@@ -665,7 +523,7 @@ impl App {
 
     fn handle_wheel_zoom(&mut self, delta: mouse::ScrollDelta) -> Task<Message> {
         // Zoom only when cursor is over the image
-        if !self.is_cursor_over_image() {
+        if !self.viewer_state().is_cursor_over_image() {
             return Task::none();
         }
 
@@ -804,18 +662,19 @@ impl App {
                     )
                     .map(Message::ViewerControls);
 
+                    let viewer_state = self.viewer_state();
                     let viewer_content = viewer::pane::view(
                         viewer::pane::ViewContext {
                             background_theme: self.settings.background_theme(),
-                            scroll_position: self.scroll_position_percentage(),
+                            scroll_position: viewer_state.scroll_position_percentage(),
                             scrollable_id: VIEWER_SCROLLABLE_ID,
                         },
                         viewer::pane::ViewModel {
                             image: image_data,
                             zoom_percent: self.zoom.zoom_percent,
-                            padding: self.image_padding(),
+                            padding: viewer_state.image_padding(),
                             is_dragging: self.drag.is_dragging,
-                            cursor_over_image: self.is_cursor_over_image(),
+                            cursor_over_image: viewer_state.is_cursor_over_image(),
                         },
                     );
 
@@ -871,7 +730,9 @@ mod tests {
     use super::*;
     use crate::config::DEFAULT_ZOOM_STEP_PERCENT;
     use crate::image_handler::ImageData;
-    use crate::ui::state::zoom::{format_number, ZOOM_STEP_INVALID_KEY, ZOOM_STEP_RANGE_KEY};
+    use crate::ui::state::zoom::{
+        format_number, MAX_ZOOM_PERCENT, MIN_ZOOM_PERCENT, ZOOM_STEP_INVALID_KEY, ZOOM_STEP_RANGE_KEY,
+    };
     use iced::widget::image::Handle;
     use std::fs;
     use std::sync::{Mutex, OnceLock};
@@ -1143,6 +1004,7 @@ mod tests {
 
         assert!(app.zoom.fit_to_window);
         let fit_zoom = app
+            .viewer_state()
             .compute_fit_zoom_percent()
             .expect("fit zoom should exist");
         assert_eq!(app.zoom.zoom_percent, fit_zoom);

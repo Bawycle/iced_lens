@@ -3,6 +3,7 @@
 
 pub mod controls;
 pub mod pane;
+pub mod state;
 
 use crate::image_handler::ImageData;
 use iced::{widget::Image, Element, Length};
