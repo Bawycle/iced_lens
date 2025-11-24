@@ -9,6 +9,7 @@
 use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::image_handler;
+use crate::ui::editor::{self, Event as EditorEvent, State as EditorState};
 use crate::ui::settings::{
     self, Event as SettingsEvent, State as SettingsState, ViewContext as SettingsViewContext,
 };
@@ -29,6 +30,7 @@ pub struct App {
     mode: AppMode,
     settings: SettingsState,
     viewer: component::State,
+    editor: Option<EditorState>,
     fullscreen: bool,
     window_id: Option<window::Id>,
 }
@@ -38,6 +40,7 @@ pub struct App {
 pub enum AppMode {
     Viewer,
     Settings,
+    Editor,
 }
 
 impl fmt::Debug for App {
@@ -56,6 +59,7 @@ pub enum Message {
     Viewer(component::Message),
     SwitchMode(AppMode),
     Settings(settings::Message),
+    Editor(editor::Message),
 }
 
 /// Runtime flags passed in from the CLI or launcher to tweak startup behavior.
@@ -138,6 +142,7 @@ impl Default for App {
             mode: AppMode::Viewer,
             settings: SettingsState::default(),
             viewer: component::State::new(),
+            editor: None,
             fullscreen: false,
             window_id: None,
         }
@@ -219,6 +224,7 @@ impl App {
             Message::Viewer(viewer_message) => self.handle_viewer_message(viewer_message),
             Message::SwitchMode(mode) => self.handle_mode_switch(mode),
             Message::Settings(settings_message) => self.handle_settings_message(settings_message),
+            Message::Editor(editor_message) => self.handle_editor_message(editor_message),
         }
     }
 
@@ -239,6 +245,7 @@ impl App {
     }
 
     fn handle_mode_switch(&mut self, mode: AppMode) -> Task<Message> {
+        // Handle Settings → Viewer transition
         if matches!(mode, AppMode::Viewer) && matches!(self.mode, AppMode::Settings) {
             match self.settings.ensure_zoom_step_committed() {
                 Ok(Some(value)) => {
@@ -257,6 +264,28 @@ impl App {
             }
         }
 
+        // Handle Viewer → Editor transition
+        if matches!(mode, AppMode::Editor) && matches!(self.mode, AppMode::Viewer) {
+            if let (Some(image_path), Some(image_data)) = (
+                self.viewer.current_image_path.clone(),
+                self.viewer.image().cloned(),
+            ) {
+                self.editor = Some(EditorState::new(image_path, image_data));
+                self.mode = mode;
+                return Task::none();
+            } else {
+                // Can't enter editor mode without an image
+                return Task::none();
+            }
+        }
+
+        // Handle Editor → Viewer transition
+        if matches!(mode, AppMode::Viewer) && matches!(self.mode, AppMode::Editor) {
+            self.editor = None;
+            self.mode = mode;
+            return Task::none();
+        }
+
         self.mode = mode;
         Task::none()
     }
@@ -271,6 +300,34 @@ impl App {
             }
             SettingsEvent::BackgroundThemeSelected(_) => self.persist_preferences(),
             SettingsEvent::SortOrderSelected(_) => self.persist_preferences(),
+        }
+    }
+
+    fn handle_editor_message(&mut self, message: editor::Message) -> Task<Message> {
+        let Some(editor_state) = self.editor.as_mut() else {
+            return Task::none();
+        };
+
+        match editor_state.update(message) {
+            EditorEvent::None => Task::none(),
+            EditorEvent::ExitEditor => {
+                self.editor = None;
+                self.mode = AppMode::Viewer;
+                Task::none()
+            }
+            EditorEvent::NavigateNext => {
+                // TODO: Implement navigation in editor mode
+                Task::none()
+            }
+            EditorEvent::NavigatePrevious => {
+                // TODO: Implement navigation in editor mode
+                Task::none()
+            }
+            EditorEvent::SaveRequested { path, overwrite } => {
+                // TODO: Implement save logic
+                eprintln!("Save requested: {:?} (overwrite: {})", path, overwrite);
+                Task::none()
+            }
         }
     }
 
@@ -348,22 +405,47 @@ impl App {
                 .settings
                 .view(SettingsViewContext { i18n: &self.i18n })
                 .map(Message::Settings),
+            AppMode::Editor => {
+                if let Some(editor_state) = &self.editor {
+                    editor_state
+                        .view(editor::ViewContext { i18n: &self.i18n })
+                        .map(Message::Editor)
+                } else {
+                    // Fallback if editor state is missing
+                    Container::new(Text::new("Editor error"))
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .into()
+                }
+            }
         };
 
-        let switch_button = if self.mode == AppMode::Viewer {
-            button(Text::new(self.i18n.tr("open-settings-button")))
-                .on_press(Message::SwitchMode(AppMode::Settings))
-        } else {
-            button(Text::new(self.i18n.tr("back-to-viewer-button")))
-                .on_press(Message::SwitchMode(AppMode::Viewer))
+        let switch_button = match self.mode {
+            AppMode::Viewer => button(Text::new(self.i18n.tr("open-settings-button")))
+                .on_press(Message::SwitchMode(AppMode::Settings)),
+            AppMode::Settings => button(Text::new(self.i18n.tr("back-to-viewer-button")))
+                .on_press(Message::SwitchMode(AppMode::Viewer)),
+            AppMode::Editor => button(Text::new(self.i18n.tr("editor-cancel")))
+                .on_press(Message::SwitchMode(AppMode::Viewer)),
         };
 
         let mut column = iced::widget::Column::new();
         if !self.fullscreen {
+            let mut top_bar = iced::widget::Row::new().spacing(10).padding(10);
+
+            // Add Settings/Back button
+            top_bar = top_bar.push(switch_button);
+
+            // Add Edit button (only in Viewer mode and when an image is loaded)
+            if self.mode == AppMode::Viewer && self.viewer.has_image() {
+                let edit_button = button(Text::new("✏ Edit"))
+                    .on_press(Message::SwitchMode(AppMode::Editor));
+                top_bar = top_bar.push(edit_button);
+            }
+
             column = column.push(
-                Container::new(switch_button)
-                    .width(Length::Shrink)
-                    .padding(10)
+                Container::new(top_bar)
+                    .width(Length::Fill)
                     .align_x(iced::alignment::Horizontal::Left),
             );
         }

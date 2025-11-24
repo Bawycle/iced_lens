@@ -1,3 +1,4 @@
+pub mod editor;
 pub mod settings;
 pub mod state;
 pub mod viewer;
