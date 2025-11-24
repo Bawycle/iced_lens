@@ -23,6 +23,7 @@ viewer-fit-percentage-label = Fit zoom
 viewer-zoom-input-error-invalid = Please enter a valid number.
 viewer-zoom-step-error-invalid = The zoom step must be a number.
 viewer-zoom-step-error-range = The zoom step must be between 1% and 200%.
+viewer-position-label = Position
 settings-zoom-step-label = Zoom step
 settings-zoom-step-placeholder = 10
 settings-zoom-step-hint = Choose how much the zoom changes when using the controls (1% to 200%).

@@ -17,7 +17,7 @@ use iced::{mouse, Rectangle};
 
 pub struct ViewContext {
     pub background_theme: BackgroundTheme,
-    pub scroll_position: Option<(f32, f32)>,
+    pub scroll_indicator: Option<String>,
     pub scrollable_id: &'static str,
 }
 
@@ -97,8 +97,7 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
             .into(),
     };
 
-    if let Some((px, py)) = ctx.scroll_position {
-        let indicator_text = format!("Position: {:.0}% x {:.0}%", px, py);
+    if let Some(indicator_text) = ctx.scroll_indicator {
         let indicator = Container::new(Text::new(indicator_text).size(12))
             .padding(6)
             .style(|_theme: &Theme| iced::widget::container::Style {

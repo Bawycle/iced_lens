@@ -199,7 +199,14 @@ impl State {
             zoom: &self.zoom,
             pane_context: pane::ViewContext {
                 background_theme: env.background_theme,
-                scroll_position: geometry_state.scroll_position_percentage(),
+                scroll_indicator: geometry_state.scroll_position_percentage().map(|(px, py)| {
+                    format!(
+                        "{}: {:.0}% x {:.0}%",
+                        env.i18n.tr("viewer-position-label"),
+                        px,
+                        py
+                    )
+                }),
                 scrollable_id: SCROLLABLE_ID,
             },
             pane_model: pane::ViewModel {
