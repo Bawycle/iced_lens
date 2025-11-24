@@ -194,16 +194,30 @@ impl State {
             show_details: error.show_details,
         });
 
+        let position_line = geometry_state
+            .scroll_position_percentage()
+            .map(|(px, py)| format_position_indicator(env.i18n, px, py));
+
+        let zoom_line = if (self.zoom.zoom_percent - crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT)
+            .abs()
+            > f32::EPSILON
+        {
+            Some(format_zoom_indicator(env.i18n, self.zoom.zoom_percent))
+        } else {
+            None
+        };
+
+        let hud_lines = position_line
+            .into_iter()
+            .chain(zoom_line.into_iter())
+            .collect::<Vec<_>>();
+
         let image = self.image.as_ref().map(|image_data| viewer::ImageContext {
             controls_context: controls::ViewContext { i18n: env.i18n },
             zoom: &self.zoom,
             pane_context: pane::ViewContext {
                 background_theme: env.background_theme,
-                scroll_indicator: geometry_state
-                    .scroll_position_percentage()
-                    .map(|(px, py)| {
-                        format_scroll_indicator(env.i18n, px, py, self.zoom.zoom_percent)
-                    }),
+                hud_lines,
                 scrollable_id: SCROLLABLE_ID,
             },
             pane_model: pane::ViewModel {
@@ -499,12 +513,18 @@ fn scroll_steps(delta: &mouse::ScrollDelta) -> f32 {
     }
 }
 
-fn format_scroll_indicator(i18n: &I18n, px: f32, py: f32, zoom_percent: f32) -> String {
+fn format_position_indicator(i18n: &I18n, px: f32, py: f32) -> String {
     format!(
-        "{}: {:.0}% x {:.0}% • {}: {:.0}%",
+        "{}: {:.0}% x {:.0}%",
         i18n.tr("viewer-position-label"),
         px,
-        py,
+        py
+    )
+}
+
+fn format_zoom_indicator(i18n: &I18n, zoom_percent: f32) -> String {
+    format!(
+        "{}: {:.0}%",
         i18n.tr("viewer-zoom-indicator-label"),
         zoom_percent
     )
@@ -517,11 +537,12 @@ mod tests {
     #[test]
     fn scroll_indicator_uses_translation() {
         let i18n = I18n::default();
-        let text = format_scroll_indicator(&i18n, 12.4, 56.7, 135.2);
-        assert!(text.starts_with(&i18n.tr("viewer-position-label")));
-        assert!(text.contains("12%"));
-        assert!(text.contains("57%"));
-        assert!(text.contains(&i18n.tr("viewer-zoom-indicator-label")));
-        assert!(text.contains("135%"));
+        let position = format_position_indicator(&i18n, 12.4, 56.7);
+        let zoom = format_zoom_indicator(&i18n, 135.2);
+        assert!(position.starts_with(&i18n.tr("viewer-position-label")));
+        assert!(position.contains("12%"));
+        assert!(position.contains("57%"));
+        assert!(zoom.starts_with(&i18n.tr("viewer-zoom-indicator-label")));
+        assert!(zoom.contains("135%"));
     }
 }

@@ -6,7 +6,7 @@ use crate::config::BackgroundTheme;
 use crate::image_handler::ImageData;
 use crate::ui::viewer::component::Message;
 use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
-use iced::widget::{mouse_area, Container, Scrollable, Stack, Text};
+use iced::widget::{mouse_area, Column, Container, Scrollable, Stack, Text};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::canvas,
@@ -17,7 +17,7 @@ use iced::{mouse, Rectangle};
 
 pub struct ViewContext {
     pub background_theme: BackgroundTheme,
-    pub scroll_indicator: Option<String>,
+    pub hud_lines: Vec<String>,
     pub scrollable_id: &'static str,
 }
 
@@ -97,8 +97,13 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
             .into(),
     };
 
-    if let Some(indicator_text) = ctx.scroll_indicator {
-        let indicator = Container::new(Text::new(indicator_text).size(12))
+    if !ctx.hud_lines.is_empty() {
+        let mut hud_column: Column<'_, Message> = Column::new().spacing(4);
+        for line in &ctx.hud_lines {
+            hud_column = hud_column.push(Text::new(line.clone()).size(12));
+        }
+
+        let indicator = Container::new(hud_column)
             .padding(6)
             .style(|_theme: &Theme| iced::widget::container::Style {
                 background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.7))),
