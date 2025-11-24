@@ -177,7 +177,6 @@ Planned / aspirational items (subject to change):
 - Basic image metadata panel (EXIF)
 - Overlay HUD
 - Richer argument parsing (additional flags)
-- Packaging (AppImage / Flatpack)
 
 ## 14. Contributing
 Contributions welcome! Start by reading [`CONTRIBUTING.md`](CONTRIBUTING.md).
