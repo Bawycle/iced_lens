@@ -209,7 +209,7 @@ impl State {
 
         let hud_lines = position_line
             .into_iter()
-            .chain(zoom_line.into_iter())
+            .chain(zoom_line)
             .collect::<Vec<_>>();
 
         let image = self.image.as_ref().map(|image_data| viewer::ImageContext {
