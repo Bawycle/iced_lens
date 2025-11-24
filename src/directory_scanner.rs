@@ -6,12 +6,8 @@
 
 use crate::config::SortOrder;
 use crate::error::Result;
+use crate::image_handler::SUPPORTED_EXTENSIONS;
 use std::path::{Path, PathBuf};
-
-/// Supported image extensions
-const SUPPORTED_EXTENSIONS: &[&str] = &[
-    "jpg", "jpeg", "png", "gif", "tiff", "tif", "webp", "bmp", "ico", "svg",
-];
 
 /// Represents a list of image files in a directory with navigation capabilities.
 #[derive(Debug, Clone, PartialEq)]
@@ -126,6 +122,23 @@ impl ImageList {
     /// Updates the current index to the given path if it exists in the list.
     pub fn set_current(&mut self, path: &Path) {
         self.current_index = self.images.iter().position(|p| p == path);
+    }
+
+    /// Returns the current index if set.
+    pub fn current_index(&self) -> Option<usize> {
+        self.current_index
+    }
+
+    /// Returns the path at the specified index.
+    pub fn get(&self, index: usize) -> Option<&Path> {
+        self.images.get(index).map(|p| p.as_path())
+    }
+
+    /// Sets the current index directly.
+    pub fn set_current_index(&mut self, index: usize) {
+        if index < self.images.len() {
+            self.current_index = Some(index);
+        }
     }
 }
 

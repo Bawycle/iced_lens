@@ -211,8 +211,23 @@ impl State {
             }
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
             Message::NavigateNext => {
+                // Save current index before rescanning (in case current image was deleted)
+                let old_index = self.image_list.current_index();
+
                 // Rescan directory to handle added/removed images
                 let _ = self.scan_directory();
+
+                // If current image was deleted, try to stay at the same position
+                if self.image_list.current_index().is_none() {
+                    if let Some(old_idx) = old_index {
+                        // Try to go to the same index, or the closest valid one
+                        let target_index = old_idx.min(self.image_list.len().saturating_sub(1));
+                        if let Some(path) = self.image_list.get(target_index).map(|p| p.to_path_buf()) {
+                            self.image_list.set_current_index(target_index);
+                            self.current_image_path = Some(path);
+                        }
+                    }
+                }
 
                 if let Some(next_path) = self.image_list.next() {
                     let path = next_path.to_path_buf();
@@ -229,8 +244,23 @@ impl State {
                 (Effect::None, Task::none())
             }
             Message::NavigatePrevious => {
+                // Save current index before rescanning (in case current image was deleted)
+                let old_index = self.image_list.current_index();
+
                 // Rescan directory to handle added/removed images
                 let _ = self.scan_directory();
+
+                // If current image was deleted, try to stay at the same position
+                if self.image_list.current_index().is_none() {
+                    if let Some(old_idx) = old_index {
+                        // Try to go to the same index, or the closest valid one
+                        let target_index = old_idx.min(self.image_list.len().saturating_sub(1));
+                        if let Some(path) = self.image_list.get(target_index).map(|p| p.to_path_buf()) {
+                            self.image_list.set_current_index(target_index);
+                            self.current_image_path = Some(path);
+                        }
+                    }
+                }
 
                 if let Some(prev_path) = self.image_list.previous() {
                     let path = prev_path.to_path_buf();
@@ -390,9 +420,8 @@ impl State {
                 mouse::Event::CursorMoved { position } => {
                     self.cursor_position = Some(position);
                     self.last_mouse_move = Some(Instant::now());
-                    if self.geometry_state().is_cursor_over_image() {
-                        self.arrows_visible = true;
-                    }
+                    // Show arrows when cursor is anywhere in the viewer
+                    self.arrows_visible = true;
                     if self.drag.is_dragging {
                         let task = self.handle_cursor_moved_during_drag(position);
                         (Effect::None, task)

@@ -40,7 +40,11 @@ IcedLens aims to provide a simple, privacy‑friendly viewer focusing on respons
 - SVG rasterization for scalable assets
 - Fit‑to‑window and manual zoom with wheel and toolbar controls
 - Simple grab‑to‑pan navigation for large images
-- Persistent preferences (language, zoom step, fit mode)
+- Multi-image navigation with keyboard shortcuts and overlay arrows
+- Configurable sort order (alphabetical, modified date, created date)
+- Automatic detection of added/removed images in the directory
+- Loop navigation with visual boundary indicators
+- Persistent preferences (language, zoom step, fit mode, background theme, sort order)
 - Internationalization with Fluent (currently `en-US` and `fr`)
 - Configurable viewer background (light, dark, checkerboard)
 - Distraction-free fullscreen mode
@@ -99,6 +103,11 @@ ARGS:
 
 ### Navigation Controls
 **Image Navigation:**
+- **Left/Right Arrow Keys**: Navigate to previous/next image in the directory
+- **Overlay Navigation Arrows**: Hover over the viewer to reveal navigation arrows (◀ ▶)
+  - Arrows appear when there's a previous/next image available
+  - Shows loop indicator (↻) when at the first or last image
+  - Automatically disappear after 3 seconds of no mouse movement
 - **Left-click + Drag**: Pan/scroll through large images (grab-and-drag)
 - **Position indicator**: Automatically appears in bottom-right corner showing scroll position (e.g., "Position: 45% x 60%")
 - **Fullscreen**: Toggle with the toolbar button, double-click on the image, or press **F11**; exit via **Esc**
@@ -113,11 +122,21 @@ ARGS:
 - Cursor changes to **grabbing hand** (closed) while dragging
 - Scrollbars are hidden for clean interface
 
+**Directory Scanning:**
+- The viewer automatically rescans the directory on each navigation action
+- Added or removed images are detected in real-time
+- Navigation loops at boundaries (wraps from last to first image and vice versa)
+- If the current image is deleted externally, navigation continues from the same position in the list
+
 ## 6. Configuration & Preferences
 User config is stored in a platform‑appropriate directory (implementation detail: uses a TOML file). Currently persisted:
-- `language`
-- `fit_to_window`
-- `zoom_step`
+- `language` - UI language (en-US, fr)
+- `fit_to_window` - Auto-fit image to viewport
+- `zoom_step` - Percentage increment for zoom in/out (1-200%)
+- `background_theme` - Viewer background (light, dark, checkerboard)
+- `sort_order` - Image navigation sort order (alphabetical, modified-date, created-date)
+
+All preferences can be configured through the Settings screen (accessible via the toolbar).
 
 Resetting config: remove the file and restart; defaults will regenerate.
 

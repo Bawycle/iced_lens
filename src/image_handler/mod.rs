@@ -27,6 +27,12 @@ use std::fs;
 use std::path::Path;
 use tiny_skia;
 
+/// Supported image extensions for the viewer.
+/// These formats can be loaded and displayed by the application.
+pub const SUPPORTED_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "tiff", "tif", "webp", "bmp", "ico", "svg",
+];
+
 #[derive(Debug, Clone)]
 pub struct ImageData {
     pub handle: image::Handle,

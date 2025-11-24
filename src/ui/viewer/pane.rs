@@ -107,28 +107,28 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
     // Add navigation arrows if visible
     if model.arrows_visible {
         if model.has_previous {
-            let left_arrow_opacity = if model.at_first { 0.5 } else { 1.0 };
-            let left_arrow = button(Text::new("◀").size(32).style(move |_theme: &Theme| {
-                iced::widget::text::Style {
-                    color: Some(Color::from_rgba(1.0, 1.0, 1.0, left_arrow_opacity)),
-                }
-            }))
-            .on_press(Message::NavigatePrevious)
-            .padding(12)
-            .style(|_theme: &Theme, _status: button::Status| button::Style {
-                background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
-                text_color: Color::WHITE,
-                border: Border {
-                    radius: 24.0.into(),
-                    width: 1.0,
-                    color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
-                },
-                shadow: Shadow {
-                    color: Color::from_rgba(0.0, 0.0, 0.0, 0.3),
-                    offset: iced::Vector::new(0.0, 2.0),
-                    blur_radius: 8.0,
-                },
-            });
+            let left_arrow_text = if model.at_first {
+                "◀\n↻" // Arrow with loop indicator
+            } else {
+                "◀"
+            };
+            let left_arrow = button(Text::new(left_arrow_text).size(28))
+                .on_press(Message::NavigatePrevious)
+                .padding(12)
+                .style(|_theme: &Theme, _status: button::Status| button::Style {
+                    background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
+                    text_color: Color::WHITE,
+                    border: Border {
+                        radius: 24.0.into(),
+                        width: 1.0,
+                        color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
+                    },
+                    shadow: Shadow {
+                        color: Color::from_rgba(0.0, 0.0, 0.0, 0.3),
+                        offset: iced::Vector::new(0.0, 2.0),
+                        blur_radius: 8.0,
+                    },
+                });
 
             stack = stack.push(
                 Container::new(left_arrow)
@@ -141,28 +141,28 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
         }
 
         if model.has_next {
-            let right_arrow_opacity = if model.at_last { 0.5 } else { 1.0 };
-            let right_arrow = button(Text::new("▶").size(32).style(move |_theme: &Theme| {
-                iced::widget::text::Style {
-                    color: Some(Color::from_rgba(1.0, 1.0, 1.0, right_arrow_opacity)),
-                }
-            }))
-            .on_press(Message::NavigateNext)
-            .padding(12)
-            .style(|_theme: &Theme, _status: button::Status| button::Style {
-                background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
-                text_color: Color::WHITE,
-                border: Border {
-                    radius: 24.0.into(),
-                    width: 1.0,
-                    color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
-                },
-                shadow: Shadow {
-                    color: Color::from_rgba(0.0, 0.0, 0.0, 0.3),
-                    offset: iced::Vector::new(0.0, 2.0),
-                    blur_radius: 8.0,
-                },
-            });
+            let right_arrow_text = if model.at_last {
+                "▶\n↻" // Arrow with loop indicator
+            } else {
+                "▶"
+            };
+            let right_arrow = button(Text::new(right_arrow_text).size(28))
+                .on_press(Message::NavigateNext)
+                .padding(12)
+                .style(|_theme: &Theme, _status: button::Status| button::Style {
+                    background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
+                    text_color: Color::WHITE,
+                    border: Border {
+                        radius: 24.0.into(),
+                        width: 1.0,
+                        color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
+                    },
+                    shadow: Shadow {
+                        color: Color::from_rgba(0.0, 0.0, 0.0, 0.3),
+                        offset: iced::Vector::new(0.0, 2.0),
+                        blur_radius: 8.0,
+                    },
+                });
 
             stack = stack.push(
                 Container::new(right_arrow)
