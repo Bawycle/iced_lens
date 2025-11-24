@@ -11,19 +11,16 @@ use crate::ui::state::zoom::{
     MIN_ZOOM_STEP_PERCENT, ZOOM_INPUT_INVALID_KEY,
 };
 use crate::ui::state::{DragState, ViewportState, ZoomState};
-use crate::ui::viewer;
+use crate::ui::viewer::{self, controls as viewer_controls};
 use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
 use iced::widget::canvas;
 use iced::widget::scrollable::{
     self, AbsoluteOffset, Direction, Id, RelativeOffset, Scrollbar, Viewport,
 };
-use iced::widget::text_input;
 use iced::{
     alignment::{Horizontal, Vertical},
     event, keyboard, mouse,
-    widget::{
-        button, checkbox, mouse_area, Column, Container, Row, Scrollable, Space, Stack, Text,
-    },
+    widget::{button, mouse_area, Column, Container, Scrollable, Stack, Text},
     window, Border, Color, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
 };
 use std::fmt;
@@ -168,12 +165,7 @@ pub enum Message {
     ImageLoaded(Result<ImageData, Error>),
     SwitchMode(AppMode),
     ToggleErrorDetails,
-    ZoomInputChanged(String),
-    ZoomInputSubmitted,
-    ResetZoom,
-    ZoomIn,
-    ZoomOut,
-    SetFitToWindow(bool),
+    ViewerControls(viewer_controls::Message),
     Settings(settings::Message),
     ViewportChanged {
         bounds: Rectangle,
@@ -363,46 +355,8 @@ impl App {
                 }
                 Task::none()
             }
-            Message::ZoomInputChanged(value) => {
-                self.zoom.zoom_input = value;
-                self.zoom.zoom_input_dirty = true;
-                self.zoom.zoom_input_error_key = None;
-                Task::none()
-            }
-            Message::ZoomInputSubmitted => {
-                self.zoom.zoom_input_dirty = false;
-
-                if let Some(value) = parse_number(&self.zoom.zoom_input) {
-                    self.zoom.apply_manual_zoom(value);
-                    return self.persist_preferences();
-                } else {
-                    self.zoom.zoom_input_error_key = Some(ZOOM_INPUT_INVALID_KEY);
-                }
-
-                Task::none()
-            }
-            Message::ResetZoom => {
-                self.zoom.apply_manual_zoom(DEFAULT_ZOOM_PERCENT);
-                self.persist_preferences()
-            }
-            Message::ZoomIn => {
-                self.zoom
-                    .apply_manual_zoom(self.zoom.zoom_percent + self.zoom.zoom_step_percent);
-                self.persist_preferences()
-            }
-            Message::ZoomOut => {
-                self.zoom
-                    .apply_manual_zoom(self.zoom.zoom_percent - self.zoom.zoom_step_percent);
-                self.persist_preferences()
-            }
-            Message::SetFitToWindow(fit) => {
-                if fit {
-                    self.zoom.enable_fit_to_window();
-                    self.refresh_fit_zoom();
-                } else {
-                    self.zoom.disable_fit_to_window();
-                }
-                self.persist_preferences()
+            Message::ViewerControls(controls_message) => {
+                self.handle_viewer_controls_message(controls_message)
             }
             Message::Settings(settings_message) => self.handle_settings_message(settings_message),
             Message::ViewportChanged { bounds, offset } => {
@@ -430,6 +384,54 @@ impl App {
                 self.persist_preferences()
             }
             SettingsEvent::BackgroundThemeSelected(_) => self.persist_preferences(),
+        }
+    }
+
+    fn handle_viewer_controls_message(
+        &mut self,
+        message: viewer_controls::Message,
+    ) -> Task<Message> {
+        match message {
+            viewer_controls::Message::ZoomInputChanged(value) => {
+                self.zoom.zoom_input = value;
+                self.zoom.zoom_input_dirty = true;
+                self.zoom.zoom_input_error_key = None;
+                Task::none()
+            }
+            viewer_controls::Message::ZoomInputSubmitted => {
+                self.zoom.zoom_input_dirty = false;
+
+                if let Some(value) = parse_number(&self.zoom.zoom_input) {
+                    self.zoom.apply_manual_zoom(value);
+                    self.persist_preferences()
+                } else {
+                    self.zoom.zoom_input_error_key = Some(ZOOM_INPUT_INVALID_KEY);
+                    Task::none()
+                }
+            }
+            viewer_controls::Message::ResetZoom => {
+                self.zoom.apply_manual_zoom(DEFAULT_ZOOM_PERCENT);
+                self.persist_preferences()
+            }
+            viewer_controls::Message::ZoomIn => {
+                self.zoom
+                    .apply_manual_zoom(self.zoom.zoom_percent + self.zoom.zoom_step_percent);
+                self.persist_preferences()
+            }
+            viewer_controls::Message::ZoomOut => {
+                self.zoom
+                    .apply_manual_zoom(self.zoom.zoom_percent - self.zoom.zoom_step_percent);
+                self.persist_preferences()
+            }
+            viewer_controls::Message::SetFitToWindow(fit) => {
+                if fit {
+                    self.zoom.enable_fit_to_window();
+                    self.refresh_fit_zoom();
+                } else {
+                    self.zoom.disable_fit_to_window();
+                }
+                self.persist_preferences()
+            }
         }
     }
 
@@ -800,52 +802,11 @@ impl App {
                         .align_y(Vertical::Center)
                         .into()
                 } else if let Some(image_data) = &self.image {
-                    let zoom_placeholder = self.i18n.tr("viewer-zoom-input-placeholder");
-                    let zoom_label = Text::new(self.i18n.tr("viewer-zoom-label"));
-
-                    let zoom_input = text_input(&zoom_placeholder, &self.zoom.zoom_input)
-                        .on_input(Message::ZoomInputChanged)
-                        .on_submit(Message::ZoomInputSubmitted)
-                        .padding(6)
-                        .size(16)
-                        .width(Length::Fixed(90.0));
-
-                    let zoom_out_button = button(Text::new(self.i18n.tr("viewer-zoom-out-button")))
-                        .on_press(Message::ZoomOut)
-                        .padding([6, 12]);
-
-                    let reset_button = button(Text::new(self.i18n.tr("viewer-zoom-reset-button")))
-                        .on_press(Message::ResetZoom)
-                        .padding([6, 12]);
-
-                    let zoom_in_button = button(Text::new(self.i18n.tr("viewer-zoom-in-button")))
-                        .on_press(Message::ZoomIn)
-                        .padding([6, 12]);
-
-                    let fit_toggle = checkbox(
-                        self.i18n.tr("viewer-fit-to-window-toggle"),
-                        self.zoom.fit_to_window,
+                    let controls_view = viewer_controls::view(
+                        viewer_controls::ViewContext { i18n: &self.i18n },
+                        &self.zoom,
                     )
-                    .on_toggle(Message::SetFitToWindow)
-                    .text_wrapping(iced::widget::text::Wrapping::Word);
-
-                    let zoom_controls_row = Row::new()
-                        .spacing(10)
-                        .align_y(Vertical::Center)
-                        .push(zoom_label)
-                        .push(zoom_input)
-                        .push(zoom_out_button)
-                        .push(reset_button)
-                        .push(zoom_in_button)
-                        .push(Space::new(Length::Fixed(16.0), Length::Shrink))
-                        .push(fit_toggle);
-
-                    let mut zoom_controls = Column::new().spacing(4).push(zoom_controls_row);
-
-                    if let Some(error_key) = self.zoom.zoom_input_error_key {
-                        let error_text = Text::new(self.i18n.tr(error_key)).size(14);
-                        zoom_controls = zoom_controls.push(error_text);
-                    }
+                    .map(Message::ViewerControls);
 
                     let image_viewer = viewer::view_image(image_data, self.zoom.zoom_percent);
                     let padding = self.image_padding();
@@ -957,7 +918,7 @@ impl App {
                         .spacing(16)
                         .width(Length::Fill)
                         .height(Length::Fill)
-                        .push(zoom_controls);
+                        .push(controls_view);
 
                     viewer_column = viewer_column.push(viewer_content);
 
@@ -1241,7 +1202,9 @@ mod tests {
         app.zoom.zoom_input = "150".into();
         app.zoom.fit_to_window = true;
 
-        let _ = app.update(Message::ZoomInputSubmitted);
+        let _ = app.update(Message::ViewerControls(
+            viewer_controls::Message::ZoomInputSubmitted,
+        ));
 
         assert_eq!(app.zoom.zoom_percent, 150.0);
         assert_eq!(app.zoom.manual_zoom_percent, 150.0);
@@ -1256,7 +1219,9 @@ mod tests {
         let mut app = App::default();
         app.zoom.zoom_input = "9999".into();
 
-        let _ = app.update(Message::ZoomInputSubmitted);
+        let _ = app.update(Message::ViewerControls(
+            viewer_controls::Message::ZoomInputSubmitted,
+        ));
 
         assert_eq!(app.zoom.zoom_percent, MAX_ZOOM_PERCENT);
         assert_eq!(app.zoom.zoom_input, format_number(MAX_ZOOM_PERCENT));
@@ -1271,7 +1236,9 @@ mod tests {
         app.zoom.fit_to_window = true;
         app.zoom.zoom_input = "oops".into();
 
-        let _ = app.update(Message::ZoomInputSubmitted);
+        let _ = app.update(Message::ViewerControls(
+            viewer_controls::Message::ZoomInputSubmitted,
+        ));
 
         assert_eq!(app.zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert!(app.zoom.fit_to_window);
@@ -1287,7 +1254,7 @@ mod tests {
         app.zoom.fit_to_window = false;
         app.zoom.zoom_input = "250".into();
 
-        let _ = app.update(Message::ResetZoom);
+        let _ = app.update(Message::ViewerControls(viewer_controls::Message::ResetZoom));
 
         assert_eq!(app.zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert_eq!(app.zoom.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
@@ -1309,7 +1276,9 @@ mod tests {
         app.zoom.fit_to_window = false;
         app.zoom.manual_zoom_percent = 160.0;
 
-        let _ = app.update(Message::SetFitToWindow(true));
+        let _ = app.update(Message::ViewerControls(
+            viewer_controls::Message::SetFitToWindow(true),
+        ));
 
         assert!(app.zoom.fit_to_window);
         let fit_zoom = app
@@ -1319,7 +1288,9 @@ mod tests {
         assert!(fit_zoom <= DEFAULT_ZOOM_PERCENT);
         assert_eq!(app.zoom.zoom_input, format_number(fit_zoom));
 
-        let _ = app.update(Message::SetFitToWindow(false));
+        let _ = app.update(Message::ViewerControls(
+            viewer_controls::Message::SetFitToWindow(false),
+        ));
 
         assert!(!app.zoom.fit_to_window);
         assert_eq!(app.zoom.zoom_percent, fit_zoom);
