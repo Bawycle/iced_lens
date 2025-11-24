@@ -36,18 +36,13 @@ Lightweight, internationalized image viewer powered by the [Iced](https://iced.r
 IcedLens aims to provide a simple, privacy‑friendly viewer focusing on responsive zoom ergonomics, clean layout, and multilingual support—without bundling heavy editing logic. It is designed as a foundation that can evolve toward a minimal asset inspector or media desk utility.
 
 ## 2. Features
-- Common image formats: JPEG, PNG, GIF (static), TIFF, WebP, BMP, ICO
-- SVG rasterization for scalable assets
-- Fit‑to‑window and manual zoom with wheel and toolbar controls
-- Simple grab‑to‑pan navigation for large images
-- Multi-image navigation with keyboard shortcuts and overlay arrows
-- Configurable sort order (alphabetical, modified date, created date)
-- Automatic detection of added/removed images in the directory
-- Loop navigation with visual boundary indicators
-- Persistent preferences (language, zoom step, fit mode, background theme, sort order)
-- Internationalization with Fluent (currently `en-US` and `fr`)
-- Configurable viewer background (light, dark, checkerboard)
-- Distraction-free fullscreen mode
+- Common raster formats (JPEG/PNG/GIF/WebP/TIFF/BMP/ICO) plus SVG rasterization
+- Wheel or toolbar zoom, fit‑to‑window toggle, and grab‑to‑pan navigation
+- Lightweight multi-image browsing (arrow keys or overlay arrows, looping, auto-refresh)
+- Persistent preferences for language, zoom, fit, background theme, and sort order
+- Fluent-based localization (en-US, fr)
+- Selectable viewer background themes
+- Distraction-free fullscreen with HUD indicators (button, double-click, F11, Esc)
 
 ## 3. Screenshots
 Screenshots will be added once UI stabilizes. Feel free to open an issue and propose layout improvements.
@@ -103,30 +98,18 @@ ARGS:
 
 ### Navigation Controls
 **Image Navigation:**
-- **Left/Right Arrow Keys**: Navigate to previous/next image in the directory
-- **Overlay Navigation Arrows**: Hover over the viewer to reveal navigation arrows (◀ ▶)
-  - Arrows appear when there's a previous/next image available
-  - Shows loop indicator (↻) when at the first or last image
-  - Automatically disappear after 3 seconds of no mouse movement
-- **Left-click + Drag**: Pan/scroll through large images (grab-and-drag)
-- **Position indicator**: Automatically appears in bottom-right corner showing scroll position (e.g., "Position: 45% x 60%")
-- **Fullscreen**: Toggle with the toolbar button, double-click on the image, or press **F11**; exit via **Esc**
+- Arrow keys or overlay arrows browse sibling images (loops automatically)
+- Left-click + drag pans large images; HUD shows scroll percentage when needed
+- Fullscreen via toolbar button, double-click, or **F11**; exit with **Esc**
 
 **Zoom Controls:**
-- **Mouse wheel**: Zoom in/out (only when cursor is over the image)
-- **Zoom buttons**: Use the UI controls in the top toolbar
-- **Fit to window**: Toggle to automatically scale image to fit viewport
+- Mouse wheel or toolbar buttons adjust zoom; fit-to-window keeps content centered
 
 **Visual Feedback:**
-- Cursor changes to **grab hand** (open) when hovering over image
-- Cursor changes to **grabbing hand** (closed) while dragging
-- Scrollbars are hidden for clean interface
+- Cursor switches between grab/grabbing states and scrollbars stay hidden for a clean view
 
 **Directory Scanning:**
-- The viewer automatically rescans the directory on each navigation action
-- Added or removed images are detected in real-time
-- Navigation loops at boundaries (wraps from last to first image and vice versa)
-- If the current image is deleted externally, navigation continues from the same position in the list
+- Each navigation step rescans the folder so added/removed files are reflected immediately
 
 ## 6. Configuration & Preferences
 User config is stored in a platform‑appropriate directory (implementation detail: uses a TOML file). Currently persisted:
