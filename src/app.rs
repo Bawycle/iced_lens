@@ -305,8 +305,8 @@ mod tests {
     use crate::error::Error;
     use crate::image_handler::ImageData;
     use crate::ui::state::zoom::{
-        format_number, DEFAULT_ZOOM_PERCENT, MAX_ZOOM_PERCENT, MIN_ZOOM_PERCENT,
-        ZOOM_STEP_INVALID_KEY, ZOOM_STEP_RANGE_KEY,
+        format_number, DEFAULT_ZOOM_PERCENT, MAX_ZOOM_PERCENT, ZOOM_STEP_INVALID_KEY,
+        ZOOM_STEP_RANGE_KEY,
     };
     use crate::ui::viewer::controls;
     use iced::widget::image::Handle;
@@ -393,8 +393,6 @@ mod tests {
         assert_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert_eq!(zoom.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));
         assert_eq!(zoom.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
-        assert!(MIN_ZOOM_PERCENT < DEFAULT_ZOOM_PERCENT);
-        assert!(MAX_ZOOM_PERCENT > DEFAULT_ZOOM_PERCENT);
         assert_eq!(
             app.settings.background_theme(),
             config::BackgroundTheme::default()
@@ -404,8 +402,10 @@ mod tests {
     #[test]
     fn zoom_step_changes_commit_when_leaving_settings() {
         with_temp_config_dir(|_| {
-            let mut app = App::default();
-            app.mode = AppMode::Settings;
+            let mut app = App {
+                mode: AppMode::Settings,
+                ..App::default()
+            };
             let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
                 "25".into(),
             )));
@@ -423,8 +423,10 @@ mod tests {
     #[test]
     fn invalid_zoom_step_prevents_leaving_settings() {
         with_temp_config_dir(|_| {
-            let mut app = App::default();
-            app.mode = AppMode::Settings;
+            let mut app = App {
+                mode: AppMode::Settings,
+                ..App::default()
+            };
             let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
                 "not-a-number".into(),
             )));
@@ -444,8 +446,10 @@ mod tests {
     #[test]
     fn out_of_range_zoom_step_shows_error_and_stays_in_settings() {
         with_temp_config_dir(|_| {
-            let mut app = App::default();
-            app.mode = AppMode::Settings;
+            let mut app = App {
+                mode: AppMode::Settings,
+                ..App::default()
+            };
             let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
                 "500".into(),
             )));
@@ -716,14 +720,10 @@ mod tests {
             let app = App::default();
             let settings_dir = config_root.join("IcedLens");
             fs::create_dir_all(&settings_dir).expect("dir");
-            let mut perms = fs::metadata(&settings_dir).expect("meta").permissions();
-            perms.set_readonly(true);
-            fs::set_permissions(&settings_dir, perms.clone()).expect("set readonly");
+            fs::create_dir_all(settings_dir.join("settings.toml"))
+                .expect("create conflicting directory");
 
             let _ = app.persist_preferences();
-
-            perms.set_readonly(false);
-            fs::set_permissions(&settings_dir, perms).expect("restore perms");
         });
     }
 }

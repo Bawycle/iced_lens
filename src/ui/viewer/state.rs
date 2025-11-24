@@ -200,12 +200,13 @@ mod tests {
     }
 
     fn viewport_with_bounds() -> ViewportState {
-        let mut viewport = ViewportState::default();
-        viewport.bounds = Some(Rectangle::new(
-            Point::new(0.0, 0.0),
-            Size::new(400.0, 300.0),
-        ));
-        viewport
+        ViewportState {
+            bounds: Some(Rectangle::new(
+                Point::new(0.0, 0.0),
+                Size::new(400.0, 300.0),
+            )),
+            ..ViewportState::default()
+        }
     }
 
     #[test]

@@ -15,6 +15,11 @@ pub const DEFAULT_ZOOM_PERCENT: f32 = 100.0;
 pub const MIN_ZOOM_STEP_PERCENT: f32 = 1.0;
 pub const MAX_ZOOM_STEP_PERCENT: f32 = 200.0;
 
+const _: () = {
+    assert!(MIN_ZOOM_PERCENT < DEFAULT_ZOOM_PERCENT);
+    assert!(MAX_ZOOM_PERCENT > DEFAULT_ZOOM_PERCENT);
+};
+
 pub const ZOOM_INPUT_INVALID_KEY: &str = "viewer-zoom-input-error-invalid";
 pub const ZOOM_STEP_INVALID_KEY: &str = "viewer-zoom-step-error-invalid";
 pub const ZOOM_STEP_RANGE_KEY: &str = "viewer-zoom-step-error-range";
@@ -173,8 +178,10 @@ mod tests {
 
     #[test]
     fn apply_manual_zoom_clamps_and_disables_fit() {
-        let mut state = ZoomState::default();
-        state.fit_to_window = true;
+        let mut state = ZoomState {
+            fit_to_window: true,
+            ..ZoomState::default()
+        };
 
         state.apply_manual_zoom(9999.0);
 
@@ -185,9 +192,11 @@ mod tests {
 
     #[test]
     fn zoom_in_out_work_correctly() {
-        let mut state = ZoomState::default();
-        state.zoom_step_percent = 10.0;
-        state.zoom_percent = 100.0;
+        let mut state = ZoomState {
+            zoom_step_percent: 10.0,
+            zoom_percent: 100.0,
+            ..ZoomState::default()
+        };
 
         state.zoom_in();
         assert_eq!(state.zoom_percent, 110.0);

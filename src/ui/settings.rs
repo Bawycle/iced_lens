@@ -343,8 +343,10 @@ mod tests {
 
     #[test]
     fn commit_zoom_step_rejects_invalid_input() {
-        let mut state = State::default();
-        state.zoom_step_input = "".into();
+        let mut state = State {
+            zoom_step_input: "".into(),
+            ..State::default()
+        };
         assert_eq!(state.commit_zoom_step(), Err(ZoomStepError::InvalidInput));
         assert_eq!(state.zoom_step_error_key, Some(ZOOM_STEP_INVALID_KEY));
     }
