@@ -42,15 +42,6 @@ pub struct ZoomState {
 
     /// Error key for zoom input validation
     pub zoom_input_error_key: Option<&'static str>,
-
-    /// Current zoom step input string
-    pub zoom_step_input: String,
-
-    /// Whether the zoom step input has been modified
-    pub zoom_step_input_dirty: bool,
-
-    /// Error key for zoom step validation
-    pub zoom_step_error_key: Option<&'static str>,
 }
 
 impl Default for ZoomState {
@@ -63,9 +54,6 @@ impl Default for ZoomState {
             zoom_input: format_number(DEFAULT_ZOOM_PERCENT),
             zoom_input_dirty: false,
             zoom_input_error_key: None,
-            zoom_step_input: format_number(DEFAULT_ZOOM_STEP_PERCENT),
-            zoom_step_input_dirty: false,
-            zoom_step_error_key: None,
         }
     }
 }
@@ -146,43 +134,9 @@ impl ZoomState {
         }
     }
 
-    /// Handles zoom step input change
-    pub fn on_zoom_step_input_changed(&mut self, input: String) {
-        self.zoom_step_input = input;
-        self.zoom_step_input_dirty = true;
-        self.zoom_step_error_key = None;
-    }
-
-    /// Handles zoom step input submission
-    pub fn on_zoom_step_submitted(&mut self) -> bool {
-        self.zoom_step_input_dirty = false;
-
-        if let Ok(value) = self.zoom_step_input.trim().parse::<f32>() {
-            let clamped = value.clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT);
-            self.zoom_step_percent = clamped;
-            self.zoom_step_input = format_number(clamped);
-
-            if (value - clamped).abs() > f32::EPSILON {
-                self.zoom_step_error_key = Some(ZOOM_STEP_RANGE_KEY);
-                false
-            } else {
-                self.zoom_step_error_key = None;
-                true
-            }
-        } else {
-            self.zoom_step_error_key = Some(ZOOM_STEP_INVALID_KEY);
-            false
-        }
-    }
-
     /// Gets the zoom input value
     pub fn zoom_input_value(&self) -> &str {
         &self.zoom_input
-    }
-
-    /// Gets the zoom step input value
-    pub fn zoom_step_input_value(&self) -> &str {
-        &self.zoom_step_input
     }
 }
 

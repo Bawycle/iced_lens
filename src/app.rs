@@ -3,7 +3,13 @@ use crate::config;
 use crate::error::Error;
 use crate::i18n::fluent::I18n;
 use crate::image_handler::{self, ImageData};
-use crate::ui::settings;
+use crate::ui::settings::{
+    self, Event as SettingsEvent, State as SettingsState, ViewContext as SettingsViewContext,
+};
+use crate::ui::state::zoom::{
+    DEFAULT_ZOOM_PERCENT, MAX_ZOOM_PERCENT, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_PERCENT,
+    MIN_ZOOM_STEP_PERCENT, ZOOM_INPUT_INVALID_KEY,
+};
 use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer;
 use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
@@ -21,6 +27,7 @@ use iced::{
     window, Border, Color, Element, Length, Padding, Point, Rectangle, Subscription, Task, Theme,
 };
 use std::fmt;
+use unic_langid::LanguageIdentifier;
 
 pub struct App {
     image: Option<ImageData>,
@@ -28,36 +35,16 @@ pub struct App {
     pub i18n: I18n, // Made public
     mode: AppMode,
     zoom: ZoomState,
+    settings: SettingsState,
     viewport: ViewportState,
     drag: DragState,
-    background_theme: config::BackgroundTheme,
     modifiers: keyboard::Modifiers,
     cursor_position: Option<Point>,
 }
 
-const MIN_ZOOM_PERCENT: f32 = 10.0;
-const MAX_ZOOM_PERCENT: f32 = 800.0;
-const DEFAULT_ZOOM_PERCENT: f32 = 100.0;
-const MIN_ZOOM_STEP_PERCENT: f32 = 1.0;
-const MAX_ZOOM_STEP_PERCENT: f32 = 200.0;
 const SCROLLBAR_GUTTER: f32 = 16.0;
 
-const ZOOM_INPUT_INVALID_KEY: &str = "viewer-zoom-input-error-invalid";
-const ZOOM_STEP_INVALID_KEY: &str = "viewer-zoom-step-error-invalid";
-const ZOOM_STEP_RANGE_KEY: &str = "viewer-zoom-step-error-range";
-
 const VIEWER_SCROLLABLE_ID: &str = "viewer-image-scrollable";
-
-fn format_number(value: f32) -> String {
-    if (value.fract()).abs() < f32::EPSILON {
-        format!("{value:.0}")
-    } else {
-        format!("{value:.2}")
-            .trim_end_matches('0')
-            .trim_end_matches('.')
-            .to_string()
-    }
-}
 
 fn parse_number(input: &str) -> Option<f32> {
     let trimmed = input.trim();
@@ -167,9 +154,9 @@ impl Default for App {
             i18n: I18n::default(),
             mode: AppMode::Viewer,
             zoom: ZoomState::default(),
+            settings: SettingsState::default(),
             viewport: ViewportState::default(),
             drag: DragState::default(),
-            background_theme: config::BackgroundTheme::default(),
             modifiers: keyboard::Modifiers::default(),
             cursor_position: None,
         }
@@ -180,7 +167,6 @@ impl Default for App {
 pub enum Message {
     ImageLoaded(Result<ImageData, Error>),
     SwitchMode(AppMode),
-    LanguageSelected(unic_langid::LanguageIdentifier),
     ToggleErrorDetails,
     ZoomInputChanged(String),
     ZoomInputSubmitted,
@@ -188,9 +174,7 @@ pub enum Message {
     ZoomIn,
     ZoomOut,
     SetFitToWindow(bool),
-    ZoomStepInputChanged(String),
-    ZoomStepSubmitted,
-    BackgroundThemeSelected(config::BackgroundTheme),
+    Settings(settings::Message),
     ViewportChanged {
         bounds: Rectangle,
         offset: AbsoluteOffset,
@@ -293,12 +277,12 @@ impl App {
         if let Some(step) = config.zoom_step {
             let clamped = clamp_zoom_step(step);
             app.zoom.zoom_step_percent = clamped;
-            app.zoom.zoom_step_input = format_number(clamped);
         }
 
-        if let Some(theme) = config.background_theme {
-            app.background_theme = theme;
-        }
+        let theme = config
+            .background_theme
+            .unwrap_or_else(config::BackgroundTheme::default);
+        app.settings = SettingsState::new(app.zoom.zoom_step_percent, theme);
 
         if app.zoom.fit_to_window {
             app.refresh_fit_zoom();
@@ -352,11 +336,16 @@ impl App {
                 Task::none()
             }
             Message::SwitchMode(mode) => {
-                if matches!(mode, AppMode::Viewer) && self.zoom.zoom_step_input_dirty {
-                    match self.apply_zoom_step_input() {
-                        Ok(task) => {
+                if matches!(mode, AppMode::Viewer) && matches!(self.mode, AppMode::Settings) {
+                    match self.settings.ensure_zoom_step_committed() {
+                        Ok(Some(value)) => {
+                            self.zoom.zoom_step_percent = value;
                             self.mode = mode;
-                            return task;
+                            return self.persist_preferences();
+                        }
+                        Ok(None) => {
+                            self.mode = mode;
+                            return Task::none();
                         }
                         Err(_) => {
                             self.mode = AppMode::Settings;
@@ -366,22 +355,6 @@ impl App {
                 }
 
                 self.mode = mode;
-                Task::none()
-            }
-            Message::LanguageSelected(locale) => {
-                self.i18n.set_locale(locale.clone());
-
-                let mut config = config::load().unwrap_or_default();
-                config.language = Some(locale.to_string());
-
-                if let Err(e) = config::save(&config) {
-                    eprintln!("Failed to save config: {:?}", e);
-                }
-
-                if let Some(error_state) = &mut self.error {
-                    error_state.refresh_translation(&self.i18n);
-                }
-
                 Task::none()
             }
             Message::ToggleErrorDetails => {
@@ -431,24 +404,7 @@ impl App {
                 }
                 self.persist_preferences()
             }
-            Message::ZoomStepInputChanged(value) => {
-                let sanitized = value.replace('%', "").trim().to_string();
-                self.zoom.zoom_step_input = sanitized;
-                self.zoom.zoom_step_input_dirty = true;
-                self.zoom.zoom_step_error_key = None;
-                Task::none()
-            }
-            Message::ZoomStepSubmitted => match self.apply_zoom_step_input() {
-                Ok(task) => task,
-                Err(_) => Task::none(),
-            },
-            Message::BackgroundThemeSelected(theme) => {
-                if self.background_theme != theme {
-                    self.background_theme = theme;
-                    return self.persist_preferences();
-                }
-                Task::none()
-            }
+            Message::Settings(settings_message) => self.handle_settings_message(settings_message),
             Message::ViewportChanged { bounds, offset } => {
                 self.viewport.update(bounds, offset);
                 self.refresh_fit_zoom();
@@ -463,6 +419,35 @@ impl App {
             }
             Message::RawEvent(event) => self.handle_raw_event(event),
         }
+    }
+
+    fn handle_settings_message(&mut self, message: settings::Message) -> Task<Message> {
+        match self.settings.update(message) {
+            SettingsEvent::None => Task::none(),
+            SettingsEvent::LanguageSelected(locale) => self.apply_language_change(locale),
+            SettingsEvent::ZoomStepChanged(value) => {
+                self.zoom.zoom_step_percent = value;
+                self.persist_preferences()
+            }
+            SettingsEvent::BackgroundThemeSelected(_) => self.persist_preferences(),
+        }
+    }
+
+    fn apply_language_change(&mut self, locale: LanguageIdentifier) -> Task<Message> {
+        self.i18n.set_locale(locale.clone());
+
+        let mut config = config::load().unwrap_or_default();
+        config.language = Some(locale.to_string());
+
+        if let Err(e) = config::save(&config) {
+            eprintln!("Failed to save config: {:?}", e);
+        }
+
+        if let Some(error_state) = &mut self.error {
+            error_state.refresh_translation(&self.i18n);
+        }
+
+        Task::none()
     }
 
     fn refresh_fit_zoom(&mut self) {
@@ -612,45 +597,13 @@ impl App {
         let mut config = config::load().unwrap_or_default();
         config.fit_to_window = Some(self.zoom.fit_to_window);
         config.zoom_step = Some(self.zoom.zoom_step_percent);
-        config.background_theme = Some(self.background_theme);
+        config.background_theme = Some(self.settings.background_theme());
 
         if let Err(error) = config::save(&config) {
             eprintln!("Failed to save config: {:?}", error);
         }
 
         Task::none()
-    }
-
-    pub(crate) fn zoom_step_input_value(&self) -> &str {
-        &self.zoom.zoom_step_input
-    }
-
-    pub(crate) fn zoom_step_error_key(&self) -> Option<&'static str> {
-        self.zoom.zoom_step_error_key
-    }
-
-    pub(crate) fn background_theme(&self) -> config::BackgroundTheme {
-        self.background_theme
-    }
-
-    fn apply_zoom_step_input(&mut self) -> Result<Task<Message>, ()> {
-        if let Some(value) = parse_number(&self.zoom.zoom_step_input) {
-            if value < MIN_ZOOM_STEP_PERCENT || value > MAX_ZOOM_STEP_PERCENT {
-                self.zoom.zoom_step_error_key = Some(ZOOM_STEP_RANGE_KEY);
-                self.zoom.zoom_step_input_dirty = true;
-                return Err(());
-            }
-
-            self.zoom.zoom_step_percent = value;
-            self.zoom.zoom_step_input = format_number(value);
-            self.zoom.zoom_step_input_dirty = false;
-            self.zoom.zoom_step_error_key = None;
-            Ok(self.persist_preferences())
-        } else {
-            self.zoom.zoom_step_error_key = Some(ZOOM_STEP_INVALID_KEY);
-            self.zoom.zoom_step_input_dirty = true;
-            Err(())
-        }
     }
 
     fn handle_mouse_button_pressed(
@@ -936,34 +889,35 @@ impl App {
                         .align_x(iced::alignment::Horizontal::Center)
                         .align_y(iced::alignment::Vertical::Center);
 
-                    let viewer_surface: Element<'_, Message> = match self.background_theme {
-                        config::BackgroundTheme::Light => {
-                            let color = Color::from_rgb8(245, 245, 245);
-                            scrollable_container
-                                .style(move |_theme: &Theme| iced::widget::container::Style {
-                                    background: Some(iced::Background::Color(color)),
-                                    ..Default::default()
-                                })
-                                .into()
-                        }
-                        config::BackgroundTheme::Dark => {
-                            let color = Color::from_rgb8(32, 33, 36);
-                            scrollable_container
-                                .style(move |_theme: &Theme| iced::widget::container::Style {
-                                    background: Some(iced::Background::Color(color)),
-                                    ..Default::default()
-                                })
-                                .into()
-                        }
-                        config::BackgroundTheme::Checkerboard => Stack::new()
-                            .push(
-                                canvas::Canvas::new(CheckerboardBackground)
-                                    .width(Length::Fill)
-                                    .height(Length::Fill),
-                            )
-                            .push(scrollable_container)
-                            .into(),
-                    };
+                    let viewer_surface: Element<'_, Message> =
+                        match self.settings.background_theme() {
+                            config::BackgroundTheme::Light => {
+                                let color = Color::from_rgb8(245, 245, 245);
+                                scrollable_container
+                                    .style(move |_theme: &Theme| iced::widget::container::Style {
+                                        background: Some(iced::Background::Color(color)),
+                                        ..Default::default()
+                                    })
+                                    .into()
+                            }
+                            config::BackgroundTheme::Dark => {
+                                let color = Color::from_rgb8(32, 33, 36);
+                                scrollable_container
+                                    .style(move |_theme: &Theme| iced::widget::container::Style {
+                                        background: Some(iced::Background::Color(color)),
+                                        ..Default::default()
+                                    })
+                                    .into()
+                            }
+                            config::BackgroundTheme::Checkerboard => Stack::new()
+                                .push(
+                                    canvas::Canvas::new(CheckerboardBackground)
+                                        .width(Length::Fill)
+                                        .height(Length::Fill),
+                                )
+                                .push(scrollable_container)
+                                .into(),
+                        };
 
                     // Add position indicator if scrolling is active
                     let viewer_content: Element<'_, Message> =
@@ -1012,7 +966,10 @@ impl App {
                     Text::new(self.i18n.tr("hello-message")).into()
                 }
             }
-            AppMode::Settings => settings::view_settings(self),
+            AppMode::Settings => self
+                .settings
+                .view(SettingsViewContext { i18n: &self.i18n })
+                .map(Message::Settings),
         };
 
         let switch_button = if self.mode == AppMode::Viewer {
@@ -1092,6 +1049,7 @@ mod tests {
     use super::*;
     use crate::config::DEFAULT_ZOOM_STEP_PERCENT;
     use crate::image_handler::ImageData;
+    use crate::ui::state::zoom::{format_number, ZOOM_STEP_INVALID_KEY, ZOOM_STEP_RANGE_KEY};
     use iced::widget::image::Handle;
     use std::fs;
     use std::sync::{Mutex, OnceLock};
@@ -1168,11 +1126,11 @@ mod tests {
 
         assert_eq!(app.zoom.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
         assert_eq!(
-            app.zoom.zoom_step_input,
+            app.settings.zoom_step_input_value(),
             format_number(DEFAULT_ZOOM_STEP_PERCENT)
         );
-        assert!(!app.zoom.zoom_step_input_dirty);
-        assert!(app.zoom.zoom_step_error_key.is_none());
+        assert!(!app.settings.zoom_step_input_dirty());
+        assert!(app.settings.zoom_step_error_key().is_none());
         assert!(MIN_ZOOM_STEP_PERCENT <= app.zoom.zoom_step_percent);
         assert!(MAX_ZOOM_STEP_PERCENT >= app.zoom.zoom_step_percent);
         assert_eq!(app.zoom.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
@@ -1185,7 +1143,10 @@ mod tests {
 
         assert!(MIN_ZOOM_PERCENT < DEFAULT_ZOOM_PERCENT);
         assert!(MAX_ZOOM_PERCENT > DEFAULT_ZOOM_PERCENT);
-        assert_eq!(app.background_theme, config::BackgroundTheme::default());
+        assert_eq!(
+            app.settings.background_theme(),
+            config::BackgroundTheme::default()
+        );
     }
 
     #[test]
@@ -1193,16 +1154,17 @@ mod tests {
         with_temp_config_dir(|_| {
             let mut app = App::default();
             app.mode = AppMode::Settings;
-            app.zoom.zoom_step_input = "25".into();
-            app.zoom.zoom_step_input_dirty = true;
+            let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
+                "25".into(),
+            )));
 
             let _ = app.update(Message::SwitchMode(AppMode::Viewer));
 
             assert_eq!(app.mode, AppMode::Viewer);
             assert_eq!(app.zoom.zoom_step_percent, 25.0);
-            assert_eq!(app.zoom.zoom_step_input, "25");
-            assert!(!app.zoom.zoom_step_input_dirty);
-            assert!(app.zoom.zoom_step_error_key.is_none());
+            assert_eq!(app.settings.zoom_step_input_value(), "25");
+            assert!(!app.settings.zoom_step_input_dirty());
+            assert!(app.settings.zoom_step_error_key().is_none());
         });
     }
 
@@ -1211,14 +1173,18 @@ mod tests {
         with_temp_config_dir(|_| {
             let mut app = App::default();
             app.mode = AppMode::Settings;
-            app.zoom.zoom_step_input = "not-a-number".into();
-            app.zoom.zoom_step_input_dirty = true;
+            let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
+                "not-a-number".into(),
+            )));
 
             let _ = app.update(Message::SwitchMode(AppMode::Viewer));
 
             assert_eq!(app.mode, AppMode::Settings);
-            assert!(app.zoom.zoom_step_error_key.is_some());
-            assert!(app.zoom.zoom_step_input_dirty);
+            assert_eq!(
+                app.settings.zoom_step_error_key(),
+                Some(ZOOM_STEP_INVALID_KEY)
+            );
+            assert!(app.settings.zoom_step_input_dirty());
             assert_eq!(app.zoom.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
         });
     }
@@ -1228,14 +1194,18 @@ mod tests {
         with_temp_config_dir(|_| {
             let mut app = App::default();
             app.mode = AppMode::Settings;
-            app.zoom.zoom_step_input = "500".into();
-            app.zoom.zoom_step_input_dirty = true;
+            let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
+                "500".into(),
+            )));
 
             let _ = app.update(Message::SwitchMode(AppMode::Viewer));
 
             assert_eq!(app.mode, AppMode::Settings);
-            assert_eq!(app.zoom.zoom_step_error_key, Some(ZOOM_STEP_RANGE_KEY));
-            assert!(app.zoom.zoom_step_input_dirty);
+            assert_eq!(
+                app.settings.zoom_step_error_key(),
+                Some(ZOOM_STEP_RANGE_KEY)
+            );
+            assert!(app.settings.zoom_step_input_dirty());
             assert_eq!(app.zoom.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
         });
     }
@@ -1448,30 +1418,40 @@ mod tests {
     #[test]
     fn zoom_step_submission_updates_config() {
         let mut app = App::default();
-        app.zoom.zoom_step_input = "5".into();
-
-        let _ = app.update(Message::ZoomStepSubmitted);
+        let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
+            "5".into(),
+        )));
+        let _ = app.update(Message::Settings(settings::Message::ZoomStepSubmitted));
 
         assert_eq!(app.zoom.zoom_step_percent, 5.0);
-        assert_eq!(app.zoom.zoom_step_input, "5");
-        assert!(app.zoom.zoom_step_error_key.is_none());
+        assert_eq!(app.settings.zoom_step_input_value(), "5");
+        assert!(app.settings.zoom_step_error_key().is_none());
     }
 
     #[test]
     fn zoom_step_submission_rejects_invalid() {
         let mut app = App::default();
         let original = app.zoom.zoom_step_percent;
-        app.zoom.zoom_step_input = "0".into();
-
-        let _ = app.update(Message::ZoomStepSubmitted);
+        let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
+            "0".into(),
+        )));
+        let _ = app.update(Message::Settings(settings::Message::ZoomStepSubmitted));
 
         assert_eq!(app.zoom.zoom_step_percent, original);
-        assert_eq!(app.zoom.zoom_step_input, "0");
-        assert_eq!(app.zoom.zoom_step_error_key, Some(ZOOM_STEP_RANGE_KEY));
+        assert_eq!(app.settings.zoom_step_input_value(), "0");
+        assert_eq!(
+            app.settings.zoom_step_error_key(),
+            Some(ZOOM_STEP_RANGE_KEY)
+        );
 
-        app.zoom.zoom_step_input = "abc".into();
-        let _ = app.update(Message::ZoomStepSubmitted);
-        assert_eq!(app.zoom.zoom_step_error_key, Some(ZOOM_STEP_INVALID_KEY));
+        let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
+            "abc".into(),
+        )));
+        let _ = app.update(Message::Settings(settings::Message::ZoomStepSubmitted));
+        assert_eq!(
+            app.settings.zoom_step_error_key(),
+            Some(ZOOM_STEP_INVALID_KEY)
+        );
     }
 
     #[test]
@@ -1495,7 +1475,9 @@ mod tests {
                 .cloned()
                 .unwrap_or_else(|| app.i18n.current_locale().clone());
 
-            let _ = app.update(Message::LanguageSelected(target_locale.clone()));
+            let _ = app.update(Message::Settings(settings::Message::LanguageSelected(
+                target_locale.clone(),
+            )));
 
             let config_path = config_root.join("IcedLens").join("settings.toml");
             assert!(config_path.exists());
