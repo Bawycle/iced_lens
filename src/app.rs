@@ -13,9 +13,8 @@ use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer::{self, controls as viewer_controls};
 use iced::widget::scrollable::{self, AbsoluteOffset, Id, RelativeOffset};
 use iced::{
-    alignment::{Horizontal, Vertical},
     event, keyboard, mouse,
-    widget::{button, Column, Container, Text},
+    widget::{button, Container, Text},
     window, Element, Length, Point, Rectangle, Subscription, Task, Theme,
 };
 use std::fmt;
@@ -483,12 +482,10 @@ impl App {
 
     fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Task<Message> {
         // Only update offset if currently dragging
-        let new_offset = match self.drag.calculate_offset(position) {
+        let proposed_offset = match self.drag.calculate_offset(position) {
             Some(offset) => offset,
             None => return Task::none(),
         };
-
-        self.viewport.offset = new_offset;
 
         // Convert absolute offset to relative offset (0.0-1.0 range)
         let viewer_state = self.viewer_state();
@@ -496,14 +493,29 @@ impl App {
             let max_offset_x = (size.width - viewport.width).max(0.0);
             let max_offset_y = (size.height - viewport.height).max(0.0);
 
+            let clamped_offset = AbsoluteOffset {
+                x: if max_offset_x > 0.0 {
+                    proposed_offset.x.clamp(0.0, max_offset_x)
+                } else {
+                    0.0
+                },
+                y: if max_offset_y > 0.0 {
+                    proposed_offset.y.clamp(0.0, max_offset_y)
+                } else {
+                    0.0
+                },
+            };
+
+            self.viewport.offset = clamped_offset;
+
             let relative_x = if max_offset_x > 0.0 {
-                (new_offset.x / max_offset_x).clamp(0.0, 1.0)
+                clamped_offset.x / max_offset_x
             } else {
                 0.0
             };
 
             let relative_y = if max_offset_y > 0.0 {
-                (new_offset.y / max_offset_y).clamp(0.0, 1.0)
+                clamped_offset.y / max_offset_y
             } else {
                 0.0
             };
@@ -517,6 +529,7 @@ impl App {
                 },
             )
         } else {
+            self.viewport.offset = proposed_offset;
             Task::none()
         }
     }
@@ -592,103 +605,31 @@ impl App {
     fn view(&self) -> Element<'_, Message> {
         let current_view: Element<'_, Message> = match self.mode {
             AppMode::Viewer => {
-                if let Some(error_state) = &self.error {
-                    let heading = Container::new(
-                        Text::new(self.i18n.tr("error-load-image-heading")).size(24),
-                    )
-                    .width(Length::Fill)
-                    .align_x(Horizontal::Center);
-
-                    let summary = Container::new(
-                        Text::new(error_state.friendly_text.clone()).width(Length::Fill),
-                    )
-                    .width(Length::Fill)
-                    .align_x(Horizontal::Center);
-
-                    let toggle_label = if error_state.show_details {
-                        self.i18n.tr("error-details-hide")
-                    } else {
-                        self.i18n.tr("error-details-show")
-                    };
-
-                    let toggle_button = Container::new(
-                        button(Text::new(toggle_label)).on_press(Message::ToggleErrorDetails),
-                    )
-                    .align_x(Horizontal::Center);
-
-                    let mut error_content = Column::new()
-                        .spacing(12)
-                        .width(Length::Fill)
-                        .align_x(iced::alignment::Horizontal::Center)
-                        .push(heading)
-                        .push(summary)
-                        .push(toggle_button);
-
-                    if error_state.show_details {
-                        let details_heading = Container::new(
-                            Text::new(self.i18n.tr("error-details-technical-heading")).size(16),
-                        )
-                        .width(Length::Fill)
-                        .align_x(Horizontal::Center);
-
-                        let details_body = Container::new(
-                            Text::new(error_state.details.clone()).width(Length::Fill),
-                        )
-                        .width(Length::Fill)
-                        .align_x(Horizontal::Left);
-
-                        let details_column = Column::new()
-                            .spacing(8)
-                            .width(Length::Fill)
-                            .push(details_heading)
-                            .push(details_body);
-
-                        error_content = error_content.push(
-                            Container::new(details_column)
-                                .width(Length::Fill)
-                                .padding(16),
-                        );
-                    }
-
-                    Container::new(error_content)
-                        .width(Length::Fill)
-                        .align_x(Horizontal::Center)
-                        .align_y(Vertical::Center)
-                        .into()
-                } else if let Some(image_data) = &self.image {
-                    let controls_view = viewer_controls::view(
-                        viewer_controls::ViewContext { i18n: &self.i18n },
-                        &self.zoom,
-                    )
-                    .map(Message::ViewerControls);
-
-                    let viewer_state = self.viewer_state();
-                    let viewer_content = viewer::pane::view(
-                        viewer::pane::ViewContext {
+                let viewer_state = self.viewer_state();
+                viewer::view(viewer::ViewContext {
+                    i18n: &self.i18n,
+                    error: self.error.as_ref().map(|error_state| viewer::ErrorContext {
+                        friendly_text: &error_state.friendly_text,
+                        details: &error_state.details,
+                        show_details: error_state.show_details,
+                    }),
+                    image: self.image.as_ref().map(|image_data| viewer::ImageContext {
+                        controls_context: viewer_controls::ViewContext { i18n: &self.i18n },
+                        zoom: &self.zoom,
+                        pane_context: viewer::pane::ViewContext {
                             background_theme: self.settings.background_theme(),
                             scroll_position: viewer_state.scroll_position_percentage(),
                             scrollable_id: VIEWER_SCROLLABLE_ID,
                         },
-                        viewer::pane::ViewModel {
+                        pane_model: viewer::pane::ViewModel {
                             image: image_data,
                             zoom_percent: self.zoom.zoom_percent,
                             padding: viewer_state.image_padding(),
                             is_dragging: self.drag.is_dragging,
                             cursor_over_image: viewer_state.is_cursor_over_image(),
                         },
-                    );
-
-                    let viewer_column = Column::new()
-                        .spacing(16)
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .push(controls_view)
-                        .push(viewer_content);
-
-                    viewer_column.into()
-                } else {
-                    Text::new(self.i18n.tr("hello-message")).into()
-                }
+                    }),
+                })
             }
             AppMode::Settings => self
                 .settings
@@ -1311,6 +1252,30 @@ mod tests {
         assert!(!app.drag.is_dragging);
         assert!(app.drag.start_position.is_none());
         assert!(app.drag.start_offset.is_none());
+    }
+
+    #[test]
+    fn drag_offset_clamps_to_scroll_bounds() {
+        let mut app = App::default();
+        app.image = Some(build_image(2000, 2000));
+        app.viewport.bounds = Some(Rectangle::new(
+            Point::new(0.0, 0.0),
+            iced::Size::new(400.0, 400.0),
+        ));
+
+        let max_offset = 1600.0; // image_height - viewport_height
+        app.drag.start(
+            Point::new(0.0, 0.0),
+            AbsoluteOffset {
+                x: 0.0,
+                y: max_offset,
+            },
+        );
+
+        // Cursor moves up, which would normally push the offset beyond the maximum
+        let _ = app.handle_cursor_moved_during_drag(Point::new(0.0, -200.0));
+
+        assert_eq!(app.viewport.offset.y, max_offset);
     }
 
     #[test]
