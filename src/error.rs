@@ -5,6 +5,7 @@ use std::fmt;
 pub enum Error {
     Io(String),
     Svg(String),
+    Config(String),
     // Add other error variants as needed
 }
 
@@ -13,6 +14,7 @@ impl fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "I/O Error: {}", e),
             Error::Svg(e) => write!(f, "SVG Error: {}", e),
+            Error::Config(e) => write!(f, "Config Error: {}", e),
         }
     }
 }
@@ -20,6 +22,18 @@ impl fmt::Display for Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Error::Io(err.to_string())
+    }
+}
+
+impl From<toml::de::Error> for Error {
+    fn from(err: toml::de::Error) -> Self {
+        Error::Config(err.to_string())
+    }
+}
+
+impl From<toml::ser::Error> for Error {
+    fn from(err: toml::ser::Error) -> Self {
+        Error::Config(err.to_string())
     }
 }
 
@@ -52,5 +66,11 @@ mod tests {
             Error::Svg(message) => assert!(message.contains("invalid svg")),
             _ => panic!("expected Svg variant"),
         }
+    }
+
+    #[test]
+    fn config_error_formats_properly() {
+        let err = Error::Config("bad field".into());
+        assert_eq!(format!("{}", err), "Config Error: bad field");
     }
 }

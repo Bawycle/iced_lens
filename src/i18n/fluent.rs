@@ -70,28 +70,65 @@ impl I18n {
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.filter_map(|e| e.ok()) {
                 let path = entry.path();
-                if path.is_file() {
-                    if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
-                        if let Some(locale_str) = filename.strip_suffix(".ftl") {
-                            if let Ok(locale) = locale_str.parse::<LanguageIdentifier>() {
-                                if let Ok(content) = fs::read_to_string(&path) {
-                                    let res =
-                                        FluentResource::try_new(content).unwrap_or_else(|_| {
-                                            panic!("Failed to parse FTL file: {}", filename)
-                                        });
-                                    let mut bundle = FluentBundle::new(vec![locale.clone()]);
-                                    bundle.add_resource(res).expect("Failed to add resource.");
-                                    bundles.insert(locale.clone(), bundle);
-                                    available_locales.push(locale);
-                                } else {
-                                    eprintln!("Failed to read FTL file: {}", filename);
-                                }
-                            } else {
-                                eprintln!("Invalid locale in FTL filename: {}", filename);
-                            }
-                        }
-                    }
+                if !path.is_file() {
+                    continue;
                 }
+
+                let filename = match path.file_name().and_then(|s| s.to_str()) {
+                    Some(name) => name.to_string(),
+                    None => continue,
+                };
+
+                let locale = match filename.strip_suffix(".ftl") {
+                    Some(locale_str) => match locale_str.parse::<LanguageIdentifier>() {
+                        Ok(locale) => locale,
+                        Err(_) => {
+                            eprintln!(
+                                "Invalid locale in FTL filename '{}'; skipping",
+                                filename
+                            );
+                            continue;
+                        }
+                    },
+                    None => continue,
+                };
+
+                let content = match fs::read_to_string(&path) {
+                    Ok(content) => content,
+                    Err(err) => {
+                        eprintln!(
+                            "Failed to read FTL file '{}': {}",
+                            path.display(),
+                            err
+                        );
+                        continue;
+                    }
+                };
+
+                let resource = match FluentResource::try_new(content) {
+                    Ok(resource) => resource,
+                    Err(errors) => {
+                        eprintln!(
+                            "Failed to parse FTL file '{}': {:?}",
+                            path.display(),
+                            errors
+                        );
+                        continue;
+                    }
+                };
+
+                let mut bundle = FluentBundle::new(vec![locale.clone()]);
+                if let Err(errors) = bundle.add_resource(resource) {
+                    eprintln!(
+                        "Failed to add resource for locale '{}': {:?}",
+                        locale,
+                        errors
+                    );
+                    continue;
+                }
+
+                bundles.insert(locale.clone(), bundle);
+                available_locales.push(locale);
             }
         } else {
             eprintln!("Failed to read translations directory: {}", dir);

@@ -27,7 +27,7 @@
 //! std::fs::remove_dir_all(&temp_dir).unwrap();
 //! ```
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf}; // Added PathBuf back
@@ -79,7 +79,17 @@ fn get_default_config_path() -> Option<PathBuf> {
 pub fn load() -> Result<Config> {
     if let Some(path) = get_default_config_path() {
         if path.exists() {
-            return load_from_path(&path);
+            match load_from_path(&path) {
+                Ok(config) => return Ok(config),
+                Err(err) => {
+                    eprintln!(
+                        "Failed to load config from {}: {}",
+                        path.display(),
+                        err
+                    );
+                    return Err(err);
+                }
+            }
         }
     }
     Ok(Config::default())
@@ -94,14 +104,15 @@ pub fn save(config: &Config) -> Result<()> {
 
 pub fn load_from_path(path: &Path) -> Result<Config> {
     let content = fs::read_to_string(path)?;
-    Ok(toml::from_str(&content).unwrap_or_default())
+    let config: Config = toml::from_str(&content)?;
+    Ok(config)
 }
 
 pub fn save_to_path(config: &Config, path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let content = toml::to_string_pretty(config).unwrap();
+    let content = toml::to_string_pretty(config).map_err(Error::from)?;
     fs::write(path, content)?;
     Ok(())
 }
@@ -109,6 +120,7 @@ pub fn save_to_path(config: &Config, path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::Error;
     use tempfile::tempdir;
 
     #[test]
@@ -131,13 +143,15 @@ mod tests {
     }
 
     #[test]
-    fn load_from_path_returns_default_on_invalid_toml() {
+    fn load_from_path_invalid_toml_errors() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("settings.toml");
         fs::write(&config_path, "not = valid = toml").expect("failed to write invalid toml");
 
-        let loaded = load_from_path(&config_path).expect("load should not error");
-        assert!(loaded.language.is_none());
+        match load_from_path(&config_path) {
+            Err(Error::Config(message)) => assert!(message.contains("expected")),
+            other => panic!("expected Config error, got {:?}", other),
+        }
     }
 
     #[test]

@@ -45,16 +45,25 @@ pub fn load_image<P: AsRef<Path>>(path: P) -> Result<ImageData> {
                 .map_err(|e| Error::Svg(e.to_string()))?;
 
             let pixmap_size = tree.size().to_int_size();
-            let mut pixmap =
-                tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).unwrap();
+            let width = pixmap_size.width();
+            let height = pixmap_size.height();
+            if width == 0 || height == 0 {
+                return Err(Error::Svg("SVG has empty dimensions".into()));
+            }
+
+            let mut pixmap = tiny_skia::Pixmap::new(width, height)
+                .ok_or_else(|| Error::Svg("Failed to allocate SVG pixmap".into()))?;
+
             resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
 
-            let png_data = pixmap.encode_png().map_err(|e| Error::Svg(e.to_string()))?;
+            let png_data = pixmap
+                .encode_png()
+                .map_err(|e| Error::Svg(e.to_string()))?;
             let handle = image::Handle::from_bytes(png_data);
             Ok(ImageData {
                 handle,
-                width: pixmap_size.width(),
-                height: pixmap_size.height(),
+                width,
+                height,
             })
         }
         _ => {
