@@ -233,7 +233,12 @@ mod tests {
         let image = sample_image();
         let mut viewport = viewport_with_bounds();
         viewport.offset = AbsoluteOffset { x: 0.0, y: 0.0 };
-        let state = ViewerState::new(Some(&image), &viewport, 100.0, Some(Point::new(500.0, 500.0)));
+        let state = ViewerState::new(
+            Some(&image),
+            &viewport,
+            100.0,
+            Some(Point::new(500.0, 500.0)),
+        );
 
         assert!(!state.is_cursor_over_image());
     }

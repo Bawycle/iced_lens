@@ -2,15 +2,15 @@
 //! Viewer pane that renders the image inside the scrollable area with proper
 //! background, cursor interaction, and position indicator.
 
-use crate::app::Message;
 use crate::config::BackgroundTheme;
 use crate::image_handler::ImageData;
+use crate::ui::viewer::component::Message;
 use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
 use iced::widget::{mouse_area, Container, Scrollable, Stack, Text};
 use iced::{
     alignment::{Horizontal, Vertical},
+    widget::canvas,
     widget::scrollable::{Direction, Id, Scrollbar, Viewport},
-    widget::{canvas},
     Background, Border, Color, Element, Length, Padding, Theme,
 };
 use iced::{mouse, Rectangle};
@@ -59,7 +59,8 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
         mouse::Interaction::default()
     };
 
-    let scrollable_with_cursor = mouse_area(wheel_blocked_scrollable).interaction(cursor_interaction);
+    let scrollable_with_cursor =
+        mouse_area(wheel_blocked_scrollable).interaction(cursor_interaction);
 
     let scrollable_container = Container::new(scrollable_with_cursor)
         .width(Length::Fill)

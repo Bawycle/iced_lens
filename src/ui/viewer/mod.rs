@@ -1,21 +1,19 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Image viewer module responsible for rendering loaded images and related UI.
 
+pub mod component;
 pub mod controls;
 pub mod pane;
 pub mod state;
 
-use crate::app::Message;
+use self::component::Message;
 use crate::i18n::fluent::I18n;
 use crate::image_handler::ImageData;
 use crate::ui::state::ZoomState;
 use iced::widget::{button, Column, Container, Image, Text};
 use iced::{alignment, Element, Length};
 
-pub fn view_image(
-    image_data: &ImageData,
-    zoom_percent: f32,
-) -> Element<'_, super::super::app::Message> {
+pub fn view_image(image_data: &ImageData, zoom_percent: f32) -> Element<'_, Message> {
     let scale = (zoom_percent / 100.0).max(0.01);
     let width = (image_data.width as f32 * scale).max(1.0);
     let height = (image_data.height as f32 * scale).max(1.0);
@@ -72,10 +70,9 @@ fn error_view<'a>(i18n: &'a I18n, error: ErrorContext<'a>) -> Element<'a, Messag
         i18n.tr("error-details-show")
     };
 
-    let toggle_button = Container::new(
-        button(Text::new(toggle_label)).on_press(Message::ToggleErrorDetails),
-    )
-    .align_x(alignment::Horizontal::Center);
+    let toggle_button =
+        Container::new(button(Text::new(toggle_label)).on_press(Message::ToggleErrorDetails))
+            .align_x(alignment::Horizontal::Center);
 
     let mut error_content = Column::new()
         .spacing(12)
@@ -86,11 +83,10 @@ fn error_view<'a>(i18n: &'a I18n, error: ErrorContext<'a>) -> Element<'a, Messag
         .push(toggle_button);
 
     if error.show_details {
-        let details_heading = Container::new(
-            Text::new(i18n.tr("error-details-technical-heading")).size(16),
-        )
-        .width(Length::Fill)
-        .align_x(alignment::Horizontal::Center);
+        let details_heading =
+            Container::new(Text::new(i18n.tr("error-details-technical-heading")).size(16))
+                .width(Length::Fill)
+                .align_x(alignment::Horizontal::Center);
 
         let details_body = Container::new(Text::new(error.details).width(Length::Fill))
             .width(Length::Fill)
@@ -117,7 +113,7 @@ fn error_view<'a>(i18n: &'a I18n, error: ErrorContext<'a>) -> Element<'a, Messag
 }
 
 fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
-    let controls_view = controls::view(ctx.controls_context, ctx.zoom).map(Message::ViewerControls);
+    let controls_view = controls::view(ctx.controls_context, ctx.zoom).map(Message::Controls);
 
     let pane_view = pane::view(ctx.pane_context, ctx.pane_model);
 
