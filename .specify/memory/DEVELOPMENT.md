@@ -55,37 +55,52 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - `Message` and `Event` types following project patterns
    - Basic tests (4 passing)
 
-2. **App Integration (Partial)**
+2. **App Integration** (COMPLETE)
    - `AppMode::Editor` variant added
    - `editor: Option<EditorState>` field in App
-   - `Message::Editor` routing
-   - Imports configured
+   - `Message::Editor` routing fully implemented
+   - `handle_editor_message()` with event handling
+   - Mode switching: Viewer ↔ Editor ↔ Settings
+   - "✏ Edit" button in viewer toolbar (appears when image loaded)
+   - View rendering for all modes
 
 3. **Translations** (en-US, fr)
    - Basic strings: title, cancel, save, tool names
+   - Rotate left/right labels
    - Undo/redo labels
 
+4. **Sidebar UI** (COMPLETE)
+   - Retractable sidebar (hamburger toggle ☰)
+   - Width: 180px expanded, 60px collapsed
+   - Tool buttons:
+     - Rotate Left (↻) / Rotate Right (↺)
+     - Crop (selectable tool)
+     - Resize (selectable tool)
+   - Navigation arrows (◀ ▶) for browsing images
+   - Action buttons: Cancel, Save (primary button)
+   - Visual hierarchy with horizontal rules
+   - Spacer pushing bottom controls to bottom
+   - Gray background (#F2F2F2) for contrast
+
 #### 🔄 In Progress
-- Completing App update/view integration
-- Adding "Edit" button in viewer toolbar
-- Mode switching logic (Viewer ↔ Editor)
+- (None - infrastructure complete)
 
 #### ⏳ To Do
-1. **Toolbar UI** - Retractable side panel with tool buttons
-2. **Rotate Tool** - 90° left/right with keyboard shortcuts
-3. **Crop Tool** - Interactive rectangle with handles, aspect ratio constraints
-4. **Resize Tool** - Slider (10-200%) + pixel inputs + presets (50%, 75%, 150%, 200%)
-5. **Undo/Redo** - Transformation history with Ctrl+Z/Ctrl+Y
-6. **Save Dialog** - Overwrite vs Save As confirmation
-7. **Keyboard Shortcuts**
+1. **Rotate Tool Implementation** - Actual 90° rotation logic using `image` crate
+2. **Crop Tool Implementation** - Interactive rectangle with handles, aspect ratio constraints
+3. **Resize Tool Implementation** - Slider (10-200%) + pixel inputs + presets (50%, 75%, 150%, 200%)
+4. **Undo/Redo System** - Transformation history with Ctrl+Z/Ctrl+Y
+5. **Save Dialog** - Overwrite vs Save As confirmation
+6. **Keyboard Shortcuts**
    - `E` = Enter edit mode (from viewer)
    - `Ctrl+S` = Save
    - `Esc` = Cancel/exit editor
    - `R` = Select rotate tool
    - `C` = Select crop tool
    - `Ctrl+Z` / `Ctrl+Y` = Undo/Redo
-8. **Image Transformation Backend** - Actual pixel manipulation using `image` crate
-9. **Preview System** - Real-time preview for transformations
+7. **Image Display** - Show current_image in editor canvas area
+8. **Preview System** - Apply transformations and update preview
+9. **Image Saving** - Write transformed image to disk (preserve format)
 10. **Tests** - Unit tests for transformation logic
 11. **README** - Document editing features
 

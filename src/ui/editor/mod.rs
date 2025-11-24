@@ -139,31 +139,254 @@ pub enum Event {
 impl State {
     /// Render the editor view.
     pub fn view<'a>(&'a self, ctx: ViewContext<'a>) -> iced::Element<'a, Message> {
-        use iced::widget::{button, column, container, text, Column};
-        use iced::Length;
+        use iced::widget::{button, container, text, Row};
+        use iced::{Background, Border, Color, Length};
 
-        // Minimal view for now - just a placeholder with Cancel button
-        let title = text(ctx.i18n.tr("editor-title")).size(30);
+        // Main layout: Row with sidebar + image area
+        let mut main_row = Row::new().spacing(0);
 
-        let cancel_button = button(text(ctx.i18n.tr("editor-cancel")))
-            .on_press(Message::Cancel);
+        // Sidebar (always visible, but can be collapsed in future)
+        if self.sidebar_expanded {
+            let sidebar = self.build_sidebar(ctx);
+            main_row = main_row.push(sidebar);
+        } else {
+            // Collapsed sidebar - just the hamburger button
+            let toggle_button = button(text("☰").size(24))
+                .on_press(Message::ToggleSidebar)
+                .padding(12);
 
-        let content: Column<'_, Message> = column![title, cancel_button]
-            .spacing(20)
-            .padding(20);
+            let collapsed_sidebar = container(toggle_button)
+                .width(Length::Fixed(60.0))
+                .height(Length::Fill)
+                .padding(10)
+                .style(|_theme: &iced::Theme| iced::widget::container::Style {
+                    background: Some(Background::Color(Color::from_rgb(0.95, 0.95, 0.95))),
+                    border: Border {
+                        width: 0.0,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                });
 
-        container(content)
+            main_row = main_row.push(collapsed_sidebar);
+        }
+
+        // Image area (placeholder for now)
+        let image_area = container(
+            text("Image will be displayed here")
+                .size(20)
+                .color(Color::from_rgb(0.5, 0.5, 0.5))
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center(Length::Fill)
+        .style(|_theme: &iced::Theme| iced::widget::container::Style {
+            background: Some(Background::Color(Color::from_rgb(0.9, 0.9, 0.9))),
+            ..Default::default()
+        });
+
+        main_row = main_row.push(image_area);
+
+        container(main_row)
             .width(Length::Fill)
             .height(Length::Fill)
-            .center(Length::Fill)
+            .into()
+    }
+
+    /// Build the expanded sidebar with tools and controls.
+    fn build_sidebar<'a>(&'a self, ctx: ViewContext<'a>) -> iced::Element<'a, Message> {
+        use iced::widget::{button, container, text, Column, Row};
+        use iced::{alignment::Vertical, Background, Border, Color, Length};
+
+        let mut sidebar_content = Column::new().spacing(8).padding(12).width(Length::Fixed(180.0));
+
+        // Hamburger toggle button
+        let toggle_button = button(text("☰").size(20))
+            .on_press(Message::ToggleSidebar)
+            .padding(8)
+            .style(iced::widget::button::secondary);
+
+        sidebar_content = sidebar_content.push(
+            Row::new()
+                .push(toggle_button)
+                .push(text("Tools").size(18))
+                .spacing(8)
+                .align_y(Vertical::Center)
+        );
+
+        sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
+
+        // Rotate tools
+        let rotate_left_btn = button(text(format!("↻\n{}", ctx.i18n.tr("editor-rotate-left"))).size(14))
+            .on_press(Message::RotateLeft)
+            .padding(12)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary);
+
+        let rotate_right_btn = button(text(format!("↺\n{}", ctx.i18n.tr("editor-rotate-right"))).size(14))
+            .on_press(Message::RotateRight)
+            .padding(12)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary);
+
+        sidebar_content = sidebar_content.push(rotate_left_btn);
+        sidebar_content = sidebar_content.push(rotate_right_btn);
+
+        sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
+
+        // Main tool buttons
+        let crop_btn = button(text(ctx.i18n.tr("editor-tool-crop")).size(16))
+            .on_press(Message::SelectTool(EditorTool::Crop))
+            .padding(12)
+            .width(Length::Fill)
+            .style(if self.active_tool == Some(EditorTool::Crop) {
+                iced::widget::button::primary
+            } else {
+                iced::widget::button::secondary
+            });
+
+        let resize_btn = button(text(ctx.i18n.tr("editor-tool-resize")).size(16))
+            .on_press(Message::SelectTool(EditorTool::Resize))
+            .padding(12)
+            .width(Length::Fill)
+            .style(if self.active_tool == Some(EditorTool::Resize) {
+                iced::widget::button::primary
+            } else {
+                iced::widget::button::secondary
+            });
+
+        sidebar_content = sidebar_content.push(crop_btn);
+        sidebar_content = sidebar_content.push(resize_btn);
+
+        // Spacer to push navigation and action buttons to bottom
+        sidebar_content = sidebar_content.push(iced::widget::Space::new(Length::Fill, Length::Fill));
+
+        sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
+
+        // Navigation arrows
+        let nav_row = Row::new()
+            .spacing(8)
+            .push(
+                button(text("◀").size(20))
+                    .on_press(Message::NavigatePrevious)
+                    .padding([8, 16])
+                    .width(Length::Fill)
+            )
+            .push(
+                button(text("▶").size(20))
+                    .on_press(Message::NavigateNext)
+                    .padding([8, 16])
+                    .width(Length::Fill)
+            );
+
+        sidebar_content = sidebar_content.push(nav_row);
+
+        sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
+
+        // Action buttons (Cancel/Save)
+        let cancel_btn = button(text(ctx.i18n.tr("editor-cancel")).size(16))
+            .on_press(Message::Cancel)
+            .padding(12)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary);
+
+        let save_btn = button(text(ctx.i18n.tr("editor-save")).size(16))
+            .on_press(Message::Save)
+            .padding(12)
+            .width(Length::Fill)
+            .style(iced::widget::button::primary);
+
+        sidebar_content = sidebar_content.push(cancel_btn);
+        sidebar_content = sidebar_content.push(save_btn);
+
+        // Container with background
+        container(sidebar_content)
+            .width(Length::Fixed(180.0))
+            .height(Length::Fill)
+            .style(|_theme: &iced::Theme| iced::widget::container::Style {
+                background: Some(Background::Color(Color::from_rgb(0.95, 0.95, 0.95))),
+                border: Border {
+                    width: 0.0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
             .into()
     }
 
     /// Update the state and emit an [`Event`] for the parent when needed.
     pub fn update(&mut self, message: Message) -> Event {
         match message {
+            Message::ToggleSidebar => {
+                self.sidebar_expanded = !self.sidebar_expanded;
+                Event::None
+            }
+            Message::SelectTool(tool) => {
+                self.active_tool = Some(tool);
+                Event::None
+            }
+            Message::RotateLeft | Message::RotateRight => {
+                // TODO: Implement rotation
+                Event::None
+            }
+            Message::SetCropRatio(ratio) => {
+                self.crop_ratio = ratio;
+                Event::None
+            }
+            Message::UpdateCropSelection(_rect) => {
+                // TODO: Implement crop selection
+                Event::None
+            }
+            Message::ApplyCrop => {
+                // TODO: Implement crop application
+                Event::None
+            }
+            Message::ScaleChanged(_percent) => {
+                // TODO: Implement scale change
+                Event::None
+            }
+            Message::WidthInputChanged(_value) => {
+                // TODO: Implement width input
+                Event::None
+            }
+            Message::HeightInputChanged(_value) => {
+                // TODO: Implement height input
+                Event::None
+            }
+            Message::ToggleLockAspect => {
+                self.resize_state.lock_aspect = !self.resize_state.lock_aspect;
+                Event::None
+            }
+            Message::ApplyResizePreset(_percent) => {
+                // TODO: Implement resize preset
+                Event::None
+            }
+            Message::ApplyResize => {
+                // TODO: Implement resize application
+                Event::None
+            }
+            Message::Undo => {
+                // TODO: Implement undo
+                Event::None
+            }
+            Message::Redo => {
+                // TODO: Implement redo
+                Event::None
+            }
+            Message::NavigateNext => Event::NavigateNext,
+            Message::NavigatePrevious => Event::NavigatePrevious,
+            Message::Save => {
+                // TODO: Implement save logic with confirmation
+                Event::SaveRequested {
+                    path: self.image_path.clone(),
+                    overwrite: true,
+                }
+            }
+            Message::SaveAs => {
+                // TODO: Implement save as dialog
+                Event::None
+            }
             Message::Cancel => Event::ExitEditor,
-            _ => Event::None,
         }
     }
 
