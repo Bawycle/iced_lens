@@ -43,6 +43,7 @@ IcedLens aims to provide a simple, privacy‑friendly viewer focusing on respons
 - Persistent preferences (language, zoom step, fit mode)
 - Internationalization with Fluent (currently `en-US` and `fr`)
 - Configurable viewer background (light, dark, checkerboard)
+- Distraction-free fullscreen mode
 
 ## 3. Screenshots
 Screenshots will be added once UI stabilizes. Feel free to open an issue and propose layout improvements.
@@ -100,6 +101,7 @@ ARGS:
 **Image Navigation:**
 - **Left-click + Drag**: Pan/scroll through large images (grab-and-drag)
 - **Position indicator**: Automatically appears in bottom-right corner showing scroll position (e.g., "Position: 45% x 60%")
+- **Fullscreen**: Toggle with the toolbar button, double-click on the image, or press **F11**; exit via **Esc**
 
 **Zoom Controls:**
 - **Mouse wheel**: Zoom in/out (only when cursor is over the image)
