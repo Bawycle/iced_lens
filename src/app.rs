@@ -1,4 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
+//! Application root state and orchestration between the viewer and settings views.
+//!
+//! The `App` struct wires together the domains (viewer, localization, settings)
+//! and translates messages into side effects like config persistence or image
+//! loading. This file intentionally keeps policy decisions (minimum window size,
+//! persistence format, localization switching) close to the main update loop so
+//! it is easy to audit user-facing behavior.
 use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::image_handler;
@@ -15,6 +22,8 @@ use iced::{
 use std::fmt;
 use unic_langid::LanguageIdentifier;
 
+/// Root Iced application state that bridges UI components, localization, and
+/// persisted preferences.
 pub struct App {
     pub i18n: I18n,
     mode: AppMode,
@@ -23,6 +32,7 @@ pub struct App {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Screens the user can navigate between.
 pub enum AppMode {
     Viewer,
     Settings,
@@ -37,6 +47,8 @@ impl fmt::Debug for App {
     }
 }
 
+/// Top-level messages consumed by [`App::update`]. The variants forward
+/// lower-level component messages while keeping a single update entrypoint.
 #[derive(Debug, Clone)]
 pub enum Message {
     Viewer(component::Message),
@@ -44,19 +56,32 @@ pub enum Message {
     Settings(settings::Message),
 }
 
+/// Runtime flags passed in from the CLI or launcher to tweak startup behavior.
 #[derive(Debug, Default)]
 pub struct Flags {
+    /// Optional locale override in BCP-47 form (e.g. `fr`, `en-US`).
     pub lang: Option<String>,
+    /// Optional image path to preload on startup.
     pub file_path: Option<String>,
+    /// Optional directory containing Fluent `.ftl` files for custom builds.
     pub i18n_dir: Option<String>,
 }
 
 pub const MIN_WINDOW_HEIGHT: u32 = 480;
 
+/// Ensures zoom step values stay inside the supported range so persisted
+/// configs cannot request nonsensical increments.
 fn clamp_zoom_step(value: f32) -> f32 {
     value.clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT)
 }
 
+/// Computes a language-aware minimum window width.
+///
+/// Iced currently needs an explicit minimum size; we approximate the required
+/// width by multiplying the localized control labels by an average monospace
+/// character width and adding padding constants for spacing, button chrome,
+/// and breathing room. The constants are empirical but centralized here so the
+/// rationale is documented.
 fn compute_min_window_width(i18n: &I18n) -> u32 {
     const CHAR_W: f32 = 8.0;
     let zoom_input_w = 90.0;
@@ -76,6 +101,8 @@ fn compute_min_window_width(i18n: &I18n) -> u32 {
         .ceil() as u32
 }
 
+/// Builds the window settings using the provided flags so translation data is
+/// available during size calculation and icon loading.
 pub fn window_settings_with_locale(flags: &Flags) -> window::Settings {
     let config = crate::config::load().unwrap_or_default();
     let i18n = I18n::new(flags.lang.clone(), flags.i18n_dir.clone(), &config);
@@ -93,6 +120,7 @@ pub fn window_settings_with_locale(flags: &Flags) -> window::Settings {
     }
 }
 
+/// Entry point used by `main.rs` to launch the Iced application loop.
 pub fn run(flags: Flags) -> iced::Result {
     iced::application(|state: &App| state.title(), App::update, App::view)
         .theme(App::theme)
@@ -113,6 +141,8 @@ impl Default for App {
 }
 
 impl App {
+    /// Initializes application state and optionally kicks off asynchronous image
+    /// loading based on `Flags` received from the launcher.
     fn new(flags: Flags) -> (Self, Task<Message>) {
         let config = config::load().unwrap_or_default();
         let i18n = I18n::new(flags.lang.clone(), flags.i18n_dir.clone(), &config);
@@ -225,6 +255,8 @@ impl App {
         }
     }
 
+    /// Applies the newly selected locale, persists it to config, and refreshes
+    /// any visible error strings that depend on localization.
     fn apply_language_change(&mut self, locale: LanguageIdentifier) -> Task<Message> {
         self.i18n.set_locale(locale.clone());
 
@@ -239,6 +271,10 @@ impl App {
         Task::none()
     }
 
+    /// Persists the current viewer + settings preferences to disk.
+    ///
+    /// Guarded during tests to keep isolation: unit tests exercise the logic by
+    /// calling the function directly rather than through `Effect`s.
     fn persist_preferences(&self) -> Task<Message> {
         if cfg!(test) {
             return Task::none();

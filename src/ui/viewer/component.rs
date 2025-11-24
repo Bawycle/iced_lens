@@ -340,6 +340,9 @@ impl State {
         }
     }
 
+    /// Updates the viewport when the user drags the image. Clamps the offset to
+    /// the scaled image bounds and mirrors the change to the scrollable widget
+    /// so keyboard/scroll interactions stay in sync.
     fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Task<Message> {
         let proposed_offset = match self.drag.calculate_offset(position) {
             Some(offset) => offset,
@@ -393,6 +396,8 @@ impl State {
         }
     }
 
+    /// Applies wheel-based zoom while the cursor is over the image, returning a
+    /// boolean so callers can decide whether to stop event propagation.
     fn handle_wheel_zoom(&mut self, delta: mouse::ScrollDelta) -> bool {
         if !self.geometry_state().is_cursor_over_image() {
             return false;
@@ -408,6 +413,8 @@ impl State {
         true
     }
 
+    /// Recomputes the fit-to-window zoom when layout-affecting events occur so
+    /// the zoom textbox always mirrors the actual fit percentage.
     fn refresh_fit_zoom(&mut self) {
         if self.zoom.fit_to_window {
             if let Some(fit_zoom) = self.compute_fit_zoom_percent() {
@@ -418,6 +425,8 @@ impl State {
         }
     }
 
+    /// Calculates the zoom percentage needed to fit the current image inside
+    /// the viewport. Returns `None` until viewport bounds are known.
     pub fn compute_fit_zoom_percent(&self) -> Option<f32> {
         let image = self.image.as_ref()?;
         let viewport = self.viewport.bounds?;
@@ -445,6 +454,8 @@ impl State {
         Some(crate::ui::state::zoom::clamp_zoom(scale * 100.0))
     }
 
+    /// Provides a lightweight view of geometry-dependent state for hit-testing
+    /// and layout helpers.
     fn geometry_state(&self) -> geometry::ViewerState<'_> {
         geometry::ViewerState::new(
             self.image.as_ref(),
@@ -477,6 +488,8 @@ fn parse_number(input: &str) -> Option<f32> {
     Some(value)
 }
 
+/// Normalizes mouse wheel units (lines vs. pixels) into our abstract step
+/// values so zooming feels consistent across platforms.
 fn scroll_steps(delta: &mouse::ScrollDelta) -> f32 {
     match delta {
         mouse::ScrollDelta::Lines { y, .. } => *y,
