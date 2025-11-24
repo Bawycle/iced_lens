@@ -167,12 +167,16 @@ impl App {
         }
 
         let theme = config.background_theme.unwrap_or_default();
-        app.settings = SettingsState::new(app.viewer.zoom_step_percent(), theme);
+        let sort_order = config.sort_order.unwrap_or_default();
+        app.settings = SettingsState::new(app.viewer.zoom_step_percent(), theme, sort_order);
 
-        let task = if let Some(path) = flags.file_path {
-            Task::perform(async move { image_handler::load_image(&path) }, |result| {
-                Message::Viewer(component::Message::ImageLoaded(result))
-            })
+        let task = if let Some(path_str) = flags.file_path {
+            let path = std::path::PathBuf::from(&path_str);
+            app.viewer.current_image_path = Some(path.clone());
+            Task::perform(
+                async move { image_handler::load_image(&path_str) },
+                |result| Message::Viewer(component::Message::ImageLoaded(result)),
+            )
         } else {
             Task::none()
         };
@@ -266,6 +270,7 @@ impl App {
                 self.persist_preferences()
             }
             SettingsEvent::BackgroundThemeSelected(_) => self.persist_preferences(),
+            SettingsEvent::SortOrderSelected(_) => self.persist_preferences(),
         }
     }
 
@@ -298,6 +303,7 @@ impl App {
         cfg.fit_to_window = Some(self.viewer.fit_to_window());
         cfg.zoom_step = Some(self.viewer.zoom_step_percent());
         cfg.background_theme = Some(self.settings.background_theme());
+        cfg.sort_order = Some(self.settings.sort_order());
 
         if let Err(error) = config::save(&cfg) {
             eprintln!("Failed to save config: {:?}", error);
@@ -388,7 +394,7 @@ mod tests {
     use crate::ui::viewer::controls;
     use iced::widget::image::Handle;
     use iced::widget::scrollable::AbsoluteOffset;
-    use iced::{event, mouse, window, Point, Rectangle, Size};
+    use iced::{event, keyboard, mouse, window, Point, Rectangle, Size};
     use std::fs;
     use std::sync::{Mutex, OnceLock};
     use tempfile::tempdir;
@@ -803,6 +809,166 @@ mod tests {
                 .expect("create conflicting directory");
 
             let _ = app.persist_preferences();
+        });
+    }
+
+    #[test]
+    fn navigate_next_loads_next_image() {
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1_path = temp_dir.path().join("a.jpg");
+        let img2_path = temp_dir.path().join("b.jpg");
+
+        fs::File::create(&img1_path)
+            .expect("failed to create img1")
+            .write_all(b"fake")
+            .expect("failed to write img1");
+        fs::File::create(&img2_path)
+            .expect("failed to create img2")
+            .write_all(b"fake")
+            .expect("failed to write img2");
+
+        let mut app = App::default();
+        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+            sample_image_data(),
+        ))));
+        app.viewer.current_image_path = Some(img1_path.clone());
+        app.viewer
+            .scan_directory()
+            .expect("failed to scan directory");
+
+        let _ = app.update(Message::Viewer(component::Message::NavigateNext));
+
+        assert!(app
+            .viewer
+            .current_image_path
+            .as_ref()
+            .map(|p| p.ends_with("b.jpg"))
+            .unwrap_or(false));
+    }
+
+    #[test]
+    fn navigate_previous_loads_previous_image() {
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1_path = temp_dir.path().join("a.jpg");
+        let img2_path = temp_dir.path().join("b.jpg");
+
+        fs::File::create(&img1_path)
+            .expect("failed to create img1")
+            .write_all(b"fake")
+            .expect("failed to write img1");
+        fs::File::create(&img2_path)
+            .expect("failed to create img2")
+            .write_all(b"fake")
+            .expect("failed to write img2");
+
+        let mut app = App::default();
+        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+            sample_image_data(),
+        ))));
+        app.viewer.current_image_path = Some(img2_path.clone());
+        app.viewer
+            .scan_directory()
+            .expect("failed to scan directory");
+
+        let _ = app.update(Message::Viewer(component::Message::NavigatePrevious));
+
+        assert!(app
+            .viewer
+            .current_image_path
+            .as_ref()
+            .map(|p| p.ends_with("a.jpg"))
+            .unwrap_or(false));
+    }
+
+    #[test]
+    fn navigate_next_wraps_to_first() {
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1_path = temp_dir.path().join("a.jpg");
+        let img2_path = temp_dir.path().join("b.jpg");
+
+        fs::File::create(&img1_path)
+            .expect("failed to create img1")
+            .write_all(b"fake")
+            .expect("failed to write img1");
+        fs::File::create(&img2_path)
+            .expect("failed to create img2")
+            .write_all(b"fake")
+            .expect("failed to write img2");
+
+        let mut app = App::default();
+        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+            sample_image_data(),
+        ))));
+        app.viewer.current_image_path = Some(img2_path.clone());
+        app.viewer
+            .scan_directory()
+            .expect("failed to scan directory");
+
+        let _ = app.update(Message::Viewer(component::Message::NavigateNext));
+
+        assert!(app
+            .viewer
+            .current_image_path
+            .as_ref()
+            .map(|p| p.ends_with("a.jpg"))
+            .unwrap_or(false));
+    }
+
+    #[test]
+    fn keyboard_right_arrow_navigates_next() {
+        with_temp_config_dir(|_| {
+            use std::io::Write;
+            use tempfile::tempdir;
+
+            let temp_dir = tempdir().expect("failed to create temp dir");
+            let img1_path = temp_dir.path().join("a.jpg");
+            let img2_path = temp_dir.path().join("b.jpg");
+
+            fs::File::create(&img1_path)
+                .expect("failed to create img1")
+                .write_all(b"fake")
+                .expect("failed to write img1");
+            fs::File::create(&img2_path)
+                .expect("failed to create img2")
+                .write_all(b"fake")
+                .expect("failed to write img2");
+
+            let mut app = App::default();
+            let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+                sample_image_data(),
+            ))));
+            app.viewer.current_image_path = Some(img1_path.clone());
+            app.viewer
+                .scan_directory()
+                .expect("failed to scan directory");
+
+            let _ = app.update(Message::Viewer(component::Message::RawEvent {
+                window: window::Id::unique(),
+                event: event::Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                    physical_key: keyboard::key::Physical::Code(keyboard::key::Code::ArrowRight),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::default(),
+                    text: None,
+                }),
+            }));
+
+            assert!(app
+                .viewer
+                .current_image_path
+                .as_ref()
+                .map(|p| p.ends_with("b.jpg"))
+                .unwrap_or(false));
         });
     }
 }

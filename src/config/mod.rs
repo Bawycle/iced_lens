@@ -44,6 +44,15 @@ pub enum BackgroundTheme {
     Checkerboard,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum SortOrder {
+    #[default]
+    Alphabetical,
+    ModifiedDate,
+    CreatedDate,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub language: Option<String>,
@@ -53,6 +62,8 @@ pub struct Config {
     pub zoom_step: Option<f32>,
     #[serde(default)]
     pub background_theme: Option<BackgroundTheme>,
+    #[serde(default)]
+    pub sort_order: Option<SortOrder>,
 }
 
 impl Default for Config {
@@ -62,6 +73,7 @@ impl Default for Config {
             fit_to_window: Some(true),
             zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
             background_theme: Some(BackgroundTheme::default()),
+            sort_order: Some(SortOrder::default()),
         }
     }
 }
@@ -126,6 +138,7 @@ mod tests {
             fit_to_window: Some(false),
             zoom_step: Some(5.0),
             background_theme: Some(BackgroundTheme::Light),
+            sort_order: Some(SortOrder::Alphabetical),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("nested").join("settings.toml");
@@ -160,6 +173,7 @@ mod tests {
             fit_to_window: Some(false),
             zoom_step: Some(7.5),
             background_theme: Some(BackgroundTheme::Checkerboard),
+            sort_order: Some(SortOrder::CreatedDate),
         };
 
         save_to_path(&config, &config_path).expect("save should create directories");
@@ -172,5 +186,29 @@ mod tests {
         assert_eq!(config.fit_to_window, Some(true));
         assert_eq!(config.zoom_step, Some(DEFAULT_ZOOM_STEP_PERCENT));
         assert_eq!(config.background_theme, Some(BackgroundTheme::default()));
+        assert_eq!(config.sort_order, Some(SortOrder::default()));
+    }
+
+    #[test]
+    fn save_and_load_preserves_sort_order() {
+        let config = Config {
+            language: Some("en-US".to_string()),
+            fit_to_window: Some(true),
+            zoom_step: Some(10.0),
+            background_theme: Some(BackgroundTheme::Dark),
+            sort_order: Some(SortOrder::ModifiedDate),
+        };
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let config_path = temp_dir.path().join("settings.toml");
+
+        save_to_path(&config, &config_path).expect("failed to save config");
+        let loaded = load_from_path(&config_path).expect("failed to load config");
+
+        assert_eq!(loaded.sort_order, Some(SortOrder::ModifiedDate));
+    }
+
+    #[test]
+    fn sort_order_default_is_alphabetical() {
+        assert_eq!(SortOrder::default(), SortOrder::Alphabetical);
     }
 }

@@ -6,7 +6,7 @@
 //! The [`State`] struct owns the local UI state, while [`Event`] values
 //! bubble up for the parent application to handle side effects.
 
-use crate::config::{BackgroundTheme, DEFAULT_ZOOM_STEP_PERCENT};
+use crate::config::{BackgroundTheme, SortOrder, DEFAULT_ZOOM_STEP_PERCENT};
 use crate::i18n::fluent::I18n;
 use crate::ui::state::zoom::{
     format_number, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT, ZOOM_STEP_INVALID_KEY,
@@ -28,6 +28,7 @@ pub struct ViewContext<'a> {
 #[derive(Debug, Clone)]
 pub struct State {
     background_theme: BackgroundTheme,
+    sort_order: SortOrder,
     zoom_step_percent: f32,
     zoom_step_input: String,
     zoom_step_input_dirty: bool,
@@ -41,6 +42,7 @@ pub enum Message {
     ZoomStepInputChanged(String),
     ZoomStepSubmitted,
     BackgroundThemeSelected(BackgroundTheme),
+    SortOrderSelected(SortOrder),
 }
 
 /// Events propagated to the parent application for side effects.
@@ -50,6 +52,7 @@ pub enum Event {
     LanguageSelected(LanguageIdentifier),
     ZoomStepChanged(f32),
     BackgroundThemeSelected(BackgroundTheme),
+    SortOrderSelected(SortOrder),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,15 +63,24 @@ pub(crate) enum ZoomStepError {
 
 impl Default for State {
     fn default() -> Self {
-        Self::new(DEFAULT_ZOOM_STEP_PERCENT, BackgroundTheme::default())
+        Self::new(
+            DEFAULT_ZOOM_STEP_PERCENT,
+            BackgroundTheme::default(),
+            SortOrder::default(),
+        )
     }
 }
 
 impl State {
-    pub fn new(initial_zoom_step_percent: f32, background_theme: BackgroundTheme) -> Self {
+    pub fn new(
+        initial_zoom_step_percent: f32,
+        background_theme: BackgroundTheme,
+        sort_order: SortOrder,
+    ) -> Self {
         let clamped = initial_zoom_step_percent.clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT);
         Self {
             background_theme,
+            sort_order,
             zoom_step_percent: clamped,
             zoom_step_input: format_number(clamped),
             zoom_step_input_dirty: false,
@@ -78,6 +90,10 @@ impl State {
 
     pub fn background_theme(&self) -> BackgroundTheme {
         self.background_theme
+    }
+
+    pub fn sort_order(&self) -> SortOrder {
+        self.sort_order
     }
 
     pub fn zoom_step_percent(&self) -> f32 {
@@ -235,6 +251,33 @@ impl State {
         .width(Length::Fill)
         .style(section_style);
 
+        let sort_order_label = Text::new(ctx.i18n.tr("settings-sort-order-label"));
+        let mut sort_order_row = Row::new().spacing(8);
+        for (order, key) in [
+            (SortOrder::Alphabetical, "settings-sort-alphabetical"),
+            (SortOrder::ModifiedDate, "settings-sort-modified"),
+            (SortOrder::CreatedDate, "settings-sort-created"),
+        ] {
+            let mut button = Button::new(Text::new(ctx.i18n.tr(key)))
+                .on_press(Message::SortOrderSelected(order));
+            button = if self.sort_order == order {
+                button.style(button::primary)
+            } else {
+                button.style(button::secondary)
+            };
+            sort_order_row = sort_order_row.push(button);
+        }
+
+        let sort_order_section = Container::new(
+            Column::new()
+                .spacing(12)
+                .push(sort_order_label)
+                .push(sort_order_row),
+        )
+        .padding(16)
+        .width(Length::Fill)
+        .style(section_style);
+
         Column::new()
             .width(Length::Fill)
             .spacing(24)
@@ -243,6 +286,7 @@ impl State {
             .push(language_section)
             .push(zoom_section)
             .push(background_section)
+            .push(sort_order_section)
             .into()
     }
 
@@ -267,6 +311,14 @@ impl State {
                 } else {
                     self.background_theme = theme;
                     Event::BackgroundThemeSelected(theme)
+                }
+            }
+            Message::SortOrderSelected(order) => {
+                if self.sort_order == order {
+                    Event::None
+                } else {
+                    self.sort_order = order;
+                    Event::SortOrderSelected(order)
                 }
             }
         }
@@ -328,7 +380,7 @@ mod tests {
 
     #[test]
     fn new_state_clamps_zoom_step() {
-        let state = State::new(500.0, BackgroundTheme::Light);
+        let state = State::new(500.0, BackgroundTheme::Light, SortOrder::Alphabetical);
         assert_eq!(state.zoom_step_percent, MAX_ZOOM_STEP_PERCENT);
         assert_eq!(state.zoom_step_input, format_number(MAX_ZOOM_STEP_PERCENT));
     }

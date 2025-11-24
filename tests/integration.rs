@@ -23,6 +23,7 @@ fn test_language_change_via_config() {
         fit_to_window: Some(true),
         zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
         background_theme: Some(config::BackgroundTheme::Dark),
+        sort_order: Some(config::SortOrder::Alphabetical),
     };
     config::save_to_path(&initial_config, &temp_config_file_path)
         .expect("Failed to write initial config file");
@@ -39,6 +40,7 @@ fn test_language_change_via_config() {
         fit_to_window: Some(true),
         zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
         background_theme: Some(config::BackgroundTheme::Dark),
+        sort_order: Some(config::SortOrder::Alphabetical),
     };
     config::save_to_path(&french_config, &temp_config_file_path)
         .expect("Failed to write french config file");

@@ -44,3 +44,7 @@ help-example-2 = iced_lens --lang fr ./image.jpg
 help-example-3 = iced_lens --help
 help-description = IcedLens – Image Viewer
 help-line-option-i18n-dir =     --i18n-dir <path>  Load translations from directory
+settings-sort-order-label = Image navigation sort order
+settings-sort-alphabetical = Alphabetical
+settings-sort-modified = Modified date
+settings-sort-created = Created date

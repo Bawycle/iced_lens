@@ -6,12 +6,12 @@ use crate::config::BackgroundTheme;
 use crate::image_handler::ImageData;
 use crate::ui::viewer::component::Message;
 use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
-use iced::widget::{mouse_area, Column, Container, Scrollable, Stack, Text};
+use iced::widget::{button, mouse_area, Column, Container, Scrollable, Stack, Text};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::canvas,
     widget::scrollable::{Direction, Id, Scrollbar, Viewport},
-    Background, Border, Color, Element, Length, Padding, Theme,
+    Background, Border, Color, Element, Length, Padding, Shadow, Theme,
 };
 use iced::{mouse, Rectangle};
 
@@ -27,6 +27,11 @@ pub struct ViewModel<'a> {
     pub padding: Padding,
     pub is_dragging: bool,
     pub cursor_over_image: bool,
+    pub arrows_visible: bool,
+    pub has_next: bool,
+    pub has_previous: bool,
+    pub at_first: bool,
+    pub at_last: bool,
 }
 
 pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> {
@@ -97,6 +102,80 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
             .into(),
     };
 
+    let mut stack = Stack::new().push(base_surface);
+
+    // Add navigation arrows if visible
+    if model.arrows_visible {
+        if model.has_previous {
+            let left_arrow_opacity = if model.at_first { 0.5 } else { 1.0 };
+            let left_arrow = button(Text::new("◀").size(32).style(move |_theme: &Theme| {
+                iced::widget::text::Style {
+                    color: Some(Color::from_rgba(1.0, 1.0, 1.0, left_arrow_opacity)),
+                }
+            }))
+            .on_press(Message::NavigatePrevious)
+            .padding(12)
+            .style(|_theme: &Theme, _status: button::Status| button::Style {
+                background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
+                text_color: Color::WHITE,
+                border: Border {
+                    radius: 24.0.into(),
+                    width: 1.0,
+                    color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
+                },
+                shadow: Shadow {
+                    color: Color::from_rgba(0.0, 0.0, 0.0, 0.3),
+                    offset: iced::Vector::new(0.0, 2.0),
+                    blur_radius: 8.0,
+                },
+            });
+
+            stack = stack.push(
+                Container::new(left_arrow)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .padding(16)
+                    .align_x(Horizontal::Left)
+                    .align_y(Vertical::Center),
+            );
+        }
+
+        if model.has_next {
+            let right_arrow_opacity = if model.at_last { 0.5 } else { 1.0 };
+            let right_arrow = button(Text::new("▶").size(32).style(move |_theme: &Theme| {
+                iced::widget::text::Style {
+                    color: Some(Color::from_rgba(1.0, 1.0, 1.0, right_arrow_opacity)),
+                }
+            }))
+            .on_press(Message::NavigateNext)
+            .padding(12)
+            .style(|_theme: &Theme, _status: button::Status| button::Style {
+                background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
+                text_color: Color::WHITE,
+                border: Border {
+                    radius: 24.0.into(),
+                    width: 1.0,
+                    color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
+                },
+                shadow: Shadow {
+                    color: Color::from_rgba(0.0, 0.0, 0.0, 0.3),
+                    offset: iced::Vector::new(0.0, 2.0),
+                    blur_radius: 8.0,
+                },
+            });
+
+            stack = stack.push(
+                Container::new(right_arrow)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .padding(16)
+                    .align_x(Horizontal::Right)
+                    .align_y(Vertical::Center),
+            );
+        }
+    }
+
+    // Add HUD indicator if present
     if !ctx.hud_lines.is_empty() {
         let mut hud_column: Column<'_, Message> = Column::new().spacing(4);
         for line in &ctx.hud_lines {
@@ -116,20 +195,17 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
                 ..Default::default()
             });
 
-        Stack::new()
-            .push(base_surface)
-            .push(
-                Container::new(indicator)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .padding(10)
-                    .align_x(Horizontal::Right)
-                    .align_y(Vertical::Bottom),
-            )
-            .into()
-    } else {
-        base_surface
+        stack = stack.push(
+            Container::new(indicator)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .padding(10)
+                .align_x(Horizontal::Right)
+                .align_y(Vertical::Bottom),
+        );
     }
+
+    stack.into()
 }
 
 #[derive(Debug, Clone, Copy, Default)]

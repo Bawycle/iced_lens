@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Viewer component encapsulating state and update logic.
 
+use crate::directory_scanner::ImageList;
 use crate::error::Error;
 use crate::i18n::fluent::I18n;
 use crate::image_handler::ImageData;
@@ -8,6 +9,7 @@ use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer::{self, controls, pane, state as geometry};
 use iced::widget::scrollable::{self, AbsoluteOffset, Id, RelativeOffset};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 /// Identifier used for the viewer scrollable widget.
@@ -28,6 +30,8 @@ pub enum Message {
         window: window::Id,
         event: event::Event,
     },
+    NavigateNext,
+    NavigatePrevious,
 }
 
 /// Side effects the application should perform after handling a viewer message.
@@ -90,6 +94,10 @@ pub struct State {
     pub drag: DragState,
     cursor_position: Option<Point>,
     last_click: Option<Instant>,
+    pub current_image_path: Option<PathBuf>,
+    pub image_list: ImageList,
+    arrows_visible: bool,
+    last_mouse_move: Option<Instant>,
 }
 
 impl State {
@@ -163,6 +171,15 @@ impl State {
         }
     }
 
+    pub fn scan_directory(&mut self) -> crate::error::Result<()> {
+        if let Some(path) = &self.current_image_path {
+            let config = crate::config::load().unwrap_or_default();
+            let sort_order = config.sort_order.unwrap_or_default();
+            self.image_list = ImageList::scan_directory(path, sort_order)?;
+        }
+        Ok(())
+    }
+
     pub fn handle_message(&mut self, message: Message, i18n: &I18n) -> (Effect, Task<Message>) {
         match message {
             Message::ImageLoaded(result) => match result {
@@ -170,6 +187,8 @@ impl State {
                     self.image = Some(image);
                     self.error = None;
                     self.refresh_fit_zoom();
+                    // Scan directory on successful image load
+                    let _ = self.scan_directory();
                     (Effect::None, Task::none())
                 }
                 Err(error) => {
@@ -191,6 +210,42 @@ impl State {
                 (Effect::None, Task::none())
             }
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
+            Message::NavigateNext => {
+                // Rescan directory to handle added/removed images
+                let _ = self.scan_directory();
+
+                if let Some(next_path) = self.image_list.next() {
+                    let path = next_path.to_path_buf();
+                    self.current_image_path = Some(path.clone());
+                    self.image_list.set_current(&path);
+                    return (
+                        Effect::None,
+                        Task::perform(
+                            async move { crate::image_handler::load_image(&path) },
+                            Message::ImageLoaded,
+                        ),
+                    );
+                }
+                (Effect::None, Task::none())
+            }
+            Message::NavigatePrevious => {
+                // Rescan directory to handle added/removed images
+                let _ = self.scan_directory();
+
+                if let Some(prev_path) = self.image_list.previous() {
+                    let path = prev_path.to_path_buf();
+                    self.current_image_path = Some(path.clone());
+                    self.image_list.set_current(&path);
+                    return (
+                        Effect::None,
+                        Task::perform(
+                            async move { crate::image_handler::load_image(&path) },
+                            Message::ImageLoaded,
+                        ),
+                    );
+                }
+                (Effect::None, Task::none())
+            }
         }
     }
 
@@ -235,6 +290,11 @@ impl State {
                 padding: geometry_state.image_padding(),
                 is_dragging: self.drag.is_dragging,
                 cursor_over_image: geometry_state.is_cursor_over_image(),
+                arrows_visible: self.arrows_visible && !self.image_list.is_empty(),
+                has_next: self.image_list.next().is_some(),
+                has_previous: self.image_list.previous().is_some(),
+                at_first: self.image_list.is_at_first(),
+                at_last: self.image_list.is_at_last(),
             },
             controls_visible: env.show_controls,
         });
@@ -329,6 +389,10 @@ impl State {
                 }
                 mouse::Event::CursorMoved { position } => {
                     self.cursor_position = Some(position);
+                    self.last_mouse_move = Some(Instant::now());
+                    if self.geometry_state().is_cursor_over_image() {
+                        self.arrows_visible = true;
+                    }
                     if self.drag.is_dragging {
                         let task = self.handle_cursor_moved_during_drag(position);
                         (Effect::None, task)
@@ -338,6 +402,7 @@ impl State {
                 }
                 mouse::Event::CursorLeft => {
                     self.cursor_position = None;
+                    self.arrows_visible = false;
                     if self.drag.is_dragging {
                         self.drag.stop();
                     }
@@ -354,6 +419,14 @@ impl State {
                     key: keyboard::Key::Named(keyboard::key::Named::Escape),
                     ..
                 } => (Effect::ExitFullscreen, Task::none()),
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                    ..
+                } => self.handle_message(Message::NavigateNext, &I18n::default()),
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                    ..
+                } => self.handle_message(Message::NavigatePrevious, &I18n::default()),
                 keyboard::Event::ModifiersChanged(modifiers) => {
                     if modifiers.command() {
                         // no-op currently, but keep placeholder for shortcut support

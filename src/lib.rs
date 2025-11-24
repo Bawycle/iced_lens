@@ -8,6 +8,7 @@
 
 pub mod app;
 pub mod config;
+pub mod directory_scanner;
 pub mod error;
 pub mod i18n;
 pub mod icon;
