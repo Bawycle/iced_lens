@@ -352,22 +352,26 @@ impl App {
                 .on_press(Message::SwitchMode(AppMode::Viewer))
         };
 
-        Container::new(
-            iced::widget::column![
+        let mut column = iced::widget::Column::new();
+        if !self.fullscreen {
+            column = column.push(
                 Container::new(switch_button)
                     .width(Length::Shrink)
                     .padding(10)
                     .align_x(iced::alignment::Horizontal::Left),
-                Container::new(current_view)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-            ]
+            );
+        }
+
+        column = column.push(
+            Container::new(current_view)
+                .width(Length::Fill)
+                .height(Length::Fill),
+        );
+
+        Container::new(column.width(Length::Fill).height(Length::Fill))
             .width(Length::Fill)
-            .height(Length::Fill),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+            .height(Length::Fill)
+            .into()
     }
 }
 
