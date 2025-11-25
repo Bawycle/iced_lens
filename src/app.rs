@@ -344,9 +344,20 @@ impl App {
                 // TODO: Implement navigation in editor mode
                 Task::none()
             }
-            EditorEvent::SaveRequested { path, overwrite } => {
-                // TODO: Implement save logic
-                eprintln!("Save requested: {:?} (overwrite: {})", path, overwrite);
+            EditorEvent::SaveRequested { path, overwrite: _ } => {
+                // Save the edited image
+                if let Some(editor) = self.editor.as_mut() {
+                    match editor.save_image(&path) {
+                        Ok(()) => {
+                            eprintln!("Image saved successfully to: {:?}", path);
+                            // TODO: Show success notification to user
+                        }
+                        Err(err) => {
+                            eprintln!("Failed to save image: {:?}", err);
+                            // TODO: Show error notification to user
+                        }
+                    }
+                }
                 Task::none()
             }
         }

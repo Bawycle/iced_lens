@@ -1039,6 +1039,34 @@ impl State {
         self.history_index < self.transformation_history.len()
     }
 
+    /// Save the edited image to a file, preserving the original format.
+    pub fn save_image(&mut self, path: &std::path::Path) -> Result<()> {
+        use image_rs::ImageFormat;
+
+        // Detect format from file extension
+        let format = match path.extension().and_then(|s| s.to_str()) {
+            Some("jpg") | Some("jpeg") => ImageFormat::Jpeg,
+            Some("png") => ImageFormat::Png,
+            Some("gif") => ImageFormat::Gif,
+            Some("bmp") => ImageFormat::Bmp,
+            Some("ico") => ImageFormat::Ico,
+            Some("tiff") | Some("tif") => ImageFormat::Tiff,
+            Some("webp") => ImageFormat::WebP,
+            _ => ImageFormat::Png, // Default fallback
+        };
+
+        // Save the working image
+        self.working_image
+            .save_with_format(path, format)
+            .map_err(|err| Error::Io(format!("Failed to save image: {}", err)))?;
+
+        // Clear transformation history after successful save
+        self.transformation_history.clear();
+        self.history_index = 0;
+
+        Ok(())
+    }
+
     /// Get the current image data.
     pub fn current_image(&self) -> &ImageData {
         &self.current_image
@@ -1647,7 +1675,7 @@ impl State {
     }
 
     /// Discard all changes and reset to original image state.
-    fn discard_changes(&mut self) {
+    pub fn discard_changes(&mut self) {
         // Reload the working image from disk
         match image_rs::open(&self.image_path) {
             Ok(fresh_image) => {
