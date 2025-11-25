@@ -2,24 +2,25 @@
 
 This document tracks ongoing development work for IcedLens. It serves as a reference for features in progress and implementation notes.
 
-**Last Updated:** 2025-11-25 (Session 3 - Rotate & Preview Complete)
+**Last Updated:** 2025-11-25 (Session 4 - Resize Preview & Scrollable Sidebar)
 
 ---
 
 ## 📊 Quick Status Summary
 
-**Overall Progress:** Infrastructure 100% | Features 20%
+**Overall Progress:** Infrastructure 100% | Features 35%
 
 - ✅ **Infrastructure Complete** - Module, UI, App integration, translations
 - ✅ **Sidebar Complete** - Retractable, all controls, Save/Save As/Cancel
 - ✅ **Rotate Tool** - Working image pipeline wired, icons corrected, history tracked
 - ✅ **Editor Preview** - Canvas now renders the edited image with fit containment
-- ⏳ **Remaining** - Crop, Resize, Undo/Redo, Save implementation, Keyboard shortcuts
+- ✅ **Resize Tool** - Slider, presets, numeric inputs, aspect lock, live preview + auto-commit
+- ⏳ **Remaining** - Crop, Undo/Redo, Save implementation, Keyboard shortcuts
 
 **Next Immediate Steps:**
 1. Implement Crop tool (selection overlay + apply flow)
-2. Build Resize tool (slider + inputs + preview sync)
-3. Hook Undo/Redo stack into toolbar shortcuts
+2. Hook Undo/Redo stack into toolbar shortcuts
+3. Wire Save/Save As persistence for edited images
 
 ---
 
@@ -104,11 +105,10 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - Spacer pushing bottom controls to bottom
    - Gray background (#F2F2F2) for contrast
 
-5. **Transformation Module** (`src/ui/editor/transform.rs`)
-   - Created dedicated module for image operations
-   - Functions: `rotate_left()`, `rotate_right()`
-   - Architecture: works with `DynamicImage` from `image_rs` crate
-   - Conversion helpers: `dynamic_to_image_data()` for display
+5. **Transformation Module** (`src/image_handler/transform.rs`)
+   - Image operations now live under `image_handler` for reuse outside the UI
+   - Functions: `rotate_left()`, `rotate_right()`, `resize()` plus `dynamic_to_image_data()` helper
+   - Shared tests confirm basic behavior
 
 6. **State Architecture for Transformations**
    - `State` now includes `working_image: DynamicImage`
@@ -118,8 +118,16 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - After each transformation: working_image → ImageData → update display
    - Custom Debug impl (DynamicImage is not Debug)
 
+7. **Resize Tool & Preview Pipeline**
+   - Slider (10–200%), presets, width/height inputs, and aspect locking wired to a shared preview flow
+   - Changes update `preview_image` in real time; toggling away commits via `commit_active_tool_changes()`
+   - Tests updated to cover resize application semantics
+
+8. **Sidebar Overflow Handling**
+   - Tool list sits inside a vertical scrollable so navigation/save controls remain accessible on short viewports
+
 #### 🔄 In Progress
-Currently focusing on Crop/Resize implementations now that rotation & preview are shipped.
+Crop overlay UX and undo/redo wiring now take priority after landing resize tooling.
 
 #### ⏳ To Do
 1. **Crop Tool Implementation**
@@ -129,30 +137,21 @@ Currently focusing on Crop/Resize implementations now that rotation & preview ar
    - Apply crop transformation
    - Update current_image
 
-2. **Resize Tool Implementation**
-   - UI panel when tool selected:
-     - Slider (10-200%)
-     - Width/Height pixel inputs
-     - Lock aspect ratio checkbox
-     - Preset buttons (50%, 75%, 150%, 200%)
-   - Real-time preview as slider moves
-   - Apply resize transformation
-
-3. **Undo/Redo System**
+2. **Undo/Redo System**
    - Push transformations to history stack
    - Track history_index
    - Undo: revert to previous state, rebuild image
    - Redo: reapply transformation
    - Ctrl+Z / Ctrl+Y shortcuts
 
-4. **Save/Save As Implementation**
+3. **Save/Save As Implementation**
    - Save: write working_image to original path
    - Save As: file picker dialog → new path
    - Preserve format (JPEG→JPEG, PNG→PNG)
    - Confirmation dialogs
    - Handle errors (write permissions, disk space)
 
-5. **Keyboard Shortcuts**
+4. **Keyboard Shortcuts**
    - `E` = Enter edit mode (from viewer)
    - `Ctrl+S` = Save
    - `Esc` = Cancel/exit editor
@@ -160,18 +159,17 @@ Currently focusing on Crop/Resize implementations now that rotation & preview ar
    - `C` = Select crop tool
    - `Ctrl+Z` / `Ctrl+Y` = Undo/Redo
 
-6. **Navigation in Editor**
+5. **Navigation in Editor**
    - Wire up NavigateNext/NavigatePrevious events in App
    - Load new image in editor when navigating
    - Prompt to save if unsaved changes exist
 
-7. **Tests** - Unit tests for transformation logic
+6. **Tests** - Unit tests for transformation logic
    - rotate_left/rotate_right dimension swaps
    - crop boundaries
-   - resize dimensions
    - transformation history
 
-8. **README** - Document editing features
+7. **README** - Document editing features
 
 ### Technical Notes
 
@@ -199,12 +197,12 @@ pub struct State {
 - `image_rs::DynamicImage` provides rich transformation API
 - Solution: keep both, sync them after each operation
 
-**Resize UX:** Hybrid modern approach
-- Primary control: Slider (10-200% scale) for intuitive adjustments
-- Secondary: Width/Height pixel inputs for precision
+**Resize UX:** Hybrid modern approach (implemented)
+- Slider (10-200% scale) for intuitive adjustments
+- Width/Height pixel inputs for precision
 - Lock aspect ratio toggle
 - Preset buttons: 50%, 75%, 150%, 200%
-- Real-time preview (performance permitting)
+- Real-time preview + auto-commit when leaving the tool
 
 **Crop UX:** Interactive selection
 - Rectangle overlay with 8 handles (4 corners + 4 edges)
