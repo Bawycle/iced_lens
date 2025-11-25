@@ -2,22 +2,25 @@
 
 This document tracks ongoing development work for IcedLens. It serves as a reference for features in progress and implementation notes.
 
-**Last Updated:** 2025-11-25 (Session 6 - Crop Base Image System & Button Logic)
+**Last Updated:** 2025-11-25 (Session 7 - Navigation Refactoring & Crop Overlay Polish)
 
 ---
 
 ## 📊 Quick Status Summary
 
-**Overall Progress:** Infrastructure 100% | Features 65%
+**Overall Progress:** Infrastructure 100% | Features 75%
 
 - ✅ **Infrastructure Complete** - Module, UI, App integration, translations
+- ✅ **Navigation Architecture** - Each mode manages its own buttons independently
+- ✅ **Settings Validation** - Zoom step validated before exiting Settings
 - ✅ **Sidebar Complete** - Retractable, all controls, intelligent button states
 - ✅ **Button Logic** - "← Retour" to exit, "Annuler" to discard, Save/SaveAs, all conditional
 - ✅ **Rotate Tool** - Working image pipeline wired, icons corrected, history tracked
 - ✅ **Editor Preview** - Canvas now renders the edited image with fit containment
 - ✅ **Resize Tool** - Slider, presets, numeric inputs, aspect lock, live preview + auto-commit
-- ✅ **Crop Tool** - Aspect ratio presets (Free, Square, 16:9, 9:16, 4:3, 3:4), immediate commit
+- ✅ **Crop Tool** - Interactive overlay with drag, resize handles, rule-of-thirds grid
 - ✅ **Crop Base System** - Sequential crops calculated from same base image, prevents distortion
+- ✅ **Crop UX Polish** - Smart ratio selection, overlay visibility control, proper state management
 - ⏳ **Remaining** - Undo/Redo wiring, Save implementation, Keyboard shortcuts
 
 **Next Immediate Steps:**
@@ -187,31 +190,73 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - Prevents cumulative distortion from chained crop operations
    - Tests passing: 98 total (92 lib + 4 main + 2 integration)
 
+12. **Interactive Crop Overlay** (COMPLETE)
+   - Canvas-based overlay with `CropOverlayRenderer`
+   - Visual elements:
+     - Darkened areas outside crop rectangle (50% black)
+     - White crop rectangle border (2px)
+     - Rule-of-thirds grid (semi-transparent white)
+     - 8 resize handles (10×10px white with black border)
+   - Mouse interactions:
+     - Click & drag rectangle to move
+     - Click & drag handles to resize
+     - Cursor leaves canvas → drag operation ends
+     - Coordinates clamped to image bounds
+   - ContentFit::Contain coordinate mapping for accurate positioning
+   - Overlay visibility controlled by tool state and ratio selection
+
+13. **Navigation Architecture Refactoring** (COMPLETE)
+   - Removed common top toolbar from app.rs
+   - Each mode now manages its own navigation independently:
+     - **Viewer**: "Settings" and "✏ Edit" buttons in own toolbar
+     - **Settings**: "Back to Viewer" button at top of settings panel
+     - **Editor**: "← Retour" button in editor's own top toolbar
+   - Benefits: Better separation of concerns, clearer ownership
+   - Fixes duplicate button issues
+
+14. **Settings Exit Validation** (COMPLETE)
+   - New event: `BackToViewerWithZoomChange(f32)`
+   - On "Back to Viewer" click:
+     - If zoom step input is dirty (modified):
+       - Validate input
+       - If valid: apply change and switch to Viewer
+       - If invalid: stay in Settings with error displayed
+     - If not dirty: switch to Viewer immediately
+   - Prevents loss of uncommitted zoom step changes
+
+15. **Crop Overlay UX Polish** (COMPLETE)
+   - **CropRatio::None** added: No button selected state
+   - Opening Crop tool: ratio = None, overlay hidden
+   - Selecting a ratio: ratio selected, overlay appears
+   - Manual resize via handles: auto-switch to Free ratio
+   - After "Apply" crop:
+     - Ratio reset to None (no button selected)
+     - Overlay hidden
+     - Crop rectangle reset to full new image size
+     - Base image updated to newly cropped image
+     - Tool stays open for sequential crops
+   - Drag state properly cleared when cursor leaves canvas
+   - Tests passing: 98 total
+
 #### 🔄 In Progress
 Undo/redo wiring and Save/Save As implementation are next priorities.
 
 #### ⏳ To Do
-1. **Crop Tool Enhancement (Optional)**
-   - Interactive rectangle overlay on image with visual feedback
-   - 8 draggable handles (4 corners + 4 edges) for manual resizing
-   - Rule-of-thirds grid overlay during crop adjustment
-   - Live dimension display during handle dragging
-
-2. **Undo/Redo System (High Priority)**
+1. **Undo/Redo System (High Priority)**
    - Wire existing transformation history to Undo/Redo buttons
    - Implement undo: replay transformations from original image up to history_index - 1
    - Implement redo: apply transformation at history_index
    - Add Ctrl+Z / Ctrl+Y keyboard shortcuts
    - Update button states based on can_undo() / can_redo()
 
-3. **Save/Save As Implementation (High Priority)**
+2. **Save/Save As Implementation (High Priority)**
    - Save: write working_image to original path
    - Save As: file picker dialog → new path
    - Preserve format (JPEG→JPEG, PNG→PNG)
    - Confirmation dialogs
    - Handle errors (write permissions, disk space)
 
-4. **Keyboard Shortcuts**
+3. **Keyboard Shortcuts**
    - `E` = Enter edit mode (from viewer)
    - `Ctrl+S` = Save
    - `Esc` = Cancel/exit editor
@@ -219,17 +264,12 @@ Undo/redo wiring and Save/Save As implementation are next priorities.
    - `C` = Select crop tool
    - `Ctrl+Z` / `Ctrl+Y` = Undo/Redo
 
-5. **Navigation in Editor**
+4. **Navigation in Editor**
    - Wire up NavigateNext/NavigatePrevious events in App
    - Load new image in editor when navigating
    - Prompt to save if unsaved changes exist
 
-6. **Tests** - Unit tests for transformation logic
-   - rotate_left/rotate_right dimension swaps
-   - crop boundaries
-   - transformation history
-
-7. **README** - Document editing features
+5. **README** - Document editing features
 
 ### Technical Notes
 
@@ -264,15 +304,21 @@ pub struct State {
 - Preset buttons: 50%, 75%, 150%, 200%
 - Real-time preview + auto-commit when leaving the tool
 
-**Crop UX:** Aspect ratio presets with base image system (implemented)
-- 6 aspect ratio buttons: Free, Square (1:1), Landscape (16:9), Portrait (9:16), Photo (4:3), Photo Portrait (3:4)
-- Immediate application on ratio selection (no preview step)
+**Crop UX:** Interactive overlay with aspect ratio presets (implemented)
+- **Initial state**: No ratio selected (CropRatio::None), no overlay visible
+- **6 aspect ratio buttons**: None (default), Free, Square (1:1), Landscape (16:9), Portrait (9:16), Photo (4:3), Photo Portrait (3:4)
+- **Interactive workflow**:
+  1. Select a ratio → overlay appears with crop rectangle
+  2. Drag rectangle to reposition
+  3. Drag handles (8 positions) to resize
+  4. Manual resize → auto-switches to Free ratio
+  5. Click "Apply" → crop applied, overlay hidden, ratio reset to None
 - **Base image anchoring**: When crop tool opens, current image is saved as base
   - All ratio calculations use base dimensions, not previous crop result
   - Example: 1000×800 image → Crop Square (800×800) → Crop Landscape = 800×450 from original 1000×800, NOT from 800×800
   - Prevents cumulative distortion from sequential crops
-  - Base resets only when crop tool is closed and reopened
-- Future enhancement: Interactive rectangle overlay with draggable handles
+  - Base updates after each "Apply" for sequential crops
+- **Visual feedback**: Rule-of-thirds grid, darkened non-crop areas, white border and handles
 
 **Transformation Pipeline:**
 ```
