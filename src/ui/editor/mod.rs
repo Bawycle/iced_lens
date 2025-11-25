@@ -25,7 +25,7 @@ const ROTATE_RIGHT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.
 <path d='M13 5V3l4 4-4 4V7c-3.309 0-6 2.691-6 6 0 1.262.389 2.432 1.053 3.403l-1.553 1.234C5.58 16.299 5 14.729 5 13c0-4.411 3.589-8 8-8z' fill='currentColor'/>
 </svg>"#;
 
-const SIDEBAR_WIDTH: f32 = 220.0;
+const SIDEBAR_WIDTH: f32 = 290.0;
 
 /// Contextual data needed to render the editor view.
 pub struct ViewContext<'a> {
