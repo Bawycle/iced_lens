@@ -25,6 +25,8 @@ const ROTATE_RIGHT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.
 <path d='M13 5V3l4 4-4 4V7c-3.309 0-6 2.691-6 6 0 1.262.389 2.432 1.053 3.403l-1.553 1.234C5.58 16.299 5 14.729 5 13c0-4.411 3.589-8 8-8z' fill='currentColor'/>
 </svg>"#;
 
+const SIDEBAR_WIDTH: f32 = 220.0;
+
 /// Contextual data needed to render the editor view.
 pub struct ViewContext<'a> {
     pub i18n: &'a crate::i18n::fluent::I18n,
@@ -168,7 +170,7 @@ pub enum Message {
     /// Save/cancel/back
     Save,
     SaveAs,
-    Cancel,      // Discard changes but stay in editor
+    Cancel,       // Discard changes but stay in editor
     BackToViewer, // Return to viewer (only if no unsaved changes)
 }
 
@@ -205,7 +207,7 @@ impl State {
         let back_btn = button(text(format!("← {}", i18n.tr("editor-back-to-viewer"))).size(14))
             .padding([8, 12]);
         let back_btn = if has_changes {
-            back_btn  // Disabled if unsaved changes
+            back_btn // Disabled if unsaved changes
         } else {
             back_btn.on_press(Message::BackToViewer)
         };
@@ -289,9 +291,7 @@ impl State {
         main_row = main_row.push(image_area);
 
         // Combine toolbar and main content in a Column
-        let content = Column::new()
-            .push(toolbar)
-            .push(main_row);
+        let content = Column::new().push(toolbar).push(main_row);
 
         container(content)
             .width(Length::Fill)
@@ -457,9 +457,9 @@ impl State {
             .width(Length::Fill)
             .style(iced::widget::button::secondary);
         let cancel_btn = if has_changes {
-            cancel_btn.on_press(Message::Cancel)  // Active if changes exist
+            cancel_btn.on_press(Message::Cancel) // Active if changes exist
         } else {
-            cancel_btn  // Disabled if no changes
+            cancel_btn // Disabled if no changes
         };
 
         let save_btn = button(text(ctx.i18n.tr("editor-save")).size(16))
@@ -467,9 +467,9 @@ impl State {
             .width(Length::Fill)
             .style(iced::widget::button::primary);
         let save_btn = if has_changes {
-            save_btn.on_press(Message::Save)  // Active if changes exist
+            save_btn.on_press(Message::Save) // Active if changes exist
         } else {
-            save_btn  // Disabled if no changes
+            save_btn // Disabled if no changes
         };
 
         let save_as_btn = button(text(ctx.i18n.tr("editor-save-as")).size(16))
@@ -477,9 +477,9 @@ impl State {
             .width(Length::Fill)
             .style(iced::widget::button::secondary);
         let save_as_btn = if has_changes {
-            save_as_btn.on_press(Message::SaveAs)  // Active if changes exist
+            save_as_btn.on_press(Message::SaveAs) // Active if changes exist
         } else {
-            save_as_btn  // Disabled if no changes
+            save_as_btn // Disabled if no changes
         };
 
         footer_section = footer_section.push(cancel_btn);
@@ -489,14 +489,14 @@ impl State {
         let sidebar_stack = Column::new()
             .spacing(8)
             .padding(12)
-            .width(Length::Fixed(180.0))
+            .width(Length::Fixed(SIDEBAR_WIDTH))
             .push(header_section)
             .push(scrollable_content)
             .push(footer_section);
 
         // Container with the same background as the viewer toolbar for visual continuity
         container(sidebar_stack)
-            .width(Length::Fixed(180.0))
+            .width(Length::Fixed(SIDEBAR_WIDTH))
             .height(Length::Fill)
             .style(|_theme: &iced::Theme| iced::widget::container::Style {
                 background: Some(Background::Color(theme::viewer_toolbar_background())),
@@ -735,8 +735,8 @@ impl State {
                 self.adjust_crop_to_ratio(ratio);
                 // Apply crop immediately from base image (no preview, direct commit)
                 self.apply_crop_from_base();
-                self.crop_modified = false;  // Already applied
-                self.preview_image = None;   // No preview needed
+                self.crop_modified = false; // Already applied
+                self.preview_image = None; // No preview needed
                 Event::None
             }
             Message::UpdateCropSelection(_rect) => {
@@ -821,7 +821,7 @@ impl State {
             Message::BackToViewer => {
                 // Return to viewer (only allowed if no unsaved changes)
                 if self.has_unsaved_changes() {
-                    Event::None  // Blocked
+                    Event::None // Blocked
                 } else {
                     Event::ExitEditor
                 }
@@ -1171,11 +1171,7 @@ impl State {
         let height = self.crop_state.height;
 
         // Validate crop bounds
-        if width == 0
-            || height == 0
-            || x >= self.crop_base_width
-            || y >= self.crop_base_height
-        {
+        if width == 0 || height == 0 || x >= self.crop_base_width || y >= self.crop_base_height {
             eprintln!("Invalid crop bounds: ({}, {}, {}×{})", x, y, width, height);
             return;
         }
