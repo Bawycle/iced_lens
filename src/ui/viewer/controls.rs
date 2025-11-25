@@ -29,7 +29,7 @@ pub enum Message {
 const DELETE_ICON_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none'><path d='M9 3v1H4v2h1v13a2 2 0 002 2h10a2 2 0 002-2V6h1V4h-5V3H9zm2 4h2v11h-2V7zm-4 0h2v11H7V7zm8 0h2v11h-2V7z' fill='currentColor'/></svg>"#;
 const ZOOM_IN_ICON_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none'><path d='M11 4a7 7 0 015.657 11.113l4.115 4.115-1.414 1.414-4.115-4.115A7 7 0 1111 4zm0 2a5 5 0 100 10 5 5 0 000-10zm1 2v2h2v2h-2v2h-2v-2H8v-2h2V8h2z' fill='currentColor'/></svg>"#;
 const ZOOM_OUT_ICON_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none'><path d='M11 4a7 7 0 015.657 11.113l4.115 4.115-1.414 1.414-4.115-4.115A7 7 0 1111 4zm0 2a5 5 0 100 10 5 5 0 000-10zm-3 4h6v2H8v-2z' fill='currentColor'/></svg>"#;
-const FULLSCREEN_ICON_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none'><path d='M5 5h6V3H3v8h2V5zm14 0v6h2V3h-8v2h6zm-6 16v-2h6v-6h2v8h-8zm-4 0H5v-6H3v8h8v-2z' fill='currentColor'/></svg>"#;
+const FULLSCREEN_ICON_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none'><path d='M4 9V4h5V2H2v7h2zm15-5h-5V2h7v7h-2zm-5 15h5v-5h2v7h-7v-2zM4 15v5h5v2H2v-7h2z' fill='currentColor'/></svg>"#;
 const ICON_BUTTON_SIZE: f32 = 32.0;
 
 pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Message> {
