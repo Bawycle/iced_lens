@@ -12,10 +12,17 @@ use iced::widget::{
 };
 use iced::{alignment::Vertical, Background, Border, Element, Length};
 
-use super::super::{
-    EditorTool, Message, SidebarMessage, State, ViewContext, ROTATE_LEFT_SVG, ROTATE_RIGHT_SVG,
-    SIDEBAR_WIDTH,
-};
+use super::super::{EditorTool, Message, SidebarMessage, State, ViewContext};
+
+const ROTATE_LEFT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
+<path d='M11 5v-3l-4 4 4 4V7c3.309 0 6 2.691 6 6 0 1.262-.389 2.432-1.053 3.403l1.553 1.234C18.42 16.299 19 14.729 19 13c0-4.411-3.589-8-8-8z' fill='currentColor'/>
+</svg>"#;
+
+const ROTATE_RIGHT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
+<path d='M13 5V3l4 4-4 4V7c-3.309 0-6 2.691-6 6 0 1.262.389 2.432 1.053 3.403l-1.553 1.234C5.58 16.299 5 14.729 5 13c0-4.411-3.589-8 8-8z' fill='currentColor'/>
+</svg>"#;
+
+const SIDEBAR_WIDTH: f32 = 290.0;
 
 pub struct SidebarModel<'a> {
     pub active_tool: Option<EditorTool>,
