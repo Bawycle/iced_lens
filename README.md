@@ -46,16 +46,12 @@ IcedLens aims to provide a simple, privacy‑friendly image viewer and editor fo
 - Distraction-free fullscreen with HUD indicators (button, double-click, F11, Esc)
 
 ### Editing
-- **Non-destructive editing** with undo/redo support
-- **Rotate**: Rotate left/right in 90° increments
-- **Crop**: Interactive crop overlay with preset aspect ratios (Free, Square, 16:9, 9:16, 4:3, 3:4)
-  - Drag to reposition, resize handles for custom crops
-  - Rule-of-thirds grid for composition guidance
-- **Resize**: Scale images with slider (10-200%) or precise pixel dimensions
-  - Lock aspect ratio toggle
-  - Quick presets (50%, 75%, 150%, 200%)
-- **Save & Save As**: Preserve original format or save to new file
-- **Keyboard shortcuts**: Streamlined workflow (E, Ctrl+S, Ctrl+Z/Y, Esc)
+- **Non-destructive pipeline** with undo/redo history and Save / Save As flows
+- **Rotate, Crop, Resize** tools share a live preview canvas
+  - Rotate: 90° increments, instant apply
+  - Crop: overlay with drag handles and preset ratios (Free, Square, 16:9, 9:16, 4:3, 3:4)
+  - Resize: slider (10–200%), width/height inputs, aspect lock, and live preview (auto-commit when leaving the tool)
+- **Keyboard shortcuts** keep the workflow fast (E to edit, Ctrl+S, Ctrl+Z/Y, Esc)
 
 ## 3. Screenshots
 Screenshots will be added once UI stabilizes. Feel free to open an issue and propose layout improvements.

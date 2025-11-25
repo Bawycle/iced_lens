@@ -2284,20 +2284,19 @@ impl iced::widget::canvas::Program<Message> for ResizeOverlayRenderer {
         let max_aspect = max_width as f32 / max_height as f32;
         let bounds_aspect = bounds.width / bounds.height;
 
-        let (display_width, display_height, offset_x, offset_y) =
-            if max_aspect > bounds_aspect {
-                // Wider - fit to width
-                let display_width = bounds.width;
-                let display_height = display_width / max_aspect;
-                let offset_y = (bounds.height - display_height) / 2.0;
-                (display_width, display_height, 0.0, offset_y)
-            } else {
-                // Taller - fit to height
-                let display_height = bounds.height;
-                let display_width = display_height * max_aspect;
-                let offset_x = (bounds.width - display_width) / 2.0;
-                (display_width, display_height, offset_x, 0.0)
-            };
+        let (display_width, display_height, offset_x, offset_y) = if max_aspect > bounds_aspect {
+            // Wider - fit to width
+            let display_width = bounds.width;
+            let display_height = display_width / max_aspect;
+            let offset_y = (bounds.height - display_height) / 2.0;
+            (display_width, display_height, 0.0, offset_y)
+        } else {
+            // Taller - fit to height
+            let display_height = bounds.height;
+            let display_width = display_height * max_aspect;
+            let offset_x = (bounds.width - display_width) / 2.0;
+            (display_width, display_height, offset_x, 0.0)
+        };
 
         // Scale factors (how many screen pixels per image pixel)
         let scale_x = display_width / max_width as f32;
