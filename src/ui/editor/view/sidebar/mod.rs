@@ -94,6 +94,27 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
         .into()
 }
 
+pub fn collapsed<'a>() -> Element<'a, Message> {
+    let toggle_button = button(text("☰").size(24))
+        .on_press(Message::ToggleSidebar)
+        .padding(12);
+
+    let collapsed_bg = theme::viewer_toolbar_background();
+    container(toggle_button)
+        .width(Length::Fixed(60.0))
+        .height(Length::Fill)
+        .padding(10)
+        .style(move |_theme: &iced::Theme| iced::widget::container::Style {
+            background: Some(Background::Color(collapsed_bg)),
+            border: Border {
+                width: 0.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
+}
+
 fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
     let toggle_button = button(text("☰").size(20))
         .on_press(Message::ToggleSidebar)
