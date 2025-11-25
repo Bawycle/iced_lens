@@ -10,7 +10,7 @@ use self::component::Message;
 use crate::i18n::fluent::I18n;
 use crate::image_handler::ImageData;
 use crate::ui::state::ZoomState;
-use iced::widget::{button, Column, Container, Image, Text};
+use iced::widget::{button, Column, Container, Image, Row, Text};
 use iced::{alignment, Element, Length};
 
 pub fn view_image(image_data: &ImageData, zoom_percent: f32) -> Element<'_, Message> {
@@ -37,6 +37,7 @@ pub struct ErrorContext<'a> {
 }
 
 pub struct ImageContext<'a> {
+    pub i18n: &'a I18n,
     pub controls_context: controls::ViewContext<'a>,
     pub zoom: &'a ZoomState,
     pub pane_context: pane::ViewContext,
@@ -121,7 +122,24 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
         .width(Length::Fill)
         .height(Length::Fill);
 
+    // Add top navigation bar with Settings and Edit buttons
     if ctx.controls_visible {
+        let mut top_bar = Row::new().spacing(10).padding(10);
+
+        let settings_button = button(Text::new(ctx.i18n.tr("open-settings-button")))
+            .on_press(Message::OpenSettings);
+        top_bar = top_bar.push(settings_button);
+
+        let edit_button = button(Text::new("✏ Edit"))
+            .on_press(Message::EnterEditor);
+        top_bar = top_bar.push(edit_button);
+
+        column = column.push(
+            Container::new(top_bar)
+                .width(Length::Fill)
+                .align_x(alignment::Horizontal::Left),
+        );
+
         let controls_view = controls::view(ctx.controls_context, ctx.zoom).map(Message::Controls);
         column = column.push(controls_view);
     }

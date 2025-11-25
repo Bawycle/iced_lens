@@ -17,7 +17,7 @@ use crate::ui::state::zoom::{MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT};
 use crate::ui::viewer::component;
 use iced::{
     event,
-    widget::{button, Container, Text},
+    widget::{Container, Text},
     window, Element, Length, Subscription, Task, Theme,
 };
 use std::fmt;
@@ -239,6 +239,11 @@ impl App {
             component::Effect::PersistPreferences => self.persist_preferences(),
             component::Effect::ToggleFullscreen => self.toggle_fullscreen_task(),
             component::Effect::ExitFullscreen => self.update_fullscreen_mode(false),
+            component::Effect::OpenSettings => {
+                self.mode = AppMode::Settings;
+                Task::none()
+            }
+            component::Effect::EnterEditor => self.handle_mode_switch(AppMode::Editor),
             component::Effect::None => Task::none(),
         };
         Task::batch([viewer_task, side_effect])
@@ -300,6 +305,15 @@ impl App {
     fn handle_settings_message(&mut self, message: settings::Message) -> Task<Message> {
         match self.settings.update(message) {
             SettingsEvent::None => Task::none(),
+            SettingsEvent::BackToViewer => {
+                self.mode = AppMode::Viewer;
+                Task::none()
+            }
+            SettingsEvent::BackToViewerWithZoomChange(value) => {
+                self.viewer.set_zoom_step_percent(value);
+                self.mode = AppMode::Viewer;
+                self.persist_preferences()
+            }
             SettingsEvent::LanguageSelected(locale) => self.apply_language_change(locale),
             SettingsEvent::ZoomStepChanged(value) => {
                 self.viewer.set_zoom_step_percent(value);
@@ -430,37 +444,7 @@ impl App {
             }
         };
 
-        let switch_button = match self.mode {
-            AppMode::Viewer => button(Text::new(self.i18n.tr("open-settings-button")))
-                .on_press(Message::SwitchMode(AppMode::Settings)),
-            AppMode::Settings => button(Text::new(self.i18n.tr("back-to-viewer-button")))
-                .on_press(Message::SwitchMode(AppMode::Viewer)),
-            AppMode::Editor => button(Text::new(self.i18n.tr("editor-cancel")))
-                .on_press(Message::SwitchMode(AppMode::Viewer)),
-        };
-
-        let mut column = iced::widget::Column::new();
-        if !self.fullscreen {
-            let mut top_bar = iced::widget::Row::new().spacing(10).padding(10);
-
-            // Add Settings/Back button
-            top_bar = top_bar.push(switch_button);
-
-            // Add Edit button (only in Viewer mode and when an image is loaded)
-            if self.mode == AppMode::Viewer && self.viewer.has_image() {
-                let edit_button =
-                    button(Text::new("✏ Edit")).on_press(Message::SwitchMode(AppMode::Editor));
-                top_bar = top_bar.push(edit_button);
-            }
-
-            column = column.push(
-                Container::new(top_bar)
-                    .width(Length::Fill)
-                    .align_x(iced::alignment::Horizontal::Left),
-            );
-        }
-
-        column = column.push(
+        let column = iced::widget::Column::new().push(
             Container::new(current_view)
                 .width(Length::Fill)
                 .height(Length::Fill),

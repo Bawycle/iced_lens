@@ -139,6 +139,56 @@ pub struct CropState {
     pub height: u32,
     /// Selected aspect ratio constraint
     pub ratio: CropRatio,
+    /// Interactive overlay state
+    pub overlay: CropOverlay,
+}
+
+/// Interactive crop overlay state
+#[derive(Debug, Clone, PartialEq)]
+pub struct CropOverlay {
+    /// Whether the overlay is currently visible
+    pub visible: bool,
+    /// Current drag operation, if any
+    pub drag_state: CropDragState,
+}
+
+/// Crop drag state for interactive overlay
+#[derive(Debug, Clone, PartialEq)]
+pub enum CropDragState {
+    /// No active drag
+    None,
+    /// Dragging the entire rectangle
+    DraggingRectangle {
+        /// Starting rectangle position
+        start_rect_x: u32,
+        start_rect_y: u32,
+        /// Starting cursor position (in image coordinates)
+        start_cursor_x: f32,
+        start_cursor_y: f32,
+    },
+    /// Dragging a resize handle
+    DraggingHandle {
+        /// Which handle is being dragged
+        handle: HandlePosition,
+        /// Starting rectangle dimensions
+        start_rect: (u32, u32, u32, u32), // x, y, width, height
+        /// Starting cursor position (in image coordinates)
+        start_cursor_x: f32,
+        start_cursor_y: f32,
+    },
+}
+
+/// Position of a resize handle on the crop rectangle
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HandlePosition {
+    TopLeft,
+    Top,
+    TopRight,
+    Right,
+    BottomRight,
+    Bottom,
+    BottomLeft,
+    Left,
 }
 
 /// Messages emitted directly by the editor widgets.
@@ -155,6 +205,10 @@ pub enum Message {
     SetCropRatio(CropRatio),
     UpdateCropSelection(Rectangle),
     ApplyCrop,
+    /// Crop overlay interaction messages
+    CropOverlayMouseDown { x: f32, y: f32 },
+    CropOverlayMouseMove { x: f32, y: f32 },
+    CropOverlayMouseUp,
     /// Resize-related messages
     ScaleChanged(f32),
     WidthInputChanged(String),
@@ -261,14 +315,42 @@ impl State {
             main_row = main_row.push(collapsed_sidebar);
         }
 
-        // Image area with current preview
+        // Image area with current preview and crop overlay
         let current_display = self.display_image().handle.clone();
-        let build_image_surface = || {
-            container(center(
-                image(current_display.clone()).content_fit(ContentFit::Contain),
-            ))
+        let img_width = self.display_image().width;
+        let img_height = self.display_image().height;
+
+        let image_widget = image(current_display.clone()).content_fit(ContentFit::Contain);
+
+        // If crop overlay is visible, wrap in Stack with overlay
+        let image_with_overlay: iced::Element<'_, Message> = if self.crop_state.overlay.visible {
+            use iced::widget::{Canvas, Stack};
+
+            // Create crop overlay canvas
+            let overlay: Canvas<_, Message> = Canvas::new(CropOverlayRenderer {
+                crop_x: self.crop_state.x,
+                crop_y: self.crop_state.y,
+                crop_width: self.crop_state.width,
+                crop_height: self.crop_state.height,
+                img_width,
+                img_height,
+            })
             .width(Length::Fill)
-            .height(Length::Fill)
+            .height(Length::Fill);
+
+            // Stack image and overlay
+            Stack::new()
+                .push(image_widget)
+                .push(overlay)
+                .into()
+        } else {
+            image_widget.into()
+        };
+
+        let build_image_surface = || {
+            container(center(image_with_overlay))
+                .width(Length::Fill)
+                .height(Length::Fill)
         };
 
         let image_area: iced::Element<'_, Message> = if theme::is_checkerboard(background_theme) {
@@ -644,6 +726,21 @@ impl State {
         ))
         .size(12);
 
+        // Apply crop button (only enabled when overlay is visible)
+        let apply_btn = {
+            use iced::widget::button;
+            let btn = button(text(ctx.i18n.tr("editor-crop-apply")).size(14))
+                .padding(8)
+                .width(Length::Fill)
+                .style(iced::widget::button::primary);
+
+            if self.crop_state.overlay.visible {
+                btn.on_press(Message::ApplyCrop)
+            } else {
+                btn
+            }
+        };
+
         container(
             Column::new()
                 .spacing(8)
@@ -652,7 +749,8 @@ impl State {
                 .push(ratio_buttons_row1)
                 .push(ratio_buttons_row2)
                 .push(ratio_buttons_row3)
-                .push(crop_info),
+                .push(crop_info)
+                .push(apply_btn),
         )
         .padding(12)
         .width(Length::Fill)
@@ -694,22 +792,37 @@ impl State {
                     self.commit_active_tool_changes();
                     self.active_tool = None;
                     self.preview_image = None;
-                    // Reset crop modified flag and clear base image when closing crop tool
+                    // Reset crop modified flag, hide overlay and clear base image when closing crop tool
                     if tool == EditorTool::Crop {
                         self.crop_modified = false;
                         self.crop_base_image = None;
+                        self.crop_state.overlay.visible = false;
+                        self.crop_state.overlay.drag_state = CropDragState::None;
                     }
                 } else {
                     self.commit_active_tool_changes();
+                    // Hide overlay when leaving crop tool
+                    if self.active_tool == Some(EditorTool::Crop) {
+                        self.crop_state.overlay.visible = false;
+                        self.crop_state.overlay.drag_state = CropDragState::None;
+                    }
                     self.active_tool = Some(tool);
                     // Clear preview when switching tools
                     self.preview_image = None;
 
-                    // When opening crop tool, memorize current image state for ratio calculations
+                    // When opening crop tool, memorize current image state and show overlay
                     if tool == EditorTool::Crop {
                         self.crop_base_image = Some(self.working_image.clone());
                         self.crop_base_width = self.current_image.width;
                         self.crop_base_height = self.current_image.height;
+                        // Initialize crop rectangle to full image size
+                        self.crop_state.x = 0;
+                        self.crop_state.y = 0;
+                        self.crop_state.width = self.current_image.width;
+                        self.crop_state.height = self.current_image.height;
+                        self.crop_state.ratio = CropRatio::Free;
+                        // Show overlay with default crop (don't apply yet)
+                        self.crop_state.overlay.visible = true;
                     }
                 }
                 Event::None
@@ -733,10 +846,9 @@ impl State {
             Message::SetCropRatio(ratio) => {
                 self.crop_state.ratio = ratio;
                 self.adjust_crop_to_ratio(ratio);
-                // Apply crop immediately from base image (no preview, direct commit)
-                self.apply_crop_from_base();
-                self.crop_modified = false; // Already applied
-                self.preview_image = None; // No preview needed
+                // Show the overlay so user can position the crop
+                self.crop_state.overlay.visible = true;
+                self.crop_modified = true;
                 Event::None
             }
             Message::UpdateCropSelection(_rect) => {
@@ -744,8 +856,25 @@ impl State {
                 Event::None
             }
             Message::ApplyCrop => {
-                // No longer used - crop now auto-commits when changing tools
-                // Kept for message compatibility
+                // Apply the crop from the overlay
+                if self.crop_state.overlay.visible {
+                    self.apply_crop_from_base();
+                    self.crop_state.overlay.visible = false;
+                    self.crop_state.overlay.drag_state = CropDragState::None;
+                    self.crop_modified = false;
+                }
+                Event::None
+            }
+            Message::CropOverlayMouseDown { x, y } => {
+                self.handle_crop_overlay_mouse_down(x, y);
+                Event::None
+            }
+            Message::CropOverlayMouseMove { x, y } => {
+                self.handle_crop_overlay_mouse_move(x, y);
+                Event::None
+            }
+            Message::CropOverlayMouseUp => {
+                self.crop_state.overlay.drag_state = CropDragState::None;
                 Event::None
             }
             Message::ScaleChanged(percent) => {
@@ -858,6 +987,10 @@ impl State {
                 width: crop_width,
                 height: crop_height,
                 ratio: CropRatio::Free,
+                overlay: CropOverlay {
+                    visible: false,
+                    drag_state: CropDragState::None,
+                },
             },
             crop_modified: false,
             resize_state: ResizeState {
@@ -1259,6 +1392,210 @@ impl State {
         }
     }
 
+    /// Handle mouse down on crop overlay to start dragging
+    fn handle_crop_overlay_mouse_down(&mut self, x: f32, y: f32) {
+        // Check if clicking on a handle
+        if let Some(handle) = self.get_handle_at_position(x, y) {
+            self.crop_state.overlay.drag_state = CropDragState::DraggingHandle {
+                handle,
+                start_rect: (
+                    self.crop_state.x,
+                    self.crop_state.y,
+                    self.crop_state.width,
+                    self.crop_state.height,
+                ),
+                start_cursor_x: x,
+                start_cursor_y: y,
+            };
+        } else if self.is_point_in_crop_rect(x, y) {
+            // Start dragging the entire rectangle
+            self.crop_state.overlay.drag_state = CropDragState::DraggingRectangle {
+                start_rect_x: self.crop_state.x,
+                start_rect_y: self.crop_state.y,
+                start_cursor_x: x,
+                start_cursor_y: y,
+            };
+        }
+    }
+
+    /// Handle mouse move on crop overlay to update drag
+    fn handle_crop_overlay_mouse_move(&mut self, x: f32, y: f32) {
+        match self.crop_state.overlay.drag_state.clone() {
+            CropDragState::DraggingRectangle {
+                start_rect_x,
+                start_rect_y,
+                start_cursor_x,
+                start_cursor_y,
+            } => {
+                // Calculate delta
+                let delta_x = x - start_cursor_x;
+                let delta_y = y - start_cursor_y;
+
+                // Update position with bounds checking
+                let new_x = (start_rect_x as f32 + delta_x)
+                    .max(0.0)
+                    .min((self.crop_base_width - self.crop_state.width) as f32);
+                let new_y = (start_rect_y as f32 + delta_y)
+                    .max(0.0)
+                    .min((self.crop_base_height - self.crop_state.height) as f32);
+
+                self.crop_state.x = new_x as u32;
+                self.crop_state.y = new_y as u32;
+                self.crop_modified = true;
+            }
+            CropDragState::DraggingHandle {
+                handle,
+                start_rect,
+                start_cursor_x,
+                start_cursor_y,
+            } => {
+                // Calculate delta
+                let delta_x = x - start_cursor_x;
+                let delta_y = y - start_cursor_y;
+
+                // Update crop dimensions based on which handle is being dragged
+                self.update_crop_from_handle_drag(handle, start_rect, delta_x, delta_y);
+                self.crop_modified = true;
+            }
+            CropDragState::None => {}
+        }
+    }
+
+    /// Check if a point is inside the crop rectangle
+    fn is_point_in_crop_rect(&self, x: f32, y: f32) -> bool {
+        let rect_x = self.crop_state.x as f32;
+        let rect_y = self.crop_state.y as f32;
+        let rect_w = self.crop_state.width as f32;
+        let rect_h = self.crop_state.height as f32;
+
+        x >= rect_x && x <= rect_x + rect_w && y >= rect_y && y <= rect_y + rect_h
+    }
+
+    /// Get the handle at the given position, if any
+    fn get_handle_at_position(&self, x: f32, y: f32) -> Option<HandlePosition> {
+        const HANDLE_SIZE: f32 = 12.0; // Handle click area size
+
+        let rect_x = self.crop_state.x as f32;
+        let rect_y = self.crop_state.y as f32;
+        let rect_w = self.crop_state.width as f32;
+        let rect_h = self.crop_state.height as f32;
+
+        // Define handle positions
+        let handles = [
+            (HandlePosition::TopLeft, rect_x, rect_y),
+            (HandlePosition::Top, rect_x + rect_w / 2.0, rect_y),
+            (HandlePosition::TopRight, rect_x + rect_w, rect_y),
+            (HandlePosition::Right, rect_x + rect_w, rect_y + rect_h / 2.0),
+            (
+                HandlePosition::BottomRight,
+                rect_x + rect_w,
+                rect_y + rect_h,
+            ),
+            (HandlePosition::Bottom, rect_x + rect_w / 2.0, rect_y + rect_h),
+            (HandlePosition::BottomLeft, rect_x, rect_y + rect_h),
+            (HandlePosition::Left, rect_x, rect_y + rect_h / 2.0),
+        ];
+
+        // Check each handle
+        for (handle, hx, hy) in handles {
+            if (x - hx).abs() <= HANDLE_SIZE && (y - hy).abs() <= HANDLE_SIZE {
+                return Some(handle);
+            }
+        }
+
+        None
+    }
+
+    /// Update crop rectangle from handle drag
+    fn update_crop_from_handle_drag(
+        &mut self,
+        handle: HandlePosition,
+        start_rect: (u32, u32, u32, u32),
+        delta_x: f32,
+        delta_y: f32,
+    ) {
+        let (start_x, start_y, start_w, start_h) = start_rect;
+
+        match handle {
+            HandlePosition::TopLeft => {
+                let new_x = (start_x as f32 + delta_x).max(0.0).min(start_x as f32 + start_w as f32 - 10.0);
+                let new_y = (start_y as f32 + delta_y).max(0.0).min(start_y as f32 + start_h as f32 - 10.0);
+                self.crop_state.width = (start_x + start_w) - new_x as u32;
+                self.crop_state.height = (start_y + start_h) - new_y as u32;
+                self.crop_state.x = new_x as u32;
+                self.crop_state.y = new_y as u32;
+            }
+            HandlePosition::Top => {
+                let new_y = (start_y as f32 + delta_y).max(0.0).min(start_y as f32 + start_h as f32 - 10.0);
+                self.crop_state.height = (start_y + start_h) - new_y as u32;
+                self.crop_state.y = new_y as u32;
+            }
+            HandlePosition::TopRight => {
+                let new_y = (start_y as f32 + delta_y).max(0.0).min(start_y as f32 + start_h as f32 - 10.0);
+                let new_w = (start_w as f32 + delta_x).max(10.0).min((self.crop_base_width - start_x) as f32);
+                self.crop_state.width = new_w as u32;
+                self.crop_state.height = (start_y + start_h) - new_y as u32;
+                self.crop_state.y = new_y as u32;
+            }
+            HandlePosition::Right => {
+                let new_w = (start_w as f32 + delta_x).max(10.0).min((self.crop_base_width - start_x) as f32);
+                self.crop_state.width = new_w as u32;
+            }
+            HandlePosition::BottomRight => {
+                let new_w = (start_w as f32 + delta_x).max(10.0).min((self.crop_base_width - start_x) as f32);
+                let new_h = (start_h as f32 + delta_y).max(10.0).min((self.crop_base_height - start_y) as f32);
+                self.crop_state.width = new_w as u32;
+                self.crop_state.height = new_h as u32;
+            }
+            HandlePosition::Bottom => {
+                let new_h = (start_h as f32 + delta_y).max(10.0).min((self.crop_base_height - start_y) as f32);
+                self.crop_state.height = new_h as u32;
+            }
+            HandlePosition::BottomLeft => {
+                let new_x = (start_x as f32 + delta_x).max(0.0).min(start_x as f32 + start_w as f32 - 10.0);
+                let new_h = (start_h as f32 + delta_y).max(10.0).min((self.crop_base_height - start_y) as f32);
+                self.crop_state.width = (start_x + start_w) - new_x as u32;
+                self.crop_state.height = new_h as u32;
+                self.crop_state.x = new_x as u32;
+            }
+            HandlePosition::Left => {
+                let new_x = (start_x as f32 + delta_x).max(0.0).min(start_x as f32 + start_w as f32 - 10.0);
+                self.crop_state.width = (start_x + start_w) - new_x as u32;
+                self.crop_state.x = new_x as u32;
+            }
+        }
+
+        // Apply aspect ratio constraint if needed
+        if self.crop_state.ratio != CropRatio::Free {
+            self.apply_aspect_ratio_constraint_to_current_crop();
+        }
+    }
+
+    /// Apply aspect ratio constraint to current crop dimensions
+    fn apply_aspect_ratio_constraint_to_current_crop(&mut self) {
+        let target_ratio = match self.crop_state.ratio {
+            CropRatio::Free => return, // No constraint
+            CropRatio::Square => 1.0,
+            CropRatio::Landscape => 16.0 / 9.0,
+            CropRatio::Portrait => 9.0 / 16.0,
+            CropRatio::Photo => 4.0 / 3.0,
+            CropRatio::PhotoPortrait => 3.0 / 4.0,
+        };
+
+        // Adjust height to match ratio, keeping width fixed
+        let new_height = (self.crop_state.width as f32 / target_ratio).round() as u32;
+
+        // Check if new height fits
+        if self.crop_state.y + new_height <= self.crop_base_height {
+            self.crop_state.height = new_height;
+        } else {
+            // Height doesn't fit, adjust width instead
+            let available_height = self.crop_base_height - self.crop_state.y;
+            self.crop_state.height = available_height;
+            self.crop_state.width = (available_height as f32 * target_ratio).round() as u32;
+        }
+    }
+
     /// Discard all changes and reset to original image state.
     fn discard_changes(&mut self) {
         // Reload the working image from disk
@@ -1278,6 +1615,8 @@ impl State {
                         self.crop_state.width = crop_width;
                         self.crop_state.height = crop_height;
                         self.crop_state.ratio = CropRatio::Free;
+                        self.crop_state.overlay.visible = false;
+                        self.crop_state.overlay.drag_state = CropDragState::None;
                         self.crop_modified = false;
 
                         // Clear transformation history
@@ -1308,6 +1647,251 @@ fn parse_dimension_input(value: &str) -> Option<u32> {
     match trimmed.parse::<u32>() {
         Ok(result) if result > 0 => Some(result),
         _ => None,
+    }
+}
+
+/// Crop overlay renderer for interactive crop selection
+struct CropOverlayRenderer {
+    crop_x: u32,
+    crop_y: u32,
+    crop_width: u32,
+    crop_height: u32,
+    img_width: u32,
+    img_height: u32,
+}
+
+impl CropOverlayRenderer {
+    /// Convert screen coordinates to image coordinates (clamped to image bounds)
+    fn screen_to_image_coords(&self, screen_pos: iced::Point, bounds: iced::Rectangle) -> Option<(f32, f32)> {
+        // Calculate image position and scale (ContentFit::Contain logic)
+        let img_aspect = self.img_width as f32 / self.img_height as f32;
+        let bounds_aspect = bounds.width / bounds.height;
+
+        let (img_display_width, img_display_height, img_offset_x, img_offset_y) = if img_aspect > bounds_aspect {
+            let display_width = bounds.width;
+            let display_height = bounds.width / img_aspect;
+            let offset_y = (bounds.height - display_height) / 2.0;
+            (display_width, display_height, 0.0, offset_y)
+        } else {
+            let display_height = bounds.height;
+            let display_width = bounds.height * img_aspect;
+            let offset_x = (bounds.width - display_width) / 2.0;
+            (display_width, display_height, offset_x, 0.0)
+        };
+
+        // Clamp screen coordinates to image display area
+        let clamped_x = screen_pos.x.max(img_offset_x).min(img_offset_x + img_display_width);
+        let clamped_y = screen_pos.y.max(img_offset_y).min(img_offset_y + img_display_height);
+
+        // Convert to image coordinates
+        let img_x = ((clamped_x - img_offset_x) * (self.img_width as f32 / img_display_width))
+            .max(0.0)
+            .min(self.img_width as f32);
+        let img_y = ((clamped_y - img_offset_y) * (self.img_height as f32 / img_display_height))
+            .max(0.0)
+            .min(self.img_height as f32);
+
+        Some((img_x, img_y))
+    }
+}
+
+impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
+    type State = ();
+
+    fn update(
+        &self,
+        _state: &mut Self::State,
+        event: iced::widget::canvas::Event,
+        bounds: iced::Rectangle,
+        cursor: iced::mouse::Cursor,
+    ) -> (iced::widget::canvas::event::Status, Option<Message>) {
+        use iced::widget::canvas::event::Status;
+
+        match event {
+            // If cursor leaves the canvas, end any drag operation
+            iced::widget::canvas::Event::Mouse(iced::mouse::Event::CursorLeft) => {
+                return (Status::Captured, Some(Message::CropOverlayMouseUp));
+            }
+            iced::widget::canvas::Event::Mouse(iced::mouse::Event::ButtonPressed(
+                iced::mouse::Button::Left,
+            )) => {
+                if let Some(cursor_position) = cursor.position_in(bounds) {
+                    if let Some((img_x, img_y)) = self.screen_to_image_coords(cursor_position, bounds) {
+                        return (Status::Captured, Some(Message::CropOverlayMouseDown { x: img_x, y: img_y }));
+                    }
+                }
+            }
+            iced::widget::canvas::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) => {
+                // If cursor is outside bounds during move, end drag
+                if cursor.position_in(bounds).is_none() {
+                    return (Status::Captured, Some(Message::CropOverlayMouseUp));
+                }
+
+                if let Some(cursor_position) = cursor.position_in(bounds) {
+                    if let Some((img_x, img_y)) = self.screen_to_image_coords(cursor_position, bounds) {
+                        return (Status::Captured, Some(Message::CropOverlayMouseMove { x: img_x, y: img_y }));
+                    }
+                }
+            }
+            iced::widget::canvas::Event::Mouse(iced::mouse::Event::ButtonReleased(
+                iced::mouse::Button::Left,
+            )) => {
+                return (Status::Captured, Some(Message::CropOverlayMouseUp));
+            }
+            _ => {}
+        }
+
+        (Status::Ignored, None)
+    }
+
+    fn draw(
+        &self,
+        _state: &Self::State,
+        renderer: &iced::Renderer,
+        _theme: &iced::Theme,
+        bounds: iced::Rectangle,
+        _cursor: iced::mouse::Cursor,
+    ) -> Vec<iced::widget::canvas::Geometry> {
+        use iced::widget::canvas::{Frame, Path, Stroke};
+        use iced::Color;
+
+        let mut frame = Frame::new(renderer, bounds.size());
+
+        // Calculate image position and scale (ContentFit::Contain logic)
+        let img_aspect = self.img_width as f32 / self.img_height as f32;
+        let bounds_aspect = bounds.width / bounds.height;
+
+        let (img_display_width, img_display_height, img_offset_x, img_offset_y) = if img_aspect > bounds_aspect {
+            // Image is wider - fit to width
+            let display_width = bounds.width;
+            let display_height = bounds.width / img_aspect;
+            let offset_y = (bounds.height - display_height) / 2.0;
+            (display_width, display_height, 0.0, offset_y)
+        } else {
+            // Image is taller - fit to height
+            let display_height = bounds.height;
+            let display_width = bounds.height * img_aspect;
+            let offset_x = (bounds.width - display_width) / 2.0;
+            (display_width, display_height, offset_x, 0.0)
+        };
+
+        // Scale factors
+        let scale_x = img_display_width / self.img_width as f32;
+        let scale_y = img_display_height / self.img_height as f32;
+
+        // Convert crop coordinates from image space to screen space
+        let crop_screen_x = img_offset_x + self.crop_x as f32 * scale_x;
+        let crop_screen_y = img_offset_y + self.crop_y as f32 * scale_y;
+        let crop_screen_width = self.crop_width as f32 * scale_x;
+        let crop_screen_height = self.crop_height as f32 * scale_y;
+
+        // Draw darkened overlay outside crop area
+        let dark_overlay = Color::from_rgba8(0, 0, 0, 0.5);
+
+        // Top rectangle
+        if crop_screen_y > img_offset_y {
+            frame.fill_rectangle(
+                iced::Point::new(img_offset_x, img_offset_y),
+                iced::Size::new(img_display_width, crop_screen_y - img_offset_y),
+                dark_overlay,
+            );
+        }
+
+        // Bottom rectangle
+        let bottom_y = crop_screen_y + crop_screen_height;
+        if bottom_y < img_offset_y + img_display_height {
+            frame.fill_rectangle(
+                iced::Point::new(img_offset_x, bottom_y),
+                iced::Size::new(img_display_width, img_offset_y + img_display_height - bottom_y),
+                dark_overlay,
+            );
+        }
+
+        // Left rectangle
+        if crop_screen_x > img_offset_x {
+            frame.fill_rectangle(
+                iced::Point::new(img_offset_x, crop_screen_y),
+                iced::Size::new(crop_screen_x - img_offset_x, crop_screen_height),
+                dark_overlay,
+            );
+        }
+
+        // Right rectangle
+        let right_x = crop_screen_x + crop_screen_width;
+        if right_x < img_offset_x + img_display_width {
+            frame.fill_rectangle(
+                iced::Point::new(right_x, crop_screen_y),
+                iced::Size::new(img_offset_x + img_display_width - right_x, crop_screen_height),
+                dark_overlay,
+            );
+        }
+
+        // Draw crop rectangle border
+        let crop_rect = Path::rectangle(
+            iced::Point::new(crop_screen_x, crop_screen_y),
+            iced::Size::new(crop_screen_width, crop_screen_height),
+        );
+        frame.stroke(
+            &crop_rect,
+            Stroke::default()
+                .with_width(2.0)
+                .with_color(Color::WHITE),
+        );
+
+        // Draw rule-of-thirds grid
+        let grid_color = Color::from_rgba8(255, 255, 255, 0.5);
+        let third_width = crop_screen_width / 3.0;
+        let third_height = crop_screen_height / 3.0;
+
+        // Vertical lines
+        for i in 1..3 {
+            let x = crop_screen_x + third_width * i as f32;
+            let line = Path::line(
+                iced::Point::new(x, crop_screen_y),
+                iced::Point::new(x, crop_screen_y + crop_screen_height),
+            );
+            frame.stroke(&line, Stroke::default().with_width(1.0).with_color(grid_color));
+        }
+
+        // Horizontal lines
+        for i in 1..3 {
+            let y = crop_screen_y + third_height * i as f32;
+            let line = Path::line(
+                iced::Point::new(crop_screen_x, y),
+                iced::Point::new(crop_screen_x + crop_screen_width, y),
+            );
+            frame.stroke(&line, Stroke::default().with_width(1.0).with_color(grid_color));
+        }
+
+        // Draw resize handles
+        let handle_size = 10.0;
+        let handle_color = Color::WHITE;
+        let handles = [
+            (crop_screen_x, crop_screen_y), // TopLeft
+            (crop_screen_x + crop_screen_width / 2.0, crop_screen_y), // Top
+            (crop_screen_x + crop_screen_width, crop_screen_y), // TopRight
+            (crop_screen_x + crop_screen_width, crop_screen_y + crop_screen_height / 2.0), // Right
+            (crop_screen_x + crop_screen_width, crop_screen_y + crop_screen_height), // BottomRight
+            (crop_screen_x + crop_screen_width / 2.0, crop_screen_y + crop_screen_height), // Bottom
+            (crop_screen_x, crop_screen_y + crop_screen_height), // BottomLeft
+            (crop_screen_x, crop_screen_y + crop_screen_height / 2.0), // Left
+        ];
+
+        for (hx, hy) in handles {
+            let handle = Path::rectangle(
+                iced::Point::new(hx - handle_size / 2.0, hy - handle_size / 2.0),
+                iced::Size::new(handle_size, handle_size),
+            );
+            frame.fill(&handle, handle_color);
+            frame.stroke(
+                &handle,
+                Stroke::default()
+                    .with_width(1.0)
+                    .with_color(Color::BLACK),
+            );
+        }
+
+        vec![frame.into_geometry()]
     }
 }
 

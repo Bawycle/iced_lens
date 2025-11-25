@@ -32,6 +32,8 @@ pub enum Message {
     },
     NavigateNext,
     NavigatePrevious,
+    OpenSettings,
+    EnterEditor,
 }
 
 /// Side effects the application should perform after handling a viewer message.
@@ -41,6 +43,8 @@ pub enum Effect {
     PersistPreferences,
     ToggleFullscreen,
     ExitFullscreen,
+    OpenSettings,
+    EnterEditor,
 }
 
 #[derive(Debug, Clone)]
@@ -280,6 +284,8 @@ impl State {
                 }
                 (Effect::None, Task::none())
             }
+            Message::OpenSettings => (Effect::OpenSettings, Task::none()),
+            Message::EnterEditor => (Effect::EnterEditor, Task::none()),
         }
     }
 
@@ -311,6 +317,7 @@ impl State {
             .collect::<Vec<_>>();
 
         let image = self.image.as_ref().map(|image_data| viewer::ImageContext {
+            i18n: env.i18n,
             controls_context: controls::ViewContext { i18n: env.i18n },
             zoom: &self.zoom,
             pane_context: pane::ViewContext {

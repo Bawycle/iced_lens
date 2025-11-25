@@ -39,6 +39,7 @@ pub struct State {
 /// Messages emitted directly by the settings widgets.
 #[derive(Debug, Clone)]
 pub enum Message {
+    BackToViewer,
     LanguageSelected(LanguageIdentifier),
     ZoomStepInputChanged(String),
     ZoomStepSubmitted,
@@ -50,6 +51,8 @@ pub enum Message {
 #[derive(Debug, Clone)]
 pub enum Event {
     None,
+    BackToViewer,
+    BackToViewerWithZoomChange(f32),
     LanguageSelected(LanguageIdentifier),
     ZoomStepChanged(f32),
     BackgroundThemeSelected(BackgroundTheme),
@@ -116,6 +119,9 @@ impl State {
 
     /// Render the settings view.
     pub fn view<'a>(&'a self, ctx: ViewContext<'a>) -> Element<'a, Message> {
+        let back_button = button(Text::new(ctx.i18n.tr("back-to-viewer-button")))
+            .on_press(Message::BackToViewer);
+
         let title = Text::new(ctx.i18n.tr("settings-title")).size(30);
 
         let mut language_selection_row = Row::new().spacing(10).align_y(Vertical::Center);
@@ -256,6 +262,8 @@ impl State {
             .width(Length::Fill)
             .spacing(24)
             .align_x(Horizontal::Left)
+            .padding(10)
+            .push(back_button)
             .push(title)
             .push(language_section)
             .push(zoom_section)
@@ -267,6 +275,23 @@ impl State {
     /// Update the state and emit an [`Event`] for the parent when needed.
     pub fn update(&mut self, message: Message) -> Event {
         match message {
+            Message::BackToViewer => {
+                // If zoom step input is dirty, validate and commit before leaving
+                if self.zoom_step_input_dirty {
+                    match self.commit_zoom_step() {
+                        Ok(value) => {
+                            // Valid zoom step, can proceed to viewer with zoom change
+                            Event::BackToViewerWithZoomChange(value)
+                        }
+                        Err(_) => {
+                            // Invalid zoom step, stay in settings
+                            Event::None
+                        }
+                    }
+                } else {
+                    Event::BackToViewer
+                }
+            }
             Message::LanguageSelected(locale) => Event::LanguageSelected(locale),
             Message::ZoomStepInputChanged(value) => {
                 let sanitized = value.replace('%', "").trim().to_string();
