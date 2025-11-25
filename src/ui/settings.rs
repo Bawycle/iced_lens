@@ -12,10 +12,11 @@ use crate::ui::state::zoom::{
     format_number, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT, ZOOM_STEP_INVALID_KEY,
     ZOOM_STEP_RANGE_KEY,
 };
+use crate::ui::theme;
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{button, text, text_input, Button, Column, Container, Row, Text},
-    Background, Color, Element, Length, Theme,
+    Color, Element, Length,
 };
 use unic_langid::LanguageIdentifier;
 
@@ -197,34 +198,7 @@ impl State {
             background_row = background_row.push(button);
         }
 
-        let section_style = |theme: &Theme| {
-            let palette = theme.extended_palette();
-            let base = palette.background.base.color;
-            let luminance = base.r + base.g + base.b;
-            let (r, g, b) = if luminance < 1.5 {
-                (
-                    (base.r + 0.10).min(1.0),
-                    (base.g + 0.10).min(1.0),
-                    (base.b + 0.10).min(1.0),
-                )
-            } else {
-                (
-                    (base.r - 0.06).max(0.0),
-                    (base.g - 0.06).max(0.0),
-                    (base.b - 0.06).max(0.0),
-                )
-            };
-
-            iced::widget::container::Style {
-                background: Some(Background::Color(Color::from_rgba(r, g, b, 0.95))),
-                border: iced::Border {
-                    radius: 12.0.into(),
-                    width: 0.0,
-                    ..Default::default()
-                },
-                ..Default::default()
-            }
-        };
+        let section_style = theme::settings_panel_style;
 
         let language_section = Container::new(
             Column::new()

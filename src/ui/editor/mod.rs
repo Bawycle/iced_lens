@@ -12,6 +12,7 @@ mod transform;
 
 use crate::error::{Error, Result};
 use crate::image_handler::ImageData;
+use crate::ui::theme;
 use iced::Rectangle;
 use image_rs::DynamicImage;
 use std::path::PathBuf;
@@ -222,8 +223,8 @@ impl State {
 
     /// Build the expanded sidebar with tools and controls.
     fn build_sidebar<'a>(&'a self, ctx: ViewContext<'a>) -> iced::Element<'a, Message> {
-        use iced::widget::{button, container, svg, text, Column, Row};
-        use iced::{alignment::Vertical, Background, Border, Color, Length};
+        use iced::widget::{button, container, svg, text, tooltip, Column, Row};
+        use iced::{alignment::Vertical, Background, Border, Length};
 
         let mut sidebar_content = Column::new()
             .spacing(8)
@@ -256,24 +257,48 @@ impl State {
                 .width(Length::Fixed(28.0))
                 .height(Length::Fixed(28.0));
 
-        let rotate_left_btn = button(rotate_left_icon)
-            .on_press(Message::RotateLeft)
-            .padding(8)
-            .width(Length::Fill)
-            .style(iced::widget::button::secondary);
+        let rotate_left_btn = tooltip::Tooltip::new(
+            button(rotate_left_icon)
+                .on_press(Message::RotateLeft)
+                .padding(8)
+                .width(Length::Fill)
+                .style(iced::widget::button::secondary),
+            text(ctx.i18n.tr("editor-rotate-left-tooltip")),
+            tooltip::Position::FollowCursor,
+        )
+        .gap(4)
+        .padding(6);
 
-        let rotate_right_btn = button(rotate_right_icon)
-            .on_press(Message::RotateRight)
-            .padding(8)
-            .width(Length::Fill)
-            .style(iced::widget::button::secondary);
+        let rotate_right_btn = tooltip::Tooltip::new(
+            button(rotate_right_icon)
+                .on_press(Message::RotateRight)
+                .padding(8)
+                .width(Length::Fill)
+                .style(iced::widget::button::secondary),
+            text(ctx.i18n.tr("editor-rotate-right-tooltip")),
+            tooltip::Position::FollowCursor,
+        )
+        .gap(4)
+        .padding(6);
 
         let rotate_row = Row::new()
             .spacing(8)
             .push(rotate_left_btn)
             .push(rotate_right_btn);
 
-        sidebar_content = sidebar_content.push(rotate_row);
+        let rotate_section_title = text(ctx.i18n.tr("editor-rotate-section-title")).size(14);
+
+        let rotate_section = container(
+            Column::new()
+                .spacing(6)
+                .push(rotate_section_title)
+                .push(rotate_row),
+        )
+        .padding(12)
+        .width(Length::Fill)
+        .style(theme::settings_panel_style);
+
+        sidebar_content = sidebar_content.push(rotate_section);
 
         sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
 
@@ -339,7 +364,6 @@ impl State {
             .padding(12)
             .width(Length::Fill)
             .style(iced::widget::button::primary);
-
         let save_as_btn = button(text(ctx.i18n.tr("editor-save-as")).size(16))
             .on_press(Message::SaveAs)
             .padding(12)
@@ -350,12 +374,12 @@ impl State {
         sidebar_content = sidebar_content.push(save_btn);
         sidebar_content = sidebar_content.push(save_as_btn);
 
-        // Container with background
+        // Container with the same background as the viewer toolbar for visual continuity
         container(sidebar_content)
             .width(Length::Fixed(180.0))
             .height(Length::Fill)
             .style(|_theme: &iced::Theme| iced::widget::container::Style {
-                background: Some(Background::Color(Color::from_rgb(0.95, 0.95, 0.95))),
+                background: Some(Background::Color(theme::viewer_toolbar_background())),
                 border: Border {
                     width: 0.0,
                     ..Default::default()
@@ -483,8 +507,7 @@ impl State {
             },
         })
     }
-
-    /// Check if there are unsaved changes.
+    /// Check if there are unsaved changes based on transformation history.
     pub fn has_unsaved_changes(&self) -> bool {
         !self.transformation_history.is_empty()
     }
