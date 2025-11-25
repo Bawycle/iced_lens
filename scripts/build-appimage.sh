@@ -12,6 +12,13 @@ BIN_NAME="iced_lens"
 LINUXDEPLOY_BIN=${LINUXDEPLOY_BIN:-${LINUXDEPLOY:-linuxdeploy}}
 TARGET_TRIPLE=${TARGET_TRIPLE:-}
 APPIMAGE_ARCH=${APPIMAGE_ARCH:-}
+# Bundle GTK dependencies (required by the rfd file-dialog crate) unless explicitly disabled.
+APPIMAGE_BUNDLE_GTK=${APPIMAGE_BUNDLE_GTK:-1}
+# Default GTK major version to deploy (can be overridden through DEPLOY_GTK_VERSION or APPIMAGE_GTK_VERSION)
+if [[ -z "${DEPLOY_GTK_VERSION:-}" ]]; then
+  DEPLOY_GTK_VERSION=${APPIMAGE_GTK_VERSION:-3}
+fi
+export DEPLOY_GTK_VERSION
 # Default AppImage output goes under target/release so CI artifacts stay with cargo builds.
 OUTPUT_DIR=${APPIMAGE_OUTPUT_DIR:-$TARGET_DIR/release}
 
@@ -36,6 +43,10 @@ Usage: scripts/build-appimage.sh [--target <triple>] [--linuxdeploy <path>] [--o
 Environment overrides:
   LINUXDEPLOY_BIN Path to linuxdeploy binary (preferred)
   LINUXDEPLOY     Legacy env alias for linuxdeploy path
+  LINUXDEPLOY_PLUGIN_GTK Path to linuxdeploy GTK plugin (auto-detected when available)
+  APPIMAGE_BUNDLE_GTK Set to 0 to skip invoking the GTK plugin (default 1)
+  APPIMAGE_GTK_VERSION Default GTK major version to bundle (fallback 3, forwarded to DEPLOY_GTK_VERSION)
+  DEPLOY_GTK_VERSION GTK major version understood by linuxdeploy-plugin-gtk (overrides APPIMAGE_GTK_VERSION)
   TARGET_TRIPLE Rust target triple to cross-compile
   APPIMAGE_ARCH Architecture label for output filename/AppImage metadata
   APPIMAGE_OUTPUT_DIR Destination directory for final AppImage (default target/release)
@@ -156,9 +167,30 @@ chmod +x "$APPRUN"
 # Run linuxdeploy inside the build dir so its output lands next to AppDir for easy cleanup.
 pushd "$BUILD_DIR" >/dev/null
 export ARCH="$APPIMAGE_ARCH" # AppImage tooling reads ARCH to label metadata correctly.
+GTK_PLUGIN_ARGS=()
+if [[ "$APPIMAGE_BUNDLE_GTK" -ne 0 ]]; then
+  if [[ -z "${LINUXDEPLOY_PLUGIN_GTK:-}" ]]; then
+    if command -v linuxdeploy-plugin-gtk.sh >/dev/null 2>&1; then
+      export LINUXDEPLOY_PLUGIN_GTK="$(command -v linuxdeploy-plugin-gtk.sh)"
+    elif command -v linuxdeploy-plugin-gtk >/dev/null 2>&1; then
+      export LINUXDEPLOY_PLUGIN_GTK="$(command -v linuxdeploy-plugin-gtk)"
+    fi
+  elif [[ ! -x "${LINUXDEPLOY_PLUGIN_GTK}" ]]; then
+    echo "linuxdeploy GTK plugin specified in LINUXDEPLOY_PLUGIN_GTK is not executable" >&2
+    exit 1
+  fi
+
+  if [[ -n "${LINUXDEPLOY_PLUGIN_GTK:-}" ]]; then
+    GTK_PLUGIN_ARGS+=(--plugin gtk)
+  else
+    echo "Warning: linuxdeploy GTK plugin not found; GTK deps required by rfd dialogs may be missing" >&2
+  fi
+fi
+
 "$LINUXDEPLOY_BIN" --appdir "$APPDIR" \
   --desktop-file "$DESKTOP_FILE" \
   --icon-file "$ICON_DEST" \
+  "${GTK_PLUGIN_ARGS[@]}" \
   --output appimage
 NEW_APPIMAGE=$(find "$BUILD_DIR" -maxdepth 1 -type f -name "*.AppImage" -print -quit)
 popd >/dev/null
