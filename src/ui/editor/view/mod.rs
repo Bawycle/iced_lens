@@ -10,6 +10,7 @@ use iced::widget::{button, container, Column, Row, Text};
 use iced::{Background, Border, Element, Length};
 
 use super::{Message, State, ViewContext};
+use canvas::CanvasModel;
 use sidebar::SidebarModel;
 use toolbar::ToolbarModel;
 
@@ -27,7 +28,8 @@ pub fn render<'a>(state: &'a State, ctx: ViewContext<'a>) -> Element<'a, Message
         main_row = main_row.push(collapsed_sidebar());
     }
 
-    let canvas = canvas::view(state, &ctx);
+    let canvas_model = CanvasModel::from_state(state);
+    let canvas = canvas::view(canvas_model, &ctx);
     main_row = main_row.push(canvas);
 
     let content = Column::new().push(toolbar).push(main_row);
