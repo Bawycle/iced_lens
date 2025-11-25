@@ -416,7 +416,40 @@ impl State {
 
         header_section = header_section.push(iced::widget::horizontal_rule(1));
 
+        // Undo/Redo buttons
+        let undo_btn = button(text(ctx.i18n.tr("editor-undo")).size(16))
+            .padding(8)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary);
+        let undo_btn = if self.can_undo() {
+            undo_btn.on_press(Message::Undo)
+        } else {
+            undo_btn
+        };
+
+        let redo_btn = button(text(ctx.i18n.tr("editor-redo")).size(16))
+            .padding(8)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary);
+        let redo_btn = if self.can_redo() {
+            redo_btn.on_press(Message::Redo)
+        } else {
+            redo_btn
+        };
+
+        let undo_redo_row = Row::new().spacing(8).push(undo_btn).push(redo_btn);
+
+        let undo_redo_section = container(undo_redo_row)
+            .padding(12)
+            .width(Length::Fill)
+            .style(theme::settings_panel_style);
+
+            
         let mut scrollable_section = Column::new().spacing(8);
+
+        scrollable_section = scrollable_section.push(undo_redo_section);
+
+        scrollable_section = scrollable_section.push(iced::widget::horizontal_rule(1));
 
         // Rotate tools
         let rotate_left_icon = svg::Svg::new(svg::Handle::from_memory(ROTATE_LEFT_SVG.as_bytes()))
@@ -472,6 +505,7 @@ impl State {
         scrollable_section = scrollable_section.push(rotate_section);
 
         scrollable_section = scrollable_section.push(iced::widget::horizontal_rule(1));
+
 
         // Main tool buttons
         let crop_btn = button(text(ctx.i18n.tr("editor-tool-crop")).size(16))
@@ -922,12 +956,18 @@ impl State {
             }
             Message::Undo => {
                 self.commit_active_tool_changes();
-                // TODO: Implement undo
+                if self.can_undo() {
+                    self.history_index -= 1;
+                    self.replay_transformations_up_to_index();
+                }
                 Event::None
             }
             Message::Redo => {
                 self.commit_active_tool_changes();
-                // TODO: Implement redo
+                if self.can_redo() {
+                    self.history_index += 1;
+                    self.replay_transformations_up_to_index();
+                }
                 Event::None
             }
             Message::NavigateNext => {
@@ -993,9 +1033,10 @@ impl State {
                     iced::Event::Keyboard(keyboard::Event::KeyPressed {
                         key, modifiers, ..
                     }) if modifiers.command() => {
-                        // Ctrl+S (or Cmd+S on macOS): Save
+                        // Ctrl+S, Ctrl+Z, Ctrl+Y (or Cmd on macOS)
                         match key {
                             keyboard::Key::Character(ref c) if c.as_str() == "s" => {
+                                // Ctrl+S: Save
                                 if self.has_unsaved_changes() {
                                     Event::SaveRequested {
                                         path: self.image_path.clone(),
@@ -1004,6 +1045,24 @@ impl State {
                                 } else {
                                     Event::None
                                 }
+                            }
+                            keyboard::Key::Character(ref c) if c.as_str() == "z" => {
+                                // Ctrl+Z: Undo
+                                self.commit_active_tool_changes();
+                                if self.can_undo() {
+                                    self.history_index -= 1;
+                                    self.replay_transformations_up_to_index();
+                                }
+                                Event::None
+                            }
+                            keyboard::Key::Character(ref c) if c.as_str() == "y" => {
+                                // Ctrl+Y: Redo
+                                self.commit_active_tool_changes();
+                                if self.can_redo() {
+                                    self.history_index += 1;
+                                    self.replay_transformations_up_to_index();
+                                }
+                                Event::None
                             }
                             _ => Event::None,
                         }
@@ -1757,6 +1816,57 @@ impl State {
             }
             Err(err) => {
                 eprintln!("Failed to reload original image: {err:?}");
+            }
+        }
+    }
+
+    /// Replay transformations from the original image up to the current history_index.
+    /// This is used for undo/redo operations.
+    fn replay_transformations_up_to_index(&mut self) {
+        // Reload the original image from disk
+        let Ok(mut working_image) = image_rs::open(&self.image_path) else {
+            eprintln!("Failed to reload original image for replay");
+            return;
+        };
+
+        // Apply transformations up to history_index
+        for i in 0..self.history_index {
+            if i >= self.transformation_history.len() {
+                break;
+            }
+
+            working_image = match &self.transformation_history[i] {
+                Transformation::RotateLeft => transform::rotate_left(&working_image),
+                Transformation::RotateRight => transform::rotate_right(&working_image),
+                Transformation::Crop { rect } => {
+                    let x = rect.x.max(0.0) as u32;
+                    let y = rect.y.max(0.0) as u32;
+                    let width = rect.width.max(1.0) as u32;
+                    let height = rect.height.max(1.0) as u32;
+                    match transform::crop(&working_image, x, y, width, height) {
+                        Some(cropped) => cropped,
+                        None => {
+                            eprintln!("Failed to apply crop during replay: invalid crop area");
+                            working_image
+                        }
+                    }
+                }
+                Transformation::Resize { width, height } => {
+                    transform::resize(&working_image, *width, *height)
+                }
+            };
+        }
+
+        // Update current state with replayed image
+        self.working_image = working_image;
+        match transform::dynamic_to_image_data(&self.working_image) {
+            Ok(image_data) => {
+                self.current_image = image_data;
+                self.sync_resize_state_dimensions();
+                self.preview_image = None;
+            }
+            Err(err) => {
+                eprintln!("Failed to convert replayed image: {err:?}");
             }
         }
     }

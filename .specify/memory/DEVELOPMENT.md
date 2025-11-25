@@ -2,13 +2,13 @@
 
 This document tracks ongoing development work for IcedLens. It serves as a reference for features in progress and implementation notes.
 
-**Last Updated:** 2025-11-25 (Session 8 - Save/Save As & Keyboard Shortcuts)
+**Last Updated:** 2025-11-25 (Session 8 - Save/Save As, Keyboard Shortcuts, Undo/Redo Complete)
 
 ---
 
 ## 📊 Quick Status Summary
 
-**Overall Progress:** Infrastructure 100% | Features 85%
+**Overall Progress:** Infrastructure 100% | Features 95%
 
 - ✅ **Infrastructure Complete** - Module, UI, App integration, translations
 - ✅ **Navigation Architecture** - Each mode manages its own buttons independently
@@ -22,13 +22,14 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
 - ✅ **Crop Base System** - Sequential crops calculated from same base image, prevents distortion
 - ✅ **Crop UX Polish** - Smart ratio selection, overlay visibility control, proper state management
 - ✅ **Save & Save As** - File persistence with format detection, Save As with file picker dialog
-- ✅ **Keyboard Shortcuts** - E (enter editor), Ctrl+S (save), Esc (cancel/exit)
+- ✅ **Keyboard Shortcuts** - E (enter editor), Ctrl+S (save), Esc (cancel/exit), Ctrl+Z/Y (undo/redo)
 - ✅ **Viewer Reload** - Image reloads in viewer after saving to show changes
-- ⏳ **Remaining** - Undo/Redo wiring (Ctrl+Z/Ctrl+Y), README documentation
+- ✅ **Undo/Redo System** - Full transformation replay with UI buttons and keyboard shortcuts
+- ⏳ **Remaining** - README documentation
 
 **Next Immediate Steps:**
-1. Hook Undo/Redo stack into toolbar shortcuts (Ctrl+Z/Ctrl+Y)
-2. Update README with editing features documentation
+1. Update README with editing features documentation
+2. Document keyboard shortcuts reference
 
 ---
 
@@ -240,38 +241,77 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - Drag state properly cleared when cursor leaves canvas
    - Tests passing: 98 total
 
+16. **Save/Save As Implementation** (COMPLETE)
+   - `save_image()` method in editor/mod.rs (lines 1042-1068)
+   - Format detection from file extension (JPEG, PNG, GIF, BMP, TIFF, WebP, ICO)
+   - Preserves original format when saving
+   - Clears transformation history after successful save
+   - Save button: Overwrites original file with `Event::SaveRequested { path, overwrite: true }`
+   - Save As button: Opens file picker dialog via `rfd` crate
+   - File picker filters: Only shows image file types
+   - Async file dialog with `Task::perform` pattern
+   - New message: `SaveAsDialogResult(Option<PathBuf>)`
+   - Error handling with console output (TODO: user notifications)
+
+17. **Keyboard Shortcuts Implementation** (COMPLETE)
+   - **Editor Mode:**
+     - `Ctrl+S` (or `Cmd+S` on macOS): Save current image
+     - `Esc`: Cancel changes if unsaved, otherwise exit editor
+   - **Viewer Mode:**
+     - `E`: Enter edit mode (only when image is loaded)
+   - Implementation details:
+     - Added `RawEvent` message to editor Message enum
+     - Modified `App::subscription()` to route keyboard events based on mode
+     - In Editor mode: keyboard events route to `Message::Editor(RawEvent)`
+     - In Viewer/Settings mode: events route to `Message::Viewer(RawEvent)`
+     - Editor handles Ctrl+S and Esc in `update()` method via pattern matching
+     - Viewer handles E key with modifier checks (no Ctrl/Alt/Shift)
+   - Tests passing: All 98 tests still green
+
+18. **Viewer Reload After Save** (COMPLETE)
+   - When exiting editor after save, viewer reloads the image
+   - Implementation in `handle_editor_message()` for `EditorEvent::ExitEditor`
+   - Captures `image_path` before dropping editor state
+   - Uses `Task::perform` with async `load_image()`
+   - Routes result to `Message::Viewer(ImageLoaded)`
+   - Ensures saved changes are immediately visible when returning to viewer
+
+19. **Undo/Redo System** (COMPLETE)
+   - **Core Implementation:**
+     - `replay_transformations_up_to_index()` method reloads original image and replays transformations
+     - `Message::Undo` decrements history_index and replays transformations
+     - `Message::Redo` increments history_index and replays transformations
+     - Both operations call `commit_active_tool_changes()` first to ensure pending changes are saved
+   - **Transformation Replay:**
+     - Reloads original image from disk for each undo/redo operation
+     - Applies transformations sequentially from index 0 to history_index
+     - Handles all transformation types: RotateLeft, RotateRight, Crop, Resize
+     - Crop transformations extracted from Rectangle with proper clamping
+   - **UI Integration:**
+     - Undo/Redo buttons added to sidebar after rotate section
+     - Buttons disabled when `can_undo()` / `can_redo()` returns false
+     - Clean visual hierarchy with horizontal row layout
+   - **Keyboard Shortcuts:**
+     - `Ctrl+Z` (or `Cmd+Z` on macOS): Undo last transformation
+     - `Ctrl+Y` (or `Cmd+Y` on macOS): Redo next transformation
+     - Shortcuts call same logic as button presses
+   - Tests passing: All 98 tests still green
+
 #### 🔄 In Progress
-Undo/redo wiring and Save/Save As implementation are next priorities.
+Documentation updates are the final priority.
 
 #### ⏳ To Do
-1. **Undo/Redo System (High Priority)**
-   - Wire existing transformation history to Undo/Redo buttons
-   - Implement undo: replay transformations from original image up to history_index - 1
-   - Implement redo: apply transformation at history_index
-   - Add Ctrl+Z / Ctrl+Y keyboard shortcuts
-   - Update button states based on can_undo() / can_redo()
+1. **README Documentation**
+   - Document editor mode features (rotate, crop, resize)
+   - Document keyboard shortcuts
+   - Update screenshots/examples if applicable
 
-2. **Save/Save As Implementation (High Priority)**
-   - Save: write working_image to original path
-   - Save As: file picker dialog → new path
-   - Preserve format (JPEG→JPEG, PNG→PNG)
-   - Confirmation dialogs
-   - Handle errors (write permissions, disk space)
-
-3. **Keyboard Shortcuts**
-   - `E` = Enter edit mode (from viewer)
-   - `Ctrl+S` = Save
-   - `Esc` = Cancel/exit editor
-   - `R` = Select rotate tool (if needed)
-   - `C` = Select crop tool
-   - `Ctrl+Z` / `Ctrl+Y` = Undo/Redo
-
-4. **Navigation in Editor**
+2. **Navigation in Editor**
    - Wire up NavigateNext/NavigatePrevious events in App
    - Load new image in editor when navigating
    - Prompt to save if unsaved changes exist
 
-5. **README** - Document editing features
+3. **README** - Document editing features
 
 ### Technical Notes
 

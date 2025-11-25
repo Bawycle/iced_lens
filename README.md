@@ -33,9 +33,10 @@ Lightweight, internationalized image viewer powered by the [Iced](https://iced.r
 16. FAQ
 
 ## 1. Motivation
-IcedLens aims to provide a simple, privacy‑friendly viewer focusing on responsive zoom ergonomics, clean layout, and multilingual support—without bundling heavy editing logic. It is designed as a foundation that can evolve toward a minimal asset inspector or media desk utility.
+IcedLens aims to provide a simple, privacy‑friendly image viewer and editor focusing on responsive zoom ergonomics, clean layout, and multilingual support. It includes essential editing tools (rotate, crop, resize) with a non-destructive workflow, while maintaining a lightweight footprint. It is designed as a foundation that can evolve toward a minimal asset inspector or media desk utility.
 
 ## 2. Features
+### Viewing
 - Common raster formats (JPEG/PNG/GIF/WebP/TIFF/BMP/ICO) plus SVG rasterization
 - Wheel or toolbar zoom, fit‑to‑window toggle, and grab‑to‑pan navigation
 - Lightweight multi-image browsing (arrow keys or overlay arrows, looping, auto-refresh)
@@ -43,6 +44,18 @@ IcedLens aims to provide a simple, privacy‑friendly viewer focusing on respons
 - Fluent-based localization (en-US, fr)
 - Selectable viewer background themes
 - Distraction-free fullscreen with HUD indicators (button, double-click, F11, Esc)
+
+### Editing
+- **Non-destructive editing** with undo/redo support
+- **Rotate**: Rotate left/right in 90° increments
+- **Crop**: Interactive crop overlay with preset aspect ratios (Free, Square, 16:9, 9:16, 4:3, 3:4)
+  - Drag to reposition, resize handles for custom crops
+  - Rule-of-thirds grid for composition guidance
+- **Resize**: Scale images with slider (10-200%) or precise pixel dimensions
+  - Lock aspect ratio toggle
+  - Quick presets (50%, 75%, 150%, 200%)
+- **Save & Save As**: Preserve original format or save to new file
+- **Keyboard shortcuts**: Streamlined workflow (E, Ctrl+S, Ctrl+Z/Y, Esc)
 
 ## 3. Screenshots
 Screenshots will be added once UI stabilizes. Feel free to open an issue and propose layout improvements.
@@ -111,6 +124,19 @@ ARGS:
 **Directory Scanning:**
 - Each navigation step rescans the folder so added/removed files are reflected immediately
 
+### Keyboard Shortcuts
+**Viewer Mode:**
+- **E**: Enter editor mode
+- **F11**: Toggle fullscreen
+- **Esc**: Exit fullscreen
+- **← / →**: Navigate to previous/next image
+
+**Editor Mode:**
+- **Ctrl+S** (Cmd+S on macOS): Save current image
+- **Ctrl+Z** (Cmd+Z on macOS): Undo last transformation
+- **Ctrl+Y** (Cmd+Y on macOS): Redo transformation
+- **Esc**: Cancel changes (if unsaved) or exit editor (if no changes)
+
 ## 6. Configuration & Preferences
 User config is stored in a platform‑appropriate directory (implementation detail: uses a TOML file). Currently persisted:
 - `language` - UI language (en-US, fr)
@@ -174,10 +200,19 @@ cargo audit
 This project does not process untrusted remote input; images are opened from local paths. Still, malformed files could trigger decoding edge cases in dependencies. Please report potential vulnerabilities via a private issue or (future) `SECURITY.md` contact channel.
 
 ## 13. Roadmap
-Planned / aspirational items (subject to change):
+### Implemented ✓
+- ✅ Non-destructive image editing (rotate, crop, resize)
+- ✅ Save & Save As with format preservation
+- ✅ Undo/Redo with transformation replay
+- ✅ Keyboard shortcuts for editor workflow
+
+### Planned / Aspirational
+Future items (subject to change based on community feedback):
 - Animated GIF/WebP frame playback
 - Basic image metadata panel (EXIF)
-- Overlay HUD
+- Additional edit tools: flip (horizontal/vertical), brightness/contrast adjustments
+- Filters: grayscale, sepia, blur, sharpen
+- Batch operations
 - Richer argument parsing (additional flags)
 
 ## 14. Contributing
@@ -203,8 +238,13 @@ The application icon (`assets/icons/iced_lens.svg` and its PNG exports) is **not
 
 ## 16. FAQ
 **Why not GPL or MIT?** MPL offers balanced file‑level reciprocity without imposing network or full project copyleft.
+
 **Does it support Windows/macOS?** Yes, via Iced's cross‑platform backends; primary development on Linux.
-**Will it become an editor?** Editing may appear as opt‑in extensions; core viewer stays lean.
+
+**Does it have editing capabilities?** Yes! IcedLens now includes a non-destructive editor with rotate, crop, and resize tools, plus undo/redo support. Access it by pressing **E** in viewer mode or clicking the "✏ Edit" button.
+
+**How does editing work?** Editing is non-destructive—changes are only applied when you save. You can undo/redo transformations, and the original file is preserved until you explicitly save or save-as.
+
 **How do I report a bug?** Open an issue with OS, Rust version, steps, and logs if available.
 
 ---
