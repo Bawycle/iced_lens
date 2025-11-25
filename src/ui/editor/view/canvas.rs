@@ -8,7 +8,8 @@ use iced::widget::{center, container, image, Canvas, Stack};
 use iced::{ContentFit, Element, Length};
 
 use super::super::{
-    CropOverlayRenderer, CropState, Message, ResizeOverlayRenderer, ResizeState, State, ViewContext,
+    overlay::{CropOverlayRenderer, ResizeOverlayRenderer},
+    CropState, Message, ResizeState, State, ViewContext,
 };
 
 pub struct CanvasModel<'a> {
