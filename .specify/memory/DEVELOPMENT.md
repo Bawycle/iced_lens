@@ -2,13 +2,13 @@
 
 This document tracks ongoing development work for IcedLens. It serves as a reference for features in progress and implementation notes.
 
-**Last Updated:** 2025-11-25 (Session 7 - Navigation Refactoring & Crop Overlay Polish)
+**Last Updated:** 2025-11-25 (Session 8 - Save/Save As & Keyboard Shortcuts)
 
 ---
 
 ## 📊 Quick Status Summary
 
-**Overall Progress:** Infrastructure 100% | Features 75%
+**Overall Progress:** Infrastructure 100% | Features 85%
 
 - ✅ **Infrastructure Complete** - Module, UI, App integration, translations
 - ✅ **Navigation Architecture** - Each mode manages its own buttons independently
@@ -21,12 +21,14 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
 - ✅ **Crop Tool** - Interactive overlay with drag, resize handles, rule-of-thirds grid
 - ✅ **Crop Base System** - Sequential crops calculated from same base image, prevents distortion
 - ✅ **Crop UX Polish** - Smart ratio selection, overlay visibility control, proper state management
-- ⏳ **Remaining** - Undo/Redo wiring, Save implementation, Keyboard shortcuts
+- ✅ **Save & Save As** - File persistence with format detection, Save As with file picker dialog
+- ✅ **Keyboard Shortcuts** - E (enter editor), Ctrl+S (save), Esc (cancel/exit)
+- ✅ **Viewer Reload** - Image reloads in viewer after saving to show changes
+- ⏳ **Remaining** - Undo/Redo wiring (Ctrl+Z/Ctrl+Y), README documentation
 
 **Next Immediate Steps:**
-1. Wire Save/Save As file persistence for edited images
-2. Hook Undo/Redo stack into toolbar shortcuts (Ctrl+Z/Ctrl+Y)
-3. Add keyboard shortcuts (E, Ctrl+S, Esc)
+1. Hook Undo/Redo stack into toolbar shortcuts (Ctrl+Z/Ctrl+Y)
+2. Update README with editing features documentation
 
 ---
 

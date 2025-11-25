@@ -467,6 +467,18 @@ impl State {
                     key: keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
                     ..
                 } => self.handle_message(Message::NavigatePrevious, &I18n::default()),
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(ref c),
+                    modifiers,
+                    ..
+                } if c.as_str() == "e" && !modifiers.command() && !modifiers.alt() && !modifiers.shift() => {
+                    // E key: Enter edit mode (only if image is loaded)
+                    if self.current_image_path.is_some() {
+                        (Effect::EnterEditor, Task::none())
+                    } else {
+                        (Effect::None, Task::none())
+                    }
+                }
                 keyboard::Event::ModifiersChanged(modifiers) => {
                     if modifiers.command() {
                         // no-op currently, but keep placeholder for shortcut support

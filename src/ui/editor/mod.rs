@@ -233,6 +233,11 @@ pub enum Message {
     SaveAs,
     Cancel,       // Discard changes but stay in editor
     BackToViewer, // Return to viewer (only if no unsaved changes)
+    /// Raw event for keyboard shortcuts
+    RawEvent {
+        window: iced::window::Id,
+        event: iced::Event,
+    },
 }
 
 /// Events propagated to the parent application for side effects.
@@ -244,6 +249,8 @@ pub enum Event {
         path: PathBuf,
         overwrite: bool,
     },
+    /// Request to open file picker for "Save As"
+    SaveAsRequested,
     /// Request to exit editor mode
     ExitEditor,
     /// Request to navigate to next image
@@ -951,12 +958,8 @@ impl State {
             }
             Message::SaveAs => {
                 self.commit_active_tool_changes();
-                // TODO: Implement file picker dialog for save location
-                // For now, emit event with overwrite: false to signal "save as" intent
-                Event::SaveRequested {
-                    path: self.image_path.clone(),
-                    overwrite: false,
-                }
+                // Request file picker dialog from parent
+                Event::SaveAsRequested
             }
             Message::Cancel => {
                 // Discard all changes but STAY in editor
@@ -969,6 +972,45 @@ impl State {
                     Event::None // Blocked
                 } else {
                     Event::ExitEditor
+                }
+            }
+            Message::RawEvent { event, .. } => {
+                use iced::keyboard;
+
+                match event {
+                    iced::Event::Keyboard(keyboard::Event::KeyPressed {
+                        key: keyboard::Key::Named(keyboard::key::Named::Escape),
+                        ..
+                    }) => {
+                        // Esc: Cancel if has changes, otherwise exit editor
+                        if self.has_unsaved_changes() {
+                            self.discard_changes();
+                            Event::None
+                        } else {
+                            Event::ExitEditor
+                        }
+                    }
+                    iced::Event::Keyboard(keyboard::Event::KeyPressed {
+                        key,
+                        modifiers,
+                        ..
+                    }) if modifiers.command() => {
+                        // Ctrl+S (or Cmd+S on macOS): Save
+                        match key {
+                            keyboard::Key::Character(ref c) if c.as_str() == "s" => {
+                                if self.has_unsaved_changes() {
+                                    Event::SaveRequested {
+                                        path: self.image_path.clone(),
+                                        overwrite: true,
+                                    }
+                                } else {
+                                    Event::None
+                                }
+                            }
+                            _ => Event::None,
+                        }
+                    }
+                    _ => Event::None,
                 }
             }
         }
@@ -1070,6 +1112,11 @@ impl State {
     /// Get the current image data.
     pub fn current_image(&self) -> &ImageData {
         &self.current_image
+    }
+
+    /// Get the image file path.
+    pub fn image_path(&self) -> &std::path::Path {
+        &self.image_path
     }
 
     fn display_image(&self) -> &ImageData {

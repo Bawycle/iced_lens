@@ -6,6 +6,7 @@
 //! loading. This file intentionally keeps policy decisions (minimum window size,
 //! persistence format, localization switching) close to the main update loop so
 //! it is easy to audit user-facing behavior.
+use std::path::PathBuf;
 use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::image_handler;
@@ -60,6 +61,7 @@ pub enum Message {
     SwitchMode(AppMode),
     Settings(settings::Message),
     Editor(editor::Message),
+    SaveAsDialogResult(Option<PathBuf>),
 }
 
 /// Runtime flags passed in from the CLI or launcher to tweak startup behavior.
@@ -198,25 +200,49 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        event::listen_with(|event, status, window_id| {
-            if matches!(
-                event,
-                event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
-            ) {
-                return Some(Message::Viewer(component::Message::RawEvent {
-                    window: window_id,
-                    event: event.clone(),
-                }));
+        // Route events based on current mode
+        match self.mode {
+            AppMode::Editor => {
+                event::listen_with(|event, status, window_id| {
+                    // In editor mode, route keyboard events to editor
+                    if matches!(event, event::Event::Keyboard(..)) {
+                        match status {
+                            event::Status::Ignored => Some(Message::Editor(
+                                crate::ui::editor::Message::RawEvent {
+                                    window: window_id,
+                                    event: event.clone(),
+                                },
+                            )),
+                            event::Status::Captured => None,
+                        }
+                    } else {
+                        None
+                    }
+                })
             }
+            _ => {
+                // In viewer or settings mode, route to viewer
+                event::listen_with(|event, status, window_id| {
+                    if matches!(
+                        event,
+                        event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
+                    ) {
+                        return Some(Message::Viewer(component::Message::RawEvent {
+                            window: window_id,
+                            event: event.clone(),
+                        }));
+                    }
 
-            match status {
-                event::Status::Ignored => Some(Message::Viewer(component::Message::RawEvent {
-                    window: window_id,
-                    event: event.clone(),
-                })),
-                event::Status::Captured => None,
+                    match status {
+                        event::Status::Ignored => Some(Message::Viewer(component::Message::RawEvent {
+                            window: window_id,
+                            event: event.clone(),
+                        })),
+                        event::Status::Captured => None,
+                    }
+                })
             }
-        })
+        }
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -225,6 +251,25 @@ impl App {
             Message::SwitchMode(mode) => self.handle_mode_switch(mode),
             Message::Settings(settings_message) => self.handle_settings_message(settings_message),
             Message::Editor(editor_message) => self.handle_editor_message(editor_message),
+            Message::SaveAsDialogResult(path_opt) => {
+                if let Some(path) = path_opt {
+                    // User selected a path, save the image there
+                    if let Some(editor) = self.editor.as_mut() {
+                        match editor.save_image(&path) {
+                            Ok(()) => {
+                                eprintln!("Image saved successfully to: {:?}", path);
+                                // TODO: Show success notification to user
+                            }
+                            Err(err) => {
+                                eprintln!("Failed to save image: {:?}", err);
+                                // TODO: Show error notification to user
+                            }
+                        }
+                    }
+                }
+                // User cancelled or error occurred, do nothing
+                Task::none()
+            }
         }
     }
 
@@ -332,9 +377,17 @@ impl App {
         match editor_state.update(message) {
             EditorEvent::None => Task::none(),
             EditorEvent::ExitEditor => {
+                // Get the current image path before dropping the editor
+                let current_image_path = editor_state.image_path().to_path_buf();
+
                 self.editor = None;
                 self.mode = AppMode::Viewer;
-                Task::none()
+
+                // Reload the image in the viewer to show any saved changes
+                Task::perform(
+                    async move { crate::image_handler::load_image(&current_image_path) },
+                    |result| Message::Viewer(component::Message::ImageLoaded(result)),
+                )
             }
             EditorEvent::NavigateNext => {
                 // TODO: Implement navigation in editor mode
@@ -359,6 +412,26 @@ impl App {
                     }
                 }
                 Task::none()
+            }
+            EditorEvent::SaveAsRequested => {
+                // Open file picker dialog for "Save As"
+                let current_path = editor_state.image_path().to_path_buf();
+                Task::perform(
+                    async move {
+                        rfd::AsyncFileDialog::new()
+                            .set_file_name(
+                                current_path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("image.png"),
+                            )
+                            .add_filter("Image Files", &["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico"])
+                            .save_file()
+                            .await
+                            .map(|h| h.path().to_path_buf())
+                    },
+                    Message::SaveAsDialogResult,
+                )
             }
         }
     }
