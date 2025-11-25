@@ -3,7 +3,7 @@
 
 use crate::error::Result;
 use crate::image_handler::ImageData;
-use image_rs::{DynamicImage, GenericImageView};
+use image_rs::{imageops::FilterType, DynamicImage, GenericImageView};
 
 /// Rotate an image 90 degrees counter-clockwise (left).
 pub fn rotate_left(image: &DynamicImage) -> DynamicImage {
@@ -28,6 +28,13 @@ pub fn dynamic_to_image_data(dynamic: &DynamicImage) -> Result<ImageData> {
         width,
         height,
     })
+}
+
+/// Resize the image to the provided dimensions using a high-quality filter.
+pub fn resize(image: &DynamicImage, width: u32, height: u32) -> DynamicImage {
+    let width = width.max(1);
+    let height = height.max(1);
+    image.resize_exact(width, height, FilterType::Lanczos3)
 }
 
 #[cfg(test)]
@@ -55,5 +62,13 @@ mod tests {
         let rotated = rotate_right(&img);
         assert_eq!(rotated.width(), 3);
         assert_eq!(rotated.height(), 4);
+    }
+
+    #[test]
+    fn resize_changes_dimensions() {
+        let img = create_test_image(8, 4);
+        let resized = resize(&img, 4, 2);
+        assert_eq!(resized.width(), 4);
+        assert_eq!(resized.height(), 2);
     }
 }

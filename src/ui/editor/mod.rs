@@ -351,6 +351,10 @@ impl State {
         sidebar_content = sidebar_content.push(crop_btn);
         sidebar_content = sidebar_content.push(resize_btn);
 
+        if self.active_tool == Some(EditorTool::Resize) {
+            sidebar_content = sidebar_content.push(self.build_resize_panel(&ctx));
+        }
+
         // Spacer to push navigation and action buttons to bottom
         sidebar_content =
             sidebar_content.push(iced::widget::Space::new(Length::Fill, Length::Fill));
@@ -414,6 +418,98 @@ impl State {
             .into()
     }
 
+    fn build_resize_panel<'a>(&'a self, ctx: &ViewContext<'a>) -> iced::Element<'a, Message> {
+        use iced::widget::{button, checkbox, container, slider, text, text_input, Column, Row};
+        use iced::Length;
+
+        let scale_section = Column::new()
+            .spacing(6)
+            .push(text(ctx.i18n.tr("editor-resize-section-title")).size(14))
+            .push(text(ctx.i18n.tr("editor-resize-scale-label")).size(13))
+            .push(
+                slider(
+                    10.0..=200.0,
+                    self.resize_state.scale_percent,
+                    Message::ScaleChanged,
+                )
+                .step(1.0),
+            )
+            .push(text(format!("{:.0}%", self.resize_state.scale_percent)).size(13));
+
+        let mut presets_row = Row::new().spacing(8);
+        for preset in [50.0, 75.0, 150.0, 200.0] {
+            let label = format!("{preset:.0}%");
+            presets_row = presets_row.push(
+                button(text(label))
+                    .on_press(Message::ApplyResizePreset(preset))
+                    .padding([6, 8])
+                    .style(iced::widget::button::secondary),
+            );
+        }
+
+        let presets_section = Column::new()
+            .spacing(6)
+            .push(text(ctx.i18n.tr("editor-resize-presets-label")).size(13))
+            .push(presets_row);
+
+        let width_label = text(ctx.i18n.tr("editor-resize-width-label")).size(13);
+        let width_placeholder = ctx.i18n.tr("editor-resize-width-label");
+        let width_input = text_input(width_placeholder.as_str(), &self.resize_state.width_input)
+            .on_input(Message::WidthInputChanged)
+            .padding(6)
+            .size(14)
+            .width(Length::Fill);
+
+        let height_label = text(ctx.i18n.tr("editor-resize-height-label")).size(13);
+        let height_placeholder = ctx.i18n.tr("editor-resize-height-label");
+        let height_input = text_input(height_placeholder.as_str(), &self.resize_state.height_input)
+            .on_input(Message::HeightInputChanged)
+            .padding(6)
+            .size(14)
+            .width(Length::Fill);
+
+        let width_column = Column::new()
+            .spacing(4)
+            .width(Length::Fill)
+            .push(width_label)
+            .push(width_input);
+
+        let height_column = Column::new()
+            .spacing(4)
+            .width(Length::Fill)
+            .push(height_label)
+            .push(height_input);
+
+        let dimensions_row = Row::new().spacing(8).push(width_column).push(height_column);
+
+        let lock_checkbox = checkbox(
+            ctx.i18n.tr("editor-resize-lock-aspect"),
+            self.resize_state.lock_aspect,
+        )
+        .on_toggle(|_| Message::ToggleLockAspect);
+
+        let apply_button = button(text(ctx.i18n.tr("editor-resize-apply")))
+            .on_press(Message::ApplyResize)
+            .padding(10)
+            .width(Length::Fill)
+            .style(iced::widget::button::primary);
+
+        container(
+            Column::new()
+                .spacing(12)
+                .push(scale_section)
+                .push(presets_section)
+                .push(text(ctx.i18n.tr("editor-resize-dimensions-label")).size(13))
+                .push(dimensions_row)
+                .push(lock_checkbox)
+                .push(apply_button),
+        )
+        .padding(12)
+        .width(Length::Fill)
+        .style(theme::settings_panel_style)
+        .into()
+    }
+
     /// Update the state and emit an [`Event`] for the parent when needed.
     pub fn update(&mut self, message: Message) -> Event {
         match message {
@@ -451,28 +547,28 @@ impl State {
                 // TODO: Implement crop application
                 Event::None
             }
-            Message::ScaleChanged(_percent) => {
-                // TODO: Implement scale change
+            Message::ScaleChanged(percent) => {
+                self.set_resize_percent(percent);
                 Event::None
             }
-            Message::WidthInputChanged(_value) => {
-                // TODO: Implement width input
+            Message::WidthInputChanged(value) => {
+                self.handle_width_input_change(value);
                 Event::None
             }
-            Message::HeightInputChanged(_value) => {
-                // TODO: Implement height input
+            Message::HeightInputChanged(value) => {
+                self.handle_height_input_change(value);
                 Event::None
             }
             Message::ToggleLockAspect => {
-                self.resize_state.lock_aspect = !self.resize_state.lock_aspect;
+                self.toggle_resize_lock();
                 Event::None
             }
-            Message::ApplyResizePreset(_percent) => {
-                // TODO: Implement resize preset
+            Message::ApplyResizePreset(percent) => {
+                self.set_resize_percent(percent);
                 Event::None
             }
             Message::ApplyResize => {
-                // TODO: Implement resize application
+                self.apply_resize_dimensions();
                 Event::None
             }
             Message::Undo => {
@@ -585,6 +681,12 @@ impl State {
         self.resize_state.height = self.current_image.height;
         self.resize_state.width_input = self.current_image.width.to_string();
         self.resize_state.height_input = self.current_image.height.to_string();
+        self.resize_state.scale_percent = 100.0;
+        self.resize_state.original_aspect = if self.current_image.height == 0 {
+            1.0
+        } else {
+            self.current_image.width as f32 / self.current_image.height.max(1) as f32
+        };
     }
 
     fn record_transformation(&mut self, transformation: Transformation) {
@@ -593,6 +695,127 @@ impl State {
         }
         self.transformation_history.push(transformation);
         self.history_index = self.transformation_history.len();
+    }
+
+    fn base_width(&self) -> f32 {
+        self.current_image.width.max(1) as f32
+    }
+
+    fn base_height(&self) -> f32 {
+        self.current_image.height.max(1) as f32
+    }
+
+    fn set_resize_percent(&mut self, percent: f32) {
+        let clamped = percent.clamp(10.0, 200.0);
+        self.resize_state.scale_percent = clamped;
+        let width = (self.base_width() * clamped / 100.0).round().max(1.0) as u32;
+        let height = (self.base_height() * clamped / 100.0).round().max(1.0) as u32;
+
+        if self.resize_state.lock_aspect {
+            self.set_width_preserving_aspect(width);
+        } else {
+            self.resize_state.width = width;
+            self.resize_state.height = height;
+            self.resize_state.width_input = width.to_string();
+            self.resize_state.height_input = height.to_string();
+        }
+    }
+
+    fn handle_width_input_change(&mut self, value: String) {
+        self.resize_state.width_input = value.clone();
+        if let Some(width) = parse_dimension_input(&value) {
+            if self.resize_state.lock_aspect {
+                self.set_width_preserving_aspect(width);
+            } else {
+                let width = width.max(1);
+                self.resize_state.width = width;
+                self.resize_state.width_input = width.to_string();
+            }
+            self.update_scale_percent_from_width();
+        }
+    }
+
+    fn handle_height_input_change(&mut self, value: String) {
+        self.resize_state.height_input = value.clone();
+        if let Some(height) = parse_dimension_input(&value) {
+            if self.resize_state.lock_aspect {
+                self.set_height_preserving_aspect(height);
+                self.update_scale_percent_from_width();
+            } else {
+                let height = height.max(1);
+                self.resize_state.height = height;
+                self.resize_state.height_input = height.to_string();
+            }
+        }
+    }
+
+    fn toggle_resize_lock(&mut self) {
+        self.resize_state.lock_aspect = !self.resize_state.lock_aspect;
+        if self.resize_state.lock_aspect {
+            let width = self.resize_state.width;
+            self.set_width_preserving_aspect(width);
+        }
+    }
+
+    fn set_width_preserving_aspect(&mut self, width: u32) {
+        let width = width.max(1);
+        let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
+        let height = (width as f32 / aspect).round().max(1.0) as u32;
+        self.resize_state.width = width;
+        self.resize_state.height = height;
+        self.resize_state.width_input = width.to_string();
+        self.resize_state.height_input = height.to_string();
+    }
+
+    fn set_height_preserving_aspect(&mut self, height: u32) {
+        let height = height.max(1);
+        let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
+        let width = (height as f32 * aspect).round().max(1.0) as u32;
+        self.resize_state.height = height;
+        self.resize_state.width = width.max(1);
+        self.resize_state.width_input = self.resize_state.width.to_string();
+        self.resize_state.height_input = height.to_string();
+    }
+
+    fn update_scale_percent_from_width(&mut self) {
+        let base_width = self.base_width();
+        if base_width <= 0.0 {
+            return;
+        }
+        let percent = (self.resize_state.width as f32 / base_width) * 100.0;
+        let clamped = percent.clamp(10.0, 200.0);
+        if (clamped - percent).abs() > f32::EPSILON {
+            self.set_resize_percent(clamped);
+        } else {
+            self.resize_state.scale_percent = clamped;
+        }
+    }
+
+    fn apply_resize_dimensions(&mut self) {
+        let target_width = self.resize_state.width.max(1);
+        let target_height = self.resize_state.height.max(1);
+        if target_width == self.current_image.width && target_height == self.current_image.height {
+            return;
+        }
+
+        self.apply_dynamic_transformation(
+            Transformation::Resize {
+                width: target_width,
+                height: target_height,
+            },
+            move |image| transform::resize(image, target_width, target_height),
+        );
+    }
+}
+
+fn parse_dimension_input(value: &str) -> Option<u32> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    match trimmed.parse::<u32>() {
+        Ok(result) if result > 0 => Some(result),
+        _ => None,
     }
 }
 
@@ -653,5 +876,21 @@ mod tests {
         assert_ne!(CropRatio::Free, CropRatio::Square);
         assert_ne!(CropRatio::Landscape, CropRatio::Portrait);
         assert_ne!(CropRatio::Photo, CropRatio::PhotoPortrait);
+    }
+
+    #[test]
+    fn apply_resize_updates_image_dimensions() {
+        let (_dir, path, img) = create_test_image(8, 6);
+        let mut state = State::new(path, img).expect("editor state");
+
+        state.resize_state.width = 4;
+        state.resize_state.height = 3;
+        state.resize_state.width_input = "4".into();
+        state.resize_state.height_input = "3".into();
+
+        state.update(Message::ApplyResize);
+
+        assert_eq!(state.current_image.width, 4);
+        assert_eq!(state.current_image.height, 3);
     }
 }
