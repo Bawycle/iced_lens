@@ -2,25 +2,27 @@
 
 This document tracks ongoing development work for IcedLens. It serves as a reference for features in progress and implementation notes.
 
-**Last Updated:** 2025-11-25 (Session 5 - Crop Tool Implementation)
+**Last Updated:** 2025-11-25 (Session 6 - Crop Base Image System & Button Logic)
 
 ---
 
 ## 📊 Quick Status Summary
 
-**Overall Progress:** Infrastructure 100% | Features 50%
+**Overall Progress:** Infrastructure 100% | Features 65%
 
 - ✅ **Infrastructure Complete** - Module, UI, App integration, translations
-- ✅ **Sidebar Complete** - Retractable, all controls, Save/Save As/Cancel
+- ✅ **Sidebar Complete** - Retractable, all controls, intelligent button states
+- ✅ **Button Logic** - "← Retour" to exit, "Annuler" to discard, Save/SaveAs, all conditional
 - ✅ **Rotate Tool** - Working image pipeline wired, icons corrected, history tracked
 - ✅ **Editor Preview** - Canvas now renders the edited image with fit containment
 - ✅ **Resize Tool** - Slider, presets, numeric inputs, aspect lock, live preview + auto-commit
-- ✅ **Crop Tool** - Aspect ratio presets (Free, Square, 16:9, 9:16, 4:3, 3:4), auto-commit on tool change
-- ⏳ **Remaining** - Undo/Redo wiring, Save implementation, Keyboard shortcuts, Interactive crop overlay
+- ✅ **Crop Tool** - Aspect ratio presets (Free, Square, 16:9, 9:16, 4:3, 3:4), immediate commit
+- ✅ **Crop Base System** - Sequential crops calculated from same base image, prevents distortion
+- ⏳ **Remaining** - Undo/Redo wiring, Save implementation, Keyboard shortcuts
 
 **Next Immediate Steps:**
-1. Hook Undo/Redo stack into toolbar shortcuts (Ctrl+Z/Ctrl+Y)
-2. Wire Save/Save As persistence for edited images
+1. Wire Save/Save As file persistence for edited images
+2. Hook Undo/Redo stack into toolbar shortcuts (Ctrl+Z/Ctrl+Y)
 3. Add keyboard shortcuts (E, Ctrl+S, Esc)
 
 ---
@@ -38,15 +40,17 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
 - State-down, messages-up architecture
 - Non-destructive editing until explicit save
 
-**UI Layout:** Retractable side toolbar
+**UI Layout:** Retractable side toolbar with top navigation
 ```
-┌────────────┬──────────────────────────────────────────┐
+┌───────────────────────────────────────────────────────┐
+│ [← Retour]                                            │
+├────────────┬──────────────────────────────────────────┤
 │ [☰] Toggle │                                          │
 │            │                                          │
 │   Tools    │                                          │
 │  ┌──────┐  │                                          │
-│  │  ↻   │  │         Image with overlays              │
-│  └──────┘  │         (crop handles, etc.)             │
+│  │  ↻   │  │         Image preview                    │
+│  └──────┘  │         (transformed)                    │
 │  ┌──────┐  │                                          │
 │  │  ↺   │  │                                          │
 │  └──────┘  │                                          │
@@ -57,10 +61,11 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
 │  │Resize│  │                                          │
 │  └──────┘  │                                          │
 │            │                                          │
-│  [◀] [▶]   │  (Navigation arrows - edit other images) │
+│  [◀] [▶]   │  (Navigation - disabled if unsaved)      │
 │            │                                          │
-│  [Cancel]  │                                          │
-│  [ Save ]  │                                          │
+│ [Annuler]  │  (Cancel - disabled if no changes)       │
+│  [Save]    │  (Disabled if no changes)                │
+│ [Save As]  │  (Disabled if no changes)                │
 └────────────┴──────────────────────────────────────────┘
 ```
 
@@ -91,17 +96,18 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - Undo/redo labels
 
 4. **Sidebar UI** (COMPLETE)
-   - Retractable sidebar (hamburger toggle ☰)
+   - **Top toolbar**: "← Retour" button to exit editor mode (disabled if unsaved changes)
+   - **Retractable sidebar** (hamburger toggle ☰)
    - Width: 180px expanded, 60px collapsed
    - Tool buttons:
      - Rotate Left (↻) / Rotate Right (↺) - instant actions
      - Crop (selectable tool, highlights when active)
      - Resize (selectable tool, highlights when active)
-   - Navigation arrows (◀ ▶) for browsing images in editor mode
-   - Action buttons:
-     - Cancel (secondary) - exits editor, discards changes
-     - Save (primary blue) - overwrites original file
-     - Save As... (secondary) - creates new file
+   - Navigation arrows (◀ ▶) for browsing images in editor mode (disabled if unsaved changes)
+   - Action buttons (all conditional based on `has_unsaved_changes()`):
+     - Annuler (secondary) - discards changes, stays in editor, disabled if no changes
+     - Save (primary blue) - overwrites original file, disabled if no changes
+     - Save As... (secondary) - creates new file, disabled if no changes
    - Visual hierarchy with horizontal rules
    - Spacer pushing bottom controls to bottom
    - Gray background (#F2F2F2) for contrast
@@ -118,6 +124,11 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
      - `current_image` (ImageData) - for display in UI
    - After each transformation: working_image → ImageData → update display
    - Custom Debug impl (DynamicImage is not Debug)
+   - **Crop base image fields** (added for relative crop calculations):
+     - `crop_base_image: Option<DynamicImage>` - Image state when crop tool opened
+     - `crop_base_width: u32` - Base image width for ratio calculations
+     - `crop_base_height: u32` - Base image height for ratio calculations
+     - Updated only when crop tool is selected, preserved across ratio changes
 
 7. **Resize Tool & Preview Pipeline**
    - Slider (10–200%), presets, width/height inputs, and aspect locking wired to a shared preview flow
@@ -132,24 +143,49 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - Tests for crop within bounds, clamping, origin crop, and entire image crop (all passing)
    - CropState structure tracking x, y, width, height, and selected ratio
    - UI panel with 6 aspect ratio buttons (Free, Square 1:1, Landscape 16:9, Portrait 9:16, Photo 4:3, Photo Portrait 3:4)
-   - `adjust_crop_to_ratio()` calculates optimal crop dimensions for selected ratio
-   - `apply_crop()` applies transformation, updates working_image and current_image
+   - `adjust_crop_to_ratio()` calculates optimal crop dimensions for selected ratio relative to base image
+   - `apply_crop_from_base()` applies transformation from the base image saved when crop tool opened
+   - **Base Image System**: When crop tool opens, current image is saved as base reference
+     - All crop ratio calculations use base image dimensions
+     - Sequential crops (e.g., Square then Landscape) both calculated from same base
+     - Base only updates when crop tool is closed and reopened
+     - Prevents cumulative crop artifacts from chained operations
+   - Immediate auto-commit on ratio selection (no preview)
    - Auto-commit on tool change (same pattern as resize)
    - Transformation recorded in history for future undo/redo
    - Translations added for en-US and fr
-   - Crop area defaults to center 75% of image
-   - After crop, crop state resets to 75% of new image dimensions
+   - "Crop libre" button is placeholder for future interactive overlay feature
 
-10. **Navigation & Cancel Protection**
-   - Navigation buttons (◀ ▶) disabled when unsaved changes exist
-   - Navigation messages return Event::None when changes are unsaved
-   - Cancel button discards all changes via `discard_changes()`:
-     - Reloads original image from disk
-     - Clears transformation history
-     - Resets crop/resize states
-     - Clears active tool and preview
-   - User MUST save or cancel before navigating to another image
-   - Visual feedback: navigation buttons appear disabled when blocked
+10. **Navigation & Button State Management**
+   - **Top toolbar "← Retour" button**: Returns to viewer mode
+     - Only enabled when NO unsaved changes exist
+     - Prevents accidental loss of work
+   - **Sidebar "Annuler" button**: Discards changes but stays in editor
+     - Calls `discard_changes()`: reloads original image, clears history, resets states
+     - Only enabled when unsaved changes exist
+     - Does NOT exit editor mode
+   - **Save / Save As buttons**: Write changes to disk
+     - Only enabled when unsaved changes exist
+     - Prevents redundant save operations
+   - **Navigation buttons (◀ ▶)**: Browse to next/previous image
+     - Disabled when unsaved changes exist
+     - Navigation messages return Event::None when changes are unsaved
+     - User MUST save or cancel before navigating
+   - All button states driven by `has_unsaved_changes()` based on transformation history
+
+11. **Crop Base Image System** (COMPLETE)
+   - Added three fields to State: `crop_base_image`, `crop_base_width`, `crop_base_height`
+   - When crop tool opens (Message::SelectTool(EditorTool::Crop)):
+     - Current `working_image` is cloned and stored as `crop_base_image`
+     - Current dimensions stored in `crop_base_width` and `crop_base_height`
+   - All crop ratio calculations use base dimensions via `adjust_crop_to_ratio()`
+   - New method `apply_crop_from_base()` applies crop from base image
+   - Base image is NOT updated after each crop application
+   - Sequential crops always reference the same base image
+   - Base only updates when user closes and reopens crop tool
+   - Message routing: SetCropRatio → adjust → apply_crop_from_base → immediate commit
+   - Prevents cumulative distortion from chained crop operations
+   - Tests passing: 98 total (92 lib + 4 main + 2 integration)
 
 #### 🔄 In Progress
 Undo/redo wiring and Save/Save As implementation are next priorities.
@@ -228,11 +264,15 @@ pub struct State {
 - Preset buttons: 50%, 75%, 150%, 200%
 - Real-time preview + auto-commit when leaving the tool
 
-**Crop UX:** Interactive selection
-- Rectangle overlay with 8 handles (4 corners + 4 edges)
-- Rule-of-thirds grid overlay
-- Aspect ratio constraints with presets
-- Live dimension display during adjustment
+**Crop UX:** Aspect ratio presets with base image system (implemented)
+- 6 aspect ratio buttons: Free, Square (1:1), Landscape (16:9), Portrait (9:16), Photo (4:3), Photo Portrait (3:4)
+- Immediate application on ratio selection (no preview step)
+- **Base image anchoring**: When crop tool opens, current image is saved as base
+  - All ratio calculations use base dimensions, not previous crop result
+  - Example: 1000×800 image → Crop Square (800×800) → Crop Landscape = 800×450 from original 1000×800, NOT from 800×800
+  - Prevents cumulative distortion from sequential crops
+  - Base resets only when crop tool is closed and reopened
+- Future enhancement: Interactive rectangle overlay with draggable handles
 
 **Transformation Pipeline:**
 ```

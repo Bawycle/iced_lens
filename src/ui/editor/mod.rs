@@ -58,6 +58,10 @@ pub struct State {
     crop_state: CropState,
     /// Track if crop state has been modified (to avoid auto-commit on tool close)
     crop_modified: bool,
+    /// Image state when crop tool was opened (to calculate ratios from original, not from previous crops)
+    crop_base_image: Option<DynamicImage>,
+    crop_base_width: u32,
+    crop_base_height: u32,
     /// Resize state
     resize_state: ResizeState,
     /// Optional preview image (used for live adjustments)
@@ -690,16 +694,23 @@ impl State {
                     self.commit_active_tool_changes();
                     self.active_tool = None;
                     self.preview_image = None;
-                    // Reset crop modified flag when closing crop tool
+                    // Reset crop modified flag and clear base image when closing crop tool
                     if tool == EditorTool::Crop {
                         self.crop_modified = false;
+                        self.crop_base_image = None;
                     }
                 } else {
                     self.commit_active_tool_changes();
                     self.active_tool = Some(tool);
                     // Clear preview when switching tools
                     self.preview_image = None;
-                    // Do NOT generate preview automatically for crop - user must select a ratio first
+
+                    // When opening crop tool, memorize current image state for ratio calculations
+                    if tool == EditorTool::Crop {
+                        self.crop_base_image = Some(self.working_image.clone());
+                        self.crop_base_width = self.current_image.width;
+                        self.crop_base_height = self.current_image.height;
+                    }
                 }
                 Event::None
             }
@@ -722,8 +733,8 @@ impl State {
             Message::SetCropRatio(ratio) => {
                 self.crop_state.ratio = ratio;
                 self.adjust_crop_to_ratio(ratio);
-                // Apply crop immediately (no preview, direct commit)
-                self.apply_crop();
+                // Apply crop immediately from base image (no preview, direct commit)
+                self.apply_crop_from_base();
                 self.crop_modified = false;  // Already applied
                 self.preview_image = None;   // No preview needed
                 Event::None
@@ -858,6 +869,9 @@ impl State {
                 width_input: image.width.to_string(),
                 height_input: image.height.to_string(),
             },
+            crop_base_image: None,
+            crop_base_width: image.width,
+            crop_base_height: image.height,
             preview_image: None,
         })
     }
@@ -1078,8 +1092,9 @@ impl State {
     }
 
     fn adjust_crop_to_ratio(&mut self, ratio: CropRatio) {
-        let img_width = self.current_image.width as f32;
-        let img_height = self.current_image.height as f32;
+        // Use base image dimensions (image when crop tool was opened), not current image
+        let img_width = self.crop_base_width as f32;
+        let img_height = self.crop_base_height as f32;
 
         let (new_width, new_height) = match ratio {
             CropRatio::Free => {
@@ -1136,11 +1151,65 @@ impl State {
         let new_width = new_width.round() as u32;
         let new_height = new_height.round() as u32;
 
-        // Center the crop area
+        // Center the crop area (using base image dimensions)
         self.crop_state.width = new_width;
         self.crop_state.height = new_height;
-        self.crop_state.x = (self.current_image.width - new_width) / 2;
-        self.crop_state.y = (self.current_image.height - new_height) / 2;
+        self.crop_state.x = (self.crop_base_width - new_width) / 2;
+        self.crop_state.y = (self.crop_base_height - new_height) / 2;
+    }
+
+    fn apply_crop_from_base(&mut self) {
+        // Apply crop from the base image (image when crop tool was opened)
+        let Some(ref base_image) = self.crop_base_image else {
+            eprintln!("No base image available for crop");
+            return;
+        };
+
+        let x = self.crop_state.x;
+        let y = self.crop_state.y;
+        let width = self.crop_state.width;
+        let height = self.crop_state.height;
+
+        // Validate crop bounds
+        if width == 0
+            || height == 0
+            || x >= self.crop_base_width
+            || y >= self.crop_base_height
+        {
+            eprintln!("Invalid crop bounds: ({}, {}, {}×{})", x, y, width, height);
+            return;
+        }
+
+        // Apply crop transformation from base image
+        if let Some(cropped) = transform::crop(base_image, x, y, width, height) {
+            match transform::dynamic_to_image_data(&cropped) {
+                Ok(image_data) => {
+                    self.working_image = cropped;
+                    self.current_image = image_data;
+                    self.sync_resize_state_dimensions();
+
+                    // Record transformation for undo/redo
+                    self.record_transformation(Transformation::Crop {
+                        rect: Rectangle {
+                            x: x as f32,
+                            y: y as f32,
+                            width: width as f32,
+                            height: height as f32,
+                        },
+                    });
+
+                    // Note: Do NOT update crop_base_image here!
+                    // All crops within the same session should be relative to the base image
+                    // captured when the Crop tool was opened. The base is only updated when
+                    // the user closes and reopens the Crop tool.
+                }
+                Err(err) => {
+                    eprintln!("Failed to convert cropped image: {err:?}");
+                }
+            }
+        } else {
+            eprintln!("Crop operation returned None");
+        }
     }
 
     fn apply_crop(&mut self) {
