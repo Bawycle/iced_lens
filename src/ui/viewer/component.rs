@@ -471,7 +471,11 @@ impl State {
                     key: keyboard::Key::Character(ref c),
                     modifiers,
                     ..
-                } if c.as_str() == "e" && !modifiers.command() && !modifiers.alt() && !modifiers.shift() => {
+                } if c.as_str() == "e"
+                    && !modifiers.command()
+                    && !modifiers.alt()
+                    && !modifiers.shift() =>
+                {
                     // E key: Enter edit mode (only if image is loaded)
                     if self.current_image_path.is_some() {
                         (Effect::EnterEditor, Task::none())

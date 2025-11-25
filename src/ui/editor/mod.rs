@@ -991,9 +991,7 @@ impl State {
                         }
                     }
                     iced::Event::Keyboard(keyboard::Event::KeyPressed {
-                        key,
-                        modifiers,
-                        ..
+                        key, modifiers, ..
                     }) if modifiers.command() => {
                         // Ctrl+S (or Cmd+S on macOS): Save
                         match key {

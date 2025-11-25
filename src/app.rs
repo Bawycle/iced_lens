@@ -6,7 +6,6 @@
 //! loading. This file intentionally keeps policy decisions (minimum window size,
 //! persistence format, localization switching) close to the main update loop so
 //! it is easy to audit user-facing behavior.
-use std::path::PathBuf;
 use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::image_handler;
@@ -22,6 +21,7 @@ use iced::{
     window, Element, Length, Subscription, Task, Theme,
 };
 use std::fmt;
+use std::path::PathBuf;
 use unic_langid::LanguageIdentifier;
 
 /// Root Iced application state that bridges UI components, localization, and
@@ -207,12 +207,12 @@ impl App {
                     // In editor mode, route keyboard events to editor
                     if matches!(event, event::Event::Keyboard(..)) {
                         match status {
-                            event::Status::Ignored => Some(Message::Editor(
-                                crate::ui::editor::Message::RawEvent {
+                            event::Status::Ignored => {
+                                Some(Message::Editor(crate::ui::editor::Message::RawEvent {
                                     window: window_id,
                                     event: event.clone(),
-                                },
-                            )),
+                                }))
+                            }
                             event::Status::Captured => None,
                         }
                     } else {
@@ -234,10 +234,12 @@ impl App {
                     }
 
                     match status {
-                        event::Status::Ignored => Some(Message::Viewer(component::Message::RawEvent {
-                            window: window_id,
-                            event: event.clone(),
-                        })),
+                        event::Status::Ignored => {
+                            Some(Message::Viewer(component::Message::RawEvent {
+                                window: window_id,
+                                event: event.clone(),
+                            }))
+                        }
                         event::Status::Captured => None,
                     }
                 })
@@ -425,7 +427,10 @@ impl App {
                                     .and_then(|n| n.to_str())
                                     .unwrap_or("image.png"),
                             )
-                            .add_filter("Image Files", &["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico"])
+                            .add_filter(
+                                "Image Files",
+                                &["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico"],
+                            )
                             .save_file()
                             .await
                             .map(|h| h.path().to_path_buf())
