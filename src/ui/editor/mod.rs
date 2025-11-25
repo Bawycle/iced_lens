@@ -54,6 +54,10 @@ pub struct State {
     crop_selection: Option<Rectangle>,
     /// Crop aspect ratio constraint
     crop_ratio: CropRatio,
+    /// Crop tool state
+    crop_state: CropState,
+    /// Track if crop state has been modified (to avoid auto-commit on tool close)
+    crop_modified: bool,
     /// Resize state
     resize_state: ResizeState,
     /// Optional preview image (used for live adjustments)
@@ -117,6 +121,18 @@ pub struct ResizeState {
     pub width_input: String,
     /// Height input field value
     pub height_input: String,
+}
+
+/// State for the crop tool.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CropState {
+    /// Crop rectangle in image coordinates
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    /// Selected aspect ratio constraint
+    pub ratio: CropRatio,
 }
 
 /// Messages emitted directly by the editor widgets.
@@ -350,8 +366,15 @@ impl State {
             });
 
         scrollable_section = scrollable_section.push(crop_btn);
+
+        // Show crop panel immediately below crop button when active
+        if self.active_tool == Some(EditorTool::Crop) {
+            scrollable_section = scrollable_section.push(self.build_crop_panel(&ctx));
+        }
+
         scrollable_section = scrollable_section.push(resize_btn);
 
+        // Show resize panel immediately below resize button when active
         if self.active_tool == Some(EditorTool::Resize) {
             scrollable_section = scrollable_section.push(self.build_resize_panel(&ctx));
         }
@@ -365,21 +388,28 @@ impl State {
 
         footer_section = footer_section.push(iced::widget::horizontal_rule(1));
 
-        // Navigation arrows
-        let nav_row = Row::new()
-            .spacing(8)
-            .push(
-                button(text("◀").size(20))
-                    .on_press(Message::NavigatePrevious)
-                    .padding([8, 16])
-                    .width(Length::Fill),
-            )
-            .push(
-                button(text("▶").size(20))
-                    .on_press(Message::NavigateNext)
-                    .padding([8, 16])
-                    .width(Length::Fill),
-            );
+        // Navigation arrows (disabled if there are unsaved changes)
+        let has_changes = self.has_unsaved_changes();
+
+        let prev_btn = button(text("◀").size(20))
+            .padding([8, 16])
+            .width(Length::Fill);
+        let prev_btn = if has_changes {
+            prev_btn // No on_press = disabled appearance
+        } else {
+            prev_btn.on_press(Message::NavigatePrevious)
+        };
+
+        let next_btn = button(text("▶").size(20))
+            .padding([8, 16])
+            .width(Length::Fill);
+        let next_btn = if has_changes {
+            next_btn // No on_press = disabled appearance
+        } else {
+            next_btn.on_press(Message::NavigateNext)
+        };
+
+        let nav_row = Row::new().spacing(8).push(prev_btn).push(next_btn);
 
         footer_section = footer_section.push(nav_row);
 
@@ -515,6 +545,94 @@ impl State {
         .into()
     }
 
+    fn build_crop_panel<'a>(&'a self, ctx: &ViewContext<'a>) -> iced::Element<'a, Message> {
+        use iced::widget::{container, text, Column, Row};
+        use iced::Length;
+
+        let title = text(ctx.i18n.tr("editor-crop-section-title")).size(14);
+
+        let ratio_label = text(ctx.i18n.tr("editor-crop-ratio-label")).size(13);
+
+        // Build aspect ratio buttons in rows
+        let ratio_buttons_row1 =
+            Row::new()
+                .spacing(4)
+                .push(self.build_crop_ratio_button(
+                    ctx.i18n.tr("editor-crop-ratio-free"),
+                    CropRatio::Free,
+                ))
+                .push(self.build_crop_ratio_button(
+                    ctx.i18n.tr("editor-crop-ratio-square"),
+                    CropRatio::Square,
+                ));
+
+        let ratio_buttons_row2 = Row::new()
+            .spacing(4)
+            .push(self.build_crop_ratio_button(
+                ctx.i18n.tr("editor-crop-ratio-landscape"),
+                CropRatio::Landscape,
+            ))
+            .push(self.build_crop_ratio_button(
+                ctx.i18n.tr("editor-crop-ratio-portrait"),
+                CropRatio::Portrait,
+            ));
+
+        let ratio_buttons_row3 =
+            Row::new()
+                .spacing(4)
+                .push(self.build_crop_ratio_button(
+                    ctx.i18n.tr("editor-crop-ratio-photo"),
+                    CropRatio::Photo,
+                ))
+                .push(self.build_crop_ratio_button(
+                    ctx.i18n.tr("editor-crop-ratio-photo-portrait"),
+                    CropRatio::PhotoPortrait,
+                ));
+
+        let crop_info = text(format!(
+            "{}×{} px",
+            self.crop_state.width, self.crop_state.height
+        ))
+        .size(12);
+
+        container(
+            Column::new()
+                .spacing(8)
+                .push(title)
+                .push(ratio_label)
+                .push(ratio_buttons_row1)
+                .push(ratio_buttons_row2)
+                .push(ratio_buttons_row3)
+                .push(crop_info),
+        )
+        .padding(12)
+        .width(Length::Fill)
+        .style(theme::settings_panel_style)
+        .into()
+    }
+
+    fn build_crop_ratio_button<'a>(
+        &'a self,
+        label: String,
+        ratio: CropRatio,
+    ) -> iced::Element<'a, Message> {
+        use iced::widget::{button, text};
+        use iced::Length;
+
+        let is_active = self.crop_state.ratio == ratio;
+        let btn = button(text(label).size(11))
+            .on_press(Message::SetCropRatio(ratio))
+            .padding([4, 6])
+            .width(Length::Fill)
+            .style(if is_active {
+                iced::widget::button::primary
+            } else {
+                iced::widget::button::secondary
+            });
+
+        btn.into()
+    }
+
     /// Update the state and emit an [`Event`] for the parent when needed.
     pub fn update(&mut self, message: Message) -> Event {
         match message {
@@ -527,12 +645,16 @@ impl State {
                     self.commit_active_tool_changes();
                     self.active_tool = None;
                     self.preview_image = None;
+                    // Reset crop modified flag when closing crop tool
+                    if tool == EditorTool::Crop {
+                        self.crop_modified = false;
+                    }
                 } else {
                     self.commit_active_tool_changes();
                     self.active_tool = Some(tool);
-                    if tool != EditorTool::Resize {
-                        self.preview_image = None;
-                    }
+                    // Clear preview when switching tools
+                    self.preview_image = None;
+                    // Do NOT generate preview automatically for crop - user must select a ratio first
                 }
                 Event::None
             }
@@ -553,15 +675,19 @@ impl State {
                 Event::None
             }
             Message::SetCropRatio(ratio) => {
-                self.crop_ratio = ratio;
+                self.crop_state.ratio = ratio;
+                self.adjust_crop_to_ratio(ratio);
+                self.crop_modified = true;  // Mark as modified when user changes ratio
+                self.update_crop_preview();  // Show preview immediately
                 Event::None
             }
             Message::UpdateCropSelection(_rect) => {
-                // TODO: Implement crop selection
+                // TODO: Implement interactive crop selection with handles
                 Event::None
             }
             Message::ApplyCrop => {
-                // TODO: Implement crop application
+                // No longer used - crop now auto-commits when changing tools
+                // Kept for message compatibility
                 Event::None
             }
             Message::ScaleChanged(percent) => {
@@ -595,12 +721,22 @@ impl State {
                 Event::None
             }
             Message::NavigateNext => {
-                self.commit_active_tool_changes();
-                Event::NavigateNext
+                // Block navigation if there are unsaved changes
+                if self.has_unsaved_changes() {
+                    Event::None
+                } else {
+                    self.commit_active_tool_changes();
+                    Event::NavigateNext
+                }
             }
             Message::NavigatePrevious => {
-                self.commit_active_tool_changes();
-                Event::NavigatePrevious
+                // Block navigation if there are unsaved changes
+                if self.has_unsaved_changes() {
+                    Event::None
+                } else {
+                    self.commit_active_tool_changes();
+                    Event::NavigatePrevious
+                }
             }
             Message::Save => {
                 self.commit_active_tool_changes();
@@ -620,7 +756,8 @@ impl State {
                 }
             }
             Message::Cancel => {
-                self.preview_image = None;
+                // Discard all changes and exit editor
+                self.discard_changes();
                 Event::ExitEditor
             }
         }
@@ -631,6 +768,12 @@ impl State {
         let original_aspect = image.width as f32 / image.height as f32;
         let working_image =
             image_rs::open(&image_path).map_err(|err| Error::Io(err.to_string()))?;
+
+        // Initialize crop to center 75% of image
+        let crop_width = (image.width as f32 * 0.75).round() as u32;
+        let crop_height = (image.height as f32 * 0.75).round() as u32;
+        let crop_x = (image.width - crop_width) / 2;
+        let crop_y = (image.height - crop_height) / 2;
 
         Ok(Self {
             image_path,
@@ -643,6 +786,14 @@ impl State {
             sidebar_expanded: true,
             crop_selection: None,
             crop_ratio: CropRatio::Free,
+            crop_state: CropState {
+                x: crop_x,
+                y: crop_y,
+                width: crop_width,
+                height: crop_height,
+                ratio: CropRatio::Free,
+            },
+            crop_modified: false,
             resize_state: ResizeState {
                 scale_percent: 100.0,
                 width: image.width,
@@ -740,6 +891,15 @@ impl State {
     fn commit_active_tool_changes(&mut self) {
         if self.active_tool == Some(EditorTool::Resize) {
             self.apply_resize_dimensions();
+        } else if self.active_tool == Some(EditorTool::Crop) {
+            // Only apply crop if user has actually selected a ratio (crop_modified == true)
+            // This prevents auto-commit when just opening/closing the crop panel without changes
+            if self.crop_modified {
+                self.apply_crop();
+                self.crop_modified = false;
+            }
+            // Clear preview when closing crop tool
+            self.preview_image = None;
         }
     }
 
@@ -866,6 +1026,195 @@ impl State {
             Err(err) => {
                 eprintln!("Failed to build resize preview: {err:?}");
                 self.preview_image = None;
+            }
+        }
+    }
+
+    fn update_crop_preview(&mut self) {
+        let x = self.crop_state.x;
+        let y = self.crop_state.y;
+        let width = self.crop_state.width;
+        let height = self.crop_state.height;
+
+        // Validate crop bounds
+        if width == 0
+            || height == 0
+            || x >= self.current_image.width
+            || y >= self.current_image.height
+        {
+            self.preview_image = None;
+            return;
+        }
+
+        // Generate preview of cropped image
+        if let Some(cropped) = transform::crop(&self.working_image, x, y, width, height) {
+            match transform::dynamic_to_image_data(&cropped) {
+                Ok(image_data) => {
+                    self.preview_image = Some(image_data);
+                }
+                Err(err) => {
+                    eprintln!("Failed to build crop preview: {err:?}");
+                    self.preview_image = None;
+                }
+            }
+        } else {
+            self.preview_image = None;
+        }
+    }
+
+    fn adjust_crop_to_ratio(&mut self, ratio: CropRatio) {
+        let img_width = self.current_image.width as f32;
+        let img_height = self.current_image.height as f32;
+
+        let (new_width, new_height) = match ratio {
+            CropRatio::Free => {
+                // Keep current dimensions
+                return;
+            }
+            CropRatio::Square => {
+                // 1:1 - make square, use smaller dimension
+                let size = img_width.min(img_height);
+                (size, size)
+            }
+            CropRatio::Landscape => {
+                // 16:9
+                let height = img_width * 9.0 / 16.0;
+                if height <= img_height {
+                    (img_width, height)
+                } else {
+                    let width = img_height * 16.0 / 9.0;
+                    (width, img_height)
+                }
+            }
+            CropRatio::Portrait => {
+                // 9:16
+                let width = img_height * 9.0 / 16.0;
+                if width <= img_width {
+                    (width, img_height)
+                } else {
+                    let height = img_width * 16.0 / 9.0;
+                    (img_width, height)
+                }
+            }
+            CropRatio::Photo => {
+                // 4:3
+                let height = img_width * 3.0 / 4.0;
+                if height <= img_height {
+                    (img_width, height)
+                } else {
+                    let width = img_height * 4.0 / 3.0;
+                    (width, img_height)
+                }
+            }
+            CropRatio::PhotoPortrait => {
+                // 3:4
+                let width = img_height * 3.0 / 4.0;
+                if width <= img_width {
+                    (width, img_height)
+                } else {
+                    let height = img_width * 4.0 / 3.0;
+                    (img_width, height)
+                }
+            }
+        };
+
+        let new_width = new_width.round() as u32;
+        let new_height = new_height.round() as u32;
+
+        // Center the crop area
+        self.crop_state.width = new_width;
+        self.crop_state.height = new_height;
+        self.crop_state.x = (self.current_image.width - new_width) / 2;
+        self.crop_state.y = (self.current_image.height - new_height) / 2;
+    }
+
+    fn apply_crop(&mut self) {
+        let x = self.crop_state.x;
+        let y = self.crop_state.y;
+        let width = self.crop_state.width;
+        let height = self.crop_state.height;
+
+        // Validate crop bounds
+        if width == 0
+            || height == 0
+            || x >= self.current_image.width
+            || y >= self.current_image.height
+        {
+            eprintln!("Invalid crop bounds: ({}, {}, {}×{})", x, y, width, height);
+            return;
+        }
+
+        // Apply crop transformation
+        if let Some(cropped) = transform::crop(&self.working_image, x, y, width, height) {
+            match transform::dynamic_to_image_data(&cropped) {
+                Ok(image_data) => {
+                    self.working_image = cropped;
+                    self.current_image = image_data;
+                    self.sync_resize_state_dimensions();
+
+                    // Record transformation for undo/redo
+                    self.record_transformation(Transformation::Crop {
+                        rect: Rectangle {
+                            x: x as f32,
+                            y: y as f32,
+                            width: width as f32,
+                            height: height as f32,
+                        },
+                    });
+
+                    // Reset crop state to new full image
+                    let new_crop_width = (self.current_image.width as f32 * 0.75).round() as u32;
+                    let new_crop_height = (self.current_image.height as f32 * 0.75).round() as u32;
+                    self.crop_state.x = (self.current_image.width - new_crop_width) / 2;
+                    self.crop_state.y = (self.current_image.height - new_crop_height) / 2;
+                    self.crop_state.width = new_crop_width;
+                    self.crop_state.height = new_crop_height;
+                }
+                Err(err) => {
+                    eprintln!("Failed to convert cropped image: {err:?}");
+                }
+            }
+        } else {
+            eprintln!("Crop operation returned None");
+        }
+    }
+
+    /// Discard all changes and reset to original image state.
+    fn discard_changes(&mut self) {
+        // Reload the working image from disk
+        match image_rs::open(&self.image_path) {
+            Ok(fresh_image) => {
+                self.working_image = fresh_image;
+                match transform::dynamic_to_image_data(&self.working_image) {
+                    Ok(image_data) => {
+                        self.current_image = image_data.clone();
+                        self.sync_resize_state_dimensions();
+
+                        // Reset crop state
+                        let crop_width = (self.current_image.width as f32 * 0.75).round() as u32;
+                        let crop_height = (self.current_image.height as f32 * 0.75).round() as u32;
+                        self.crop_state.x = (self.current_image.width - crop_width) / 2;
+                        self.crop_state.y = (self.current_image.height - crop_height) / 2;
+                        self.crop_state.width = crop_width;
+                        self.crop_state.height = crop_height;
+                        self.crop_state.ratio = CropRatio::Free;
+                        self.crop_modified = false;
+
+                        // Clear transformation history
+                        self.transformation_history.clear();
+                        self.history_index = 0;
+
+                        // Clear active tool and preview
+                        self.active_tool = None;
+                        self.preview_image = None;
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to convert reloaded image: {err:?}");
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("Failed to reload original image: {err:?}");
             }
         }
     }

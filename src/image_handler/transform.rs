@@ -37,6 +37,33 @@ pub fn resize(image: &DynamicImage, width: u32, height: u32) -> DynamicImage {
     image.resize_exact(width, height, FilterType::Lanczos3)
 }
 
+/// Crop the image to the specified rectangle.
+///
+/// The rectangle coordinates are clamped to the image boundaries.
+/// If the resulting crop area is invalid (zero width or height), returns None.
+pub fn crop(image: &DynamicImage, x: u32, y: u32, width: u32, height: u32) -> Option<DynamicImage> {
+    let img_width = image.width();
+    let img_height = image.height();
+
+    // Clamp coordinates to image boundaries
+    let x = x.min(img_width.saturating_sub(1));
+    let y = y.min(img_height.saturating_sub(1));
+
+    // Calculate available width and height from the crop start point
+    let max_width = img_width.saturating_sub(x);
+    let max_height = img_height.saturating_sub(y);
+
+    let width = width.min(max_width).max(1);
+    let height = height.min(max_height).max(1);
+
+    // Ensure we have a valid crop area
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    Some(image.crop_imm(x, y, width, height))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -70,5 +97,47 @@ mod tests {
         let resized = resize(&img, 4, 2);
         assert_eq!(resized.width(), 4);
         assert_eq!(resized.height(), 2);
+    }
+
+    #[test]
+    fn crop_within_bounds() {
+        let img = create_test_image(10, 8);
+        let cropped = crop(&img, 2, 2, 4, 3);
+        assert!(cropped.is_some());
+        let result = cropped.unwrap();
+        assert_eq!(result.width(), 4);
+        assert_eq!(result.height(), 3);
+    }
+
+    #[test]
+    fn crop_clamps_to_boundaries() {
+        let img = create_test_image(10, 8);
+        // Request crop that extends beyond image
+        let cropped = crop(&img, 8, 6, 10, 10);
+        assert!(cropped.is_some());
+        let result = cropped.unwrap();
+        // Should be clamped to available area (10-8=2, 8-6=2)
+        assert_eq!(result.width(), 2);
+        assert_eq!(result.height(), 2);
+    }
+
+    #[test]
+    fn crop_at_origin() {
+        let img = create_test_image(10, 8);
+        let cropped = crop(&img, 0, 0, 5, 5);
+        assert!(cropped.is_some());
+        let result = cropped.unwrap();
+        assert_eq!(result.width(), 5);
+        assert_eq!(result.height(), 5);
+    }
+
+    #[test]
+    fn crop_entire_image() {
+        let img = create_test_image(10, 8);
+        let cropped = crop(&img, 0, 0, 10, 8);
+        assert!(cropped.is_some());
+        let result = cropped.unwrap();
+        assert_eq!(result.width(), 10);
+        assert_eq!(result.height(), 8);
     }
 }

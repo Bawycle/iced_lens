@@ -2,25 +2,26 @@
 
 This document tracks ongoing development work for IcedLens. It serves as a reference for features in progress and implementation notes.
 
-**Last Updated:** 2025-11-25 (Session 4 - Resize Preview & Scrollable Sidebar)
+**Last Updated:** 2025-11-25 (Session 5 - Crop Tool Implementation)
 
 ---
 
 ## 📊 Quick Status Summary
 
-**Overall Progress:** Infrastructure 100% | Features 35%
+**Overall Progress:** Infrastructure 100% | Features 50%
 
 - ✅ **Infrastructure Complete** - Module, UI, App integration, translations
 - ✅ **Sidebar Complete** - Retractable, all controls, Save/Save As/Cancel
 - ✅ **Rotate Tool** - Working image pipeline wired, icons corrected, history tracked
 - ✅ **Editor Preview** - Canvas now renders the edited image with fit containment
 - ✅ **Resize Tool** - Slider, presets, numeric inputs, aspect lock, live preview + auto-commit
-- ⏳ **Remaining** - Crop, Undo/Redo, Save implementation, Keyboard shortcuts
+- ✅ **Crop Tool** - Aspect ratio presets (Free, Square, 16:9, 9:16, 4:3, 3:4), auto-commit on tool change
+- ⏳ **Remaining** - Undo/Redo wiring, Save implementation, Keyboard shortcuts, Interactive crop overlay
 
 **Next Immediate Steps:**
-1. Implement Crop tool (selection overlay + apply flow)
-2. Hook Undo/Redo stack into toolbar shortcuts
-3. Wire Save/Save As persistence for edited images
+1. Hook Undo/Redo stack into toolbar shortcuts (Ctrl+Z/Ctrl+Y)
+2. Wire Save/Save As persistence for edited images
+3. Add keyboard shortcuts (E, Ctrl+S, Esc)
 
 ---
 
@@ -126,25 +127,48 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
 8. **Sidebar Overflow Handling**
    - Tool list sits inside a vertical scrollable so navigation/save controls remain accessible on short viewports
 
+9. **Crop Tool Implementation**
+   - `crop()` function in transform.rs with boundary clamping and validation
+   - Tests for crop within bounds, clamping, origin crop, and entire image crop (all passing)
+   - CropState structure tracking x, y, width, height, and selected ratio
+   - UI panel with 6 aspect ratio buttons (Free, Square 1:1, Landscape 16:9, Portrait 9:16, Photo 4:3, Photo Portrait 3:4)
+   - `adjust_crop_to_ratio()` calculates optimal crop dimensions for selected ratio
+   - `apply_crop()` applies transformation, updates working_image and current_image
+   - Auto-commit on tool change (same pattern as resize)
+   - Transformation recorded in history for future undo/redo
+   - Translations added for en-US and fr
+   - Crop area defaults to center 75% of image
+   - After crop, crop state resets to 75% of new image dimensions
+
+10. **Navigation & Cancel Protection**
+   - Navigation buttons (◀ ▶) disabled when unsaved changes exist
+   - Navigation messages return Event::None when changes are unsaved
+   - Cancel button discards all changes via `discard_changes()`:
+     - Reloads original image from disk
+     - Clears transformation history
+     - Resets crop/resize states
+     - Clears active tool and preview
+   - User MUST save or cancel before navigating to another image
+   - Visual feedback: navigation buttons appear disabled when blocked
+
 #### 🔄 In Progress
-Crop overlay UX and undo/redo wiring now take priority after landing resize tooling.
+Undo/redo wiring and Save/Save As implementation are next priorities.
 
 #### ⏳ To Do
-1. **Crop Tool Implementation**
-   - Interactive rectangle overlay on image
-   - 8 handles (4 corners + 4 edges) for resizing
-   - Aspect ratio constraint UI (Free, 1:1, 16:9, etc.)
-   - Apply crop transformation
-   - Update current_image
+1. **Crop Tool Enhancement (Optional)**
+   - Interactive rectangle overlay on image with visual feedback
+   - 8 draggable handles (4 corners + 4 edges) for manual resizing
+   - Rule-of-thirds grid overlay during crop adjustment
+   - Live dimension display during handle dragging
 
-2. **Undo/Redo System**
-   - Push transformations to history stack
-   - Track history_index
-   - Undo: revert to previous state, rebuild image
-   - Redo: reapply transformation
-   - Ctrl+Z / Ctrl+Y shortcuts
+2. **Undo/Redo System (High Priority)**
+   - Wire existing transformation history to Undo/Redo buttons
+   - Implement undo: replay transformations from original image up to history_index - 1
+   - Implement redo: apply transformation at history_index
+   - Add Ctrl+Z / Ctrl+Y keyboard shortcuts
+   - Update button states based on can_undo() / can_redo()
 
-3. **Save/Save As Implementation**
+3. **Save/Save As Implementation (High Priority)**
    - Save: write working_image to original path
    - Save As: file picker dialog → new path
    - Preserve format (JPEG→JPEG, PNG→PNG)
