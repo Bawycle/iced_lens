@@ -249,13 +249,11 @@ impl State {
 
     /// Build the expanded sidebar with tools and controls.
     fn build_sidebar<'a>(&'a self, ctx: ViewContext<'a>) -> iced::Element<'a, Message> {
-        use iced::widget::{button, container, svg, text, tooltip, Column, Row};
+        use iced::widget::scrollable::{Direction, Scrollbar};
+        use iced::widget::{button, container, svg, text, tooltip, Column, Row, Scrollable};
         use iced::{alignment::Vertical, Background, Border, Length};
 
-        let mut sidebar_content = Column::new()
-            .spacing(8)
-            .padding(12)
-            .width(Length::Fixed(180.0));
+        let mut header_section = Column::new().spacing(8);
 
         // Hamburger toggle button
         let toggle_button = button(text("☰").size(20))
@@ -263,7 +261,7 @@ impl State {
             .padding(8)
             .style(iced::widget::button::secondary);
 
-        sidebar_content = sidebar_content.push(
+        header_section = header_section.push(
             Row::new()
                 .push(toggle_button)
                 .push(text("Tools").size(18))
@@ -271,7 +269,9 @@ impl State {
                 .align_y(Vertical::Center),
         );
 
-        sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
+        header_section = header_section.push(iced::widget::horizontal_rule(1));
+
+        let mut scrollable_section = Column::new().spacing(8);
 
         // Rotate tools
         let rotate_left_icon = svg::Svg::new(svg::Handle::from_memory(ROTATE_LEFT_SVG.as_bytes()))
@@ -324,9 +324,9 @@ impl State {
         .width(Length::Fill)
         .style(theme::settings_panel_style);
 
-        sidebar_content = sidebar_content.push(rotate_section);
+        scrollable_section = scrollable_section.push(rotate_section);
 
-        sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
+        scrollable_section = scrollable_section.push(iced::widget::horizontal_rule(1));
 
         // Main tool buttons
         let crop_btn = button(text(ctx.i18n.tr("editor-tool-crop")).size(16))
@@ -349,18 +349,21 @@ impl State {
                 iced::widget::button::secondary
             });
 
-        sidebar_content = sidebar_content.push(crop_btn);
-        sidebar_content = sidebar_content.push(resize_btn);
+        scrollable_section = scrollable_section.push(crop_btn);
+        scrollable_section = scrollable_section.push(resize_btn);
 
         if self.active_tool == Some(EditorTool::Resize) {
-            sidebar_content = sidebar_content.push(self.build_resize_panel(&ctx));
+            scrollable_section = scrollable_section.push(self.build_resize_panel(&ctx));
         }
 
-        // Spacer to push navigation and action buttons to bottom
-        sidebar_content =
-            sidebar_content.push(iced::widget::Space::new(Length::Fill, Length::Fill));
+        let scrollable_content = Scrollable::new(scrollable_section)
+            .direction(Direction::Vertical(Scrollbar::new()))
+            .height(Length::Fill)
+            .width(Length::Fill);
 
-        sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
+        let mut footer_section = Column::new().spacing(8);
+
+        footer_section = footer_section.push(iced::widget::horizontal_rule(1));
 
         // Navigation arrows
         let nav_row = Row::new()
@@ -378,9 +381,9 @@ impl State {
                     .width(Length::Fill),
             );
 
-        sidebar_content = sidebar_content.push(nav_row);
+        footer_section = footer_section.push(nav_row);
 
-        sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
+        footer_section = footer_section.push(iced::widget::horizontal_rule(1));
 
         // Action buttons (Cancel/Save/Save As)
         let cancel_btn = button(text(ctx.i18n.tr("editor-cancel")).size(16))
@@ -400,12 +403,20 @@ impl State {
             .width(Length::Fill)
             .style(iced::widget::button::secondary);
 
-        sidebar_content = sidebar_content.push(cancel_btn);
-        sidebar_content = sidebar_content.push(save_btn);
-        sidebar_content = sidebar_content.push(save_as_btn);
+        footer_section = footer_section.push(cancel_btn);
+        footer_section = footer_section.push(save_btn);
+        footer_section = footer_section.push(save_as_btn);
+
+        let sidebar_stack = Column::new()
+            .spacing(8)
+            .padding(12)
+            .width(Length::Fixed(180.0))
+            .push(header_section)
+            .push(scrollable_content)
+            .push(footer_section);
 
         // Container with the same background as the viewer toolbar for visual continuity
-        container(sidebar_content)
+        container(sidebar_stack)
             .width(Length::Fixed(180.0))
             .height(Length::Fill)
             .style(|_theme: &iced::Theme| iced::widget::container::Style {
