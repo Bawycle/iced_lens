@@ -49,6 +49,7 @@ settings-sort-alphabetical = Alphabetical
 settings-sort-modified = Modified date
 settings-sort-created = Created date
 editor-title = Image Editor
+editor-back-to-viewer = Back to Viewer
 editor-cancel = Cancel
 editor-save = Save
 editor-save-as = Save As...

@@ -161,10 +161,11 @@ pub enum Message {
     /// Navigation
     NavigateNext,
     NavigatePrevious,
-    /// Save/cancel
+    /// Save/cancel/back
     Save,
     SaveAs,
-    Cancel,
+    Cancel,      // Discard changes but stay in editor
+    BackToViewer, // Return to viewer (only if no unsaved changes)
 }
 
 /// Events propagated to the parent application for side effects.
@@ -187,13 +188,39 @@ pub enum Event {
 impl State {
     /// Render the editor view.
     pub fn view<'a>(&'a self, ctx: ViewContext<'a>) -> iced::Element<'a, Message> {
-        use iced::widget::{button, center, container, image, text, Row};
-        use iced::{Background, Border, ContentFit, Length};
+        use iced::widget::{button, center, container, image, text, Column, Row};
+        use iced::{Alignment, Background, Border, ContentFit, Length};
 
         let ViewContext {
             i18n,
             background_theme,
         } = ctx;
+
+        // Top toolbar with "Back to Viewer" button
+        let has_changes = self.has_unsaved_changes();
+        let back_btn = button(text(format!("← {}", i18n.tr("editor-back-to-viewer"))).size(14))
+            .padding([8, 12]);
+        let back_btn = if has_changes {
+            back_btn  // Disabled if unsaved changes
+        } else {
+            back_btn.on_press(Message::BackToViewer)
+        };
+
+        let toolbar = container(
+            Row::new()
+                .push(back_btn)
+                .align_y(Alignment::Center)
+                .padding(8),
+        )
+        .width(Length::Fill)
+        .style(|_theme: &iced::Theme| iced::widget::container::Style {
+            background: Some(Background::Color(theme::viewer_toolbar_background())),
+            border: Border {
+                width: 0.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
 
         // Main layout: Row with sidebar + image area
         let mut main_row = Row::new().spacing(0);
@@ -257,7 +284,12 @@ impl State {
 
         main_row = main_row.push(image_area);
 
-        container(main_row)
+        // Combine toolbar and main content in a Column
+        let content = Column::new()
+            .push(toolbar)
+            .push(main_row);
+
+        container(content)
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
@@ -756,9 +788,17 @@ impl State {
                 }
             }
             Message::Cancel => {
-                // Discard all changes and exit editor
+                // Discard all changes but STAY in editor
                 self.discard_changes();
-                Event::ExitEditor
+                Event::None
+            }
+            Message::BackToViewer => {
+                // Return to viewer (only allowed if no unsaved changes)
+                if self.has_unsaved_changes() {
+                    Event::None  // Blocked
+                } else {
+                    Event::ExitEditor
+                }
             }
         }
     }
