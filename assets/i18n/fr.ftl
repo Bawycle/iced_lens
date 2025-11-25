@@ -1,7 +1,7 @@
 window-title = IcedLens
 hello-message = Bonjour, le monde !
 open-settings-button = Paramètres
-back-to-viewer-button = Retour à la visionneuse
+settings-back-to-viewer-button = Retour
 settings-title = Paramètres
 select-language-label = Sélectionner la langue :
 language-name-en-US = Anglais

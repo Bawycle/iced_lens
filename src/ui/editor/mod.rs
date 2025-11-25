@@ -128,6 +128,18 @@ pub struct ResizeState {
     pub width_input: String,
     /// Height input field value
     pub height_input: String,
+    /// Visual overlay showing original size markers
+    pub overlay: ResizeOverlay,
+}
+
+/// Visual overlay for resize tool showing original dimensions
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResizeOverlay {
+    /// Whether the overlay is currently visible
+    pub visible: bool,
+    /// Original image dimensions for reference
+    pub original_width: u32,
+    pub original_height: u32,
 }
 
 /// State for the crop tool.
@@ -355,6 +367,22 @@ impl State {
 
             // Stack image and overlay
             Stack::new().push(image_widget).push(overlay).into()
+        } else if self.resize_state.overlay.visible {
+            use iced::widget::{Canvas, Stack};
+
+            // Create resize overlay canvas
+            // Overlay calculates scale based on max(original, new) to fit both rectangles
+            let overlay: Canvas<_, Message> = Canvas::new(ResizeOverlayRenderer {
+                original_width: self.resize_state.overlay.original_width,
+                original_height: self.resize_state.overlay.original_height,
+                new_width: self.resize_state.width,
+                new_height: self.resize_state.height,
+            })
+            .width(Length::Fill)
+            .height(Length::Fill);
+
+            // Stack image and overlay
+            Stack::new().push(image_widget).push(overlay).into()
         } else {
             image_widget.into()
         };
@@ -444,14 +472,13 @@ impl State {
 
         let undo_redo_section = container(
             Column::new()
-            .spacing(6)
-            .push(undo_redo_section_title)
-            .push(undo_redo_row) 
+                .spacing(6)
+                .push(undo_redo_section_title)
+                .push(undo_redo_row),
         )
-            .padding(12)
-            .width(Length::Fill)
-            .style(theme::settings_panel_style);
-
+        .padding(12)
+        .width(Length::Fill)
+        .style(theme::settings_panel_style);
 
         let mut scrollable_section = Column::new().spacing(8);
 
@@ -513,7 +540,6 @@ impl State {
         scrollable_section = scrollable_section.push(rotate_section);
 
         scrollable_section = scrollable_section.push(iced::widget::horizontal_rule(1));
-
 
         // Main tool buttons
         let crop_btn = button(text(ctx.i18n.tr("editor-tool-crop")).size(16))
@@ -860,12 +886,20 @@ impl State {
                         self.crop_state.overlay.visible = false;
                         self.crop_state.overlay.drag_state = CropDragState::None;
                     }
+                    // Hide resize overlay when closing resize tool
+                    if tool == EditorTool::Resize {
+                        self.resize_state.overlay.visible = false;
+                    }
                 } else {
                     self.commit_active_tool_changes();
                     // Hide overlay when leaving crop tool
                     if self.active_tool == Some(EditorTool::Crop) {
                         self.crop_state.overlay.visible = false;
                         self.crop_state.overlay.drag_state = CropDragState::None;
+                    }
+                    // Hide resize overlay when leaving resize tool
+                    if self.active_tool == Some(EditorTool::Resize) {
+                        self.resize_state.overlay.visible = false;
                     }
                     self.active_tool = Some(tool);
                     // Clear preview when switching tools
@@ -884,6 +918,13 @@ impl State {
                         self.crop_state.ratio = CropRatio::None;
                         // Don't show overlay until user selects a ratio
                         self.crop_state.overlay.visible = false;
+                    }
+
+                    // When opening resize tool, show overlay with current image dimensions as baseline
+                    if tool == EditorTool::Resize {
+                        self.resize_state.overlay.visible = true;
+                        self.resize_state.overlay.original_width = self.current_image.width;
+                        self.resize_state.overlay.original_height = self.current_image.height;
                     }
                 }
                 Event::None
@@ -1137,6 +1178,11 @@ impl State {
                 original_aspect,
                 width_input: image.width.to_string(),
                 height_input: image.height.to_string(),
+                overlay: ResizeOverlay {
+                    visible: false,
+                    original_width: image.width,
+                    original_height: image.height,
+                },
             },
             crop_base_image: None,
             crop_base_width: image.width,
@@ -1372,6 +1418,12 @@ impl State {
     }
 
     fn update_resize_preview(&mut self) {
+        // Don't generate preview when overlay is visible - the overlay will show the preview
+        if self.resize_state.overlay.visible {
+            self.preview_image = None;
+            return;
+        }
+
         let target_width = self.resize_state.width.max(1);
         let target_height = self.resize_state.height.max(1);
         if target_width == self.current_image.width && target_height == self.current_image.height {
@@ -2181,6 +2233,135 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
                 Stroke::default().with_width(1.0).with_color(Color::BLACK),
             );
         }
+
+        vec![frame.into_geometry()]
+    }
+}
+
+/// Resize overlay renderer showing original dimensions and preview
+struct ResizeOverlayRenderer {
+    /// Original image dimensions (reference markers - white rectangle)
+    original_width: u32,
+    original_height: u32,
+    /// New dimensions after resize (preview - blue rectangle)
+    new_width: u32,
+    new_height: u32,
+}
+
+impl iced::widget::canvas::Program<Message> for ResizeOverlayRenderer {
+    type State = ();
+
+    fn update(
+        &self,
+        _state: &mut Self::State,
+        _event: iced::widget::canvas::Event,
+        _bounds: iced::Rectangle,
+        _cursor: iced::mouse::Cursor,
+    ) -> (iced::widget::canvas::event::Status, Option<Message>) {
+        // No interaction needed for resize overlay
+        (iced::widget::canvas::event::Status::Ignored, None)
+    }
+
+    fn draw(
+        &self,
+        _state: &Self::State,
+        renderer: &iced::Renderer,
+        _theme: &iced::Theme,
+        bounds: iced::Rectangle,
+        _cursor: iced::mouse::Cursor,
+    ) -> Vec<iced::widget::canvas::Geometry> {
+        use iced::widget::canvas::{Frame, Path, Stroke, Text};
+        use iced::Color;
+
+        let mut frame = Frame::new(renderer, bounds.size());
+
+        // Calculate the bounding box that contains both original and new dimensions
+        // This ensures both rectangles fit in the viewport
+        let max_width = self.original_width.max(self.new_width);
+        let max_height = self.original_height.max(self.new_height);
+
+        // Use the max dimensions for ContentFit::Contain calculation
+        let max_aspect = max_width as f32 / max_height as f32;
+        let bounds_aspect = bounds.width / bounds.height;
+
+        let (display_width, display_height, offset_x, offset_y) =
+            if max_aspect > bounds_aspect {
+                // Wider - fit to width with margin
+                let display_width = bounds.width * 0.95; // 5% margin
+                let display_height = display_width / max_aspect;
+                let offset_x = (bounds.width - display_width) / 2.0;
+                let offset_y = (bounds.height - display_height) / 2.0;
+                (display_width, display_height, offset_x, offset_y)
+            } else {
+                // Taller - fit to height with margin
+                let display_height = bounds.height * 0.95; // 5% margin
+                let display_width = display_height * max_aspect;
+                let offset_x = (bounds.width - display_width) / 2.0;
+                let offset_y = (bounds.height - display_height) / 2.0;
+                (display_width, display_height, offset_x, offset_y)
+            };
+
+        // Scale factors (how many screen pixels per image pixel)
+        let scale_x = display_width / max_width as f32;
+        let scale_y = display_height / max_height as f32;
+
+        // Calculate screen dimensions for original and new sizes using the same scale
+        let original_screen_width = self.original_width as f32 * scale_x;
+        let original_screen_height = self.original_height as f32 * scale_y;
+        let new_screen_width = self.new_width as f32 * scale_x;
+        let new_screen_height = self.new_height as f32 * scale_y;
+
+        // Center both rectangles within the display area
+        let original_x = offset_x + (display_width - original_screen_width) / 2.0;
+        let original_y = offset_y + (display_height - original_screen_height) / 2.0;
+        let new_x = offset_x + (display_width - new_screen_width) / 2.0;
+        let new_y = offset_y + (display_height - new_screen_height) / 2.0;
+
+        // Draw the original dimensions marker first (white stroke, thick)
+        let original_rect = Path::rectangle(
+            iced::Point::new(original_x, original_y),
+            iced::Size::new(original_screen_width, original_screen_height),
+        );
+        frame.stroke(
+            &original_rect,
+            Stroke::default().with_width(3.0).with_color(Color::WHITE),
+        );
+
+        // Draw the resized image area on top (blue stroke only, no fill to see through)
+        let new_rect = Path::rectangle(
+            iced::Point::new(new_x, new_y),
+            iced::Size::new(new_screen_width, new_screen_height),
+        );
+        frame.stroke(
+            &new_rect,
+            Stroke::default()
+                .with_width(3.0)
+                .with_color(Color::from_rgb8(100, 150, 255)),
+        );
+
+        // Draw dimension labels
+        let label_color = Color::WHITE;
+        let font_size = 16.0;
+
+        // Original dimensions label (top-left of original rect)
+        let original_label = format!("Original: {}×{}", self.original_width, self.original_height);
+        frame.fill_text(Text {
+            content: original_label,
+            position: iced::Point::new(original_x, original_y - 20.0),
+            color: label_color,
+            size: font_size.into(),
+            ..Text::default()
+        });
+
+        // New dimensions label (bottom-right of new rect)
+        let new_label = format!("New: {}×{}", self.new_width, self.new_height);
+        frame.fill_text(Text {
+            content: new_label,
+            position: iced::Point::new(new_x, new_y + new_screen_height + 5.0),
+            color: Color::from_rgb8(100, 150, 255),
+            size: font_size.into(),
+            ..Text::default()
+        });
 
         vec![frame.into_geometry()]
     }
