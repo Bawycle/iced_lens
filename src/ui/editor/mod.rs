@@ -102,6 +102,7 @@ pub enum Transformation {
 /// Crop aspect ratio constraints.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CropRatio {
+    None,          // No ratio selected
     Free,
     Square,        // 1:1
     Landscape,     // 16:9
@@ -810,7 +811,7 @@ impl State {
                     // Clear preview when switching tools
                     self.preview_image = None;
 
-                    // When opening crop tool, memorize current image state and show overlay
+                    // When opening crop tool, memorize current image state
                     if tool == EditorTool::Crop {
                         self.crop_base_image = Some(self.working_image.clone());
                         self.crop_base_width = self.current_image.width;
@@ -820,9 +821,9 @@ impl State {
                         self.crop_state.y = 0;
                         self.crop_state.width = self.current_image.width;
                         self.crop_state.height = self.current_image.height;
-                        self.crop_state.ratio = CropRatio::Free;
-                        // Show overlay with default crop (don't apply yet)
-                        self.crop_state.overlay.visible = true;
+                        self.crop_state.ratio = CropRatio::None;
+                        // Don't show overlay until user selects a ratio
+                        self.crop_state.overlay.visible = false;
                     }
                 }
                 Event::None
@@ -862,6 +863,18 @@ impl State {
                     self.crop_state.overlay.visible = false;
                     self.crop_state.overlay.drag_state = CropDragState::None;
                     self.crop_modified = false;
+                    // Reset to None (deselect all ratio buttons)
+                    self.crop_state.ratio = CropRatio::None;
+                    // Reset crop rectangle to full new image size for next crop
+                    self.crop_state.x = 0;
+                    self.crop_state.y = 0;
+                    self.crop_state.width = self.current_image.width;
+                    self.crop_state.height = self.current_image.height;
+                    // Update base image to the newly cropped image
+                    self.crop_base_image = Some(self.working_image.clone());
+                    self.crop_base_width = self.current_image.width;
+                    self.crop_base_height = self.current_image.height;
+                    // Overlay stays hidden until user selects a ratio
                 }
                 Event::None
             }
@@ -1230,8 +1243,8 @@ impl State {
         let img_height = self.crop_base_height as f32;
 
         let (new_width, new_height) = match ratio {
-            CropRatio::Free => {
-                // Keep current dimensions
+            CropRatio::None | CropRatio::Free => {
+                // No adjustment needed
                 return;
             }
             CropRatio::Square => {
@@ -1456,6 +1469,8 @@ impl State {
                 // Update crop dimensions based on which handle is being dragged
                 self.update_crop_from_handle_drag(handle, start_rect, delta_x, delta_y);
                 self.crop_modified = true;
+                // Switch to Free ratio when manually resizing
+                self.crop_state.ratio = CropRatio::Free;
             }
             CropDragState::None => {}
         }
@@ -1574,7 +1589,7 @@ impl State {
     /// Apply aspect ratio constraint to current crop dimensions
     fn apply_aspect_ratio_constraint_to_current_crop(&mut self) {
         let target_ratio = match self.crop_state.ratio {
-            CropRatio::Free => return, // No constraint
+            CropRatio::None | CropRatio::Free => return, // No constraint
             CropRatio::Square => 1.0,
             CropRatio::Landscape => 16.0 / 9.0,
             CropRatio::Portrait => 9.0 / 16.0,
