@@ -439,12 +439,19 @@ impl State {
 
         let undo_redo_row = Row::new().spacing(8).push(undo_btn).push(redo_btn);
 
-        let undo_redo_section = container(undo_redo_row)
+        let undo_redo_section_title = text(ctx.i18n.tr("editor-undo-redo-section-title")).size(14);
+
+        let undo_redo_section = container(
+            Column::new()
+            .spacing(6)
+            .push(undo_redo_section_title)
+            .push(undo_redo_row) 
+        )
             .padding(12)
             .width(Length::Fill)
             .style(theme::settings_panel_style);
 
-            
+
         let mut scrollable_section = Column::new().spacing(8);
 
         scrollable_section = scrollable_section.push(undo_redo_section);

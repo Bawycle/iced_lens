@@ -77,5 +77,6 @@ editor-crop-ratio-portrait = Portrait (9:16)
 editor-crop-ratio-photo = Photo (4:3)
 editor-crop-ratio-photo-portrait = Photo Portrait (3:4)
 editor-crop-apply = Apply crop
+editor-undo-redo-section-title = Last modification
 editor-undo = Undo
 editor-redo = Redo
