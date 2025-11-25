@@ -415,7 +415,10 @@ impl App {
             AppMode::Editor => {
                 if let Some(editor_state) = &self.editor {
                     editor_state
-                        .view(editor::ViewContext { i18n: &self.i18n })
+                        .view(editor::ViewContext {
+                            i18n: &self.i18n,
+                            background_theme: self.settings.background_theme(),
+                        })
                         .map(Message::Editor)
                 } else {
                     // Fallback if editor state is missing

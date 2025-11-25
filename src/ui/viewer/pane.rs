@@ -4,16 +4,16 @@
 
 use crate::config::BackgroundTheme;
 use crate::image_handler::ImageData;
+use crate::ui::theme;
 use crate::ui::viewer::component::Message;
 use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
+use iced::mouse;
 use iced::widget::{button, mouse_area, Column, Container, Scrollable, Stack, Text};
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::canvas,
     widget::scrollable::{Direction, Id, Scrollbar, Viewport},
     Background, Border, Color, Element, Length, Padding, Shadow, Theme,
 };
-use iced::{mouse, Rectangle};
 
 pub struct ViewContext {
     pub background_theme: BackgroundTheme,
@@ -75,7 +75,7 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
 
     let base_surface: Element<'_, Message> = match ctx.background_theme {
         BackgroundTheme::Light => {
-            let color = Color::from_rgb8(245, 245, 245);
+            let color = theme::viewer_light_surface_color();
             scrollable_container
                 .style(move |_theme: &Theme| iced::widget::container::Style {
                     background: Some(Background::Color(color)),
@@ -84,7 +84,7 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
                 .into()
         }
         BackgroundTheme::Dark => {
-            let color = Color::from_rgb8(32, 33, 36);
+            let color = theme::viewer_dark_surface_color();
             scrollable_container
                 .style(move |_theme: &Theme| iced::widget::container::Style {
                     background: Some(Background::Color(color)),
@@ -92,14 +92,7 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
                 })
                 .into()
         }
-        BackgroundTheme::Checkerboard => Stack::new()
-            .push(
-                canvas::Canvas::new(CheckerboardBackground)
-                    .width(Length::Fill)
-                    .height(Length::Fill),
-            )
-            .push(scrollable_container)
-            .into(),
+        BackgroundTheme::Checkerboard => theme::wrap_with_checkerboard(scrollable_container),
     };
 
     let mut stack = Stack::new().push(base_surface);
@@ -214,47 +207,4 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
     }
 
     stack.into()
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct CheckerboardBackground;
-
-impl CheckerboardBackground {
-    const TILE: f32 = 20.0;
-}
-
-impl canvas::Program<Message> for CheckerboardBackground {
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &Self::State,
-        renderer: &iced::Renderer,
-        _theme: &Theme,
-        bounds: Rectangle,
-        _cursor: mouse::Cursor,
-    ) -> Vec<canvas::Geometry> {
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-        let tile = Self::TILE;
-        let light = Color::from_rgb(0.85, 0.85, 0.85);
-        let dark = Color::from_rgb(0.75, 0.75, 0.75);
-
-        let cols = ((bounds.width / tile).ceil() as i32).max(1);
-        let rows = ((bounds.height / tile).ceil() as i32).max(1);
-
-        for row in 0..rows {
-            for col in 0..cols {
-                let color = if (row + col) % 2 == 0 { light } else { dark };
-                let x = col as f32 * tile;
-                let y = row as f32 * tile;
-                let path = canvas::Path::rectangle(
-                    iced::Point::new(x, y),
-                    iced::Size::new(tile + 0.5, tile + 0.5),
-                );
-                frame.fill(&path, color);
-            }
-        }
-
-        vec![frame.into_geometry()]
-    }
 }

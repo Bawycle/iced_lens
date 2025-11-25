@@ -10,6 +10,7 @@
 
 mod transform;
 
+use crate::config::BackgroundTheme;
 use crate::error::{Error, Result};
 use crate::image_handler::ImageData;
 use crate::ui::theme;
@@ -28,6 +29,7 @@ const ROTATE_RIGHT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.
 /// Contextual data needed to render the editor view.
 pub struct ViewContext<'a> {
     pub i18n: &'a crate::i18n::fluent::I18n,
+    pub background_theme: BackgroundTheme,
 }
 
 /// Local UI state for the editor screen.
@@ -172,12 +174,20 @@ impl State {
         use iced::widget::{button, center, container, image, text, Row};
         use iced::{Background, Border, Color, ContentFit, Length};
 
+        let ViewContext {
+            i18n,
+            background_theme,
+        } = ctx;
+
         // Main layout: Row with sidebar + image area
         let mut main_row = Row::new().spacing(0);
 
         // Sidebar (always visible, but can be collapsed in future)
         if self.sidebar_expanded {
-            let sidebar = self.build_sidebar(ctx);
+            let sidebar = self.build_sidebar(ViewContext {
+                i18n,
+                background_theme,
+            });
             main_row = main_row.push(sidebar);
         } else {
             // Collapsed sidebar - just the hamburger button
@@ -202,16 +212,30 @@ impl State {
         }
 
         // Image area with current preview
-        let image_widget =
-            image(self.current_image.handle.clone()).content_fit(ContentFit::Contain);
-
-        let image_area = container(center(image_widget))
+        let build_image_surface = || {
+            container(center(
+                image(self.current_image.handle.clone()).content_fit(ContentFit::Contain),
+            ))
             .width(Length::Fill)
             .height(Length::Fill)
-            .style(|_theme: &iced::Theme| iced::widget::container::Style {
-                background: Some(Background::Color(Color::from_rgb(0.9, 0.9, 0.9))),
-                ..Default::default()
-            });
+        };
+
+        let image_area: iced::Element<'_, Message> = if theme::is_checkerboard(background_theme) {
+            theme::wrap_with_checkerboard(build_image_surface())
+        } else {
+            let bg_color = match background_theme {
+                BackgroundTheme::Light => theme::viewer_light_surface_color(),
+                BackgroundTheme::Dark => theme::viewer_dark_surface_color(),
+                BackgroundTheme::Checkerboard => unreachable!(),
+            };
+
+            build_image_surface()
+                .style(move |_theme: &iced::Theme| iced::widget::container::Style {
+                    background: Some(Background::Color(bg_color)),
+                    ..Default::default()
+                })
+                .into()
+        };
 
         main_row = main_row.push(image_area);
 
