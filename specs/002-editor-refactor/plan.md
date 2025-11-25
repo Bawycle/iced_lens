@@ -67,3 +67,14 @@ src/ui/editor/
 - Preserve existing public functions until the final step to avoid API churn.
 - Keep unit tests close to the logic they cover; when moving code, move its tests to the same module.
 - Use integration tests (already in `tests/integration.rs`) as final verification.
+
+## Follow-up Opportunities
+The core refactor is complete, but we identified additional improvements that keep the "state down / messages up" layering intact while reducing module size and clarifying ownership:
+
+1. **Tool-specific handlers**: move crop/resize (and future tools) update logic into `state/crop.rs`, `state/resize.rs`, etc., so `State::update` delegates instead of embedding long match arms.
+2. **History subsystem**: extract `Transformation`, undo/redo bookkeeping, and replay logic into `state/history.rs` to simplify the main state struct and enable focused tests.
+3. **Scoped messages**: define toolbar/sidebar/canvas message enums next to their view modules, re-export them from the facade, and keep routing centralized—this limits cross-module imports and clarifies who can emit what.
+4. **Shared helpers/services**: relocate utilities like `parse_dimension_input`, crop math, and image conversions into dedicated helpers (e.g., `state/utils.rs` or `image_ops.rs`) to avoid bloating the primary impl block.
+5. **Targeted tests**: as modules split, co-locate new unit tests with each subsystem (crop ratios, resize clamping, history replay) to guard against regressions without relying solely on the large integration test.
+
+These can land incrementally; each preserves the existing public API and continues to funnel state updates/messages through the current editor facade.
