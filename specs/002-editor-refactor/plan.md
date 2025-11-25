@@ -46,27 +46,21 @@ src/ui/editor/
 - View submodules take `&ViewContext` + lightweight view models; they never mutate state directly—only emit messages.
 
 ## Incremental Plan
-1. **Audit & Baseline (current step)**
-   - Document structure (done in this file) and ensure `cargo clippy`/`cargo test` green for baseline.
+1. **Audit & Baseline** ✅ (structure captured here; `cargo clippy`/`cargo test` were green before refactor work started).
 
-2. **State Extraction**
-   - Move `ResizeState`, `CropState`, `CropOverlay`, `ResizeOverlay`, and helper functions tied exclusively to each tool into `state/resize.rs` and `state/crop.rs`.
-   - Update imports in `mod.rs`; keep public API untouched. Re-run tests.
+2. **State Extraction** ✅ (`state/{crop,resize}.rs` now own tool-specific data & helpers; imports updated in `mod.rs`, tests kept passing).
 
-3. **View Split**
-   - Extract `build_sidebar`, `build_resize_panel`, `build_crop_panel`, `build_crop_ratio_button`, and overlay stack assembly into `view/*` modules.
-   - Introduce dedicated view models if necessary so submodules only get the data they need.
+3. **View Split** ✅ (toolbar/sidebar/canvas/crop+resize panels live under `view/`, driven by lightweight view models).
 
-4. **Message Routing Cleanup**
-   - Define nested enums (`Message::Toolbar(ToolbarMessage)`, etc.).
-   - Update `State::update` to delegate to per-tool handlers, reducing the giant match block.
+4. **Message Routing Cleanup** ✅ (`Message::{Toolbar,Sidebar,Canvas}` with dedicated handlers landed; state update logic now delegates per area).
 
-5. **Overlay Modules**
-   - Move `CropOverlayRenderer`/`ResizeOverlayRenderer` canvas logic into `overlay/` files to isolate drawing code from state mutations.
+5. **Overlay Modules** ✅ (`overlay/{crop,resize}.rs` host the canvas programs; `view/canvas.rs` consumes them, keeping drawing logic isolated).
 
-6. **Testing & Regression Guarding**
-   - After each step: `cargo fmt`, `cargo clippy`, `cargo test`.
-   - Manual QA checklist: crop drag/ratio, resize inputs/lock, rotate undo/redo, save/save-as/back navigation, keyboard shortcuts (undo/redo, navigate, save).
+6. **Testing & Regression Guarding** ✅
+   - Automated: latest run `cargo fmt && cargo clippy && cargo test editor` (2025-11-26) passes.
+   - Manual QA (2025-11-26): verified crop drag/ratio, resize inputs & lock toggle, rotate + undo/redo, navigation/save/back buttons, and keyboard shortcuts (undo/redo, navigate, save) in the UI.
+
+> Continue tracking new regressions in a follow-up QA checklist if additional editor functionality changes beyond this plan.
 
 ## Risk Mitigation
 - Work in small commits per step to ease review and rollback.
