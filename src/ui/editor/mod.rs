@@ -222,6 +222,7 @@ pub enum Message {
     HeightInputChanged(String),
     ToggleLockAspect,
     ApplyResizePreset(f32), // Preset percentage (50%, 75%, 150%, 200%)
+    ApplyResize,
     /// Undo/redo
     Undo,
     Redo,
@@ -713,6 +714,13 @@ impl State {
         )
         .on_toggle(|_| Message::ToggleLockAspect);
 
+        // Apply button
+        let apply_btn = button(text(ctx.i18n.tr("editor-resize-apply")).size(16))
+            .padding(10)
+            .width(Length::Fill)
+            .style(iced::widget::button::primary)
+            .on_press(Message::ApplyResize);
+
         container(
             Column::new()
                 .spacing(12)
@@ -720,7 +728,8 @@ impl State {
                 .push(presets_section)
                 .push(text(ctx.i18n.tr("editor-resize-dimensions-label")).size(13))
                 .push(dimensions_row)
-                .push(lock_checkbox),
+                .push(lock_checkbox)
+                .push(apply_btn),
         )
         .padding(12)
         .width(Length::Fill)
@@ -959,6 +968,11 @@ impl State {
             }
             Message::ApplyResizePreset(percent) => {
                 self.set_resize_percent(percent);
+                Event::None
+            }
+            Message::ApplyResize => {
+                // Apply the resize transformation
+                self.apply_resize_dimensions();
                 Event::None
             }
             Message::Undo => {
@@ -1246,10 +1260,8 @@ impl State {
     }
 
     fn commit_active_tool_changes(&mut self) {
-        if self.active_tool == Some(EditorTool::Resize) {
-            self.apply_resize_dimensions();
-        }
-        // Note: Crop tool applies immediately when ratio is selected, no auto-commit needed
+        // Note: Both Crop and Resize tools now require explicit "Apply" button press
+        // No auto-commit when switching tools
     }
 
     fn set_resize_percent(&mut self, percent: f32) {
