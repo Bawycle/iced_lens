@@ -222,7 +222,9 @@ impl State {
                     if let Some(old_idx) = old_index {
                         // Try to go to the same index, or the closest valid one
                         let target_index = old_idx.min(self.image_list.len().saturating_sub(1));
-                        if let Some(path) = self.image_list.get(target_index).map(|p| p.to_path_buf()) {
+                        if let Some(path) =
+                            self.image_list.get(target_index).map(|p| p.to_path_buf())
+                        {
                             self.image_list.set_current_index(target_index);
                             self.current_image_path = Some(path);
                         }
@@ -255,7 +257,9 @@ impl State {
                     if let Some(old_idx) = old_index {
                         // Try to go to the same index, or the closest valid one
                         let target_index = old_idx.min(self.image_list.len().saturating_sub(1));
-                        if let Some(path) = self.image_list.get(target_index).map(|p| p.to_path_buf()) {
+                        if let Some(path) =
+                            self.image_list.get(target_index).map(|p| p.to_path_buf())
+                        {
                             self.image_list.set_current_index(target_index);
                             self.current_image_path = Some(path);
                         }

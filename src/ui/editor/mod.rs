@@ -10,6 +10,7 @@
 
 mod transform;
 
+use crate::error::{Error, Result};
 use crate::image_handler::ImageData;
 use iced::Rectangle;
 use image_rs::DynamicImage;
@@ -80,10 +81,10 @@ pub enum Transformation {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CropRatio {
     Free,
-    Square,      // 1:1
-    Landscape,   // 16:9
-    Portrait,    // 9:16
-    Photo,       // 4:3
+    Square,        // 1:1
+    Landscape,     // 16:9
+    Portrait,      // 9:16
+    Photo,         // 4:3
     PhotoPortrait, // 3:4
 }
 
@@ -144,7 +145,10 @@ pub enum Message {
 pub enum Event {
     None,
     /// Request to save the edited image
-    SaveRequested { path: PathBuf, overwrite: bool },
+    SaveRequested {
+        path: PathBuf,
+        overwrite: bool,
+    },
     /// Request to exit editor mode
     ExitEditor,
     /// Request to navigate to next image
@@ -156,8 +160,8 @@ pub enum Event {
 impl State {
     /// Render the editor view.
     pub fn view<'a>(&'a self, ctx: ViewContext<'a>) -> iced::Element<'a, Message> {
-        use iced::widget::{button, container, text, Row};
-        use iced::{Background, Border, Color, Length};
+        use iced::widget::{button, center, container, image, text, Row};
+        use iced::{Background, Border, Color, ContentFit, Length};
 
         // Main layout: Row with sidebar + image area
         let mut main_row = Row::new().spacing(0);
@@ -188,19 +192,17 @@ impl State {
             main_row = main_row.push(collapsed_sidebar);
         }
 
-        // Image area (placeholder for now)
-        let image_area = container(
-            text("Image will be displayed here")
-                .size(20)
-                .color(Color::from_rgb(0.5, 0.5, 0.5))
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center(Length::Fill)
-        .style(|_theme: &iced::Theme| iced::widget::container::Style {
-            background: Some(Background::Color(Color::from_rgb(0.9, 0.9, 0.9))),
-            ..Default::default()
-        });
+        // Image area with current preview
+        let image_widget =
+            image(self.current_image.handle.clone()).content_fit(ContentFit::Contain);
+
+        let image_area = container(center(image_widget))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(|_theme: &iced::Theme| iced::widget::container::Style {
+                background: Some(Background::Color(Color::from_rgb(0.9, 0.9, 0.9))),
+                ..Default::default()
+            });
 
         main_row = main_row.push(image_area);
 
@@ -215,7 +217,10 @@ impl State {
         use iced::widget::{button, container, text, Column, Row};
         use iced::{alignment::Vertical, Background, Border, Color, Length};
 
-        let mut sidebar_content = Column::new().spacing(8).padding(12).width(Length::Fixed(180.0));
+        let mut sidebar_content = Column::new()
+            .spacing(8)
+            .padding(12)
+            .width(Length::Fixed(180.0));
 
         // Hamburger toggle button
         let toggle_button = button(text("☰").size(20))
@@ -228,23 +233,25 @@ impl State {
                 .push(toggle_button)
                 .push(text("Tools").size(18))
                 .spacing(8)
-                .align_y(Vertical::Center)
+                .align_y(Vertical::Center),
         );
 
         sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
 
         // Rotate tools
-        let rotate_left_btn = button(text(format!("↻\n{}", ctx.i18n.tr("editor-rotate-left"))).size(14))
-            .on_press(Message::RotateLeft)
-            .padding(12)
-            .width(Length::Fill)
-            .style(iced::widget::button::secondary);
+        let rotate_left_btn =
+            button(text(format!("↻\n{}", ctx.i18n.tr("editor-rotate-left"))).size(14))
+                .on_press(Message::RotateLeft)
+                .padding(12)
+                .width(Length::Fill)
+                .style(iced::widget::button::secondary);
 
-        let rotate_right_btn = button(text(format!("↺\n{}", ctx.i18n.tr("editor-rotate-right"))).size(14))
-            .on_press(Message::RotateRight)
-            .padding(12)
-            .width(Length::Fill)
-            .style(iced::widget::button::secondary);
+        let rotate_right_btn =
+            button(text(format!("↺\n{}", ctx.i18n.tr("editor-rotate-right"))).size(14))
+                .on_press(Message::RotateRight)
+                .padding(12)
+                .width(Length::Fill)
+                .style(iced::widget::button::secondary);
 
         sidebar_content = sidebar_content.push(rotate_left_btn);
         sidebar_content = sidebar_content.push(rotate_right_btn);
@@ -276,7 +283,8 @@ impl State {
         sidebar_content = sidebar_content.push(resize_btn);
 
         // Spacer to push navigation and action buttons to bottom
-        sidebar_content = sidebar_content.push(iced::widget::Space::new(Length::Fill, Length::Fill));
+        sidebar_content =
+            sidebar_content.push(iced::widget::Space::new(Length::Fill, Length::Fill));
 
         sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
 
@@ -287,13 +295,13 @@ impl State {
                 button(text("◀").size(20))
                     .on_press(Message::NavigatePrevious)
                     .padding([8, 16])
-                    .width(Length::Fill)
+                    .width(Length::Fill),
             )
             .push(
                 button(text("▶").size(20))
                     .on_press(Message::NavigateNext)
                     .padding([8, 16])
-                    .width(Length::Fill)
+                    .width(Length::Fill),
             );
 
         sidebar_content = sidebar_content.push(nav_row);
@@ -349,8 +357,18 @@ impl State {
                 self.active_tool = Some(tool);
                 Event::None
             }
-            Message::RotateLeft | Message::RotateRight => {
-                // TODO: Implement rotation
+            Message::RotateLeft => {
+                self.apply_dynamic_transformation(
+                    Transformation::RotateLeft,
+                    transform::rotate_left,
+                );
+                Event::None
+            }
+            Message::RotateRight => {
+                self.apply_dynamic_transformation(
+                    Transformation::RotateRight,
+                    transform::rotate_right,
+                );
                 Event::None
             }
             Message::SetCropRatio(ratio) => {
@@ -419,13 +437,16 @@ impl State {
     }
 
     /// Create a new editor state for the given image.
-    pub fn new(image_path: PathBuf, image: ImageData) -> Self {
+    pub fn new(image_path: PathBuf, image: ImageData) -> Result<Self> {
         let original_aspect = image.width as f32 / image.height as f32;
+        let working_image =
+            image_rs::open(&image_path).map_err(|err| Error::Io(err.to_string()))?;
 
-        Self {
+        Ok(Self {
             image_path,
             original_image: image.clone(),
             current_image: image.clone(),
+            working_image,
             active_tool: None,
             transformation_history: Vec::new(),
             history_index: 0,
@@ -441,7 +462,7 @@ impl State {
                 width_input: image.width.to_string(),
                 height_input: image.height.to_string(),
             },
-        }
+        })
     }
 
     /// Check if there are unsaved changes.
@@ -473,25 +494,66 @@ impl State {
     pub fn is_sidebar_expanded(&self) -> bool {
         self.sidebar_expanded
     }
+
+    fn apply_dynamic_transformation<F>(&mut self, transformation: Transformation, operation: F)
+    where
+        F: Fn(&DynamicImage) -> DynamicImage,
+    {
+        let updated = operation(&self.working_image);
+        match transform::dynamic_to_image_data(&updated) {
+            Ok(image_data) => {
+                self.working_image = updated;
+                self.current_image = image_data;
+                self.sync_resize_state_dimensions();
+                self.record_transformation(transformation);
+            }
+            Err(err) => {
+                eprintln!("Failed to apply transformation: {err:?}");
+            }
+        }
+    }
+
+    fn sync_resize_state_dimensions(&mut self) {
+        self.resize_state.width = self.current_image.width;
+        self.resize_state.height = self.current_image.height;
+        self.resize_state.width_input = self.current_image.width.to_string();
+        self.resize_state.height_input = self.current_image.height.to_string();
+    }
+
+    fn record_transformation(&mut self, transformation: Transformation) {
+        if self.history_index < self.transformation_history.len() {
+            self.transformation_history.truncate(self.history_index);
+        }
+        self.transformation_history.push(transformation);
+        self.history_index = self.transformation_history.len();
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use iced::widget::image;
+    use image_rs::{Rgba, RgbaImage};
+    use tempfile::tempdir;
 
-    fn create_test_image() -> ImageData {
-        ImageData {
-            handle: image::Handle::from_rgba(4, 3, vec![0; 4 * 3 * 4]),
-            width: 4,
-            height: 3,
-        }
+    fn create_test_image(width: u32, height: u32) -> (tempfile::TempDir, PathBuf, ImageData) {
+        let temp_dir = tempdir().expect("temp dir");
+        let path = temp_dir.path().join("test.png");
+        let img = RgbaImage::from_pixel(width, height, Rgba([0, 0, 0, 255]));
+        img.save(&path).expect("write png");
+        let pixels = vec![0; (width * height * 4) as usize];
+        let image = ImageData {
+            handle: image::Handle::from_rgba(width, height, pixels),
+            width,
+            height,
+        };
+        (temp_dir, path, image)
     }
 
     #[test]
     fn new_editor_state_has_no_changes() {
-        let img = create_test_image();
-        let state = State::new(PathBuf::from("test.png"), img);
+        let (_dir, path, img) = create_test_image(4, 3);
+        let state = State::new(path, img).expect("editor state");
 
         assert!(!state.has_unsaved_changes());
         assert!(!state.can_undo());
@@ -501,8 +563,8 @@ mod tests {
 
     #[test]
     fn new_editor_state_initializes_resize_state() {
-        let img = create_test_image();
-        let state = State::new(PathBuf::from("test.png"), img);
+        let (_dir, path, img) = create_test_image(4, 3);
+        let state = State::new(path, img).expect("editor state");
 
         assert_eq!(state.resize_state.width, 4);
         assert_eq!(state.resize_state.height, 3);
@@ -513,8 +575,8 @@ mod tests {
 
     #[test]
     fn sidebar_starts_expanded() {
-        let img = create_test_image();
-        let state = State::new(PathBuf::from("test.png"), img);
+        let (_dir, path, img) = create_test_image(4, 3);
+        let state = State::new(path, img).expect("editor state");
 
         assert!(state.is_sidebar_expanded());
     }

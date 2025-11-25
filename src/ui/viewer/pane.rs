@@ -112,25 +112,27 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
             let left_arrow = button(Text::new("◀").size(28))
                 .on_press(Message::NavigatePrevious)
                 .padding(12)
-                .style(move |_theme: &Theme, _status: button::Status| button::Style {
-                    background: Some(Background::Color(Color::from_rgba(
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.5 * opacity_factor,
-                    ))),
-                    text_color: Color::from_rgba(1.0, 1.0, 1.0, opacity_factor),
-                    border: Border {
-                        radius: 24.0.into(),
-                        width: 1.0,
-                        color: Color::from_rgba(1.0, 1.0, 1.0, 0.2 * opacity_factor),
+                .style(
+                    move |_theme: &Theme, _status: button::Status| button::Style {
+                        background: Some(Background::Color(Color::from_rgba(
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.5 * opacity_factor,
+                        ))),
+                        text_color: Color::from_rgba(1.0, 1.0, 1.0, opacity_factor),
+                        border: Border {
+                            radius: 24.0.into(),
+                            width: 1.0,
+                            color: Color::from_rgba(1.0, 1.0, 1.0, 0.2 * opacity_factor),
+                        },
+                        shadow: Shadow {
+                            color: Color::from_rgba(0.0, 0.0, 0.0, 0.3 * opacity_factor),
+                            offset: iced::Vector::new(0.0, 2.0),
+                            blur_radius: 8.0,
+                        },
                     },
-                    shadow: Shadow {
-                        color: Color::from_rgba(0.0, 0.0, 0.0, 0.3 * opacity_factor),
-                        offset: iced::Vector::new(0.0, 2.0),
-                        blur_radius: 8.0,
-                    },
-                });
+                );
 
             stack = stack.push(
                 Container::new(left_arrow)
@@ -148,25 +150,27 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
             let right_arrow = button(Text::new("▶").size(28))
                 .on_press(Message::NavigateNext)
                 .padding(12)
-                .style(move |_theme: &Theme, _status: button::Status| button::Style {
-                    background: Some(Background::Color(Color::from_rgba(
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.5 * opacity_factor,
-                    ))),
-                    text_color: Color::from_rgba(1.0, 1.0, 1.0, opacity_factor),
-                    border: Border {
-                        radius: 24.0.into(),
-                        width: 1.0,
-                        color: Color::from_rgba(1.0, 1.0, 1.0, 0.2 * opacity_factor),
+                .style(
+                    move |_theme: &Theme, _status: button::Status| button::Style {
+                        background: Some(Background::Color(Color::from_rgba(
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.5 * opacity_factor,
+                        ))),
+                        text_color: Color::from_rgba(1.0, 1.0, 1.0, opacity_factor),
+                        border: Border {
+                            radius: 24.0.into(),
+                            width: 1.0,
+                            color: Color::from_rgba(1.0, 1.0, 1.0, 0.2 * opacity_factor),
+                        },
+                        shadow: Shadow {
+                            color: Color::from_rgba(0.0, 0.0, 0.0, 0.3 * opacity_factor),
+                            offset: iced::Vector::new(0.0, 2.0),
+                            blur_radius: 8.0,
+                        },
                     },
-                    shadow: Shadow {
-                        color: Color::from_rgba(0.0, 0.0, 0.0, 0.3 * opacity_factor),
-                        offset: iced::Vector::new(0.0, 2.0),
-                        blur_radius: 8.0,
-                    },
-                });
+                );
 
             stack = stack.push(
                 Container::new(right_arrow)

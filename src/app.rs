@@ -270,8 +270,15 @@ impl App {
                 self.viewer.current_image_path.clone(),
                 self.viewer.image().cloned(),
             ) {
-                self.editor = Some(EditorState::new(image_path, image_data));
-                self.mode = mode;
+                match EditorState::new(image_path, image_data) {
+                    Ok(state) => {
+                        self.editor = Some(state);
+                        self.mode = mode;
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to enter editor mode: {err:?}");
+                    }
+                }
                 return Task::none();
             } else {
                 // Can't enter editor mode without an image
@@ -438,8 +445,8 @@ impl App {
 
             // Add Edit button (only in Viewer mode and when an image is loaded)
             if self.mode == AppMode::Viewer && self.viewer.has_image() {
-                let edit_button = button(Text::new("✏ Edit"))
-                    .on_press(Message::SwitchMode(AppMode::Editor));
+                let edit_button =
+                    button(Text::new("✏ Edit")).on_press(Message::SwitchMode(AppMode::Editor));
                 top_bar = top_bar.push(edit_button);
             }
 
