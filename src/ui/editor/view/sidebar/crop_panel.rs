@@ -6,7 +6,8 @@ use crate::ui::theme;
 use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length};
 
-use super::super::{Message, ViewContext};
+use super::super::ViewContext;
+use crate::ui::editor::{Message, SidebarMessage};
 
 pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let title = text(ctx.i18n.tr("editor-crop-section-title")).size(14);
@@ -59,7 +60,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
             .width(Length::Fill)
             .style(iced::widget::button::primary);
         if crop.overlay.visible {
-            btn.on_press(Message::ApplyCrop)
+            btn.on_press(SidebarMessage::ApplyCrop.into())
         } else {
             btn
         }
@@ -85,7 +86,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
 fn ratio_button<'a>(crop: &'a CropState, label: String, ratio: CropRatio) -> Element<'a, Message> {
     let selected = crop.ratio == ratio;
     button(text(label).size(11))
-        .on_press(Message::SetCropRatio(ratio))
+        .on_press(SidebarMessage::SetCropRatio(ratio).into())
         .padding([4, 6])
         .width(Length::Fill)
         .style(if selected {

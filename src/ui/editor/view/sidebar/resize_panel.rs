@@ -5,15 +5,21 @@ use crate::ui::theme;
 use iced::widget::{button, checkbox, container, slider, text, text_input, Column, Row};
 use iced::{Element, Length};
 
-use super::super::{Message, ViewContext};
+use super::super::ViewContext;
 use crate::ui::editor::state::ResizeState;
+use crate::ui::editor::{Message, SidebarMessage};
 
 pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let scale_section = Column::new()
         .spacing(6)
         .push(text(ctx.i18n.tr("editor-resize-section-title")).size(14))
         .push(text(ctx.i18n.tr("editor-resize-scale-label")).size(13))
-        .push(slider(10.0..=200.0, resize.scale_percent, Message::ScaleChanged).step(1.0))
+        .push(
+            slider(10.0..=200.0, resize.scale_percent, |percent| {
+                Message::Sidebar(SidebarMessage::ScaleChanged(percent))
+            })
+            .step(1.0),
+        )
         .push(text(format!("{:.0}%", resize.scale_percent)).size(13));
 
     let mut presets = Row::new().spacing(8);
@@ -21,7 +27,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
         let label = format!("{preset:.0}%");
         presets = presets.push(
             button(text(label))
-                .on_press(Message::ApplyResizePreset(preset))
+                .on_press(SidebarMessage::ApplyResizePreset(preset).into())
                 .padding([6, 8])
                 .style(iced::widget::button::secondary),
         );
@@ -35,7 +41,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
     let width_placeholder = ctx.i18n.tr("editor-resize-width-label");
     let width_label = text(width_placeholder.clone()).size(13);
     let width_input = text_input(width_placeholder.as_str(), &resize.width_input)
-        .on_input(Message::WidthInputChanged)
+        .on_input(|value| Message::Sidebar(SidebarMessage::WidthInputChanged(value)))
         .padding(6)
         .size(14)
         .width(Length::Fill);
@@ -43,7 +49,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
     let height_placeholder = ctx.i18n.tr("editor-resize-height-label");
     let height_label = text(height_placeholder.clone()).size(13);
     let height_input = text_input(height_placeholder.as_str(), &resize.height_input)
-        .on_input(Message::HeightInputChanged)
+        .on_input(|value| Message::Sidebar(SidebarMessage::HeightInputChanged(value)))
         .padding(6)
         .size(14)
         .width(Length::Fill);
@@ -66,13 +72,13 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
         );
 
     let lock_checkbox = checkbox(ctx.i18n.tr("editor-resize-lock-aspect"), resize.lock_aspect)
-        .on_toggle(|_| Message::ToggleLockAspect);
+        .on_toggle(|_| Message::Sidebar(SidebarMessage::ToggleLockAspect));
 
     let apply_btn = button(text(ctx.i18n.tr("editor-resize-apply")).size(16))
         .padding(10)
         .width(Length::Fill)
         .style(iced::widget::button::primary)
-        .on_press(Message::ApplyResize);
+        .on_press(SidebarMessage::ApplyResize.into());
 
     container(
         Column::new()

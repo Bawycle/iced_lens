@@ -96,53 +96,73 @@ pub enum Transformation {
     Resize { width: u32, height: u32 },
 }
 
-/// Messages emitted directly by the editor widgets.
+/// Toolbar-specific messages.
 #[derive(Debug, Clone)]
-pub enum Message {
-    /// Toggle sidebar expanded/collapsed
+pub enum ToolbarMessage {
+    BackToViewer,
+}
+
+/// Sidebar control messages.
+#[derive(Debug, Clone)]
+pub enum SidebarMessage {
     ToggleSidebar,
-    /// Select an editing tool
     SelectTool(EditorTool),
-    /// Apply rotation transformation
     RotateLeft,
     RotateRight,
-    /// Crop-related messages
     SetCropRatio(CropRatio),
-    UpdateCropSelection(Rectangle),
     ApplyCrop,
-    /// Crop overlay interaction messages
-    CropOverlayMouseDown {
-        x: f32,
-        y: f32,
-    },
-    CropOverlayMouseMove {
-        x: f32,
-        y: f32,
-    },
-    CropOverlayMouseUp,
-    /// Resize-related messages
     ScaleChanged(f32),
     WidthInputChanged(String),
     HeightInputChanged(String),
     ToggleLockAspect,
-    ApplyResizePreset(f32), // Preset percentage (50%, 75%, 150%, 200%)
+    ApplyResizePreset(f32),
     ApplyResize,
-    /// Undo/redo
     Undo,
     Redo,
-    /// Navigation
     NavigateNext,
     NavigatePrevious,
-    /// Save/cancel/back
     Save,
     SaveAs,
-    Cancel,       // Discard changes but stay in editor
-    BackToViewer, // Return to viewer (only if no unsaved changes)
+    Cancel,
+}
+
+/// Canvas overlay interaction messages.
+#[derive(Debug, Clone)]
+pub enum CanvasMessage {
+    CropOverlayMouseDown { x: f32, y: f32 },
+    CropOverlayMouseMove { x: f32, y: f32 },
+    CropOverlayMouseUp,
+}
+
+/// Messages emitted directly by the editor widgets.
+#[derive(Debug, Clone)]
+pub enum Message {
+    Toolbar(ToolbarMessage),
+    Sidebar(SidebarMessage),
+    Canvas(CanvasMessage),
     /// Raw event for keyboard shortcuts
     RawEvent {
         window: iced::window::Id,
         event: iced::Event,
     },
+}
+
+impl From<ToolbarMessage> for Message {
+    fn from(message: ToolbarMessage) -> Self {
+        Message::Toolbar(message)
+    }
+}
+
+impl From<SidebarMessage> for Message {
+    fn from(message: SidebarMessage) -> Self {
+        Message::Sidebar(message)
+    }
+}
+
+impl From<CanvasMessage> for Message {
+    fn from(message: CanvasMessage) -> Self {
+        Message::Canvas(message)
+    }
 }
 
 /// Events propagated to the parent application for side effects.
@@ -173,57 +193,69 @@ impl State {
     /// Update the state and emit an [`Event`] for the parent when needed.
     pub fn update(&mut self, message: Message) -> Event {
         match message {
-            Message::ToggleSidebar => {
+            Message::Toolbar(msg) => self.handle_toolbar_message(msg),
+            Message::Sidebar(msg) => self.handle_sidebar_message(msg),
+            Message::Canvas(msg) => self.handle_canvas_message(msg),
+            Message::RawEvent { event, .. } => self.handle_raw_event(event),
+        }
+    }
+
+    fn handle_toolbar_message(&mut self, message: ToolbarMessage) -> Event {
+        match message {
+            ToolbarMessage::BackToViewer => {
+                if self.has_unsaved_changes() {
+                    Event::None
+                } else {
+                    Event::ExitEditor
+                }
+            }
+        }
+    }
+
+    fn handle_sidebar_message(&mut self, message: SidebarMessage) -> Event {
+        match message {
+            SidebarMessage::ToggleSidebar => {
                 self.sidebar_expanded = !self.sidebar_expanded;
                 Event::None
             }
-            Message::SelectTool(tool) => {
+            SidebarMessage::SelectTool(tool) => {
                 if self.active_tool == Some(tool) {
                     self.commit_active_tool_changes();
                     self.active_tool = None;
                     self.preview_image = None;
-                    // Reset crop modified flag, hide overlay and clear base image when closing crop tool
                     if tool == EditorTool::Crop {
                         self.crop_modified = false;
                         self.crop_base_image = None;
                         self.crop_state.overlay.visible = false;
                         self.crop_state.overlay.drag_state = CropDragState::None;
                     }
-                    // Hide resize overlay when closing resize tool
                     if tool == EditorTool::Resize {
                         self.resize_state.overlay.visible = false;
                     }
                 } else {
                     self.commit_active_tool_changes();
-                    // Hide overlay when leaving crop tool
                     if self.active_tool == Some(EditorTool::Crop) {
                         self.crop_state.overlay.visible = false;
                         self.crop_state.overlay.drag_state = CropDragState::None;
                     }
-                    // Hide resize overlay when leaving resize tool
                     if self.active_tool == Some(EditorTool::Resize) {
                         self.resize_state.overlay.visible = false;
                     }
                     self.active_tool = Some(tool);
-                    // Clear preview when switching tools
                     self.preview_image = None;
 
-                    // When opening crop tool, memorize current image state
                     if tool == EditorTool::Crop {
                         self.crop_base_image = Some(self.working_image.clone());
                         self.crop_base_width = self.current_image.width;
                         self.crop_base_height = self.current_image.height;
-                        // Initialize crop rectangle to full image size
                         self.crop_state.x = 0;
                         self.crop_state.y = 0;
                         self.crop_state.width = self.current_image.width;
                         self.crop_state.height = self.current_image.height;
                         self.crop_state.ratio = CropRatio::None;
-                        // Don't show overlay until user selects a ratio
                         self.crop_state.overlay.visible = false;
                     }
 
-                    // When opening resize tool, show overlay with current image dimensions as baseline
                     if tool == EditorTool::Resize {
                         self.resize_state.overlay.visible = true;
                         self.resize_state.overlay.set_original_dimensions(
@@ -234,7 +266,7 @@ impl State {
                 }
                 Event::None
             }
-            Message::RotateLeft => {
+            SidebarMessage::RotateLeft => {
                 self.commit_active_tool_changes();
                 self.apply_dynamic_transformation(
                     Transformation::RotateLeft,
@@ -242,7 +274,7 @@ impl State {
                 );
                 Event::None
             }
-            Message::RotateRight => {
+            SidebarMessage::RotateRight => {
                 self.commit_active_tool_changes();
                 self.apply_dynamic_transformation(
                     Transformation::RotateRight,
@@ -250,78 +282,55 @@ impl State {
                 );
                 Event::None
             }
-            Message::SetCropRatio(ratio) => {
+            SidebarMessage::SetCropRatio(ratio) => {
                 self.crop_state.ratio = ratio;
                 self.adjust_crop_to_ratio(ratio);
-                // Show the overlay so user can position the crop
                 self.crop_state.overlay.visible = true;
                 self.crop_modified = true;
                 Event::None
             }
-            Message::UpdateCropSelection(_rect) => {
-                // TODO: Implement interactive crop selection with handles
-                Event::None
-            }
-            Message::ApplyCrop => {
-                // Apply the crop from the overlay
+            SidebarMessage::ApplyCrop => {
                 if self.crop_state.overlay.visible {
                     self.apply_crop_from_base();
                     self.crop_state.overlay.visible = false;
                     self.crop_state.overlay.drag_state = CropDragState::None;
                     self.crop_modified = false;
-                    // Reset to None (deselect all ratio buttons)
                     self.crop_state.ratio = CropRatio::None;
-                    // Reset crop rectangle to full new image size for next crop
                     self.crop_state.x = 0;
                     self.crop_state.y = 0;
                     self.crop_state.width = self.current_image.width;
                     self.crop_state.height = self.current_image.height;
-                    // Update base image to the newly cropped image
                     self.crop_base_image = Some(self.working_image.clone());
                     self.crop_base_width = self.current_image.width;
                     self.crop_base_height = self.current_image.height;
-                    // Overlay stays hidden until user selects a ratio
                 }
                 Event::None
             }
-            Message::CropOverlayMouseDown { x, y } => {
-                self.handle_crop_overlay_mouse_down(x, y);
-                Event::None
-            }
-            Message::CropOverlayMouseMove { x, y } => {
-                self.handle_crop_overlay_mouse_move(x, y);
-                Event::None
-            }
-            Message::CropOverlayMouseUp => {
-                self.crop_state.overlay.drag_state = CropDragState::None;
-                Event::None
-            }
-            Message::ScaleChanged(percent) => {
+            SidebarMessage::ScaleChanged(percent) => {
                 self.set_resize_percent(percent);
                 Event::None
             }
-            Message::WidthInputChanged(value) => {
+            SidebarMessage::WidthInputChanged(value) => {
                 self.handle_width_input_change(value);
                 Event::None
             }
-            Message::HeightInputChanged(value) => {
+            SidebarMessage::HeightInputChanged(value) => {
                 self.handle_height_input_change(value);
                 Event::None
             }
-            Message::ToggleLockAspect => {
+            SidebarMessage::ToggleLockAspect => {
                 self.toggle_resize_lock();
                 Event::None
             }
-            Message::ApplyResizePreset(percent) => {
+            SidebarMessage::ApplyResizePreset(percent) => {
                 self.set_resize_percent(percent);
                 Event::None
             }
-            Message::ApplyResize => {
-                // Apply the resize transformation
+            SidebarMessage::ApplyResize => {
                 self.apply_resize_dimensions();
                 Event::None
             }
-            Message::Undo => {
+            SidebarMessage::Undo => {
                 self.commit_active_tool_changes();
                 if self.can_undo() {
                     self.history_index -= 1;
@@ -329,7 +338,7 @@ impl State {
                 }
                 Event::None
             }
-            Message::Redo => {
+            SidebarMessage::Redo => {
                 self.commit_active_tool_changes();
                 if self.can_redo() {
                     self.history_index += 1;
@@ -337,8 +346,7 @@ impl State {
                 }
                 Event::None
             }
-            Message::NavigateNext => {
-                // Block navigation if there are unsaved changes
+            SidebarMessage::NavigateNext => {
                 if self.has_unsaved_changes() {
                     Event::None
                 } else {
@@ -346,8 +354,7 @@ impl State {
                     Event::NavigateNext
                 }
             }
-            Message::NavigatePrevious => {
-                // Block navigation if there are unsaved changes
+            SidebarMessage::NavigatePrevious => {
                 if self.has_unsaved_changes() {
                     Event::None
                 } else {
@@ -355,88 +362,90 @@ impl State {
                     Event::NavigatePrevious
                 }
             }
-            Message::Save => {
+            SidebarMessage::Save => {
                 self.commit_active_tool_changes();
-                // Save overwrites the original file (confirmation may be added later)
                 Event::SaveRequested {
                     path: self.image_path.clone(),
                     overwrite: true,
                 }
             }
-            Message::SaveAs => {
+            SidebarMessage::SaveAs => {
                 self.commit_active_tool_changes();
-                // Request file picker dialog from parent
                 Event::SaveAsRequested
             }
-            Message::Cancel => {
-                // Discard all changes but STAY in editor
+            SidebarMessage::Cancel => {
                 self.discard_changes();
                 Event::None
             }
-            Message::BackToViewer => {
-                // Return to viewer (only allowed if no unsaved changes)
+        }
+    }
+
+    fn handle_canvas_message(&mut self, message: CanvasMessage) -> Event {
+        match message {
+            CanvasMessage::CropOverlayMouseDown { x, y } => {
+                self.handle_crop_overlay_mouse_down(x, y);
+                Event::None
+            }
+            CanvasMessage::CropOverlayMouseMove { x, y } => {
+                self.handle_crop_overlay_mouse_move(x, y);
+                Event::None
+            }
+            CanvasMessage::CropOverlayMouseUp => {
+                self.crop_state.overlay.drag_state = CropDragState::None;
+                Event::None
+            }
+        }
+    }
+
+    fn handle_raw_event(&mut self, event: iced::Event) -> Event {
+        use iced::keyboard;
+
+        match event {
+            iced::Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(keyboard::key::Named::Escape),
+                ..
+            }) => {
                 if self.has_unsaved_changes() {
-                    Event::None // Blocked
+                    self.discard_changes();
+                    Event::None
                 } else {
                     Event::ExitEditor
                 }
             }
-            Message::RawEvent { event, .. } => {
-                use iced::keyboard;
-
-                match event {
-                    iced::Event::Keyboard(keyboard::Event::KeyPressed {
-                        key: keyboard::Key::Named(keyboard::key::Named::Escape),
-                        ..
-                    }) => {
-                        // Esc: Cancel if has changes, otherwise exit editor
+            iced::Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
+                if modifiers.command() =>
+            {
+                match key {
+                    keyboard::Key::Character(ref c) if c.as_str() == "s" => {
                         if self.has_unsaved_changes() {
-                            self.discard_changes();
-                            Event::None
+                            Event::SaveRequested {
+                                path: self.image_path.clone(),
+                                overwrite: true,
+                            }
                         } else {
-                            Event::ExitEditor
+                            Event::None
                         }
                     }
-                    iced::Event::Keyboard(keyboard::Event::KeyPressed {
-                        key, modifiers, ..
-                    }) if modifiers.command() => {
-                        // Ctrl+S, Ctrl+Z, Ctrl+Y (or Cmd on macOS)
-                        match key {
-                            keyboard::Key::Character(ref c) if c.as_str() == "s" => {
-                                // Ctrl+S: Save
-                                if self.has_unsaved_changes() {
-                                    Event::SaveRequested {
-                                        path: self.image_path.clone(),
-                                        overwrite: true,
-                                    }
-                                } else {
-                                    Event::None
-                                }
-                            }
-                            keyboard::Key::Character(ref c) if c.as_str() == "z" => {
-                                // Ctrl+Z: Undo
-                                self.commit_active_tool_changes();
-                                if self.can_undo() {
-                                    self.history_index -= 1;
-                                    self.replay_transformations_up_to_index();
-                                }
-                                Event::None
-                            }
-                            keyboard::Key::Character(ref c) if c.as_str() == "y" => {
-                                // Ctrl+Y: Redo
-                                self.commit_active_tool_changes();
-                                if self.can_redo() {
-                                    self.history_index += 1;
-                                    self.replay_transformations_up_to_index();
-                                }
-                                Event::None
-                            }
-                            _ => Event::None,
+                    keyboard::Key::Character(ref c) if c.as_str() == "z" => {
+                        self.commit_active_tool_changes();
+                        if self.can_undo() {
+                            self.history_index -= 1;
+                            self.replay_transformations_up_to_index();
                         }
+                        Event::None
+                    }
+                    keyboard::Key::Character(ref c) if c.as_str() == "y" => {
+                        self.commit_active_tool_changes();
+                        if self.can_redo() {
+                            self.history_index += 1;
+                            self.replay_transformations_up_to_index();
+                        }
+                        Event::None
                     }
                     _ => Event::None,
                 }
             }
+            _ => Event::None,
         }
     }
 
@@ -1111,6 +1120,13 @@ impl State {
                         self.crop_state.overlay.drag_state = CropDragState::None;
                         self.crop_modified = false;
 
+                        // Hide resize overlay to avoid stale rectangles after cancel
+                        self.resize_state.overlay.visible = false;
+                        self.resize_state.overlay.set_original_dimensions(
+                            self.current_image.width,
+                            self.current_image.height,
+                        );
+
                         // Clear transformation history
                         self.transformation_history.clear();
                         self.history_index = 0;
@@ -1264,7 +1280,10 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
         match event {
             // If cursor leaves the canvas, end any drag operation
             iced::widget::canvas::Event::Mouse(iced::mouse::Event::CursorLeft) => {
-                return (Status::Captured, Some(Message::CropOverlayMouseUp));
+                return (
+                    Status::Captured,
+                    Some(Message::Canvas(CanvasMessage::CropOverlayMouseUp)),
+                );
             }
             iced::widget::canvas::Event::Mouse(iced::mouse::Event::ButtonPressed(
                 iced::mouse::Button::Left,
@@ -1275,7 +1294,10 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
                     {
                         return (
                             Status::Captured,
-                            Some(Message::CropOverlayMouseDown { x: img_x, y: img_y }),
+                            Some(Message::Canvas(CanvasMessage::CropOverlayMouseDown {
+                                x: img_x,
+                                y: img_y,
+                            })),
                         );
                     }
                 }
@@ -1283,7 +1305,10 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
             iced::widget::canvas::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) => {
                 // If cursor is outside bounds during move, end drag
                 if cursor.position_in(bounds).is_none() {
-                    return (Status::Captured, Some(Message::CropOverlayMouseUp));
+                    return (
+                        Status::Captured,
+                        Some(Message::Canvas(CanvasMessage::CropOverlayMouseUp)),
+                    );
                 }
 
                 if let Some(cursor_position) = cursor.position_in(bounds) {
@@ -1292,7 +1317,10 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
                     {
                         return (
                             Status::Captured,
-                            Some(Message::CropOverlayMouseMove { x: img_x, y: img_y }),
+                            Some(Message::Canvas(CanvasMessage::CropOverlayMouseMove {
+                                x: img_x,
+                                y: img_y,
+                            })),
                         );
                     }
                 }
@@ -1300,7 +1328,10 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
             iced::widget::canvas::Event::Mouse(iced::mouse::Event::ButtonReleased(
                 iced::mouse::Button::Left,
             )) => {
-                return (Status::Captured, Some(Message::CropOverlayMouseUp));
+                return (
+                    Status::Captured,
+                    Some(Message::Canvas(CanvasMessage::CropOverlayMouseUp)),
+                );
             }
             _ => {}
         }
@@ -1667,14 +1698,31 @@ mod tests {
         let (_dir, path, img) = create_test_image(8, 6);
         let mut state = State::new(path, img).expect("editor state");
 
-        state.update(Message::SelectTool(EditorTool::Resize));
+        state.update(Message::Sidebar(SidebarMessage::SelectTool(
+            EditorTool::Resize,
+        )));
         state.resize_state.width = 4;
         state.resize_state.height = 3;
         state.resize_state.width_input = "4".into();
         state.resize_state.height_input = "3".into();
-        state.update(Message::ApplyResize);
+        state.update(Message::Sidebar(SidebarMessage::ApplyResize));
 
         assert_eq!(state.current_image.width, 4);
         assert_eq!(state.current_image.height, 3);
+    }
+
+    #[test]
+    fn cancel_hides_resize_overlay() {
+        let (_dir, path, img) = create_test_image(5, 4);
+        let mut state = State::new(path, img).expect("editor state");
+
+        state.update(Message::Sidebar(SidebarMessage::SelectTool(
+            EditorTool::Resize,
+        )));
+        assert!(state.resize_state.overlay.visible);
+
+        state.discard_changes();
+
+        assert!(!state.resize_state.overlay.visible);
     }
 }

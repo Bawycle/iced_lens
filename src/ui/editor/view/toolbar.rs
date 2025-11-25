@@ -5,7 +5,7 @@ use crate::ui::theme;
 use iced::widget::{button, container, Row, Text};
 use iced::{Alignment, Background, Border, Element, Length};
 
-use super::super::{Message, State, ViewContext};
+use super::super::{Message, State, ToolbarMessage, ViewContext};
 
 pub struct ToolbarModel {
     pub has_unsaved_changes: bool,
@@ -27,7 +27,7 @@ pub fn view<'a>(model: &ToolbarModel, ctx: &ViewContext<'a>) -> Element<'a, Mess
     let back_btn = if has_changes {
         back_btn
     } else {
-        back_btn.on_press(Message::BackToViewer)
+        back_btn.on_press(Message::Toolbar(ToolbarMessage::BackToViewer))
     };
 
     container(

@@ -13,7 +13,8 @@ use iced::widget::{
 use iced::{alignment::Vertical, Background, Border, Element, Length};
 
 use super::super::{
-    EditorTool, Message, State, ViewContext, ROTATE_LEFT_SVG, ROTATE_RIGHT_SVG, SIDEBAR_WIDTH,
+    EditorTool, Message, SidebarMessage, State, ViewContext, ROTATE_LEFT_SVG, ROTATE_RIGHT_SVG,
+    SIDEBAR_WIDTH,
 };
 
 pub struct SidebarModel<'a> {
@@ -49,7 +50,7 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
 
     let crop_button = tool_button(
         ctx.i18n.tr("editor-tool-crop"),
-        Message::SelectTool(EditorTool::Crop),
+        SidebarMessage::SelectTool(EditorTool::Crop),
         model.active_tool == Some(EditorTool::Crop),
     );
     scrollable_section = scrollable_section.push(crop_button);
@@ -59,7 +60,7 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
 
     let resize_button = tool_button(
         ctx.i18n.tr("editor-tool-resize"),
-        Message::SelectTool(EditorTool::Resize),
+        SidebarMessage::SelectTool(EditorTool::Resize),
         model.active_tool == Some(EditorTool::Resize),
     );
     scrollable_section = scrollable_section.push(resize_button);
@@ -96,7 +97,7 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
 
 pub fn collapsed<'a>() -> Element<'a, Message> {
     let toggle_button = button(text("☰").size(24))
-        .on_press(Message::ToggleSidebar)
+        .on_press(SidebarMessage::ToggleSidebar.into())
         .padding(12);
 
     let collapsed_bg = theme::viewer_toolbar_background();
@@ -117,7 +118,7 @@ pub fn collapsed<'a>() -> Element<'a, Message> {
 
 fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
     let toggle_button = button(text("☰").size(20))
-        .on_press(Message::ToggleSidebar)
+        .on_press(SidebarMessage::ToggleSidebar.into())
         .padding(8)
         .style(iced::widget::button::secondary);
 
@@ -133,9 +134,9 @@ fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
         .push(horizontal_rule(1))
 }
 
-fn tool_button<'a>(label: String, message: Message, active: bool) -> Element<'a, Message> {
+fn tool_button<'a>(label: String, message: SidebarMessage, active: bool) -> Element<'a, Message> {
     button(text(label).size(16))
-        .on_press(message)
+        .on_press(message.into())
         .padding(12)
         .width(Length::Fill)
         .style(if active {
@@ -156,7 +157,7 @@ fn undo_redo_section<'a>(
         .width(Length::Fill)
         .style(iced::widget::button::secondary);
     let undo_btn = if can_undo {
-        undo_btn.on_press(Message::Undo)
+        undo_btn.on_press(SidebarMessage::Undo.into())
     } else {
         undo_btn
     };
@@ -166,7 +167,7 @@ fn undo_redo_section<'a>(
         .width(Length::Fill)
         .style(iced::widget::button::secondary);
     let redo_btn = if can_redo {
-        redo_btn.on_press(Message::Redo)
+        redo_btn.on_press(SidebarMessage::Redo.into())
     } else {
         redo_btn
     };
@@ -191,7 +192,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 
     let rotate_left_btn = tooltip::Tooltip::new(
         button(rotate_left_icon)
-            .on_press(Message::RotateLeft)
+            .on_press(SidebarMessage::RotateLeft.into())
             .padding(8)
             .width(Length::Fill)
             .style(iced::widget::button::secondary),
@@ -203,7 +204,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 
     let rotate_right_btn = tooltip::Tooltip::new(
         button(rotate_right_icon)
-            .on_press(Message::RotateRight)
+            .on_press(SidebarMessage::RotateRight.into())
             .padding(8)
             .width(Length::Fill)
             .style(iced::widget::button::secondary),
@@ -233,7 +234,7 @@ fn footer_section<'a>(has_changes: bool, ctx: &ViewContext<'a>) -> Column<'a, Me
     let prev_btn = if has_changes {
         prev_btn
     } else {
-        prev_btn.on_press(Message::NavigatePrevious)
+        prev_btn.on_press(SidebarMessage::NavigatePrevious.into())
     };
 
     let next_btn = button(text("▶").size(20))
@@ -242,7 +243,7 @@ fn footer_section<'a>(has_changes: bool, ctx: &ViewContext<'a>) -> Column<'a, Me
     let next_btn = if has_changes {
         next_btn
     } else {
-        next_btn.on_press(Message::NavigateNext)
+        next_btn.on_press(SidebarMessage::NavigateNext.into())
     };
 
     let nav_row = Row::new().spacing(8).push(prev_btn).push(next_btn);
@@ -252,7 +253,7 @@ fn footer_section<'a>(has_changes: bool, ctx: &ViewContext<'a>) -> Column<'a, Me
         .width(Length::Fill)
         .style(iced::widget::button::secondary);
     let cancel_btn = if has_changes {
-        cancel_btn.on_press(Message::Cancel)
+        cancel_btn.on_press(SidebarMessage::Cancel.into())
     } else {
         cancel_btn
     };
@@ -262,7 +263,7 @@ fn footer_section<'a>(has_changes: bool, ctx: &ViewContext<'a>) -> Column<'a, Me
         .width(Length::Fill)
         .style(iced::widget::button::primary);
     let save_btn = if has_changes {
-        save_btn.on_press(Message::Save)
+        save_btn.on_press(SidebarMessage::Save.into())
     } else {
         save_btn
     };
@@ -272,7 +273,7 @@ fn footer_section<'a>(has_changes: bool, ctx: &ViewContext<'a>) -> Column<'a, Me
         .width(Length::Fill)
         .style(iced::widget::button::secondary);
     let save_as_btn = if has_changes {
-        save_as_btn.on_press(Message::SaveAs)
+        save_as_btn.on_press(SidebarMessage::SaveAs.into())
     } else {
         save_as_btn
     };
