@@ -449,21 +449,34 @@ impl State {
 
         // Action buttons (Cancel/Save/Save As)
         let cancel_btn = button(text(ctx.i18n.tr("editor-cancel")).size(16))
-            .on_press(Message::Cancel)
             .padding(12)
             .width(Length::Fill)
             .style(iced::widget::button::secondary);
+        let cancel_btn = if has_changes {
+            cancel_btn.on_press(Message::Cancel)  // Active if changes exist
+        } else {
+            cancel_btn  // Disabled if no changes
+        };
 
         let save_btn = button(text(ctx.i18n.tr("editor-save")).size(16))
-            .on_press(Message::Save)
             .padding(12)
             .width(Length::Fill)
             .style(iced::widget::button::primary);
+        let save_btn = if has_changes {
+            save_btn.on_press(Message::Save)  // Active if changes exist
+        } else {
+            save_btn  // Disabled if no changes
+        };
+
         let save_as_btn = button(text(ctx.i18n.tr("editor-save-as")).size(16))
-            .on_press(Message::SaveAs)
             .padding(12)
             .width(Length::Fill)
             .style(iced::widget::button::secondary);
+        let save_as_btn = if has_changes {
+            save_as_btn.on_press(Message::SaveAs)  // Active if changes exist
+        } else {
+            save_as_btn  // Disabled if no changes
+        };
 
         footer_section = footer_section.push(cancel_btn);
         footer_section = footer_section.push(save_btn);
@@ -709,8 +722,10 @@ impl State {
             Message::SetCropRatio(ratio) => {
                 self.crop_state.ratio = ratio;
                 self.adjust_crop_to_ratio(ratio);
-                self.crop_modified = true;  // Mark as modified when user changes ratio
-                self.update_crop_preview();  // Show preview immediately
+                // Apply crop immediately (no preview, direct commit)
+                self.apply_crop();
+                self.crop_modified = false;  // Already applied
+                self.preview_image = None;   // No preview needed
                 Event::None
             }
             Message::UpdateCropSelection(_rect) => {
@@ -931,16 +946,8 @@ impl State {
     fn commit_active_tool_changes(&mut self) {
         if self.active_tool == Some(EditorTool::Resize) {
             self.apply_resize_dimensions();
-        } else if self.active_tool == Some(EditorTool::Crop) {
-            // Only apply crop if user has actually selected a ratio (crop_modified == true)
-            // This prevents auto-commit when just opening/closing the crop panel without changes
-            if self.crop_modified {
-                self.apply_crop();
-                self.crop_modified = false;
-            }
-            // Clear preview when closing crop tool
-            self.preview_image = None;
         }
+        // Note: Crop tool applies immediately when ratio is selected, no auto-commit needed
     }
 
     fn set_resize_percent(&mut self, percent: f32) {
@@ -1067,38 +1074,6 @@ impl State {
                 eprintln!("Failed to build resize preview: {err:?}");
                 self.preview_image = None;
             }
-        }
-    }
-
-    fn update_crop_preview(&mut self) {
-        let x = self.crop_state.x;
-        let y = self.crop_state.y;
-        let width = self.crop_state.width;
-        let height = self.crop_state.height;
-
-        // Validate crop bounds
-        if width == 0
-            || height == 0
-            || x >= self.current_image.width
-            || y >= self.current_image.height
-        {
-            self.preview_image = None;
-            return;
-        }
-
-        // Generate preview of cropped image
-        if let Some(cropped) = transform::crop(&self.working_image, x, y, width, height) {
-            match transform::dynamic_to_image_data(&cropped) {
-                Ok(image_data) => {
-                    self.preview_image = Some(image_data);
-                }
-                Err(err) => {
-                    eprintln!("Failed to build crop preview: {err:?}");
-                    self.preview_image = None;
-                }
-            }
-        } else {
-            self.preview_image = None;
         }
     }
 
