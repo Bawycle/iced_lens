@@ -1294,16 +1294,11 @@ impl State {
     }
 
     fn commit_active_tool_changes(&mut self) {
-        match self.active_tool {
-            Some(EditorTool::Resize) => {
-                self.apply_resize_dimensions();
-            }
-            Some(EditorTool::Crop) => {
-                if self.crop_modified && self.crop_state.overlay.visible {
-                    self.finalize_crop_overlay();
-                }
-            }
-            _ => {}
+        if matches!(self.active_tool, Some(EditorTool::Crop))
+            && self.crop_modified
+            && self.crop_state.overlay.visible
+        {
+            self.finalize_crop_overlay();
         }
     }
 
@@ -1412,6 +1407,9 @@ impl State {
             },
             move |image| transform::resize(image, target_width, target_height),
         );
+
+        self.resize_state.overlay.original_width = self.current_image.width;
+        self.resize_state.overlay.original_height = self.current_image.height;
     }
 
     fn update_resize_preview(&mut self) {
@@ -2398,9 +2396,7 @@ mod tests {
         state.resize_state.height = 3;
         state.resize_state.width_input = "4".into();
         state.resize_state.height_input = "3".into();
-
-        // Collapse the tool by selecting it again to commit the change
-        state.update(Message::SelectTool(EditorTool::Resize));
+        state.update(Message::ApplyResize);
 
         assert_eq!(state.current_image.width, 4);
         assert_eq!(state.current_image.height, 3);

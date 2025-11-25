@@ -23,6 +23,7 @@ pub enum Message {
     ZoomOut,
     SetFitToWindow(bool),
     ToggleFullscreen,
+    DeleteCurrentImage,
 }
 
 pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Message> {
@@ -59,6 +60,10 @@ pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Messag
         .on_press(Message::ToggleFullscreen)
         .padding([6, 10]);
 
+    let delete_button = button(Text::new(ctx.i18n.tr("viewer-delete-button")))
+        .on_press(Message::DeleteCurrentImage)
+        .padding([6, 12]);
+
     let zoom_controls_row = Row::new()
         .spacing(10)
         .align_y(Vertical::Center)
@@ -69,6 +74,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Messag
         .push(zoom_in_button)
         .push(Space::new(Length::Fixed(16.0), Length::Shrink))
         .push(fit_toggle)
+        .push(delete_button)
         .push(fullscreen_button);
 
     let mut zoom_controls = Column::new().spacing(4).push(zoom_controls_row);

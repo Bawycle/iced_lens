@@ -133,10 +133,6 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
         let edit_button = button(Text::new("✏ Edit")).on_press(Message::EnterEditor);
         top_bar = top_bar.push(edit_button);
 
-        let delete_button = button(Text::new(ctx.i18n.tr("viewer-delete-button")))
-            .on_press(Message::DeleteCurrentImage);
-        top_bar = top_bar.push(delete_button);
-
         column = column.push(
             Container::new(top_bar)
                 .width(Length::Fill)

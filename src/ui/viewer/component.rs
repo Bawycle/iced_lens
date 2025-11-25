@@ -208,7 +208,12 @@ impl State {
                 }
                 (Effect::None, Task::none())
             }
-            Message::Controls(control) => self.handle_controls(control),
+            Message::Controls(control) => {
+                if matches!(control, controls::Message::DeleteCurrentImage) {
+                    return self.delete_current_image(i18n);
+                }
+                self.handle_controls(control)
+            }
             Message::ViewportChanged { bounds, offset } => {
                 self.viewport.update(bounds, offset);
                 self.refresh_fit_zoom();
@@ -273,53 +278,7 @@ impl State {
                 }
                 (Effect::None, Task::none())
             }
-            Message::DeleteCurrentImage => {
-                let Some(current_path) = self.current_image_path.clone() else {
-                    return (Effect::None, Task::none());
-                };
-
-                let has_multiple = self.image_list.len() > 1;
-                let next_candidate = if has_multiple {
-                    self.image_list
-                        .next()
-                        .map(|path| path.to_path_buf())
-                        .filter(|next| next != &current_path)
-                } else {
-                    None
-                };
-
-                match std::fs::remove_file(&current_path) {
-                    Ok(()) => {
-                        self.image = None;
-                        self.error = None;
-
-                        let scan_seed = next_candidate
-                            .as_ref()
-                            .cloned()
-                            .unwrap_or_else(|| current_path.clone());
-                        self.current_image_path = Some(scan_seed);
-                        let _ = self.scan_directory();
-
-                        if let Some(next_path) = next_candidate {
-                            self.current_image_path = Some(next_path.clone());
-                            self.image_list.set_current(&next_path);
-                            (Effect::None, Self::load_image_task(next_path))
-                        } else {
-                            self.current_image_path = None;
-                            (Effect::None, Task::none())
-                        }
-                    }
-                    Err(err) => {
-                        self.error = Some(ErrorState {
-                            friendly_key: "error-delete-image-io",
-                            friendly_text: i18n.tr("error-delete-image-io"),
-                            details: err.to_string(),
-                            show_details: false,
-                        });
-                        (Effect::None, Task::none())
-                    }
-                }
-            }
+            Message::DeleteCurrentImage => self.delete_current_image(i18n),
             Message::OpenSettings => (Effect::OpenSettings, Task::none()),
             Message::EnterEditor => (Effect::EnterEditor, Task::none()),
         }
@@ -430,6 +389,7 @@ impl State {
                 (Effect::PersistPreferences, Task::none())
             }
             ToggleFullscreen => (Effect::ToggleFullscreen, Task::none()),
+            DeleteCurrentImage => (Effect::None, Task::none()),
         }
     }
 
@@ -688,6 +648,54 @@ impl State {
             async move { crate::image_handler::load_image(&path) },
             Message::ImageLoaded,
         )
+    }
+
+    fn delete_current_image(&mut self, i18n: &I18n) -> (Effect, Task<Message>) {
+        let Some(current_path) = self.current_image_path.clone() else {
+            return (Effect::None, Task::none());
+        };
+
+        let has_multiple = self.image_list.len() > 1;
+        let next_candidate = if has_multiple {
+            self.image_list
+                .next()
+                .map(|path| path.to_path_buf())
+                .filter(|next| next != &current_path)
+        } else {
+            None
+        };
+
+        match std::fs::remove_file(&current_path) {
+            Ok(()) => {
+                self.image = None;
+                self.error = None;
+
+                let scan_seed = next_candidate
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| current_path.clone());
+                self.current_image_path = Some(scan_seed);
+                let _ = self.scan_directory();
+
+                if let Some(next_path) = next_candidate {
+                    self.current_image_path = Some(next_path.clone());
+                    self.image_list.set_current(&next_path);
+                    (Effect::None, Self::load_image_task(next_path))
+                } else {
+                    self.current_image_path = None;
+                    (Effect::None, Task::none())
+                }
+            }
+            Err(err) => {
+                self.error = Some(ErrorState {
+                    friendly_key: "error-delete-image-io",
+                    friendly_text: i18n.tr("error-delete-image-io"),
+                    details: err.to_string(),
+                    show_details: false,
+                });
+                (Effect::None, Task::none())
+            }
+        }
     }
 }
 

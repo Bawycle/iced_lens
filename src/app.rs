@@ -99,13 +99,25 @@ fn compute_min_window_width(i18n: &I18n) -> u32 {
         i18n.tr("viewer-zoom-reset-button"),
         i18n.tr("viewer-zoom-in-button"),
         i18n.tr("viewer-fit-to-window-toggle"),
+        i18n.tr("viewer-delete-button"),
     ];
     let text_total: f32 = parts.iter().map(|s| s.len() as f32 * CHAR_W).sum();
-    let button_padding = (6.0 * 2.0) * 4.0;
+    let text_button_count = 4.0; // zoom out/reset/in + delete
+    let text_button_padding = 24.0 * text_button_count; // horizontal padding per button
+    let fullscreen_padding = 20.0; // icon button (⛶) padding
     let extra_label_padding = 12.0;
-    let gaps = 10.0 * 6.0;
+    let spacer_width = 16.0; // fixed Space widget between zoom controls and fit toggle
+    let gaps = 10.0 * 8.0; // approximate inter-widget spacing
     let breathing_room = 40.0;
-    (text_total + zoom_input_w + button_padding + extra_label_padding + gaps + breathing_room)
+
+    (text_total
+        + zoom_input_w
+        + text_button_padding
+        + fullscreen_padding
+        + extra_label_padding
+        + spacer_width
+        + gaps
+        + breathing_room)
         .ceil() as u32
 }
 
