@@ -7,8 +7,20 @@ use iced::{Alignment, Background, Border, Element, Length};
 
 use super::super::{Message, State, ViewContext};
 
-pub fn view<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let has_changes = state.has_unsaved_changes();
+pub struct ToolbarModel {
+    pub has_unsaved_changes: bool,
+}
+
+impl ToolbarModel {
+    pub fn from_state(state: &State) -> Self {
+        Self {
+            has_unsaved_changes: state.has_unsaved_changes(),
+        }
+    }
+}
+
+pub fn view<'a>(model: &ToolbarModel, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let has_changes = model.has_unsaved_changes;
     let back_label = format!("← {}", ctx.i18n.tr("editor-back-to-viewer"));
 
     let back_btn = button(Text::new(back_label).size(14)).padding([8, 12]);

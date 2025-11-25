@@ -11,9 +11,11 @@ use iced::{Background, Border, Element, Length};
 
 use super::{Message, State, ViewContext};
 use sidebar::SidebarModel;
+use toolbar::ToolbarModel;
 
 pub fn render<'a>(state: &'a State, ctx: ViewContext<'a>) -> Element<'a, Message> {
-    let toolbar = toolbar::view(state, &ctx);
+    let toolbar_model = ToolbarModel::from_state(state);
+    let toolbar = toolbar::view(&toolbar_model, &ctx);
 
     let mut main_row = Row::new().spacing(0);
 
