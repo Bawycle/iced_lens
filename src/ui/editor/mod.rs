@@ -8,10 +8,9 @@
 // TODO: Remove this once editor features are fully implemented
 #![allow(dead_code)]
 
-mod transform;
-
 use crate::config::BackgroundTheme;
 use crate::error::{Error, Result};
+use crate::image_handler::transform;
 use crate::image_handler::ImageData;
 use crate::ui::theme;
 use iced::Rectangle;
@@ -57,6 +56,8 @@ pub struct State {
     crop_ratio: CropRatio,
     /// Resize state
     resize_state: ResizeState,
+    /// Optional preview image (used for live adjustments)
+    preview_image: Option<ImageData>,
 }
 
 impl std::fmt::Debug for State {
@@ -138,7 +139,6 @@ pub enum Message {
     HeightInputChanged(String),
     ToggleLockAspect,
     ApplyResizePreset(f32), // Preset percentage (50%, 75%, 150%, 200%)
-    ApplyResize,
     /// Undo/redo
     Undo,
     Redo,
@@ -213,9 +213,10 @@ impl State {
         }
 
         // Image area with current preview
+        let current_display = self.display_image().handle.clone();
         let build_image_surface = || {
             container(center(
-                image(self.current_image.handle.clone()).content_fit(ContentFit::Contain),
+                image(current_display.clone()).content_fit(ContentFit::Contain),
             ))
             .width(Length::Fill)
             .height(Length::Fill)
@@ -488,12 +489,6 @@ impl State {
         )
         .on_toggle(|_| Message::ToggleLockAspect);
 
-        let apply_button = button(text(ctx.i18n.tr("editor-resize-apply")))
-            .on_press(Message::ApplyResize)
-            .padding(10)
-            .width(Length::Fill)
-            .style(iced::widget::button::primary);
-
         container(
             Column::new()
                 .spacing(12)
@@ -501,8 +496,7 @@ impl State {
                 .push(presets_section)
                 .push(text(ctx.i18n.tr("editor-resize-dimensions-label")).size(13))
                 .push(dimensions_row)
-                .push(lock_checkbox)
-                .push(apply_button),
+                .push(lock_checkbox),
         )
         .padding(12)
         .width(Length::Fill)
@@ -518,10 +512,21 @@ impl State {
                 Event::None
             }
             Message::SelectTool(tool) => {
-                self.active_tool = Some(tool);
+                if self.active_tool == Some(tool) {
+                    self.commit_active_tool_changes();
+                    self.active_tool = None;
+                    self.preview_image = None;
+                } else {
+                    self.commit_active_tool_changes();
+                    self.active_tool = Some(tool);
+                    if tool != EditorTool::Resize {
+                        self.preview_image = None;
+                    }
+                }
                 Event::None
             }
             Message::RotateLeft => {
+                self.commit_active_tool_changes();
                 self.apply_dynamic_transformation(
                     Transformation::RotateLeft,
                     transform::rotate_left,
@@ -529,6 +534,7 @@ impl State {
                 Event::None
             }
             Message::RotateRight => {
+                self.commit_active_tool_changes();
                 self.apply_dynamic_transformation(
                     Transformation::RotateRight,
                     transform::rotate_right,
@@ -567,21 +573,26 @@ impl State {
                 self.set_resize_percent(percent);
                 Event::None
             }
-            Message::ApplyResize => {
-                self.apply_resize_dimensions();
-                Event::None
-            }
             Message::Undo => {
+                self.commit_active_tool_changes();
                 // TODO: Implement undo
                 Event::None
             }
             Message::Redo => {
+                self.commit_active_tool_changes();
                 // TODO: Implement redo
                 Event::None
             }
-            Message::NavigateNext => Event::NavigateNext,
-            Message::NavigatePrevious => Event::NavigatePrevious,
+            Message::NavigateNext => {
+                self.commit_active_tool_changes();
+                Event::NavigateNext
+            }
+            Message::NavigatePrevious => {
+                self.commit_active_tool_changes();
+                Event::NavigatePrevious
+            }
             Message::Save => {
+                self.commit_active_tool_changes();
                 // Save overwrites the original file (confirmation may be added later)
                 Event::SaveRequested {
                     path: self.image_path.clone(),
@@ -589,6 +600,7 @@ impl State {
                 }
             }
             Message::SaveAs => {
+                self.commit_active_tool_changes();
                 // TODO: Implement file picker dialog for save location
                 // For now, emit event with overwrite: false to signal "save as" intent
                 Event::SaveRequested {
@@ -596,7 +608,10 @@ impl State {
                     overwrite: false,
                 }
             }
-            Message::Cancel => Event::ExitEditor,
+            Message::Cancel => {
+                self.preview_image = None;
+                Event::ExitEditor
+            }
         }
     }
 
@@ -626,6 +641,7 @@ impl State {
                 width_input: image.width.to_string(),
                 height_input: image.height.to_string(),
             },
+            preview_image: None,
         })
     }
     /// Check if there are unsaved changes based on transformation history.
@@ -648,6 +664,10 @@ impl State {
         &self.current_image
     }
 
+    fn display_image(&self) -> &ImageData {
+        self.preview_image.as_ref().unwrap_or(&self.current_image)
+    }
+
     /// Get the active tool.
     pub fn active_tool(&self) -> Option<EditorTool> {
         self.active_tool
@@ -668,6 +688,7 @@ impl State {
                 self.working_image = updated;
                 self.current_image = image_data;
                 self.sync_resize_state_dimensions();
+                self.preview_image = None;
                 self.record_transformation(transformation);
             }
             Err(err) => {
@@ -705,6 +726,12 @@ impl State {
         self.current_image.height.max(1) as f32
     }
 
+    fn commit_active_tool_changes(&mut self) {
+        if self.active_tool == Some(EditorTool::Resize) {
+            self.apply_resize_dimensions();
+        }
+    }
+
     fn set_resize_percent(&mut self, percent: f32) {
         let clamped = percent.clamp(10.0, 200.0);
         self.resize_state.scale_percent = clamped;
@@ -719,6 +746,8 @@ impl State {
             self.resize_state.width_input = width.to_string();
             self.resize_state.height_input = height.to_string();
         }
+
+        self.update_resize_preview();
     }
 
     fn handle_width_input_change(&mut self, value: String) {
@@ -746,6 +775,7 @@ impl State {
                 self.resize_state.height = height;
                 self.resize_state.height_input = height.to_string();
             }
+            self.update_resize_preview();
         }
     }
 
@@ -755,6 +785,7 @@ impl State {
             let width = self.resize_state.width;
             self.set_width_preserving_aspect(width);
         }
+        self.update_resize_preview();
     }
 
     fn set_width_preserving_aspect(&mut self, width: u32) {
@@ -788,6 +819,7 @@ impl State {
             self.set_resize_percent(clamped);
         } else {
             self.resize_state.scale_percent = clamped;
+            self.update_resize_preview();
         }
     }
 
@@ -805,6 +837,26 @@ impl State {
             },
             move |image| transform::resize(image, target_width, target_height),
         );
+    }
+
+    fn update_resize_preview(&mut self) {
+        let target_width = self.resize_state.width.max(1);
+        let target_height = self.resize_state.height.max(1);
+        if target_width == self.current_image.width && target_height == self.current_image.height {
+            self.preview_image = None;
+            return;
+        }
+
+        let preview_dynamic = transform::resize(&self.working_image, target_width, target_height);
+        match transform::dynamic_to_image_data(&preview_dynamic) {
+            Ok(image_data) => {
+                self.preview_image = Some(image_data);
+            }
+            Err(err) => {
+                eprintln!("Failed to build resize preview: {err:?}");
+                self.preview_image = None;
+            }
+        }
     }
 }
 
@@ -883,12 +935,14 @@ mod tests {
         let (_dir, path, img) = create_test_image(8, 6);
         let mut state = State::new(path, img).expect("editor state");
 
+        state.update(Message::SelectTool(EditorTool::Resize));
         state.resize_state.width = 4;
         state.resize_state.height = 3;
         state.resize_state.width_input = "4".into();
         state.resize_state.height_input = "3".into();
 
-        state.update(Message::ApplyResize);
+        // Collapse the tool by selecting it again to commit the change
+        state.update(Message::SelectTool(EditorTool::Resize));
 
         assert_eq!(state.current_image.width, 4);
         assert_eq!(state.current_image.height, 3);

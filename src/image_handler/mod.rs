@@ -19,6 +19,8 @@
 //! # }
 //! ```
 
+pub mod transform;
+
 use crate::error::{Error, Result};
 use iced::widget::image;
 use image_rs::{GenericImageView, ImageError};
