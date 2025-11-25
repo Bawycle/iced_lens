@@ -177,8 +177,15 @@ impl App {
         match self.mode {
             AppMode::Editor => {
                 event::listen_with(|event, status, window_id| {
+                    if let event::Event::Window(window::Event::Resized(_)) = &event {
+                        return Some(Message::Viewer(component::Message::RawEvent {
+                            window: window_id,
+                            event: event.clone(),
+                        }));
+                    }
+
                     // In editor mode, route keyboard events to editor
-                    if matches!(event, event::Event::Keyboard(..)) {
+                    if let event::Event::Keyboard(..) = &event {
                         match status {
                             event::Status::Ignored => {
                                 Some(Message::Editor(crate::ui::editor::Message::RawEvent {
