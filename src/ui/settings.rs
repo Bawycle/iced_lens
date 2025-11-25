@@ -119,8 +119,8 @@ impl State {
 
     /// Render the settings view.
     pub fn view<'a>(&'a self, ctx: ViewContext<'a>) -> Element<'a, Message> {
-        let back_button = button(Text::new(ctx.i18n.tr("back-to-viewer-button")))
-            .on_press(Message::BackToViewer);
+        let back_button =
+            button(Text::new(ctx.i18n.tr("back-to-viewer-button"))).on_press(Message::BackToViewer);
 
         let title = Text::new(ctx.i18n.tr("settings-title")).size(30);
 

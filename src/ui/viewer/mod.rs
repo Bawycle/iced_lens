@@ -126,12 +126,11 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
     if ctx.controls_visible {
         let mut top_bar = Row::new().spacing(10).padding(10);
 
-        let settings_button = button(Text::new(ctx.i18n.tr("open-settings-button")))
-            .on_press(Message::OpenSettings);
+        let settings_button =
+            button(Text::new(ctx.i18n.tr("open-settings-button"))).on_press(Message::OpenSettings);
         top_bar = top_bar.push(settings_button);
 
-        let edit_button = button(Text::new("✏ Edit"))
-            .on_press(Message::EnterEditor);
+        let edit_button = button(Text::new("✏ Edit")).on_press(Message::EnterEditor);
         top_bar = top_bar.push(edit_button);
 
         column = column.push(
