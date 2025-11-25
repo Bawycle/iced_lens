@@ -16,6 +16,14 @@ use iced::Rectangle;
 use image_rs::DynamicImage;
 use std::path::PathBuf;
 
+const ROTATE_LEFT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
+<path d='M11 5v-3l-4 4 4 4V7c3.309 0 6 2.691 6 6 0 1.262-.389 2.432-1.053 3.403l1.553 1.234C18.42 16.299 19 14.729 19 13c0-4.411-3.589-8-8-8z' fill='currentColor'/>
+</svg>"#;
+
+const ROTATE_RIGHT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
+<path d='M13 5V3l4 4-4 4V7c-3.309 0-6 2.691-6 6 0 1.262.389 2.432 1.053 3.403l-1.553 1.234C5.58 16.299 5 14.729 5 13c0-4.411 3.589-8 8-8z' fill='currentColor'/>
+</svg>"#;
+
 /// Contextual data needed to render the editor view.
 pub struct ViewContext<'a> {
     pub i18n: &'a crate::i18n::fluent::I18n,
@@ -214,7 +222,7 @@ impl State {
 
     /// Build the expanded sidebar with tools and controls.
     fn build_sidebar<'a>(&'a self, ctx: ViewContext<'a>) -> iced::Element<'a, Message> {
-        use iced::widget::{button, container, text, Column, Row};
+        use iced::widget::{button, container, svg, text, Column, Row};
         use iced::{alignment::Vertical, Background, Border, Color, Length};
 
         let mut sidebar_content = Column::new()
@@ -239,22 +247,33 @@ impl State {
         sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
 
         // Rotate tools
-        let rotate_left_btn =
-            button(text(format!("↻\n{}", ctx.i18n.tr("editor-rotate-left"))).size(14))
-                .on_press(Message::RotateLeft)
-                .padding(12)
-                .width(Length::Fill)
-                .style(iced::widget::button::secondary);
+        let rotate_left_icon = svg::Svg::new(svg::Handle::from_memory(ROTATE_LEFT_SVG.as_bytes()))
+            .width(Length::Fixed(28.0))
+            .height(Length::Fixed(28.0));
 
-        let rotate_right_btn =
-            button(text(format!("↺\n{}", ctx.i18n.tr("editor-rotate-right"))).size(14))
-                .on_press(Message::RotateRight)
-                .padding(12)
-                .width(Length::Fill)
-                .style(iced::widget::button::secondary);
+        let rotate_right_icon =
+            svg::Svg::new(svg::Handle::from_memory(ROTATE_RIGHT_SVG.as_bytes()))
+                .width(Length::Fixed(28.0))
+                .height(Length::Fixed(28.0));
 
-        sidebar_content = sidebar_content.push(rotate_left_btn);
-        sidebar_content = sidebar_content.push(rotate_right_btn);
+        let rotate_left_btn = button(rotate_left_icon)
+            .on_press(Message::RotateLeft)
+            .padding(8)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary);
+
+        let rotate_right_btn = button(rotate_right_icon)
+            .on_press(Message::RotateRight)
+            .padding(8)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary);
+
+        let rotate_row = Row::new()
+            .spacing(8)
+            .push(rotate_left_btn)
+            .push(rotate_right_btn);
+
+        sidebar_content = sidebar_content.push(rotate_row);
 
         sidebar_content = sidebar_content.push(iced::widget::horizontal_rule(1));
 

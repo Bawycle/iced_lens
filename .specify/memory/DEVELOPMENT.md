@@ -2,23 +2,24 @@
 
 This document tracks ongoing development work for IcedLens. It serves as a reference for features in progress and implementation notes.
 
-**Last Updated:** 2025-11-24 (Session 2 - Editor Infrastructure Complete)
+**Last Updated:** 2025-11-25 (Session 3 - Rotate & Preview Complete)
 
 ---
 
 ## 📊 Quick Status Summary
 
-**Overall Progress:** Infrastructure 100% | Features 10%
+**Overall Progress:** Infrastructure 100% | Features 20%
 
 - ✅ **Infrastructure Complete** - Module, UI, App integration, translations
 - ✅ **Sidebar Complete** - Retractable, all controls, Save/Save As/Cancel
-- 🔄 **Rotate Tool** - 90% (functions ready, wiring in progress)
+- ✅ **Rotate Tool** - Working image pipeline wired, icons corrected, history tracked
+- ✅ **Editor Preview** - Canvas now renders the edited image with fit containment
 - ⏳ **Remaining** - Crop, Resize, Undo/Redo, Save implementation, Keyboard shortcuts
 
 **Next Immediate Steps:**
-1. Complete Rotate tool wiring (~10 min)
-2. Display image in editor canvas
-3. Implement Crop tool
+1. Implement Crop tool (selection overlay + apply flow)
+2. Build Resize tool (slider + inputs + preview sync)
+3. Hook Undo/Redo stack into toolbar shortcuts
 
 ---
 
@@ -118,28 +119,17 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - Custom Debug impl (DynamicImage is not Debug)
 
 #### 🔄 In Progress
-**Rotate Tool Implementation** (90% complete)
-- Module and functions created
-- State architecture ready
-- Remaining: wire up in `State::new()` and `update()` handlers
+Currently focusing on Crop/Resize implementations now that rotation & preview are shipped.
 
 #### ⏳ To Do
-1. **Complete Rotate Tool** (~10 min)
-   - Load DynamicImage in `State::new()` from file path
-   - Wire up RotateLeft/RotateRight in `update()` to apply transformation
-   - Update current_image after transformation for display
-   - Add to transformation history for undo/redo
-
-2. **Image Display in Editor** - Show current_image in canvas area (placeholder exists)
-
-3. **Crop Tool Implementation**
+1. **Crop Tool Implementation**
    - Interactive rectangle overlay on image
    - 8 handles (4 corners + 4 edges) for resizing
    - Aspect ratio constraint UI (Free, 1:1, 16:9, etc.)
    - Apply crop transformation
    - Update current_image
 
-4. **Resize Tool Implementation**
+2. **Resize Tool Implementation**
    - UI panel when tool selected:
      - Slider (10-200%)
      - Width/Height pixel inputs
@@ -148,21 +138,21 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - Real-time preview as slider moves
    - Apply resize transformation
 
-5. **Undo/Redo System**
+3. **Undo/Redo System**
    - Push transformations to history stack
    - Track history_index
    - Undo: revert to previous state, rebuild image
    - Redo: reapply transformation
    - Ctrl+Z / Ctrl+Y shortcuts
 
-6. **Save/Save As Implementation**
+4. **Save/Save As Implementation**
    - Save: write working_image to original path
    - Save As: file picker dialog → new path
    - Preserve format (JPEG→JPEG, PNG→PNG)
    - Confirmation dialogs
    - Handle errors (write permissions, disk space)
 
-7. **Keyboard Shortcuts**
+5. **Keyboard Shortcuts**
    - `E` = Enter edit mode (from viewer)
    - `Ctrl+S` = Save
    - `Esc` = Cancel/exit editor
@@ -170,18 +160,18 @@ This document tracks ongoing development work for IcedLens. It serves as a refer
    - `C` = Select crop tool
    - `Ctrl+Z` / `Ctrl+Y` = Undo/Redo
 
-8. **Navigation in Editor**
+6. **Navigation in Editor**
    - Wire up NavigateNext/NavigatePrevious events in App
    - Load new image in editor when navigating
    - Prompt to save if unsaved changes exist
 
-9. **Tests** - Unit tests for transformation logic
+7. **Tests** - Unit tests for transformation logic
    - rotate_left/rotate_right dimension swaps
    - crop boundaries
    - resize dimensions
    - transformation history
 
-10. **README** - Document editing features
+8. **README** - Document editing features
 
 ### Technical Notes
 

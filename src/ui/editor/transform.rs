@@ -7,12 +7,12 @@ use image_rs::{DynamicImage, GenericImageView};
 
 /// Rotate an image 90 degrees counter-clockwise (left).
 pub fn rotate_left(image: &DynamicImage) -> DynamicImage {
-    image.rotate90()
+    image.rotate270()
 }
 
 /// Rotate an image 90 degrees clockwise (right).
 pub fn rotate_right(image: &DynamicImage) -> DynamicImage {
-    image.rotate270()
+    image.rotate90()
 }
 
 /// Convert DynamicImage back to ImageData for display.
