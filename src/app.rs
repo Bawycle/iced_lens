@@ -75,7 +75,10 @@ pub struct Flags {
     pub i18n_dir: Option<String>,
 }
 
+pub const WINDOW_DEFAULT_HEIGHT: u32 = 600;
+pub const WINDOW_DEFAULT_WIDTH: u32 = 800;
 pub const MIN_WINDOW_HEIGHT: u32 = 480;
+pub const MIN_WINDOW_WIDTH: u32 = 650;
 
 /// Ensures zoom step values stay inside the supported range so persisted
 /// configs cannot request nonsensical increments.
@@ -83,56 +86,14 @@ fn clamp_zoom_step(value: f32) -> f32 {
     value.clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT)
 }
 
-/// Computes a language-aware minimum window width.
-///
-/// Iced currently needs an explicit minimum size; we approximate the required
-/// width by multiplying the localized control labels by an average monospace
-/// character width and adding padding constants for spacing, button chrome,
-/// and breathing room. The constants are empirical but centralized here so the
-/// rationale is documented.
-fn compute_min_window_width(i18n: &I18n) -> u32 {
-    const CHAR_W: f32 = 8.0;
-    let zoom_input_w = 90.0;
-    let parts = [
-        i18n.tr("viewer-zoom-label"),
-        i18n.tr("viewer-zoom-out-button"),
-        i18n.tr("viewer-zoom-reset-button"),
-        i18n.tr("viewer-zoom-in-button"),
-        i18n.tr("viewer-fit-to-window-toggle"),
-        i18n.tr("viewer-delete-button"),
-    ];
-    let text_total: f32 = parts.iter().map(|s| s.len() as f32 * CHAR_W).sum();
-    let text_button_count = 4.0; // zoom out/reset/in + delete
-    let text_button_padding = 24.0 * text_button_count; // horizontal padding per button
-    let fullscreen_padding = 20.0; // icon button (⛶) padding
-    let extra_label_padding = 12.0;
-    let spacer_width = 16.0; // fixed Space widget between zoom controls and fit toggle
-    let gaps = 10.0 * 8.0; // approximate inter-widget spacing
-    let breathing_room = 40.0;
-
-    (text_total
-        + zoom_input_w
-        + text_button_padding
-        + fullscreen_padding
-        + extra_label_padding
-        + spacer_width
-        + gaps
-        + breathing_room)
-        .ceil() as u32
-}
-
-/// Builds the window settings using the provided flags so translation data is
-/// available during size calculation and icon loading.
-pub fn window_settings_with_locale(flags: &Flags) -> window::Settings {
-    let config = crate::config::load().unwrap_or_default();
-    let i18n = I18n::new(flags.lang.clone(), flags.i18n_dir.clone(), &config);
-    let computed_width = compute_min_window_width(&i18n);
+/// Builds the window settings
+pub fn window_settings_with_locale() -> window::Settings {
     let icon = crate::icon::load_window_icon();
 
     window::Settings {
-        size: iced::Size::new(computed_width as f32, 600.0),
+        size: iced::Size::new(WINDOW_DEFAULT_WIDTH as f32, WINDOW_DEFAULT_HEIGHT as f32),
         min_size: Some(iced::Size::new(
-            computed_width as f32,
+            MIN_WINDOW_WIDTH as f32,
             MIN_WINDOW_HEIGHT as f32,
         )),
         icon,
@@ -144,7 +105,7 @@ pub fn window_settings_with_locale(flags: &Flags) -> window::Settings {
 pub fn run(flags: Flags) -> iced::Result {
     iced::application(|state: &App| state.title(), App::update, App::view)
         .theme(App::theme)
-        .window(window_settings_with_locale(&flags))
+        .window(window_settings_with_locale())
         .subscription(App::subscription)
         .run_with(move || App::new(flags))
 }
@@ -953,27 +914,6 @@ mod tests {
             let contents = fs::read_to_string(config_path).expect("config should be readable");
             assert!(contents.contains(&target_locale.to_string()));
         });
-    }
-
-    #[test]
-    fn dynamic_min_width_french_not_smaller_than_english() {
-        let english_flags = Flags {
-            lang: Some("en-US".into()),
-            file_path: None,
-            i18n_dir: None,
-        };
-        let ws_en = window_settings_with_locale(&english_flags);
-        let min_en = ws_en.min_size.expect("min size en").width;
-
-        let french_flags = Flags {
-            lang: Some("fr".into()),
-            file_path: None,
-            i18n_dir: None,
-        };
-        let ws_fr = window_settings_with_locale(&french_flags);
-        let min_fr = ws_fr.min_size.expect("min size fr").width;
-
-        assert!(min_fr >= min_en);
     }
 
     #[test]
