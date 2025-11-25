@@ -11,6 +11,12 @@ use crate::image_handler::transform;
 use crate::image_handler::ImageData;
 use crate::ui::theme;
 use iced::Rectangle;
+
+mod state;
+
+pub use self::state::{
+    CropDragState, CropOverlay, CropRatio, CropState, HandlePosition, ResizeOverlay, ResizeState,
+};
 use image_rs::DynamicImage;
 use std::path::PathBuf;
 
@@ -88,111 +94,6 @@ pub enum Transformation {
     RotateRight,
     Crop { rect: Rectangle },
     Resize { width: u32, height: u32 },
-}
-
-/// Crop aspect ratio constraints.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CropRatio {
-    None, // No ratio selected
-    Free,
-    Square,        // 1:1
-    Landscape,     // 16:9
-    Portrait,      // 9:16
-    Photo,         // 4:3
-    PhotoPortrait, // 3:4
-}
-
-/// State for the resize tool.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResizeState {
-    /// Scale percentage (10-200%)
-    pub scale_percent: f32,
-    /// Target width in pixels
-    pub width: u32,
-    /// Target height in pixels
-    pub height: u32,
-    /// Whether aspect ratio is locked
-    pub lock_aspect: bool,
-    /// Original aspect ratio
-    pub original_aspect: f32,
-    /// Width input field value
-    pub width_input: String,
-    /// Height input field value
-    pub height_input: String,
-    /// Visual overlay showing original size markers
-    pub overlay: ResizeOverlay,
-}
-
-/// Visual overlay for resize tool showing original dimensions
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResizeOverlay {
-    /// Whether the overlay is currently visible
-    pub visible: bool,
-    /// Original image dimensions for reference
-    pub original_width: u32,
-    pub original_height: u32,
-}
-
-/// State for the crop tool.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CropState {
-    /// Crop rectangle in image coordinates
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-    /// Selected aspect ratio constraint
-    pub ratio: CropRatio,
-    /// Interactive overlay state
-    pub overlay: CropOverlay,
-}
-
-/// Interactive crop overlay state
-#[derive(Debug, Clone, PartialEq)]
-pub struct CropOverlay {
-    /// Whether the overlay is currently visible
-    pub visible: bool,
-    /// Current drag operation, if any
-    pub drag_state: CropDragState,
-}
-
-/// Crop drag state for interactive overlay
-#[derive(Debug, Clone, PartialEq)]
-pub enum CropDragState {
-    /// No active drag
-    None,
-    /// Dragging the entire rectangle
-    DraggingRectangle {
-        /// Starting rectangle position
-        start_rect_x: u32,
-        start_rect_y: u32,
-        /// Starting cursor position (in image coordinates)
-        start_cursor_x: f32,
-        start_cursor_y: f32,
-    },
-    /// Dragging a resize handle
-    DraggingHandle {
-        /// Which handle is being dragged
-        handle: HandlePosition,
-        /// Starting rectangle dimensions
-        start_rect: (u32, u32, u32, u32), // x, y, width, height
-        /// Starting cursor position (in image coordinates)
-        start_cursor_x: f32,
-        start_cursor_y: f32,
-    },
-}
-
-/// Position of a resize handle on the crop rectangle
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HandlePosition {
-    TopLeft,
-    Top,
-    TopRight,
-    Right,
-    BottomRight,
-    Bottom,
-    BottomLeft,
-    Left,
 }
 
 /// Messages emitted directly by the editor widgets.
@@ -914,8 +815,10 @@ impl State {
                     // When opening resize tool, show overlay with current image dimensions as baseline
                     if tool == EditorTool::Resize {
                         self.resize_state.overlay.visible = true;
-                        self.resize_state.overlay.original_width = self.current_image.width;
-                        self.resize_state.overlay.original_height = self.current_image.height;
+                        self.resize_state.overlay.set_original_dimensions(
+                            self.current_image.width,
+                            self.current_image.height,
+                        );
                     }
                 }
                 Event::None
@@ -1128,15 +1031,8 @@ impl State {
 
     /// Create a new editor state for the given image.
     pub fn new(image_path: PathBuf, image: ImageData) -> Result<Self> {
-        let original_aspect = image.width as f32 / image.height as f32;
         let working_image =
             image_rs::open(&image_path).map_err(|err| Error::Io(err.to_string()))?;
-
-        // Initialize crop to center 75% of image
-        let crop_width = (image.width as f32 * 0.75).round() as u32;
-        let crop_height = (image.height as f32 * 0.75).round() as u32;
-        let crop_x = (image.width - crop_width) / 2;
-        let crop_y = (image.height - crop_height) / 2;
 
         Ok(Self {
             image_path,
@@ -1146,32 +1042,9 @@ impl State {
             transformation_history: Vec::new(),
             history_index: 0,
             sidebar_expanded: true,
-            crop_state: CropState {
-                x: crop_x,
-                y: crop_y,
-                width: crop_width,
-                height: crop_height,
-                ratio: CropRatio::Free,
-                overlay: CropOverlay {
-                    visible: false,
-                    drag_state: CropDragState::None,
-                },
-            },
+            crop_state: CropState::from_image(&image),
             crop_modified: false,
-            resize_state: ResizeState {
-                scale_percent: 100.0,
-                width: image.width,
-                height: image.height,
-                lock_aspect: true,
-                original_aspect,
-                width_input: image.width.to_string(),
-                height_input: image.height.to_string(),
-                overlay: ResizeOverlay {
-                    visible: false,
-                    original_width: image.width,
-                    original_height: image.height,
-                },
-            },
+            resize_state: ResizeState::from_image(&image),
             crop_base_image: None,
             crop_base_width: image.width,
             crop_base_height: image.height,
@@ -1265,16 +1138,7 @@ impl State {
     }
 
     fn sync_resize_state_dimensions(&mut self) {
-        self.resize_state.width = self.current_image.width;
-        self.resize_state.height = self.current_image.height;
-        self.resize_state.width_input = self.current_image.width.to_string();
-        self.resize_state.height_input = self.current_image.height.to_string();
-        self.resize_state.scale_percent = 100.0;
-        self.resize_state.original_aspect = if self.current_image.height == 0 {
-            1.0
-        } else {
-            self.current_image.width as f32 / self.current_image.height.max(1) as f32
-        };
+        self.resize_state.sync_from_image(&self.current_image);
     }
 
     fn record_transformation(&mut self, transformation: Transformation) {
@@ -1408,8 +1272,9 @@ impl State {
             move |image| transform::resize(image, target_width, target_height),
         );
 
-        self.resize_state.overlay.original_width = self.current_image.width;
-        self.resize_state.overlay.original_height = self.current_image.height;
+        self.resize_state
+            .overlay
+            .set_original_dimensions(self.current_image.width, self.current_image.height);
     }
 
     fn update_resize_preview(&mut self) {
