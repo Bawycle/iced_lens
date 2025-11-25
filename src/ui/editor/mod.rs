@@ -172,7 +172,7 @@ impl State {
     /// Render the editor view.
     pub fn view<'a>(&'a self, ctx: ViewContext<'a>) -> iced::Element<'a, Message> {
         use iced::widget::{button, center, container, image, text, Row};
-        use iced::{Background, Border, Color, ContentFit, Length};
+        use iced::{Background, Border, ContentFit, Length};
 
         let ViewContext {
             i18n,
@@ -195,12 +195,13 @@ impl State {
                 .on_press(Message::ToggleSidebar)
                 .padding(12);
 
+            let collapsed_bg = theme::viewer_toolbar_background();
             let collapsed_sidebar = container(toggle_button)
                 .width(Length::Fixed(60.0))
                 .height(Length::Fill)
                 .padding(10)
-                .style(|_theme: &iced::Theme| iced::widget::container::Style {
-                    background: Some(Background::Color(Color::from_rgb(0.95, 0.95, 0.95))),
+                .style(move |_theme: &iced::Theme| iced::widget::container::Style {
+                    background: Some(Background::Color(collapsed_bg)),
                     border: Border {
                         width: 0.0,
                         ..Default::default()
