@@ -32,6 +32,7 @@ pub enum Message {
     },
     NavigateNext,
     NavigatePrevious,
+    DeleteCurrentImage,
     OpenSettings,
     EnterEditor,
 }
@@ -239,13 +240,7 @@ impl State {
                     let path = next_path.to_path_buf();
                     self.current_image_path = Some(path.clone());
                     self.image_list.set_current(&path);
-                    return (
-                        Effect::None,
-                        Task::perform(
-                            async move { crate::image_handler::load_image(&path) },
-                            Message::ImageLoaded,
-                        ),
-                    );
+                    return (Effect::None, Self::load_image_task(path));
                 }
                 (Effect::None, Task::none())
             }
@@ -274,15 +269,56 @@ impl State {
                     let path = prev_path.to_path_buf();
                     self.current_image_path = Some(path.clone());
                     self.image_list.set_current(&path);
-                    return (
-                        Effect::None,
-                        Task::perform(
-                            async move { crate::image_handler::load_image(&path) },
-                            Message::ImageLoaded,
-                        ),
-                    );
+                    return (Effect::None, Self::load_image_task(path));
                 }
                 (Effect::None, Task::none())
+            }
+            Message::DeleteCurrentImage => {
+                let Some(current_path) = self.current_image_path.clone() else {
+                    return (Effect::None, Task::none());
+                };
+
+                let has_multiple = self.image_list.len() > 1;
+                let next_candidate = if has_multiple {
+                    self.image_list
+                        .next()
+                        .map(|path| path.to_path_buf())
+                        .filter(|next| next != &current_path)
+                } else {
+                    None
+                };
+
+                match std::fs::remove_file(&current_path) {
+                    Ok(()) => {
+                        self.image = None;
+                        self.error = None;
+
+                        let scan_seed = next_candidate
+                            .as_ref()
+                            .cloned()
+                            .unwrap_or_else(|| current_path.clone());
+                        self.current_image_path = Some(scan_seed);
+                        let _ = self.scan_directory();
+
+                        if let Some(next_path) = next_candidate {
+                            self.current_image_path = Some(next_path.clone());
+                            self.image_list.set_current(&next_path);
+                            (Effect::None, Self::load_image_task(next_path))
+                        } else {
+                            self.current_image_path = None;
+                            (Effect::None, Task::none())
+                        }
+                    }
+                    Err(err) => {
+                        self.error = Some(ErrorState {
+                            friendly_key: "error-delete-image-io",
+                            friendly_text: i18n.tr("error-delete-image-io"),
+                            details: err.to_string(),
+                            show_details: false,
+                        });
+                        (Effect::None, Task::none())
+                    }
+                }
             }
             Message::OpenSettings => (Effect::OpenSettings, Task::none()),
             Message::EnterEditor => (Effect::EnterEditor, Task::none()),
@@ -644,6 +680,13 @@ impl State {
             &self.viewport,
             self.zoom.zoom_percent,
             self.cursor_position,
+        )
+    }
+
+    fn load_image_task(path: PathBuf) -> Task<Message> {
+        Task::perform(
+            async move { crate::image_handler::load_image(&path) },
+            Message::ImageLoaded,
         )
     }
 }

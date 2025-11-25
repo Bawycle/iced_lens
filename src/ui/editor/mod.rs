@@ -5,9 +5,6 @@
 //! and viewer modules. The editor operates on a copy of the original image and only
 //! modifies the source file when the user explicitly saves.
 
-// TODO: Remove this once editor features are fully implemented
-#![allow(dead_code)]
-
 use crate::config::BackgroundTheme;
 use crate::error::{Error, Result};
 use crate::image_handler::transform;
@@ -38,8 +35,6 @@ pub struct ViewContext<'a> {
 pub struct State {
     /// Path to the image being edited
     image_path: PathBuf,
-    /// Original unmodified image data (for display)
-    original_image: ImageData,
     /// Current edited image (after applying transformations, for display)
     current_image: ImageData,
     /// Working image for transformations (DynamicImage from image_rs crate)
@@ -52,10 +47,6 @@ pub struct State {
     history_index: usize,
     /// Whether the sidebar is expanded
     sidebar_expanded: bool,
-    /// Crop selection rectangle (in image coordinates)
-    crop_selection: Option<Rectangle>,
-    /// Crop aspect ratio constraint
-    crop_ratio: CropRatio,
     /// Crop tool state
     crop_state: CropState,
     /// Track if crop state has been modified (to avoid auto-commit on tool close)
@@ -1149,15 +1140,12 @@ impl State {
 
         Ok(Self {
             image_path,
-            original_image: image.clone(),
             current_image: image.clone(),
             working_image,
             active_tool: None,
             transformation_history: Vec::new(),
             history_index: 0,
             sidebar_expanded: true,
-            crop_selection: None,
-            crop_ratio: CropRatio::Free,
             crop_state: CropState {
                 x: crop_x,
                 y: crop_y,
@@ -1306,8 +1294,17 @@ impl State {
     }
 
     fn commit_active_tool_changes(&mut self) {
-        // Note: Both Crop and Resize tools now require explicit "Apply" button press
-        // No auto-commit when switching tools
+        match self.active_tool {
+            Some(EditorTool::Resize) => {
+                self.apply_resize_dimensions();
+            }
+            Some(EditorTool::Crop) => {
+                if self.crop_modified && self.crop_state.overlay.visible {
+                    self.finalize_crop_overlay();
+                }
+            }
+            _ => {}
+        }
     }
 
     fn set_resize_percent(&mut self, percent: f32) {
@@ -1560,55 +1557,23 @@ impl State {
         }
     }
 
-    fn apply_crop(&mut self) {
-        let x = self.crop_state.x;
-        let y = self.crop_state.y;
-        let width = self.crop_state.width;
-        let height = self.crop_state.height;
-
-        // Validate crop bounds
-        if width == 0
-            || height == 0
-            || x >= self.current_image.width
-            || y >= self.current_image.height
-        {
-            eprintln!("Invalid crop bounds: ({}, {}, {}×{})", x, y, width, height);
+    fn finalize_crop_overlay(&mut self) {
+        if !self.crop_state.overlay.visible {
             return;
         }
 
-        // Apply crop transformation
-        if let Some(cropped) = transform::crop(&self.working_image, x, y, width, height) {
-            match transform::dynamic_to_image_data(&cropped) {
-                Ok(image_data) => {
-                    self.working_image = cropped;
-                    self.current_image = image_data;
-                    self.sync_resize_state_dimensions();
-
-                    // Record transformation for undo/redo
-                    self.record_transformation(Transformation::Crop {
-                        rect: Rectangle {
-                            x: x as f32,
-                            y: y as f32,
-                            width: width as f32,
-                            height: height as f32,
-                        },
-                    });
-
-                    // Reset crop state to new full image
-                    let new_crop_width = (self.current_image.width as f32 * 0.75).round() as u32;
-                    let new_crop_height = (self.current_image.height as f32 * 0.75).round() as u32;
-                    self.crop_state.x = (self.current_image.width - new_crop_width) / 2;
-                    self.crop_state.y = (self.current_image.height - new_crop_height) / 2;
-                    self.crop_state.width = new_crop_width;
-                    self.crop_state.height = new_crop_height;
-                }
-                Err(err) => {
-                    eprintln!("Failed to convert cropped image: {err:?}");
-                }
-            }
-        } else {
-            eprintln!("Crop operation returned None");
-        }
+        self.apply_crop_from_base();
+        self.crop_state.overlay.visible = false;
+        self.crop_state.overlay.drag_state = CropDragState::None;
+        self.crop_modified = false;
+        self.crop_state.ratio = CropRatio::None;
+        self.crop_state.x = 0;
+        self.crop_state.y = 0;
+        self.crop_state.width = self.current_image.width;
+        self.crop_state.height = self.current_image.height;
+        self.crop_base_image = Some(self.working_image.clone());
+        self.crop_base_width = self.current_image.width;
+        self.crop_base_height = self.current_image.height;
     }
 
     /// Handle mouse down on crop overlay to start dragging
