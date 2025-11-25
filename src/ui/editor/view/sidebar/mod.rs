@@ -4,6 +4,7 @@
 pub mod crop_panel;
 pub mod resize_panel;
 
+use crate::ui::editor::state::{CropState, ResizeState};
 use crate::ui::theme;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{
@@ -15,10 +16,33 @@ use super::super::{
     EditorTool, Message, State, ViewContext, ROTATE_LEFT_SVG, ROTATE_RIGHT_SVG, SIDEBAR_WIDTH,
 };
 
-pub fn expanded<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+pub struct SidebarModel<'a> {
+    pub active_tool: Option<EditorTool>,
+    pub crop_state: &'a CropState,
+    pub resize_state: &'a ResizeState,
+    pub can_undo: bool,
+    pub can_redo: bool,
+    pub has_unsaved_changes: bool,
+}
+
+impl<'a> SidebarModel<'a> {
+    pub fn from_state(state: &'a State) -> Self {
+        Self {
+            active_tool: state.active_tool,
+            crop_state: &state.crop_state,
+            resize_state: &state.resize_state,
+            can_undo: state.can_undo(),
+            can_redo: state.can_redo(),
+            has_unsaved_changes: state.has_unsaved_changes(),
+        }
+    }
+}
+
+pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let mut scrollable_section = Column::new().spacing(12);
 
-    scrollable_section = scrollable_section.push(undo_redo_section(state, ctx));
+    scrollable_section =
+        scrollable_section.push(undo_redo_section(model.can_undo, model.can_redo, ctx));
     scrollable_section = scrollable_section.push(horizontal_rule(1));
     scrollable_section = scrollable_section.push(rotate_section(ctx));
     scrollable_section = scrollable_section.push(horizontal_rule(1));
@@ -26,21 +50,21 @@ pub fn expanded<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Mess
     let crop_button = tool_button(
         ctx.i18n.tr("editor-tool-crop"),
         Message::SelectTool(EditorTool::Crop),
-        state.active_tool == Some(EditorTool::Crop),
+        model.active_tool == Some(EditorTool::Crop),
     );
     scrollable_section = scrollable_section.push(crop_button);
-    if state.active_tool == Some(EditorTool::Crop) {
-        scrollable_section = scrollable_section.push(crop_panel::panel(state, ctx));
+    if model.active_tool == Some(EditorTool::Crop) {
+        scrollable_section = scrollable_section.push(crop_panel::panel(model.crop_state, ctx));
     }
 
     let resize_button = tool_button(
         ctx.i18n.tr("editor-tool-resize"),
         Message::SelectTool(EditorTool::Resize),
-        state.active_tool == Some(EditorTool::Resize),
+        model.active_tool == Some(EditorTool::Resize),
     );
     scrollable_section = scrollable_section.push(resize_button);
-    if state.active_tool == Some(EditorTool::Resize) {
-        scrollable_section = scrollable_section.push(resize_panel::panel(state, ctx));
+    if model.active_tool == Some(EditorTool::Resize) {
+        scrollable_section = scrollable_section.push(resize_panel::panel(model.resize_state, ctx));
     }
 
     let scrollable = Scrollable::new(scrollable_section)
@@ -54,7 +78,7 @@ pub fn expanded<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Mess
         .width(Length::Fixed(SIDEBAR_WIDTH))
         .push(header_section(ctx))
         .push(scrollable)
-        .push(footer_section(state, ctx));
+        .push(footer_section(model.has_unsaved_changes, ctx));
 
     container(layout)
         .width(Length::Fixed(SIDEBAR_WIDTH))
@@ -101,12 +125,16 @@ fn tool_button<'a>(label: String, message: Message, active: bool) -> Element<'a,
         .into()
 }
 
-fn undo_redo_section<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+fn undo_redo_section<'a>(
+    can_undo: bool,
+    can_redo: bool,
+    ctx: &ViewContext<'a>,
+) -> Element<'a, Message> {
     let undo_btn = button(text(ctx.i18n.tr("editor-undo")).size(16))
         .padding(8)
         .width(Length::Fill)
         .style(iced::widget::button::secondary);
-    let undo_btn = if state.can_undo() {
+    let undo_btn = if can_undo {
         undo_btn.on_press(Message::Undo)
     } else {
         undo_btn
@@ -116,7 +144,7 @@ fn undo_redo_section<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a,
         .padding(8)
         .width(Length::Fill)
         .style(iced::widget::button::secondary);
-    let redo_btn = if state.can_redo() {
+    let redo_btn = if can_redo {
         redo_btn.on_press(Message::Redo)
     } else {
         redo_btn
@@ -177,9 +205,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .into()
 }
 
-fn footer_section<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Column<'a, Message> {
-    let has_changes = state.has_unsaved_changes();
-
+fn footer_section<'a>(has_changes: bool, ctx: &ViewContext<'a>) -> Column<'a, Message> {
     let prev_btn = button(text("◀").size(20))
         .padding([8, 16])
         .width(Length::Fill);

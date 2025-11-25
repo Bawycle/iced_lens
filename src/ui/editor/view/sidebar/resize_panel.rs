@@ -5,22 +5,16 @@ use crate::ui::theme;
 use iced::widget::{button, checkbox, container, slider, text, text_input, Column, Row};
 use iced::{Element, Length};
 
-use super::super::{Message, State, ViewContext};
+use super::super::{Message, ViewContext};
+use crate::ui::editor::state::ResizeState;
 
-pub fn panel<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let scale_section = Column::new()
         .spacing(6)
         .push(text(ctx.i18n.tr("editor-resize-section-title")).size(14))
         .push(text(ctx.i18n.tr("editor-resize-scale-label")).size(13))
-        .push(
-            slider(
-                10.0..=200.0,
-                state.resize_state.scale_percent,
-                Message::ScaleChanged,
-            )
-            .step(1.0),
-        )
-        .push(text(format!("{:.0}%", state.resize_state.scale_percent)).size(13));
+        .push(slider(10.0..=200.0, resize.scale_percent, Message::ScaleChanged).step(1.0))
+        .push(text(format!("{:.0}%", resize.scale_percent)).size(13));
 
     let mut presets = Row::new().spacing(8);
     for preset in [50.0, 75.0, 150.0, 200.0] {
@@ -40,7 +34,7 @@ pub fn panel<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Message
 
     let width_placeholder = ctx.i18n.tr("editor-resize-width-label");
     let width_label = text(width_placeholder.clone()).size(13);
-    let width_input = text_input(width_placeholder.as_str(), &state.resize_state.width_input)
+    let width_input = text_input(width_placeholder.as_str(), &resize.width_input)
         .on_input(Message::WidthInputChanged)
         .padding(6)
         .size(14)
@@ -48,14 +42,11 @@ pub fn panel<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Message
 
     let height_placeholder = ctx.i18n.tr("editor-resize-height-label");
     let height_label = text(height_placeholder.clone()).size(13);
-    let height_input = text_input(
-        height_placeholder.as_str(),
-        &state.resize_state.height_input,
-    )
-    .on_input(Message::HeightInputChanged)
-    .padding(6)
-    .size(14)
-    .width(Length::Fill);
+    let height_input = text_input(height_placeholder.as_str(), &resize.height_input)
+        .on_input(Message::HeightInputChanged)
+        .padding(6)
+        .size(14)
+        .width(Length::Fill);
 
     let dimensions_row = Row::new()
         .spacing(8)
@@ -74,11 +65,8 @@ pub fn panel<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Message
                 .push(height_input),
         );
 
-    let lock_checkbox = checkbox(
-        ctx.i18n.tr("editor-resize-lock-aspect"),
-        state.resize_state.lock_aspect,
-    )
-    .on_toggle(|_| Message::ToggleLockAspect);
+    let lock_checkbox = checkbox(ctx.i18n.tr("editor-resize-lock-aspect"), resize.lock_aspect)
+        .on_toggle(|_| Message::ToggleLockAspect);
 
     let apply_btn = button(text(ctx.i18n.tr("editor-resize-apply")).size(16))
         .padding(10)

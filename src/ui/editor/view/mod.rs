@@ -10,6 +10,7 @@ use iced::widget::{button, container, Column, Row, Text};
 use iced::{Background, Border, Element, Length};
 
 use super::{Message, State, ViewContext};
+use sidebar::SidebarModel;
 
 pub fn render<'a>(state: &'a State, ctx: ViewContext<'a>) -> Element<'a, Message> {
     let toolbar = toolbar::view(state, &ctx);
@@ -17,7 +18,8 @@ pub fn render<'a>(state: &'a State, ctx: ViewContext<'a>) -> Element<'a, Message
     let mut main_row = Row::new().spacing(0);
 
     if state.sidebar_expanded {
-        let sidebar = sidebar::expanded(state, &ctx);
+        let sidebar_model = SidebarModel::from_state(state);
+        let sidebar = sidebar::expanded(sidebar_model, &ctx);
         main_row = main_row.push(sidebar);
     } else {
         main_row = main_row.push(collapsed_sidebar());
