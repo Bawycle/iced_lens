@@ -4,8 +4,7 @@
 use crate::config::BackgroundTheme;
 use crate::image_handler::ImageData;
 use crate::ui::theme;
-use iced::widget::scrollable::{Direction, Scrollbar};
-use iced::widget::{container, image, Canvas, Scrollable, Stack};
+use iced::widget::{center, container, image, Canvas, Stack};
 use iced::{ContentFit, Element, Length};
 
 use super::super::{
@@ -72,17 +71,8 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
 
     let background_theme = ctx.background_theme;
 
-    // Wrap image in scrollable for when preview exceeds available space
-    let scrollable = Scrollable::new(image_with_overlay)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .direction(Direction::Both {
-            vertical: Scrollbar::new(),
-            horizontal: Scrollbar::new(),
-        });
-
     let build_image_surface = || {
-        container(scrollable)
+        container(center(image_with_overlay))
             .width(Length::Fill)
             .height(Length::Fill)
     };

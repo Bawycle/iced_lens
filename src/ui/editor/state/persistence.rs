@@ -53,7 +53,7 @@ impl State {
                         self.crop_state.y = (self.current_image.height - crop_height) / 2;
                         self.crop_state.width = crop_width;
                         self.crop_state.height = crop_height;
-                        self.crop_state.ratio = CropRatio::Free;
+                        self.crop_state.ratio = CropRatio::None;
                         self.crop_state.overlay.visible = false;
                         self.crop_state.overlay.drag_state = CropDragState::None;
                         self.crop_modified = false;
