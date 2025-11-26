@@ -10,6 +10,7 @@ use crate::config;
 use crate::error::Error;
 use crate::i18n::fluent::I18n;
 use crate::image_handler::{self, ImageData};
+use crate::image_navigation::ImageNavigator;
 use crate::ui::editor::{self, Event as EditorEvent, State as EditorState};
 use crate::ui::settings::{
     self, Event as SettingsEvent, State as SettingsState, ViewContext as SettingsViewContext,
@@ -33,6 +34,7 @@ pub struct App {
     settings: SettingsState,
     viewer: component::State,
     editor: Option<EditorState>,
+    image_navigator: ImageNavigator,
     fullscreen: bool,
     window_id: Option<window::Id>,
 }
@@ -120,6 +122,7 @@ impl Default for App {
             settings: SettingsState::default(),
             viewer: component::State::new(),
             editor: None,
+            image_navigator: ImageNavigator::new(),
             fullscreen: false,
             window_id: None,
         }
@@ -239,8 +242,9 @@ impl App {
                 match result {
                     Ok(image_data) => {
                         // Create a new EditorState with the loaded image
-                        if let Some(current_image_path) = self.viewer.current_image_path.clone() {
-                            match editor::State::new(current_image_path, image_data) {
+                        if let Some(current_image_path) = self.image_navigator.current_image_path() {
+                            let path = current_image_path.to_path_buf();
+                            match editor::State::new(path, image_data) {
                                 Ok(new_editor_state) => {
                                     self.editor = Some(new_editor_state);
                                 }
@@ -325,6 +329,13 @@ impl App {
                 self.viewer.current_image_path.clone(),
                 self.viewer.image().cloned(),
             ) {
+                // Synchronize image_navigator with viewer state before entering editor
+                let config = config::load().unwrap_or_default();
+                let sort_order = config.sort_order.unwrap_or_default();
+                if let Err(err) = self.image_navigator.scan_directory(&image_path, sort_order) {
+                    eprintln!("Failed to scan directory: {:?}", err);
+                }
+
                 match EditorState::new(image_path, image_data) {
                     Ok(state) => {
                         self.editor = Some(state);
@@ -396,17 +407,21 @@ impl App {
             }
             EditorEvent::NavigateNext => {
                 // Rescan directory to handle added/removed images
-                let _ = self.viewer.scan_directory();
+                if let Some(current_path) = self.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+                    let config = config::load().unwrap_or_default();
+                    let sort_order = config.sort_order.unwrap_or_default();
+                    let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+                }
 
                 // Navigate to next image in the list
-                if let Some(next_path) = self.viewer.image_list.next() {
-                    let path = next_path.to_path_buf();
-                    self.viewer.current_image_path = Some(path.clone());
-                    self.viewer.image_list.set_current(&path);
+                if let Some(next_path) = self.image_navigator.navigate_next() {
+                    // Synchronize viewer state immediately
+                    self.viewer.current_image_path = Some(next_path.clone());
+                    self.viewer.image_list.set_current(&next_path);
 
                     // Load the next image and create a new EditorState
                     Task::perform(
-                        async move { crate::image_handler::load_image(&path) },
+                        async move { crate::image_handler::load_image(&next_path) },
                         Message::EditorImageLoaded,
                     )
                 } else {
@@ -415,17 +430,21 @@ impl App {
             }
             EditorEvent::NavigatePrevious => {
                 // Rescan directory to handle added/removed images
-                let _ = self.viewer.scan_directory();
+                if let Some(current_path) = self.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+                    let config = config::load().unwrap_or_default();
+                    let sort_order = config.sort_order.unwrap_or_default();
+                    let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+                }
 
                 // Navigate to previous image in the list
-                if let Some(prev_path) = self.viewer.image_list.previous() {
-                    let path = prev_path.to_path_buf();
-                    self.viewer.current_image_path = Some(path.clone());
-                    self.viewer.image_list.set_current(&path);
+                if let Some(prev_path) = self.image_navigator.navigate_previous() {
+                    // Synchronize viewer state immediately
+                    self.viewer.current_image_path = Some(prev_path.clone());
+                    self.viewer.image_list.set_current(&prev_path);
 
                     // Load the previous image and create a new EditorState
                     Task::perform(
-                        async move { crate::image_handler::load_image(&path) },
+                        async move { crate::image_handler::load_image(&prev_path) },
                         Message::EditorImageLoaded,
                     )
                 } else {

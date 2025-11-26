@@ -235,28 +235,20 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 }
 
 fn footer_section<'a>(has_changes: bool, ctx: &ViewContext<'a>) -> Column<'a, Message> {
-    let prev_btn = button(
-        container(text("◀").size(20))
-            .center_x(Length::Fill)
-            .center_y(Length::Fill),
-    )
-    .padding([8, 16])
-    .width(Length::Fill)
-    .height(Length::Shrink);
+    let prev_btn = button(text("◀").size(20))
+        .padding([8, 16])
+        .width(Length::Fill)
+        .height(Length::Shrink);
     let prev_btn = if has_changes {
         prev_btn
     } else {
         prev_btn.on_press(SidebarMessage::NavigatePrevious.into())
     };
 
-    let next_btn = button(
-        container(text("▶").size(20))
-            .center_x(Length::Fill)
-            .center_y(Length::Fill),
-    )
-    .padding([8, 16])
-    .width(Length::Fill)
-    .height(Length::Shrink);
+    let next_btn = button(text("▶").size(20))
+        .padding([8, 16])
+        .width(Length::Fill)
+        .height(Length::Shrink);
     let next_btn = if has_changes {
         next_btn
     } else {

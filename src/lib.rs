@@ -13,6 +13,7 @@ pub mod error;
 pub mod i18n;
 pub mod icon;
 pub mod image_handler;
+pub mod image_navigation;
 pub mod ui;
 
 #[cfg(test)]
