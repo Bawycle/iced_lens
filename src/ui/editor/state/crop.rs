@@ -371,7 +371,7 @@ impl State {
     }
 
     fn get_handle_at_position(&self, x: f32, y: f32) -> Option<HandlePosition> {
-        const HANDLE_SIZE: f32 = 12.0; // Handle click area size
+        const HANDLE_SIZE: f32 = 20.0; // Handle click area size (extended for better grabbability)
 
         let rect_x = self.crop_state.x as f32;
         let rect_y = self.crop_state.y as f32;
