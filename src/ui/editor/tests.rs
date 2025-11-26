@@ -76,16 +76,139 @@ fn apply_resize_updates_image_dimensions() {
 }
 
 #[test]
-fn cancel_hides_resize_overlay() {
+fn cancel_clears_resize_preview() {
     let (_dir, path, img) = create_test_image(5, 4);
     let mut state = State::new(path, img).expect("editor state");
 
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
     )));
-    assert!(state.resize_state.overlay.visible);
+    // In Option A2, no overlay is used
+    assert!(!state.resize_state.overlay.visible);
+
+    // Make a change to create a preview
+    state.update(Message::Sidebar(SidebarMessage::ScaleChanged(50.0)));
+    assert!(state.preview_image.is_some(), "Preview should exist after making changes");
 
     state.discard_changes();
 
-    assert!(!state.resize_state.overlay.visible);
+    // After canceling, preview should be cleared
+    assert!(state.preview_image.is_none(), "Preview should be cleared after cancel");
+}
+
+#[test]
+fn resize_preview_updates_when_width_changes() {
+    let (_dir, path, img) = create_test_image(100, 100);
+    let mut state = State::new(path, img).expect("editor state");
+
+    state.update(Message::Sidebar(SidebarMessage::SelectTool(
+        EditorTool::Resize,
+    )));
+    state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
+        "50".to_string(),
+    )));
+
+    // Preview should exist with new dimensions
+    assert!(
+        state.preview_image.is_some(),
+        "Preview image should be generated when width changes"
+    );
+    let preview = state.preview_image.as_ref().unwrap();
+    assert_eq!(preview.width, 50, "Preview width should match input");
+    assert_eq!(preview.height, 50, "Preview height should maintain aspect ratio");
+}
+
+#[test]
+fn resize_preview_updates_when_scale_changes() {
+    let (_dir, path, img) = create_test_image(100, 80);
+    let mut state = State::new(path, img).expect("editor state");
+
+    state.update(Message::Sidebar(SidebarMessage::SelectTool(
+        EditorTool::Resize,
+    )));
+    state.update(Message::Sidebar(SidebarMessage::ScaleChanged(
+        50.0,
+    )));
+
+    // Preview should exist and be at 50% size
+    assert!(
+        state.preview_image.is_some(),
+        "Preview should be generated when scale changes"
+    );
+    let preview = state.preview_image.as_ref().unwrap();
+    assert_eq!(preview.width, 50, "Preview should be 50% of original width");
+    assert_eq!(preview.height, 40, "Preview should be 50% of original height");
+}
+
+#[test]
+fn resize_preview_clears_when_dimensions_match_original() {
+    let (_dir, path, img) = create_test_image(100, 100);
+    let mut state = State::new(path, img).expect("editor state");
+
+    state.update(Message::Sidebar(SidebarMessage::SelectTool(
+        EditorTool::Resize,
+    )));
+
+    // First change dimensions
+    state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
+        "50".to_string(),
+    )));
+    assert!(state.preview_image.is_some(), "Preview should exist after resize");
+
+    // Then reset to original dimensions
+    state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
+        "100".to_string(),
+    )));
+
+    // Preview should be cleared when dimensions match original
+    assert!(
+        state.preview_image.is_none(),
+        "Preview should be None when dimensions match original"
+    );
+}
+
+#[test]
+fn resize_preview_updates_when_height_changes() {
+    let (_dir, path, img) = create_test_image(100, 100);
+    let mut state = State::new(path, img).expect("editor state");
+
+    state.update(Message::Sidebar(SidebarMessage::SelectTool(
+        EditorTool::Resize,
+    )));
+
+    // Unlock aspect ratio to test independent height change
+    state.update(Message::Sidebar(SidebarMessage::ToggleLockAspect));
+
+    state.update(Message::Sidebar(SidebarMessage::HeightInputChanged(
+        "75".to_string(),
+    )));
+
+    assert!(state.preview_image.is_some(), "Preview should exist after height change");
+    let preview = state.preview_image.as_ref().unwrap();
+    assert_eq!(preview.height, 75, "Preview height should match input");
+}
+
+#[test]
+fn resize_preview_works_with_tool_selected() {
+    let (_dir, path, img) = create_test_image(100, 100);
+    let mut state = State::new(path, img).expect("editor state");
+
+    state.update(Message::Sidebar(SidebarMessage::SelectTool(
+        EditorTool::Resize,
+    )));
+
+    // In Option A2, no overlay is shown - preview is direct
+    assert!(!state.resize_state.overlay.visible, "Overlay should not be visible in Option A2");
+
+    // Change dimensions - preview should be generated directly on canvas
+    state.update(Message::Sidebar(SidebarMessage::ScaleChanged(
+        75.0,
+    )));
+
+    assert!(
+        state.preview_image.is_some(),
+        "Preview should be generated when resize tool is active (Option A2)"
+    );
+    let preview = state.preview_image.as_ref().unwrap();
+    assert_eq!(preview.width, 75, "Preview should reflect the new scale");
 }

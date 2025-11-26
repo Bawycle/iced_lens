@@ -40,7 +40,9 @@ impl State {
 
                     match tool {
                         EditorTool::Crop => self.prepare_crop_tool(),
-                        EditorTool::Resize => self.show_resize_overlay(),
+                        EditorTool::Resize => {
+                            // Option A2: No overlay - preview shows directly on canvas
+                        }
                         EditorTool::Rotate => {}
                     }
                 }

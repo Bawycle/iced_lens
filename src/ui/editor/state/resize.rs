@@ -83,13 +83,6 @@ impl ResizeOverlay {
 }
 
 impl State {
-    pub(crate) fn show_resize_overlay(&mut self) {
-        self.resize_state.overlay.visible = true;
-        self.resize_state
-            .overlay
-            .set_original_dimensions(self.current_image.width, self.current_image.height);
-    }
-
     pub(crate) fn hide_resize_overlay(&mut self) {
         self.resize_state.overlay.visible = false;
     }
@@ -226,12 +219,6 @@ impl State {
     }
 
     fn update_resize_preview(&mut self) {
-        // Don't generate preview when overlay is visible - the overlay will show the preview
-        if self.resize_state.overlay.visible {
-            self.preview_image = None;
-            return;
-        }
-
         let target_width = self.resize_state.width.max(1);
         let target_height = self.resize_state.height.max(1);
         if target_width == self.current_image.width && target_height == self.current_image.height {
