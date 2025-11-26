@@ -2,7 +2,7 @@
 //! Crop tool state and helpers.
 
 use crate::image_handler::{transform, ImageData};
-use crate::ui::editor::{State, Transformation};
+use crate::ui::editor::{CanvasMessage, Event, State, Transformation};
 use iced::Rectangle;
 
 /// Crop aspect ratio constraints.
@@ -101,6 +101,23 @@ impl CropState {
 }
 
 impl State {
+    pub(crate) fn handle_crop_canvas_message(&mut self, message: CanvasMessage) -> Event {
+        match message {
+            CanvasMessage::CropOverlayMouseDown { x, y } => {
+                self.handle_crop_overlay_mouse_down(x, y);
+                Event::None
+            }
+            CanvasMessage::CropOverlayMouseMove { x, y } => {
+                self.handle_crop_overlay_mouse_move(x, y);
+                Event::None
+            }
+            CanvasMessage::CropOverlayMouseUp => {
+                self.crop_state.overlay.drag_state = CropDragState::None;
+                Event::None
+            }
+        }
+    }
+
     pub(crate) fn prepare_crop_tool(&mut self) {
         self.crop_base_image = Some(self.working_image.clone());
         self.crop_base_width = self.current_image.width;
@@ -122,6 +139,19 @@ impl State {
         self.crop_modified = false;
         self.crop_base_image = None;
         self.hide_crop_overlay();
+    }
+
+    pub(crate) fn set_crop_ratio_from_sidebar(&mut self, ratio: CropRatio) {
+        self.crop_state.ratio = ratio;
+        self.adjust_crop_to_ratio(ratio);
+        self.crop_state.overlay.visible = true;
+        self.crop_modified = true;
+    }
+
+    pub(crate) fn apply_crop_from_sidebar(&mut self) {
+        if self.crop_state.overlay.visible {
+            self.finalize_crop_overlay();
+        }
     }
 
     pub(crate) fn adjust_crop_to_ratio(&mut self, ratio: CropRatio) {

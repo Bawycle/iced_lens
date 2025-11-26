@@ -255,51 +255,35 @@ impl State {
                 Event::None
             }
             SidebarMessage::SetCropRatio(ratio) => {
-                self.crop_state.ratio = ratio;
-                self.adjust_crop_to_ratio(ratio);
-                self.crop_state.overlay.visible = true;
-                self.crop_modified = true;
+                self.set_crop_ratio_from_sidebar(ratio);
                 Event::None
             }
             SidebarMessage::ApplyCrop => {
-                if self.crop_state.overlay.visible {
-                    self.apply_crop_from_base();
-                    self.crop_state.overlay.visible = false;
-                    self.crop_state.overlay.drag_state = CropDragState::None;
-                    self.crop_modified = false;
-                    self.crop_state.ratio = CropRatio::None;
-                    self.crop_state.x = 0;
-                    self.crop_state.y = 0;
-                    self.crop_state.width = self.current_image.width;
-                    self.crop_state.height = self.current_image.height;
-                    self.crop_base_image = Some(self.working_image.clone());
-                    self.crop_base_width = self.current_image.width;
-                    self.crop_base_height = self.current_image.height;
-                }
+                self.apply_crop_from_sidebar();
                 Event::None
             }
             SidebarMessage::ScaleChanged(percent) => {
-                self.set_resize_percent(percent);
+                self.sidebar_scale_changed(percent);
                 Event::None
             }
             SidebarMessage::WidthInputChanged(value) => {
-                self.handle_width_input_change(value);
+                self.sidebar_width_input_changed(value);
                 Event::None
             }
             SidebarMessage::HeightInputChanged(value) => {
-                self.handle_height_input_change(value);
+                self.sidebar_height_input_changed(value);
                 Event::None
             }
             SidebarMessage::ToggleLockAspect => {
-                self.toggle_resize_lock();
+                self.sidebar_toggle_lock();
                 Event::None
             }
             SidebarMessage::ApplyResizePreset(percent) => {
-                self.set_resize_percent(percent);
+                self.sidebar_scale_changed(percent);
                 Event::None
             }
             SidebarMessage::ApplyResize => {
-                self.apply_resize_dimensions();
+                self.sidebar_apply_resize();
                 Event::None
             }
             SidebarMessage::Undo => {
@@ -353,20 +337,7 @@ impl State {
     }
 
     fn handle_canvas_message(&mut self, message: CanvasMessage) -> Event {
-        match message {
-            CanvasMessage::CropOverlayMouseDown { x, y } => {
-                self.handle_crop_overlay_mouse_down(x, y);
-                Event::None
-            }
-            CanvasMessage::CropOverlayMouseMove { x, y } => {
-                self.handle_crop_overlay_mouse_move(x, y);
-                Event::None
-            }
-            CanvasMessage::CropOverlayMouseUp => {
-                self.crop_state.overlay.drag_state = CropDragState::None;
-                Event::None
-            }
-        }
+        self.handle_crop_canvas_message(message)
     }
 
     fn handle_raw_event(&mut self, event: iced::Event) -> Event {

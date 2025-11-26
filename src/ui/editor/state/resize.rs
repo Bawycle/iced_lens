@@ -94,7 +94,27 @@ impl State {
         self.resize_state.overlay.visible = false;
     }
 
-    pub(crate) fn set_resize_percent(&mut self, percent: f32) {
+    pub(crate) fn sidebar_scale_changed(&mut self, percent: f32) {
+        self.set_resize_percent(percent);
+    }
+
+    pub(crate) fn sidebar_width_input_changed(&mut self, value: String) {
+        self.handle_width_input_change(value);
+    }
+
+    pub(crate) fn sidebar_height_input_changed(&mut self, value: String) {
+        self.handle_height_input_change(value);
+    }
+
+    pub(crate) fn sidebar_toggle_lock(&mut self) {
+        self.toggle_resize_lock();
+    }
+
+    pub(crate) fn sidebar_apply_resize(&mut self) {
+        self.apply_resize_dimensions();
+    }
+
+    fn set_resize_percent(&mut self, percent: f32) {
         let clamped = percent.clamp(10.0, 200.0);
         self.resize_state.scale_percent = clamped;
         let width = (self.base_width() * clamped / 100.0).round().max(1.0) as u32;
@@ -112,7 +132,7 @@ impl State {
         self.update_resize_preview();
     }
 
-    pub(crate) fn handle_width_input_change(&mut self, value: String) {
+    fn handle_width_input_change(&mut self, value: String) {
         self.resize_state.width_input = value.clone();
         if let Some(width) = parse_dimension_input(&value) {
             if self.resize_state.lock_aspect {
@@ -126,7 +146,7 @@ impl State {
         }
     }
 
-    pub(crate) fn handle_height_input_change(&mut self, value: String) {
+    fn handle_height_input_change(&mut self, value: String) {
         self.resize_state.height_input = value.clone();
         if let Some(height) = parse_dimension_input(&value) {
             if self.resize_state.lock_aspect {
@@ -141,7 +161,7 @@ impl State {
         }
     }
 
-    pub(crate) fn toggle_resize_lock(&mut self) {
+    fn toggle_resize_lock(&mut self) {
         self.resize_state.lock_aspect = !self.resize_state.lock_aspect;
         if self.resize_state.lock_aspect {
             let width = self.resize_state.width;
@@ -150,7 +170,7 @@ impl State {
         self.update_resize_preview();
     }
 
-    pub(crate) fn set_width_preserving_aspect(&mut self, width: u32) {
+    fn set_width_preserving_aspect(&mut self, width: u32) {
         let width = width.max(1);
         let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
         let height = (width as f32 / aspect).round().max(1.0) as u32;
@@ -160,7 +180,7 @@ impl State {
         self.resize_state.height_input = height.to_string();
     }
 
-    pub(crate) fn set_height_preserving_aspect(&mut self, height: u32) {
+    fn set_height_preserving_aspect(&mut self, height: u32) {
         let height = height.max(1);
         let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
         let width = (height as f32 * aspect).round().max(1.0) as u32;
@@ -170,7 +190,7 @@ impl State {
         self.resize_state.height_input = height.to_string();
     }
 
-    pub(crate) fn update_scale_percent_from_width(&mut self) {
+    fn update_scale_percent_from_width(&mut self) {
         let base_width = self.base_width();
         if base_width <= 0.0 {
             return;
@@ -185,7 +205,7 @@ impl State {
         }
     }
 
-    pub(crate) fn apply_resize_dimensions(&mut self) {
+    fn apply_resize_dimensions(&mut self) {
         let target_width = self.resize_state.width.max(1);
         let target_height = self.resize_state.height.max(1);
         if target_width == self.current_image.width && target_height == self.current_image.height {
@@ -205,7 +225,7 @@ impl State {
             .set_original_dimensions(self.current_image.width, self.current_image.height);
     }
 
-    pub(crate) fn update_resize_preview(&mut self) {
+    fn update_resize_preview(&mut self) {
         // Don't generate preview when overlay is visible - the overlay will show the preview
         if self.resize_state.overlay.visible {
             self.preview_image = None;
