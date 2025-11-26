@@ -193,13 +193,7 @@ impl State {
 
     fn handle_toolbar_message(&mut self, message: ToolbarMessage) -> Event {
         match message {
-            ToolbarMessage::BackToViewer => {
-                if self.has_unsaved_changes() {
-                    Event::None
-                } else {
-                    Event::ExitEditor
-                }
-            }
+            ToolbarMessage::BackToViewer => self.toolbar_back_to_viewer(),
         }
     }
 
@@ -290,37 +284,11 @@ impl State {
                 self.sidebar_redo();
                 Event::None
             }
-            SidebarMessage::NavigateNext => {
-                if self.has_unsaved_changes() {
-                    Event::None
-                } else {
-                    self.commit_active_tool_changes();
-                    Event::NavigateNext
-                }
-            }
-            SidebarMessage::NavigatePrevious => {
-                if self.has_unsaved_changes() {
-                    Event::None
-                } else {
-                    self.commit_active_tool_changes();
-                    Event::NavigatePrevious
-                }
-            }
-            SidebarMessage::Save => {
-                self.commit_active_tool_changes();
-                Event::SaveRequested {
-                    path: self.image_path.clone(),
-                    overwrite: true,
-                }
-            }
-            SidebarMessage::SaveAs => {
-                self.commit_active_tool_changes();
-                Event::SaveAsRequested
-            }
-            SidebarMessage::Cancel => {
-                self.discard_changes();
-                Event::None
-            }
+            SidebarMessage::NavigateNext => self.sidebar_navigate_next(),
+            SidebarMessage::NavigatePrevious => self.sidebar_navigate_previous(),
+            SidebarMessage::Save => self.sidebar_save(),
+            SidebarMessage::SaveAs => self.sidebar_save_as(),
+            SidebarMessage::Cancel => self.sidebar_cancel(),
         }
     }
 

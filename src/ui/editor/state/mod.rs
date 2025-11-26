@@ -4,6 +4,7 @@
 pub mod crop;
 pub mod history;
 pub mod resize;
+pub mod session;
 pub mod tools;
 
 pub use crop::{CropDragState, CropOverlay, CropRatio, CropState, HandlePosition};
