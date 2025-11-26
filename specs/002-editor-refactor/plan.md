@@ -80,17 +80,3 @@ The core refactor is complete, but we identified additional improvements that ke
 These can land incrementally; each preserves the existing public API and continues to funnel state updates/messages through the current editor facade.
 
 ## Recent Progress (2025-11-26)
-- Offloaded crop and resize helper implementations into their respective state modules, shrinking `mod.rs` while keeping the facade unchanged.
-- Added state-level hooks for showing/hiding overlays and initializing crop sessions, paving the way for delegating sidebar/canvas message branches into the tool modules.
-- Sidebar ratio/resize actions and canvas overlay events now route through the tool modules, so `mod.rs` keeps only high-level dispatching.
-- Introduced `state/tools.rs` so rotate buttons and keyboard shortcuts reuse the same helper logic instead of duplicating it in the facade.
-- Moved undo/redo capability checks, recording, and replaying into `state/history.rs`, with the sidebar and keyboard branches delegating to those helpers.
-- Added `state/session.rs` so toolbar back button plus sidebar navigation/save/cancel branches reuse consistent logic.
-- Created `state/persistence.rs` to host save/discard helpers, further shrinking `mod.rs` and keeping IO-heavy routines isolated.
-- Added `state/routing.rs` so toolbar, sidebar, canvas, and raw-event handlers live outside the main facade while keeping the public API unchanged.
-- Moved the per-editor unit tests into `src/ui/editor/tests.rs`, keeping the facade lean while preserving the existing coverage.
-- Created `state/helpers.rs` to house shared helper methods (`apply_dynamic_transformation`, resize syncing, crop commit hook), shrinking the core impl even further.
-- Added `component.rs` so `ViewContext`, `State::view`, and display helpers sit outside `mod.rs`, keeping the public facade tight.
-- Added `messages.rs` so toolbar/sidebar/canvas/raw-event enums and the user-facing `Message`/`Event` live outside the facade while continuing to be re-exported.
-- Moved the `State::new` constructor into `component.rs`, so `mod.rs` now just re-exports it while staying focused on the shared state struct.
-- Relocated the `EditorTool` and `Transformation` enums into `component.rs`, finishing the extraction of public-facing glue from `mod.rs`.
