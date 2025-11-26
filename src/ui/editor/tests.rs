@@ -495,8 +495,14 @@ fn flip_horizontal_can_be_undone() {
     state.update(Message::Sidebar(SidebarMessage::Undo));
     assert!(!state.can_undo(), "Should not be able to undo further");
     assert!(state.can_redo(), "Should be able to redo after undo");
-    assert_eq!(state.current_image.width, original_width, "Dimensions should be restored");
-    assert_eq!(state.current_image.height, original_height, "Dimensions should be restored");
+    assert_eq!(
+        state.current_image.width, original_width,
+        "Dimensions should be restored"
+    );
+    assert_eq!(
+        state.current_image.height, original_height,
+        "Dimensions should be restored"
+    );
 }
 
 #[test]
@@ -513,8 +519,14 @@ fn flip_vertical_can_be_undone() {
     state.update(Message::Sidebar(SidebarMessage::Undo));
     assert!(!state.can_undo(), "Should not be able to undo further");
     assert!(state.can_redo(), "Should be able to redo after undo");
-    assert_eq!(state.current_image.width, original_width, "Dimensions should be restored");
-    assert_eq!(state.current_image.height, original_height, "Dimensions should be restored");
+    assert_eq!(
+        state.current_image.width, original_width,
+        "Dimensions should be restored"
+    );
+    assert_eq!(
+        state.current_image.height, original_height,
+        "Dimensions should be restored"
+    );
 }
 
 #[test]
@@ -536,7 +548,10 @@ fn flip_operations_can_be_combined() {
     state.update(Message::Sidebar(SidebarMessage::Undo));
 
     assert!(!state.can_undo(), "Should not be able to undo further");
-    assert!(state.has_unsaved_changes(), "History still contains transformations");
+    assert!(
+        state.has_unsaved_changes(),
+        "History still contains transformations"
+    );
 }
 
 #[test]
@@ -546,7 +561,10 @@ fn flip_combined_with_rotate() {
 
     // Rotate then flip
     state.update(Message::Sidebar(SidebarMessage::RotateLeft));
-    assert_eq!(state.current_image.width, 6, "Rotate should swap dimensions");
+    assert_eq!(
+        state.current_image.width, 6,
+        "Rotate should swap dimensions"
+    );
     assert_eq!(state.current_image.height, 8);
 
     state.update(Message::Sidebar(SidebarMessage::FlipHorizontal));

@@ -183,8 +183,16 @@ mod tests {
         let flipped_rgba = flipped.to_rgba8();
 
         // After horizontal flip, left should be white, right should be black
-        assert_eq!(flipped_rgba.get_pixel(0, 0).0, [255, 255, 255, 255], "Top-left should be white after flip");
-        assert_eq!(flipped_rgba.get_pixel(3, 0).0, [0, 0, 0, 255], "Top-right should be black after flip");
+        assert_eq!(
+            flipped_rgba.get_pixel(0, 0).0,
+            [255, 255, 255, 255],
+            "Top-left should be white after flip"
+        );
+        assert_eq!(
+            flipped_rgba.get_pixel(3, 0).0,
+            [0, 0, 0, 255],
+            "Top-right should be black after flip"
+        );
     }
 
     #[test]
@@ -203,7 +211,15 @@ mod tests {
         let flipped_rgba = flipped.to_rgba8();
 
         // After vertical flip, top should be white, bottom should be black
-        assert_eq!(flipped_rgba.get_pixel(0, 0).0, [255, 255, 255, 255], "Top-left should be white after flip");
-        assert_eq!(flipped_rgba.get_pixel(0, 3).0, [0, 0, 0, 255], "Bottom-left should be black after flip");
+        assert_eq!(
+            flipped_rgba.get_pixel(0, 0).0,
+            [255, 255, 255, 255],
+            "Top-left should be white after flip"
+        );
+        assert_eq!(
+            flipped_rgba.get_pixel(0, 3).0,
+            [0, 0, 0, 255],
+            "Bottom-left should be black after flip"
+        );
     }
 }

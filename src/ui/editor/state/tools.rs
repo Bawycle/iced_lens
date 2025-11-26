@@ -14,7 +14,10 @@ impl State {
     }
 
     pub(crate) fn sidebar_flip_horizontal(&mut self) {
-        self.apply_dynamic_transformation(Transformation::FlipHorizontal, transform::flip_horizontal);
+        self.apply_dynamic_transformation(
+            Transformation::FlipHorizontal,
+            transform::flip_horizontal,
+        );
     }
 
     pub(crate) fn sidebar_flip_vertical(&mut self) {

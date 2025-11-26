@@ -27,7 +27,9 @@ const FLIP_HORIZONTAL_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.
 </svg>"#;
 
 const FLIP_VERTICAL_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
-<path d='M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z' transform='rotate(90 12 12)' fill='currentColor'/>
+<g transform='rotate(90 12 12)'>
+<path d='M15 21h2v-2h-2v2zm4-12h2V7h-2v2zM3 5v14c0 1.1.9 2 2 2h4v-2H5V5h4V3H5c-1.1 0-2 .9-2 2zm16-2v2h2c0-1.1-.9-2-2-2zm-8 20h2V1h-2v22zm8-6h2v-2h-2v2zM15 5h2V3h-2v2zm4 8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2z' fill='currentColor'/>
+</g>
 </svg>"#;
 
 const SIDEBAR_WIDTH: f32 = 290.0;
@@ -245,9 +247,10 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 }
 
 fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let flip_horizontal_icon = svg::Svg::new(svg::Handle::from_memory(FLIP_HORIZONTAL_SVG.as_bytes()))
-        .width(Length::Fixed(28.0))
-        .height(Length::Fixed(28.0));
+    let flip_horizontal_icon =
+        svg::Svg::new(svg::Handle::from_memory(FLIP_HORIZONTAL_SVG.as_bytes()))
+            .width(Length::Fixed(28.0))
+            .height(Length::Fixed(28.0));
     let flip_vertical_icon = svg::Svg::new(svg::Handle::from_memory(FLIP_VERTICAL_SVG.as_bytes()))
         .width(Length::Fixed(28.0))
         .height(Length::Fixed(28.0));
