@@ -4,7 +4,7 @@
 use crate::config::BackgroundTheme;
 use crate::error::{Error, Result};
 use crate::image_handler::ImageData;
-use iced::Element;
+use iced::{Element, Rectangle};
 use image_rs;
 use std::path::PathBuf;
 
@@ -48,4 +48,21 @@ impl State {
     pub(crate) fn display_image(&self) -> &ImageData {
         self.preview_image.as_ref().unwrap_or(&self.current_image)
     }
+}
+
+/// Available editing tools.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorTool {
+    Rotate,
+    Crop,
+    Resize,
+}
+
+/// Image transformations that can be applied and undone.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Transformation {
+    RotateLeft,
+    RotateRight,
+    Crop { rect: Rectangle },
+    Resize { width: u32, height: u32 },
 }

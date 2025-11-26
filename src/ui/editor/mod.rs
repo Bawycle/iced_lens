@@ -6,7 +6,6 @@
 //! modifies the source file when the user explicitly saves.
 
 use crate::image_handler::ImageData;
-use iced::Rectangle;
 
 mod component;
 mod messages;
@@ -17,7 +16,7 @@ mod view;
 pub use self::state::{
     CropDragState, CropOverlay, CropRatio, CropState, HandlePosition, ResizeOverlay, ResizeState,
 };
-pub use component::ViewContext;
+pub use component::{EditorTool, Transformation, ViewContext};
 use image_rs::DynamicImage;
 pub use messages::{CanvasMessage, Event, Message, SidebarMessage, ToolbarMessage};
 use std::path::PathBuf;
@@ -63,23 +62,6 @@ impl std::fmt::Debug for State {
             .field("sidebar_expanded", &self.sidebar_expanded)
             .finish()
     }
-}
-
-/// Available editing tools.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EditorTool {
-    Rotate,
-    Crop,
-    Resize,
-}
-
-/// Image transformations that can be applied and undone.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Transformation {
-    RotateLeft,
-    RotateRight,
-    Crop { rect: Rectangle },
-    Resize { width: u32, height: u32 },
 }
 
 impl State {
