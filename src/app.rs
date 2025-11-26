@@ -252,7 +252,8 @@ impl App {
                 match result {
                     Ok(image_data) => {
                         // Create a new EditorState with the loaded image
-                        if let Some(current_image_path) = self.image_navigator.current_image_path() {
+                        if let Some(current_image_path) = self.image_navigator.current_image_path()
+                        {
                             let path = current_image_path.to_path_buf();
                             match editor::State::new(path, image_data) {
                                 Ok(new_editor_state) => {
@@ -419,10 +420,16 @@ impl App {
             }
             EditorEvent::NavigateNext => {
                 // Rescan directory to handle added/removed images
-                if let Some(current_path) = self.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+                if let Some(current_path) = self
+                    .image_navigator
+                    .current_image_path()
+                    .map(|p| p.to_path_buf())
+                {
                     let config = config::load().unwrap_or_default();
                     let sort_order = config.sort_order.unwrap_or_default();
-                    let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+                    let _ = self
+                        .image_navigator
+                        .scan_directory(&current_path, sort_order);
                 }
 
                 // Navigate to next image in the list
@@ -442,10 +449,16 @@ impl App {
             }
             EditorEvent::NavigatePrevious => {
                 // Rescan directory to handle added/removed images
-                if let Some(current_path) = self.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+                if let Some(current_path) = self
+                    .image_navigator
+                    .current_image_path()
+                    .map(|p| p.to_path_buf())
+                {
                     let config = config::load().unwrap_or_default();
                     let sort_order = config.sort_order.unwrap_or_default();
-                    let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+                    let _ = self
+                        .image_navigator
+                        .scan_directory(&current_path, sort_order);
                 }
 
                 // Navigate to previous image in the list
@@ -507,10 +520,16 @@ impl App {
 
     fn handle_navigate_next(&mut self) -> Task<Message> {
         // Rescan directory to handle added/removed images
-        if let Some(current_path) = self.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+        if let Some(current_path) = self
+            .image_navigator
+            .current_image_path()
+            .map(|p| p.to_path_buf())
+        {
             let config = config::load().unwrap_or_default();
             let sort_order = config.sort_order.unwrap_or_default();
-            let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+            let _ = self
+                .image_navigator
+                .scan_directory(&current_path, sort_order);
         }
 
         // Navigate to next image
@@ -532,10 +551,16 @@ impl App {
 
     fn handle_navigate_previous(&mut self) -> Task<Message> {
         // Rescan directory to handle added/removed images
-        if let Some(current_path) = self.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+        if let Some(current_path) = self
+            .image_navigator
+            .current_image_path()
+            .map(|p| p.to_path_buf())
+        {
             let config = config::load().unwrap_or_default();
             let sort_order = config.sort_order.unwrap_or_default();
-            let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+            let _ = self
+                .image_navigator
+                .scan_directory(&current_path, sort_order);
         }
 
         // Navigate to previous image

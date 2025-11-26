@@ -88,12 +88,18 @@ fn cancel_clears_resize_preview() {
 
     // Make a change to create a preview
     state.update(Message::Sidebar(SidebarMessage::ScaleChanged(50.0)));
-    assert!(state.preview_image.is_some(), "Preview should exist after making changes");
+    assert!(
+        state.preview_image.is_some(),
+        "Preview should exist after making changes"
+    );
 
     state.discard_changes();
 
     // After canceling, preview should be cleared
-    assert!(state.preview_image.is_none(), "Preview should be cleared after cancel");
+    assert!(
+        state.preview_image.is_none(),
+        "Preview should be cleared after cancel"
+    );
 }
 
 #[test]
@@ -115,7 +121,10 @@ fn resize_preview_updates_when_width_changes() {
     );
     let preview = state.preview_image.as_ref().unwrap();
     assert_eq!(preview.width, 50, "Preview width should match input");
-    assert_eq!(preview.height, 50, "Preview height should maintain aspect ratio");
+    assert_eq!(
+        preview.height, 50,
+        "Preview height should maintain aspect ratio"
+    );
 }
 
 #[test]
@@ -126,9 +135,7 @@ fn resize_preview_updates_when_scale_changes() {
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
     )));
-    state.update(Message::Sidebar(SidebarMessage::ScaleChanged(
-        50.0,
-    )));
+    state.update(Message::Sidebar(SidebarMessage::ScaleChanged(50.0)));
 
     // Preview should exist and be at 50% size
     assert!(
@@ -137,7 +144,10 @@ fn resize_preview_updates_when_scale_changes() {
     );
     let preview = state.preview_image.as_ref().unwrap();
     assert_eq!(preview.width, 50, "Preview should be 50% of original width");
-    assert_eq!(preview.height, 40, "Preview should be 50% of original height");
+    assert_eq!(
+        preview.height, 40,
+        "Preview should be 50% of original height"
+    );
 }
 
 #[test]
@@ -153,7 +163,10 @@ fn resize_preview_clears_when_dimensions_match_original() {
     state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
         "50".to_string(),
     )));
-    assert!(state.preview_image.is_some(), "Preview should exist after resize");
+    assert!(
+        state.preview_image.is_some(),
+        "Preview should exist after resize"
+    );
 
     // Then reset to original dimensions
     state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
@@ -183,7 +196,10 @@ fn resize_preview_updates_when_height_changes() {
         "75".to_string(),
     )));
 
-    assert!(state.preview_image.is_some(), "Preview should exist after height change");
+    assert!(
+        state.preview_image.is_some(),
+        "Preview should exist after height change"
+    );
     let preview = state.preview_image.as_ref().unwrap();
     assert_eq!(preview.height, 75, "Preview height should match input");
 }
@@ -198,12 +214,13 @@ fn resize_preview_works_with_tool_selected() {
     )));
 
     // In Option A2, no overlay is shown - preview is direct
-    assert!(!state.resize_state.overlay.visible, "Overlay should not be visible in Option A2");
+    assert!(
+        !state.resize_state.overlay.visible,
+        "Overlay should not be visible in Option A2"
+    );
 
     // Change dimensions - preview should be generated directly on canvas
-    state.update(Message::Sidebar(SidebarMessage::ScaleChanged(
-        75.0,
-    )));
+    state.update(Message::Sidebar(SidebarMessage::ScaleChanged(75.0)));
 
     assert!(
         state.preview_image.is_some(),
