@@ -46,6 +46,8 @@ pub enum Effect {
     ExitFullscreen,
     OpenSettings,
     EnterEditor,
+    NavigateNext,
+    NavigatePrevious,
 }
 
 #[derive(Debug, Clone)]
@@ -221,62 +223,12 @@ impl State {
             }
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
             Message::NavigateNext => {
-                // Save current index before rescanning (in case current image was deleted)
-                let old_index = self.image_list.current_index();
-
-                // Rescan directory to handle added/removed images
-                let _ = self.scan_directory();
-
-                // If current image was deleted, try to stay at the same position
-                if self.image_list.current_index().is_none() {
-                    if let Some(old_idx) = old_index {
-                        // Try to go to the same index, or the closest valid one
-                        let target_index = old_idx.min(self.image_list.len().saturating_sub(1));
-                        if let Some(path) =
-                            self.image_list.get(target_index).map(|p| p.to_path_buf())
-                        {
-                            self.image_list.set_current_index(target_index);
-                            self.current_image_path = Some(path);
-                        }
-                    }
-                }
-
-                if let Some(next_path) = self.image_list.next() {
-                    let path = next_path.to_path_buf();
-                    self.current_image_path = Some(path.clone());
-                    self.image_list.set_current(&path);
-                    return (Effect::None, Self::load_image_task(path));
-                }
-                (Effect::None, Task::none())
+                // Emit effect to let App handle navigation with ImageNavigator
+                (Effect::NavigateNext, Task::none())
             }
             Message::NavigatePrevious => {
-                // Save current index before rescanning (in case current image was deleted)
-                let old_index = self.image_list.current_index();
-
-                // Rescan directory to handle added/removed images
-                let _ = self.scan_directory();
-
-                // If current image was deleted, try to stay at the same position
-                if self.image_list.current_index().is_none() {
-                    if let Some(old_idx) = old_index {
-                        // Try to go to the same index, or the closest valid one
-                        let target_index = old_idx.min(self.image_list.len().saturating_sub(1));
-                        if let Some(path) =
-                            self.image_list.get(target_index).map(|p| p.to_path_buf())
-                        {
-                            self.image_list.set_current_index(target_index);
-                            self.current_image_path = Some(path);
-                        }
-                    }
-                }
-
-                if let Some(prev_path) = self.image_list.previous() {
-                    let path = prev_path.to_path_buf();
-                    self.current_image_path = Some(path.clone());
-                    self.image_list.set_current(&path);
-                    return (Effect::None, Self::load_image_task(path));
-                }
-                (Effect::None, Task::none())
+                // Emit effect to let App handle navigation with ImageNavigator
+                (Effect::NavigatePrevious, Task::none())
             }
             Message::DeleteCurrentImage => self.delete_current_image(i18n),
             Message::OpenSettings => (Effect::OpenSettings, Task::none()),

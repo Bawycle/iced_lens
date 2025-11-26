@@ -157,7 +157,17 @@ impl App {
 
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
+
+            // Initialize ImageNavigator with the initial image
+            let config = config::load().unwrap_or_default();
+            let sort_order = config.sort_order.unwrap_or_default();
+            if let Err(err) = app.image_navigator.scan_directory(&path, sort_order) {
+                eprintln!("Failed to scan directory: {:?}", err);
+            }
+
+            // Synchronize viewer state
             app.viewer.current_image_path = Some(path.clone());
+
             Task::perform(
                 async move { image_handler::load_image(&path_str) },
                 |result| Message::Viewer(component::Message::ImageLoaded(result)),
@@ -298,6 +308,8 @@ impl App {
                 Task::none()
             }
             component::Effect::EnterEditor => self.handle_mode_switch(AppMode::Editor),
+            component::Effect::NavigateNext => self.handle_navigate_next(),
+            component::Effect::NavigatePrevious => self.handle_navigate_previous(),
             component::Effect::None => Task::none(),
         };
         Task::batch([viewer_task, side_effect])
@@ -490,6 +502,56 @@ impl App {
                     Message::SaveAsDialogResult,
                 )
             }
+        }
+    }
+
+    fn handle_navigate_next(&mut self) -> Task<Message> {
+        // Rescan directory to handle added/removed images
+        if let Some(current_path) = self.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+            let config = config::load().unwrap_or_default();
+            let sort_order = config.sort_order.unwrap_or_default();
+            let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+        }
+
+        // Navigate to next image
+        if let Some(next_path) = self.image_navigator.navigate_next() {
+            // Synchronize viewer state from navigator
+            self.viewer.current_image_path = Some(next_path.clone());
+            // Also sync viewer.image_list from viewer.current_image_path
+            let _ = self.viewer.scan_directory();
+
+            // Load the next image
+            Task::perform(
+                async move { crate::image_handler::load_image(&next_path) },
+                |result| Message::Viewer(component::Message::ImageLoaded(result)),
+            )
+        } else {
+            Task::none()
+        }
+    }
+
+    fn handle_navigate_previous(&mut self) -> Task<Message> {
+        // Rescan directory to handle added/removed images
+        if let Some(current_path) = self.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+            let config = config::load().unwrap_or_default();
+            let sort_order = config.sort_order.unwrap_or_default();
+            let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+        }
+
+        // Navigate to previous image
+        if let Some(prev_path) = self.image_navigator.navigate_previous() {
+            // Synchronize viewer state from navigator
+            self.viewer.current_image_path = Some(prev_path.clone());
+            // Also sync viewer.image_list from viewer.current_image_path
+            let _ = self.viewer.scan_directory();
+
+            // Load the previous image
+            Task::perform(
+                async move { crate::image_handler::load_image(&prev_path) },
+                |result| Message::Viewer(component::Message::ImageLoaded(result)),
+            )
+        } else {
+            Task::none()
         }
     }
 
@@ -1036,6 +1098,11 @@ mod tests {
             .scan_directory()
             .expect("failed to scan directory");
 
+        // Also initialize image_navigator
+        let _ = app
+            .image_navigator
+            .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
+
         let _ = app.update(Message::Viewer(component::Message::NavigateNext));
 
         assert!(app
@@ -1072,6 +1139,11 @@ mod tests {
         app.viewer
             .scan_directory()
             .expect("failed to scan directory");
+
+        // Also initialize image_navigator
+        let _ = app
+            .image_navigator
+            .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
 
         let _ = app.update(Message::Viewer(component::Message::NavigatePrevious));
 
@@ -1110,6 +1182,11 @@ mod tests {
             .scan_directory()
             .expect("failed to scan directory");
 
+        // Also initialize image_navigator
+        let _ = app
+            .image_navigator
+            .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
+
         let _ = app.update(Message::Viewer(component::Message::NavigateNext));
 
         assert!(app
@@ -1147,6 +1224,11 @@ mod tests {
             app.viewer
                 .scan_directory()
                 .expect("failed to scan directory");
+
+            // Also initialize image_navigator
+            let _ = app
+                .image_navigator
+                .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
 
             let _ = app.update(Message::Viewer(component::Message::RawEvent {
                 window: window::Id::unique(),
