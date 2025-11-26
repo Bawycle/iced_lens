@@ -79,9 +79,9 @@ pub struct Flags {
     pub i18n_dir: Option<String>,
 }
 
-pub const WINDOW_DEFAULT_HEIGHT: u32 = 600;
+pub const WINDOW_DEFAULT_HEIGHT: u32 = 650;
 pub const WINDOW_DEFAULT_WIDTH: u32 = 800;
-pub const MIN_WINDOW_HEIGHT: u32 = 480;
+pub const MIN_WINDOW_HEIGHT: u32 = 650;
 pub const MIN_WINDOW_WIDTH: u32 = 650;
 
 /// Ensures zoom step values stay inside the supported range so persisted
