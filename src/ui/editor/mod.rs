@@ -6,6 +6,7 @@
 //! modifies the source file when the user explicitly saves.
 
 use crate::image_handler::ImageData;
+use crate::ui::state::ViewportState;
 
 mod component;
 mod messages;
@@ -50,6 +51,8 @@ pub struct State {
     resize_state: ResizeState,
     /// Optional preview image (used for live adjustments)
     preview_image: Option<ImageData>,
+    /// Viewport state for tracking canvas bounds and scroll position
+    pub viewport: ViewportState,
 }
 
 impl std::fmt::Debug for State {
@@ -72,6 +75,10 @@ impl State {
             Message::Sidebar(msg) => self.handle_sidebar_message(msg),
             Message::Canvas(msg) => self.handle_canvas_message(msg),
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
+            Message::ViewportChanged { bounds, offset } => {
+                self.viewport.update(bounds, offset);
+                Event::None
+            }
         }
     }
 

@@ -3,6 +3,8 @@
 
 use crate::ui::editor::{state::CropRatio, EditorTool};
 use iced;
+use iced::widget::scrollable::AbsoluteOffset;
+use iced::Rectangle;
 use std::path::PathBuf;
 
 /// Toolbar-specific messages.
@@ -53,6 +55,11 @@ pub enum Message {
     RawEvent {
         window: iced::window::Id,
         event: iced::Event,
+    },
+    /// Canvas viewport changed (scrolling or resizing)
+    ViewportChanged {
+        bounds: Rectangle,
+        offset: AbsoluteOffset,
     },
 }
 

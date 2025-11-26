@@ -4,26 +4,32 @@
 use crate::config::BackgroundTheme;
 use crate::image_handler::ImageData;
 use crate::ui::theme;
-use iced::widget::{center, container, image, Canvas, Stack};
-use iced::{ContentFit, Element, Length};
+use iced::widget::{container, image, Canvas, Stack};
+use iced::{Element, Length};
 
 use super::super::{
     overlay::{CropOverlayRenderer, ResizeOverlayRenderer},
     CropState, Message, ResizeState, State, ViewContext,
 };
+use super::scrollable_canvas;
 
 pub struct CanvasModel<'a> {
     pub display_image: &'a ImageData,
     pub crop_state: &'a CropState,
     pub resize_state: &'a ResizeState,
+    pub image_width: f32,
+    pub image_height: f32,
 }
 
 impl<'a> CanvasModel<'a> {
     pub fn from_state(state: &'a State) -> Self {
+        let display_image = state.display_image();
         Self {
-            display_image: state.display_image(),
+            display_image,
             crop_state: &state.crop_state,
             resize_state: &state.resize_state,
+            image_width: display_image.width as f32,
+            image_height: display_image.height as f32,
         }
     }
 }
@@ -33,7 +39,10 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
     let img_width = current_display.width;
     let img_height = current_display.height;
 
-    let image_widget = image(current_display.handle.clone()).content_fit(ContentFit::Contain);
+    // Render image at natural size (will be centered by center() widget)
+    let image_widget = image(current_display.handle.clone())
+        .width(Length::Fixed(img_width as f32))
+        .height(Length::Fixed(img_height as f32));
 
     let image_with_overlay: Element<'a, Message> = if model.crop_state.overlay.visible {
         Stack::new()
@@ -71,8 +80,15 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
 
     let background_theme = ctx.background_theme;
 
+    // Wrap image in scrollable canvas (centered for small, scrollable for large)
+    let scrollable = scrollable_canvas::scrollable_canvas(
+        image_with_overlay,
+        model.image_width,
+        model.image_height,
+    );
+
     let build_image_surface = || {
-        container(center(image_with_overlay))
+        container(scrollable)
             .width(Length::Fill)
             .height(Length::Fill)
     };

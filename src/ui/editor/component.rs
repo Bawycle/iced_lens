@@ -37,6 +37,7 @@ impl State {
             crop_base_width: image.width,
             crop_base_height: image.height,
             preview_image: None,
+            viewport: crate::ui::state::ViewportState::default(),
         })
     }
 

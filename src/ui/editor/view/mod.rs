@@ -2,6 +2,8 @@
 //! Editor view composition helpers.
 
 pub mod canvas;
+pub mod centered_scrollable;
+pub mod scrollable_canvas;
 pub mod sidebar;
 pub mod toolbar;
 
