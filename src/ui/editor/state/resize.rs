@@ -83,6 +83,17 @@ impl ResizeOverlay {
 }
 
 impl State {
+    pub(crate) fn show_resize_overlay(&mut self) {
+        self.resize_state.overlay.visible = true;
+        self.resize_state
+            .overlay
+            .set_original_dimensions(self.current_image.width, self.current_image.height);
+    }
+
+    pub(crate) fn hide_resize_overlay(&mut self) {
+        self.resize_state.overlay.visible = false;
+    }
+
     pub(crate) fn set_resize_percent(&mut self, percent: f32) {
         let clamped = percent.clamp(10.0, 200.0);
         self.resize_state.scale_percent = clamped;

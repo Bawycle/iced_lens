@@ -101,6 +101,29 @@ impl CropState {
 }
 
 impl State {
+    pub(crate) fn prepare_crop_tool(&mut self) {
+        self.crop_base_image = Some(self.working_image.clone());
+        self.crop_base_width = self.current_image.width;
+        self.crop_base_height = self.current_image.height;
+        self.crop_state.x = 0;
+        self.crop_state.y = 0;
+        self.crop_state.width = self.current_image.width;
+        self.crop_state.height = self.current_image.height;
+        self.crop_state.ratio = CropRatio::None;
+        self.hide_crop_overlay();
+    }
+
+    pub(crate) fn hide_crop_overlay(&mut self) {
+        self.crop_state.overlay.visible = false;
+        self.crop_state.overlay.drag_state = CropDragState::None;
+    }
+
+    pub(crate) fn teardown_crop_tool(&mut self) {
+        self.crop_modified = false;
+        self.crop_base_image = None;
+        self.hide_crop_overlay();
+    }
+
     pub(crate) fn adjust_crop_to_ratio(&mut self, ratio: CropRatio) {
         // Use base image dimensions (image when crop tool was opened), not current image
         let img_width = self.crop_base_width as f32;

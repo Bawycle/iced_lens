@@ -214,45 +214,26 @@ impl State {
                     self.commit_active_tool_changes();
                     self.active_tool = None;
                     self.preview_image = None;
-                    if tool == EditorTool::Crop {
-                        self.crop_modified = false;
-                        self.crop_base_image = None;
-                        self.crop_state.overlay.visible = false;
-                        self.crop_state.overlay.drag_state = CropDragState::None;
-                    }
-                    if tool == EditorTool::Resize {
-                        self.resize_state.overlay.visible = false;
+                    match tool {
+                        EditorTool::Crop => self.teardown_crop_tool(),
+                        EditorTool::Resize => self.hide_resize_overlay(),
+                        EditorTool::Rotate => {}
                     }
                 } else {
                     self.commit_active_tool_changes();
                     if self.active_tool == Some(EditorTool::Crop) {
-                        self.crop_state.overlay.visible = false;
-                        self.crop_state.overlay.drag_state = CropDragState::None;
+                        self.hide_crop_overlay();
                     }
                     if self.active_tool == Some(EditorTool::Resize) {
-                        self.resize_state.overlay.visible = false;
+                        self.hide_resize_overlay();
                     }
                     self.active_tool = Some(tool);
                     self.preview_image = None;
 
-                    if tool == EditorTool::Crop {
-                        self.crop_base_image = Some(self.working_image.clone());
-                        self.crop_base_width = self.current_image.width;
-                        self.crop_base_height = self.current_image.height;
-                        self.crop_state.x = 0;
-                        self.crop_state.y = 0;
-                        self.crop_state.width = self.current_image.width;
-                        self.crop_state.height = self.current_image.height;
-                        self.crop_state.ratio = CropRatio::None;
-                        self.crop_state.overlay.visible = false;
-                    }
-
-                    if tool == EditorTool::Resize {
-                        self.resize_state.overlay.visible = true;
-                        self.resize_state.overlay.set_original_dimensions(
-                            self.current_image.width,
-                            self.current_image.height,
-                        );
+                    match tool {
+                        EditorTool::Crop => self.prepare_crop_tool(),
+                        EditorTool::Resize => self.show_resize_overlay(),
+                        EditorTool::Rotate => {}
                     }
                 }
                 Event::None
