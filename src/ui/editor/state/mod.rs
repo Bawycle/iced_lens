@@ -5,6 +5,7 @@ pub mod crop;
 pub mod history;
 pub mod persistence;
 pub mod resize;
+pub mod routing;
 pub mod session;
 pub mod tools;
 
