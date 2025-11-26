@@ -7,8 +7,9 @@
 //! persistence format, localization switching) close to the main update loop so
 //! it is easy to audit user-facing behavior.
 use crate::config;
+use crate::error::Error;
 use crate::i18n::fluent::I18n;
-use crate::image_handler;
+use crate::image_handler::{self, ImageData};
 use crate::ui::editor::{self, Event as EditorEvent, State as EditorState};
 use crate::ui::settings::{
     self, Event as SettingsEvent, State as SettingsState, ViewContext as SettingsViewContext,
@@ -61,6 +62,7 @@ pub enum Message {
     SwitchMode(AppMode),
     Settings(settings::Message),
     Editor(editor::Message),
+    EditorImageLoaded(Result<ImageData, Error>),
     SaveAsDialogResult(Option<PathBuf>),
 }
 
@@ -233,6 +235,27 @@ impl App {
             Message::SwitchMode(mode) => self.handle_mode_switch(mode),
             Message::Settings(settings_message) => self.handle_settings_message(settings_message),
             Message::Editor(editor_message) => self.handle_editor_message(editor_message),
+            Message::EditorImageLoaded(result) => {
+                match result {
+                    Ok(image_data) => {
+                        // Create a new EditorState with the loaded image
+                        if let Some(current_image_path) = self.viewer.current_image_path.clone() {
+                            match editor::State::new(current_image_path, image_data) {
+                                Ok(new_editor_state) => {
+                                    self.editor = Some(new_editor_state);
+                                }
+                                Err(err) => {
+                                    eprintln!("Failed to create editor state: {:?}", err);
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to load image for editor: {:?}", err);
+                    }
+                }
+                Task::none()
+            }
             Message::SaveAsDialogResult(path_opt) => {
                 if let Some(path) = path_opt {
                     // User selected a path, save the image there
@@ -372,12 +395,42 @@ impl App {
                 )
             }
             EditorEvent::NavigateNext => {
-                // TODO: Implement navigation in editor mode
-                Task::none()
+                // Rescan directory to handle added/removed images
+                let _ = self.viewer.scan_directory();
+
+                // Navigate to next image in the list
+                if let Some(next_path) = self.viewer.image_list.next() {
+                    let path = next_path.to_path_buf();
+                    self.viewer.current_image_path = Some(path.clone());
+                    self.viewer.image_list.set_current(&path);
+
+                    // Load the next image and create a new EditorState
+                    Task::perform(
+                        async move { crate::image_handler::load_image(&path) },
+                        Message::EditorImageLoaded,
+                    )
+                } else {
+                    Task::none()
+                }
             }
             EditorEvent::NavigatePrevious => {
-                // TODO: Implement navigation in editor mode
-                Task::none()
+                // Rescan directory to handle added/removed images
+                let _ = self.viewer.scan_directory();
+
+                // Navigate to previous image in the list
+                if let Some(prev_path) = self.viewer.image_list.previous() {
+                    let path = prev_path.to_path_buf();
+                    self.viewer.current_image_path = Some(path.clone());
+                    self.viewer.image_list.set_current(&path);
+
+                    // Load the previous image and create a new EditorState
+                    Task::perform(
+                        async move { crate::image_handler::load_image(&path) },
+                        Message::EditorImageLoaded,
+                    )
+                } else {
+                    Task::none()
+                }
             }
             EditorEvent::SaveRequested { path, overwrite: _ } => {
                 // Save the edited image
@@ -541,6 +594,7 @@ mod tests {
     use iced::widget::scrollable::AbsoluteOffset;
     use iced::{event, keyboard, mouse, window, Point, Rectangle, Size};
     use std::fs;
+    use std::path::Path;
     use std::sync::{Mutex, OnceLock};
     use tempfile::tempdir;
 
@@ -1094,5 +1148,123 @@ mod tests {
                 .map(|p| p.ends_with("b.jpg"))
                 .unwrap_or(false));
         });
+    }
+
+    /// Helper function to create a real PNG image for editor tests
+    fn create_real_png_image(path: &Path, width: u32, height: u32) -> std::io::Result<()> {
+        use image_rs::{DynamicImage, ImageBuffer};
+        let buffer = ImageBuffer::from_pixel(width, height, image_rs::Rgba([255, 0, 0, 255]));
+        let img = DynamicImage::ImageRgba8(buffer);
+        img.save(path).map_err(std::io::Error::other)
+    }
+
+    #[test]
+    fn editor_navigate_next_loads_next_image() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1_path = temp_dir.path().join("a.png");
+        let img2_path = temp_dir.path().join("b.png");
+
+        // Create real PNG images
+        create_real_png_image(&img1_path, 10, 10).expect("failed to create img1");
+        create_real_png_image(&img2_path, 10, 10).expect("failed to create img2");
+
+        let mut app = App::default();
+
+        // Load first image in viewer
+        let img1_data = image_handler::load_image(&img1_path).expect("failed to load img1");
+        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+            img1_data.clone(),
+        ))));
+        app.viewer.current_image_path = Some(img1_path.clone());
+        app.viewer
+            .scan_directory()
+            .expect("failed to scan directory");
+
+        // Switch to editor mode
+        let _ = app.update(Message::SwitchMode(AppMode::Editor));
+
+        // Navigate to next image
+        let _ = app.update(Message::Editor(editor::Message::Sidebar(
+            crate::ui::editor::SidebarMessage::NavigateNext,
+        )));
+
+        // Verify the viewer's current image path has changed to the next image
+        assert!(app
+            .viewer
+            .current_image_path
+            .as_ref()
+            .map(|p| p.ends_with("b.png"))
+            .unwrap_or(false));
+
+        // Simulate the async image loading completing
+        let img2_data = image_handler::load_image(&img2_path).expect("failed to load img2");
+        let _ = app.update(Message::EditorImageLoaded(Ok(img2_data)));
+
+        // Verify editor has loaded the second image
+        assert!(app.editor.is_some(), "Editor should still be active");
+        if let Some(editor) = &app.editor {
+            assert_eq!(
+                editor.image_path(),
+                img2_path.as_path(),
+                "Editor should have loaded b.png"
+            );
+        }
+    }
+
+    #[test]
+    fn editor_navigate_previous_loads_previous_image() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1_path = temp_dir.path().join("a.png");
+        let img2_path = temp_dir.path().join("b.png");
+
+        // Create real PNG images
+        create_real_png_image(&img1_path, 10, 10).expect("failed to create img1");
+        create_real_png_image(&img2_path, 10, 10).expect("failed to create img2");
+
+        let mut app = App::default();
+
+        // Load second image in viewer
+        let img2_data = image_handler::load_image(&img2_path).expect("failed to load img2");
+        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+            img2_data.clone(),
+        ))));
+        app.viewer.current_image_path = Some(img2_path.clone());
+        app.viewer
+            .scan_directory()
+            .expect("failed to scan directory");
+
+        // Switch to editor mode
+        let _ = app.update(Message::SwitchMode(AppMode::Editor));
+
+        // Navigate to previous image
+        let _ = app.update(Message::Editor(editor::Message::Sidebar(
+            crate::ui::editor::SidebarMessage::NavigatePrevious,
+        )));
+
+        // Verify the viewer's current image path has changed to the previous image
+        assert!(app
+            .viewer
+            .current_image_path
+            .as_ref()
+            .map(|p| p.ends_with("a.png"))
+            .unwrap_or(false));
+
+        // Simulate the async image loading completing
+        let img1_data = image_handler::load_image(&img1_path).expect("failed to load img1");
+        let _ = app.update(Message::EditorImageLoaded(Ok(img1_data)));
+
+        // Verify editor has loaded the first image
+        assert!(app.editor.is_some(), "Editor should still be active");
+        if let Some(editor) = &app.editor {
+            assert_eq!(
+                editor.image_path(),
+                img1_path.as_path(),
+                "Editor should have loaded a.png"
+            );
+        }
     }
 }
