@@ -69,8 +69,7 @@ impl State {
                         self.transformation_history.clear();
                         self.history_index = 0;
 
-                        // Clear active tool and preview
-                        self.active_tool = None;
+                        // Clear preview but keep tool panel open
                         self.preview_image = None;
                     }
                     Err(err) => {
