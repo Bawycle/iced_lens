@@ -91,3 +91,101 @@ impl State {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::image_handler::ImageData;
+    use iced::widget::image;
+    use image_rs::{Rgba, RgbaImage};
+    use tempfile::TempDir;
+
+    fn create_test_image(width: u32, height: u32) -> (TempDir, std::path::PathBuf, ImageData) {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("history.png");
+        let rgba = RgbaImage::from_pixel(width, height, Rgba([0, 0, 0, 255]));
+        rgba.save(&path).expect("write png");
+        let pixels = vec![0; (width * height * 4) as usize];
+        let image = ImageData {
+            handle: image::Handle::from_rgba(width, height, pixels),
+            width,
+            height,
+        };
+        (temp_dir, path, image)
+    }
+
+    fn editor_state(width: u32, height: u32) -> (TempDir, State) {
+        let (dir, path, image) = create_test_image(width, height);
+        let state = State::new(path, image).expect("editor state");
+        (dir, state)
+    }
+
+    #[test]
+    fn recording_after_undo_discards_redo_stack() {
+        let (_dir, mut state) = editor_state(8, 6);
+
+        state.record_transformation(Transformation::RotateLeft);
+        state.record_transformation(Transformation::RotateRight);
+        assert_eq!(state.transformation_history.len(), 2);
+
+        state.sidebar_undo();
+        assert_eq!(state.history_index, 1);
+
+        state.record_transformation(Transformation::Resize {
+            width: 4,
+            height: 3,
+        });
+
+        assert_eq!(state.transformation_history.len(), 2);
+        assert!(matches!(
+            state.transformation_history[1],
+            Transformation::Resize {
+                width: 4,
+                height: 3
+            }
+        ));
+        assert_eq!(state.history_index, 2);
+    }
+
+    #[test]
+    fn undo_redo_respect_history_bounds() {
+        let (_dir, mut state) = editor_state(6, 4);
+
+        state.record_transformation(Transformation::RotateLeft);
+        assert!(state.can_undo());
+        assert!(!state.can_redo());
+
+        state.sidebar_undo();
+        assert_eq!(state.history_index, 0);
+        assert!(!state.can_undo());
+
+        state.sidebar_undo();
+        assert_eq!(state.history_index, 0);
+
+        state.sidebar_redo();
+        assert_eq!(state.history_index, 1);
+        assert!(!state.can_redo());
+
+        state.sidebar_redo();
+        assert_eq!(state.history_index, 1);
+    }
+
+    #[test]
+    fn replay_reapplies_transformations() {
+        let (_dir, mut state) = editor_state(5, 3);
+
+        state.record_transformation(Transformation::RotateLeft);
+        state.replay_transformations_up_to_index();
+
+        assert_eq!(state.current_image.width, 3);
+        assert_eq!(state.current_image.height, 5);
+
+        state.sidebar_undo();
+        assert_eq!(state.current_image.width, 5);
+        assert_eq!(state.current_image.height, 3);
+
+        state.sidebar_redo();
+        assert_eq!(state.current_image.width, 3);
+        assert_eq!(state.current_image.height, 5);
+    }
+}
