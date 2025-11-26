@@ -2,6 +2,7 @@
 //! Shared editor sub-state modules (crop, resize, ...).
 
 pub mod crop;
+mod helpers;
 pub mod history;
 pub mod persistence;
 pub mod resize;
