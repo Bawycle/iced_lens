@@ -71,7 +71,7 @@ src/ui/editor/
 ## Follow-up Opportunities
 The core refactor is complete, but we identified additional improvements that keep the "state down / messages up" layering intact while reducing module size and clarifying ownership:
 
-1. **Tool-specific handlers (ongoing)**: crop/resize helper methods now live in `state/{crop,resize}.rs`, rotate sidebar/shortcut actions route through `state/tools.rs`, and navigation/save/cancel/back logic just moved into `state/session.rs`. Next up: look at moving less-critical helpers (e.g., discard/save implementations) or eventually shrinking `State::update` by extracting top-level routing.
+1. **Tool-specific handlers (ongoing)**: crop/resize helper methods now live in `state/{crop,resize}.rs`, rotate sidebar/shortcut actions route through `state/tools.rs`, navigation/save/cancel/back logic lives in `state/session.rs`, and save/discard flows are now handled by `state/persistence.rs`. Next up: start peeling more of `State::update` itself into lightweight routers so the facade only wires messages/events.
 2. **History subsystem**: undo/redo bookkeeping and replay logic now reside in `state/history.rs`; follow-up work could add focused unit tests there and trim the main state impl further (e.g., replay-specific error handling).
 3. **Scoped messages**: define toolbar/sidebar/canvas message enums next to their view modules, re-export them from the facade, and keep routing centralized—this limits cross-module imports and clarifies who can emit what.
 4. **Shared helpers/services**: relocate utilities like `parse_dimension_input`, crop math, and image conversions into dedicated helpers (e.g., `state/utils.rs` or `image_ops.rs`) to avoid bloating the primary impl block.
@@ -86,3 +86,4 @@ These can land incrementally; each preserves the existing public API and continu
 - Introduced `state/tools.rs` so rotate buttons and keyboard shortcuts reuse the same helper logic instead of duplicating it in the facade.
 - Moved undo/redo capability checks, recording, and replaying into `state/history.rs`, with the sidebar and keyboard branches delegating to those helpers.
 - Added `state/session.rs` so toolbar back button plus sidebar navigation/save/cancel branches reuse consistent logic.
+- Created `state/persistence.rs` to host save/discard helpers, further shrinking `mod.rs` and keeping IO-heavy routines isolated.

@@ -364,34 +364,6 @@ impl State {
             preview_image: None,
         })
     }
-    /// Save the edited image to a file, preserving the original format.
-    pub fn save_image(&mut self, path: &std::path::Path) -> Result<()> {
-        use image_rs::ImageFormat;
-
-        // Detect format from file extension
-        let format = match path.extension().and_then(|s| s.to_str()) {
-            Some("jpg") | Some("jpeg") => ImageFormat::Jpeg,
-            Some("png") => ImageFormat::Png,
-            Some("gif") => ImageFormat::Gif,
-            Some("bmp") => ImageFormat::Bmp,
-            Some("ico") => ImageFormat::Ico,
-            Some("tiff") | Some("tif") => ImageFormat::Tiff,
-            Some("webp") => ImageFormat::WebP,
-            _ => ImageFormat::Png, // Default fallback
-        };
-
-        // Save the working image
-        self.working_image
-            .save_with_format(path, format)
-            .map_err(|err| Error::Io(format!("Failed to save image: {}", err)))?;
-
-        // Clear transformation history after successful save
-        self.transformation_history.clear();
-        self.history_index = 0;
-
-        Ok(())
-    }
-
     /// Get the current image data.
     pub fn current_image(&self) -> &ImageData {
         &self.current_image
@@ -453,55 +425,6 @@ impl State {
             && self.crop_state.overlay.visible
         {
             self.finalize_crop_overlay();
-        }
-    }
-
-    /// Discard all changes and reset to original image state.
-    pub fn discard_changes(&mut self) {
-        // Reload the working image from disk
-        match image_rs::open(&self.image_path) {
-            Ok(fresh_image) => {
-                self.working_image = fresh_image;
-                match transform::dynamic_to_image_data(&self.working_image) {
-                    Ok(image_data) => {
-                        self.current_image = image_data.clone();
-                        self.sync_resize_state_dimensions();
-
-                        // Reset crop state
-                        let crop_width = (self.current_image.width as f32 * 0.75).round() as u32;
-                        let crop_height = (self.current_image.height as f32 * 0.75).round() as u32;
-                        self.crop_state.x = (self.current_image.width - crop_width) / 2;
-                        self.crop_state.y = (self.current_image.height - crop_height) / 2;
-                        self.crop_state.width = crop_width;
-                        self.crop_state.height = crop_height;
-                        self.crop_state.ratio = CropRatio::Free;
-                        self.crop_state.overlay.visible = false;
-                        self.crop_state.overlay.drag_state = CropDragState::None;
-                        self.crop_modified = false;
-
-                        // Hide resize overlay to avoid stale rectangles after cancel
-                        self.resize_state.overlay.visible = false;
-                        self.resize_state.overlay.set_original_dimensions(
-                            self.current_image.width,
-                            self.current_image.height,
-                        );
-
-                        // Clear transformation history
-                        self.transformation_history.clear();
-                        self.history_index = 0;
-
-                        // Clear active tool and preview
-                        self.active_tool = None;
-                        self.preview_image = None;
-                    }
-                    Err(err) => {
-                        eprintln!("Failed to convert reloaded image: {err:?}");
-                    }
-                }
-            }
-            Err(err) => {
-                eprintln!("Failed to reload original image: {err:?}");
-            }
         }
     }
 }
