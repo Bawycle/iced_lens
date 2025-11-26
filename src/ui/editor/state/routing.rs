@@ -58,6 +58,16 @@ impl State {
                 self.sidebar_rotate_right();
                 Event::None
             }
+            SidebarMessage::FlipHorizontal => {
+                self.commit_active_tool_changes();
+                self.sidebar_flip_horizontal();
+                Event::None
+            }
+            SidebarMessage::FlipVertical => {
+                self.commit_active_tool_changes();
+                self.sidebar_flip_vertical();
+                Event::None
+            }
             SidebarMessage::SetCropRatio(ratio) => {
                 self.set_crop_ratio_from_sidebar(ratio);
                 Event::None

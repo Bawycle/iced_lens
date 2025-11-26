@@ -406,3 +406,163 @@ fn crop_handle_detection_at_image_edges() {
         "Should detect BottomRight handle at image edge (100, 100)"
     );
 }
+
+#[test]
+fn flip_horizontal_preserves_dimensions() {
+    let (_dir, path, img) = create_test_image(8, 6);
+    let mut state = State::new(path, img).expect("editor state");
+
+    let original_width = state.current_image.width;
+    let original_height = state.current_image.height;
+
+    state.update(Message::Sidebar(SidebarMessage::FlipHorizontal));
+
+    assert_eq!(
+        state.current_image.width, original_width,
+        "Width should be preserved after horizontal flip"
+    );
+    assert_eq!(
+        state.current_image.height, original_height,
+        "Height should be preserved after horizontal flip"
+    );
+}
+
+#[test]
+fn flip_vertical_preserves_dimensions() {
+    let (_dir, path, img) = create_test_image(8, 6);
+    let mut state = State::new(path, img).expect("editor state");
+
+    let original_width = state.current_image.width;
+    let original_height = state.current_image.height;
+
+    state.update(Message::Sidebar(SidebarMessage::FlipVertical));
+
+    assert_eq!(
+        state.current_image.width, original_width,
+        "Width should be preserved after vertical flip"
+    );
+    assert_eq!(
+        state.current_image.height, original_height,
+        "Height should be preserved after vertical flip"
+    );
+}
+
+#[test]
+fn flip_horizontal_records_transformation() {
+    let (_dir, path, img) = create_test_image(4, 4);
+    let mut state = State::new(path, img).expect("editor state");
+
+    assert!(!state.has_unsaved_changes(), "Should start with no changes");
+
+    state.update(Message::Sidebar(SidebarMessage::FlipHorizontal));
+
+    assert!(
+        state.has_unsaved_changes(),
+        "Should have unsaved changes after flip"
+    );
+    assert!(state.can_undo(), "Should be able to undo flip");
+    assert!(!state.can_redo(), "Should not be able to redo before undo");
+}
+
+#[test]
+fn flip_vertical_records_transformation() {
+    let (_dir, path, img) = create_test_image(4, 4);
+    let mut state = State::new(path, img).expect("editor state");
+
+    assert!(!state.has_unsaved_changes(), "Should start with no changes");
+
+    state.update(Message::Sidebar(SidebarMessage::FlipVertical));
+
+    assert!(
+        state.has_unsaved_changes(),
+        "Should have unsaved changes after flip"
+    );
+    assert!(state.can_undo(), "Should be able to undo flip");
+    assert!(!state.can_redo(), "Should not be able to redo before undo");
+}
+
+#[test]
+fn flip_horizontal_can_be_undone() {
+    let (_dir, path, img) = create_test_image(8, 6);
+    let mut state = State::new(path, img).expect("editor state");
+
+    let original_width = state.current_image.width;
+    let original_height = state.current_image.height;
+
+    state.update(Message::Sidebar(SidebarMessage::FlipHorizontal));
+    assert!(state.has_unsaved_changes());
+
+    state.update(Message::Sidebar(SidebarMessage::Undo));
+    assert!(!state.can_undo(), "Should not be able to undo further");
+    assert!(state.can_redo(), "Should be able to redo after undo");
+    assert_eq!(state.current_image.width, original_width, "Dimensions should be restored");
+    assert_eq!(state.current_image.height, original_height, "Dimensions should be restored");
+}
+
+#[test]
+fn flip_vertical_can_be_undone() {
+    let (_dir, path, img) = create_test_image(8, 6);
+    let mut state = State::new(path, img).expect("editor state");
+
+    let original_width = state.current_image.width;
+    let original_height = state.current_image.height;
+
+    state.update(Message::Sidebar(SidebarMessage::FlipVertical));
+    assert!(state.has_unsaved_changes());
+
+    state.update(Message::Sidebar(SidebarMessage::Undo));
+    assert!(!state.can_undo(), "Should not be able to undo further");
+    assert!(state.can_redo(), "Should be able to redo after undo");
+    assert_eq!(state.current_image.width, original_width, "Dimensions should be restored");
+    assert_eq!(state.current_image.height, original_height, "Dimensions should be restored");
+}
+
+#[test]
+fn flip_operations_can_be_combined() {
+    let (_dir, path, img) = create_test_image(8, 6);
+    let mut state = State::new(path, img).expect("editor state");
+
+    // Apply both flips
+    state.update(Message::Sidebar(SidebarMessage::FlipHorizontal));
+    state.update(Message::Sidebar(SidebarMessage::FlipVertical));
+
+    assert_eq!(state.current_image.width, 8);
+    assert_eq!(state.current_image.height, 6);
+    assert!(state.has_unsaved_changes());
+
+    // Undo both
+    state.update(Message::Sidebar(SidebarMessage::Undo));
+    assert!(state.can_undo(), "Should be able to undo once more");
+    state.update(Message::Sidebar(SidebarMessage::Undo));
+
+    assert!(!state.can_undo(), "Should not be able to undo further");
+    assert!(state.has_unsaved_changes(), "History still contains transformations");
+}
+
+#[test]
+fn flip_combined_with_rotate() {
+    let (_dir, path, img) = create_test_image(8, 6);
+    let mut state = State::new(path, img).expect("editor state");
+
+    // Rotate then flip
+    state.update(Message::Sidebar(SidebarMessage::RotateLeft));
+    assert_eq!(state.current_image.width, 6, "Rotate should swap dimensions");
+    assert_eq!(state.current_image.height, 8);
+
+    state.update(Message::Sidebar(SidebarMessage::FlipHorizontal));
+    assert_eq!(
+        state.current_image.width, 6,
+        "Flip should preserve dimensions"
+    );
+    assert_eq!(state.current_image.height, 8);
+
+    // Undo flip, dimensions should stay rotated
+    state.update(Message::Sidebar(SidebarMessage::Undo));
+    assert_eq!(state.current_image.width, 6);
+    assert_eq!(state.current_image.height, 8);
+
+    // Undo rotate, dimensions should be back to original
+    state.update(Message::Sidebar(SidebarMessage::Undo));
+    assert_eq!(state.current_image.width, 8);
+    assert_eq!(state.current_image.height, 6);
+}

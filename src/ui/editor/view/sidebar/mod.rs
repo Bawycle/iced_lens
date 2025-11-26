@@ -22,6 +22,14 @@ const ROTATE_RIGHT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.
 <path d='M13 5V3l4 4-4 4V7c-3.309 0-6 2.691-6 6 0 1.262.389 2.432 1.053 3.403l-1.553 1.234C5.58 16.299 5 14.729 5 13c0-4.411-3.589-8 8-8z' fill='currentColor'/>
 </svg>"#;
 
+const FLIP_HORIZONTAL_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
+<path d='M15 21h2v-2h-2v2zm4-12h2V7h-2v2zM3 5v14c0 1.1.9 2 2 2h4v-2H5V5h4V3H5c-1.1 0-2 .9-2 2zm16-2v2h2c0-1.1-.9-2-2-2zm-8 20h2V1h-2v22zm8-6h2v-2h-2v2zM15 5h2V3h-2v2zm4 8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2z' fill='currentColor'/>
+</svg>"#;
+
+const FLIP_VERTICAL_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
+<path d='M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z' transform='rotate(90 12 12)' fill='currentColor'/>
+</svg>"#;
+
 const SIDEBAR_WIDTH: f32 = 290.0;
 
 pub struct SidebarModel<'a> {
@@ -53,6 +61,8 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
         scrollable_section.push(undo_redo_section(model.can_undo, model.can_redo, ctx));
     scrollable_section = scrollable_section.push(horizontal_rule(1));
     scrollable_section = scrollable_section.push(rotate_section(ctx));
+    scrollable_section = scrollable_section.push(horizontal_rule(1));
+    scrollable_section = scrollable_section.push(flip_section(ctx));
     scrollable_section = scrollable_section.push(horizontal_rule(1));
 
     let crop_button = tool_button(
@@ -226,6 +236,51 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(rotate_left_btn)
         .push(rotate_right_btn);
     let title = text(ctx.i18n.tr("editor-rotate-section-title")).size(14);
+
+    container(Column::new().spacing(6).push(title).push(controls))
+        .padding(12)
+        .width(Length::Fill)
+        .style(theme::settings_panel_style)
+        .into()
+}
+
+fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let flip_horizontal_icon = svg::Svg::new(svg::Handle::from_memory(FLIP_HORIZONTAL_SVG.as_bytes()))
+        .width(Length::Fixed(28.0))
+        .height(Length::Fixed(28.0));
+    let flip_vertical_icon = svg::Svg::new(svg::Handle::from_memory(FLIP_VERTICAL_SVG.as_bytes()))
+        .width(Length::Fixed(28.0))
+        .height(Length::Fixed(28.0));
+
+    let flip_horizontal_btn = tooltip::Tooltip::new(
+        button(flip_horizontal_icon)
+            .on_press(SidebarMessage::FlipHorizontal.into())
+            .padding(8)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary),
+        text(ctx.i18n.tr("editor-flip-horizontal-tooltip")),
+        tooltip::Position::FollowCursor,
+    )
+    .gap(4)
+    .padding(6);
+
+    let flip_vertical_btn = tooltip::Tooltip::new(
+        button(flip_vertical_icon)
+            .on_press(SidebarMessage::FlipVertical.into())
+            .padding(8)
+            .width(Length::Fill)
+            .style(iced::widget::button::secondary),
+        text(ctx.i18n.tr("editor-flip-vertical-tooltip")),
+        tooltip::Position::FollowCursor,
+    )
+    .gap(4)
+    .padding(6);
+
+    let controls = Row::new()
+        .spacing(8)
+        .push(flip_horizontal_btn)
+        .push(flip_vertical_btn);
+    let title = text(ctx.i18n.tr("editor-flip-section-title")).size(14);
 
     container(Column::new().spacing(6).push(title).push(controls))
         .padding(12)

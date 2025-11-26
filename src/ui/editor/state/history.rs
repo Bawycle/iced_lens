@@ -58,6 +58,8 @@ impl State {
             working_image = match &self.transformation_history[i] {
                 Transformation::RotateLeft => transform::rotate_left(&working_image),
                 Transformation::RotateRight => transform::rotate_right(&working_image),
+                Transformation::FlipHorizontal => transform::flip_horizontal(&working_image),
+                Transformation::FlipVertical => transform::flip_vertical(&working_image),
                 Transformation::Crop { rect } => {
                     let x = rect.x.max(0.0) as u32;
                     let y = rect.y.max(0.0) as u32;

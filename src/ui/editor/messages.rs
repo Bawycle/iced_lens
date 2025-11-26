@@ -20,6 +20,8 @@ pub enum SidebarMessage {
     SelectTool(EditorTool),
     RotateLeft,
     RotateRight,
+    FlipHorizontal,
+    FlipVertical,
     SetCropRatio(CropRatio),
     ApplyCrop,
     ScaleChanged(f32),

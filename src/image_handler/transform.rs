@@ -15,6 +15,16 @@ pub fn rotate_right(image: &DynamicImage) -> DynamicImage {
     image.rotate90()
 }
 
+/// Flip an image horizontally (mirror left-to-right).
+pub fn flip_horizontal(image: &DynamicImage) -> DynamicImage {
+    image.fliph()
+}
+
+/// Flip an image vertically (mirror top-to-bottom).
+pub fn flip_vertical(image: &DynamicImage) -> DynamicImage {
+    image.flipv()
+}
+
 /// Convert DynamicImage back to ImageData for display.
 pub fn dynamic_to_image_data(dynamic: &DynamicImage) -> Result<ImageData> {
     let (width, height) = dynamic.dimensions();
@@ -139,5 +149,61 @@ mod tests {
         let result = cropped.unwrap();
         assert_eq!(result.width(), 10);
         assert_eq!(result.height(), 8);
+    }
+
+    #[test]
+    fn flip_horizontal_preserves_dimensions() {
+        let img = create_test_image(8, 6);
+        let flipped = flip_horizontal(&img);
+        assert_eq!(flipped.width(), 8);
+        assert_eq!(flipped.height(), 6);
+    }
+
+    #[test]
+    fn flip_vertical_preserves_dimensions() {
+        let img = create_test_image(8, 6);
+        let flipped = flip_vertical(&img);
+        assert_eq!(flipped.width(), 8);
+        assert_eq!(flipped.height(), 6);
+    }
+
+    #[test]
+    fn flip_horizontal_mirrors_pixels_left_to_right() {
+        // Create an image with distinct left and right sides
+        let mut buffer = ImageBuffer::from_pixel(4, 2, image_rs::Rgba([0, 0, 0, 255]));
+        // Fill right half with white
+        for x in 2..4 {
+            for y in 0..2 {
+                buffer.put_pixel(x, y, image_rs::Rgba([255, 255, 255, 255]));
+            }
+        }
+        let img = DynamicImage::ImageRgba8(buffer);
+
+        let flipped = flip_horizontal(&img);
+        let flipped_rgba = flipped.to_rgba8();
+
+        // After horizontal flip, left should be white, right should be black
+        assert_eq!(flipped_rgba.get_pixel(0, 0).0, [255, 255, 255, 255], "Top-left should be white after flip");
+        assert_eq!(flipped_rgba.get_pixel(3, 0).0, [0, 0, 0, 255], "Top-right should be black after flip");
+    }
+
+    #[test]
+    fn flip_vertical_mirrors_pixels_top_to_bottom() {
+        // Create an image with distinct top and bottom halves
+        let mut buffer = ImageBuffer::from_pixel(2, 4, image_rs::Rgba([0, 0, 0, 255]));
+        // Fill bottom half with white
+        for x in 0..2 {
+            for y in 2..4 {
+                buffer.put_pixel(x, y, image_rs::Rgba([255, 255, 255, 255]));
+            }
+        }
+        let img = DynamicImage::ImageRgba8(buffer);
+
+        let flipped = flip_vertical(&img);
+        let flipped_rgba = flipped.to_rgba8();
+
+        // After vertical flip, top should be white, bottom should be black
+        assert_eq!(flipped_rgba.get_pixel(0, 0).0, [255, 255, 255, 255], "Top-left should be white after flip");
+        assert_eq!(flipped_rgba.get_pixel(0, 3).0, [0, 0, 0, 255], "Bottom-left should be black after flip");
     }
 }

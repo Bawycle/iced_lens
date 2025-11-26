@@ -64,6 +64,8 @@ pub enum EditorTool {
 pub enum Transformation {
     RotateLeft,
     RotateRight,
+    FlipHorizontal,
+    FlipVertical,
     Crop { rect: Rectangle },
     Resize { width: u32, height: u32 },
 }
