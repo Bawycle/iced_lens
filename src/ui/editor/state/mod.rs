@@ -2,7 +2,9 @@
 //! Shared editor sub-state modules (crop, resize, ...).
 
 pub mod crop;
+pub mod history;
 pub mod resize;
+pub mod tools;
 
 pub use crop::{CropDragState, CropOverlay, CropRatio, CropState, HandlePosition};
 pub use resize::{ResizeOverlay, ResizeState};
