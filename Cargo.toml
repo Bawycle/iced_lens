@@ -2,6 +2,15 @@
 name = "iced_lens"
 version = "0.1.0"
 edition = "2021"
+authors = ["Bawycle"]
+description = "Lightweight, internationalized image viewer and editor built with the Iced GUI toolkit"
+repository = "https://codeberg.org/Bawycle/iced_lens"
+homepage = "https://codeberg.org/Bawycle/iced_lens"
+license = "MPL-2.0"
+keywords = ["image", "viewer", "editor", "gui", "iced"]
+categories = ["multimedia::images", "gui"]
+readme = "README.md"
+rust-version = "1.78"
 
 [dependencies]
 dirs = "6.0.0"

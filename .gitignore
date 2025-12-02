@@ -24,6 +24,10 @@ Thumbs.db
 .gemini/
 GEMINI.md
 
+# Claude code
+.claude/
+CLAUDE.md
+
 # Added by cargo
 /target
 

@@ -1,16 +1,14 @@
 # IcedLens
 
-Lightweight, internationalized image viewer powered by the [Iced](https://iced.rs/) GUI toolkit.
+Lightweight, internationalized image viewer and editor powered by the [Iced](https://iced.rs/) GUI toolkit.
 
-<!-- Badges: replace <ORG>/<REPO> when repository is published -->
-<!-- Example GitHub Actions badge (uncomment once CI is configured) -->
-<!-- [![Build](https://github.com/<ORG>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<ORG>/<REPO>/actions) -->
+[![Release](https://img.shields.io/badge/release-v0.1.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/Rust-1.78%2B-blue)](https://www.rust-lang.org)
 ![Locales](https://img.shields.io/badge/i18n-en--US|fr-green)
-![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)
-<!-- Optional future crates.io badge -->
-<!-- [![Crates.io](https://img.shields.io/crates/v/iced_lens.svg)](https://crates.io/crates/iced_lens) -->
+![Status: Pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange)
+
+> **Note**: This is a pre-1.0 release. The software is functional but still under active development. Testing has been performed exclusively on Linux Mint 22.2. Feedback and contributions are welcome!
 
 </div>
 
