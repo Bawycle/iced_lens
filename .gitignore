@@ -1,0 +1,35 @@
+# Rust
+target/
+debug/
+release/
+*.rs.bk
+*.rlib
+
+# Crate-specific
+Cargo.lock
+
+# General
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+*.log
+.env*
+
+# IDEs
+.vscode/
+.idea/
+
+# Gemini cli
+.gemini/
+GEMINI.md
+
+# Claude code
+.claude/
+CLAUDE.md
+
+# Added by cargo
+/target
+
+# External documentation
+.ext_doc/

@@ -1,0 +1,39 @@
+[package]
+name = "iced_lens"
+version = "0.1.0"
+edition = "2021"
+authors = ["Bawycle"]
+description = "Lightweight, internationalized image viewer and editor built with the Iced GUI toolkit"
+repository = "https://codeberg.org/Bawycle/iced_lens"
+homepage = "https://codeberg.org/Bawycle/iced_lens"
+license = "MPL-2.0"
+keywords = ["image", "viewer", "editor", "gui", "iced"]
+categories = ["multimedia::images", "gui"]
+readme = "README.md"
+rust-version = "1.78"
+
+[dependencies]
+dirs = "6.0.0"
+fluent-bundle = "0.16.0"
+fluent-syntax = "0.12.0"
+iced = { version = "0.13.1", features = ["tokio", "svg", "image", "advanced", "canvas"] }
+image_rs = { package = "image", version = "0.24", features = ["jpeg", "png", "gif", "tiff", "webp", "bmp", "ico"] }
+pico-args = "0.5.0"
+resvg = "0.45.1"
+rfd = "0.15"
+rust-embed = "8.9.0"
+serde = { version = "1.0.228", features = ["derive"] }
+sys-locale = "0.3.2"
+tiny-skia = "0.11.4"
+toml = "0.9.8"
+unic-langid = "0.9.6"
+iced_core = "0.13.1"
+iced_widget = "0.13.1"
+
+[dev-dependencies]
+criterion = { version = "0.7.0", features = ["html_reports"] }
+tempfile = "3.23.0"
+
+[[bench]]
+name = "image_loading"
+harness = false # Let Criterion manage the main function

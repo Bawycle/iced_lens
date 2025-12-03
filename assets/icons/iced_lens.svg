@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- IcedLens Icon
+       Concept: Stylized lens + subtle snowflake core with warm accent ring.
+       Colors chosen for theme adaptability: neutral dark outline, soft light fill, vivid but not neon yellow accent.
+       Palette:
+         Accent Yellow: #F2C94C
+         Dark Neutral (Outline/Shadows): #2E3440
+         Light Neutral (Surface): #ECEFF4
+         Mid Neutral (Inner ring): #D8DEE9
+       License: LicenseRef-IcedLens-Icon (see ICON_LICENSE.md) – Redistribution permitted only unmodified for representing IcedLens.
+  -->
+  <defs>
+    <linearGradient id="accentRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5D059"/>
+      <stop offset="100%" stop-color="#F2C94C"/>
+    </linearGradient>
+    <linearGradient id="lensGradient" x1="35%" y1="30%" x2="65%" y2="70%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#D8DEE9"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#2E3440" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Outer lens body -->
+  <circle cx="256" cy="256" r="216" fill="url(#lensGradient)" stroke="#2E3440" stroke-width="16" filter="url(#softShadow)"/>
+
+  <!-- Accent ring -->
+  <circle cx="256" cy="256" r="172" fill="none" stroke="url(#accentRing)" stroke-width="36" stroke-linecap="round" stroke-dasharray="1080 60"/>
+
+  <!-- Inner ring -->
+  <circle cx="256" cy="256" r="128" fill="#ECEFF4" stroke="#D8DEE9" stroke-width="8"/>
+
+  <!-- Simplified snowflake / crystalline mark (geometric, subtle) -->
+  <g fill="none" stroke="#2E3440" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="256" y1="196" x2="256" y2="316"/>
+    <line x1="196" y1="256" x2="316" y2="256"/>
+    <line x1="218" y1="218" x2="294" y2="294"/>
+    <line x1="294" y1="218" x2="218" y2="294"/>
+  </g>
+
+  <!-- Highlight glint -->
+  <circle cx="200" cy="212" r="34" fill="#FFFFFF" opacity="0.55"/>
+
+  <!-- Name (optional, not visible at small sizes) -->
+  <text x="256" y="470" font-family="Inter,Arial,sans-serif" font-size="42" text-anchor="middle" fill="#2E3440" opacity="0.55">IcedLens</text>
+</svg>

@@ -1,0 +1,168 @@
+// SPDX-License-Identifier: MPL-2.0
+//! Message routing helpers that keep the editor facade slim.
+
+use crate::ui::editor::{CanvasMessage, EditorTool, Event, SidebarMessage, State, ToolbarMessage};
+use iced::{self, keyboard};
+
+impl State {
+    pub(crate) fn handle_toolbar_message(&mut self, message: ToolbarMessage) -> Event {
+        match message {
+            ToolbarMessage::BackToViewer => self.toolbar_back_to_viewer(),
+        }
+    }
+
+    pub(crate) fn handle_sidebar_message(&mut self, message: SidebarMessage) -> Event {
+        match message {
+            SidebarMessage::ToggleSidebar => {
+                self.sidebar_expanded = !self.sidebar_expanded;
+                Event::None
+            }
+            SidebarMessage::SelectTool(tool) => {
+                if self.active_tool == Some(tool) {
+                    self.commit_active_tool_changes();
+                    self.active_tool = None;
+                    self.preview_image = None;
+                    match tool {
+                        EditorTool::Crop => self.teardown_crop_tool(),
+                        EditorTool::Resize => self.hide_resize_overlay(),
+                        EditorTool::Rotate => {}
+                    }
+                } else {
+                    self.commit_active_tool_changes();
+                    if self.active_tool == Some(EditorTool::Crop) {
+                        self.hide_crop_overlay();
+                    }
+                    if self.active_tool == Some(EditorTool::Resize) {
+                        self.hide_resize_overlay();
+                    }
+                    self.active_tool = Some(tool);
+                    self.preview_image = None;
+
+                    match tool {
+                        EditorTool::Crop => self.prepare_crop_tool(),
+                        EditorTool::Resize => {
+                            // Option A2: No overlay - preview shows directly on canvas
+                        }
+                        EditorTool::Rotate => {}
+                    }
+                }
+                Event::None
+            }
+            SidebarMessage::RotateLeft => {
+                self.commit_active_tool_changes();
+                self.sidebar_rotate_left();
+                Event::None
+            }
+            SidebarMessage::RotateRight => {
+                self.commit_active_tool_changes();
+                self.sidebar_rotate_right();
+                Event::None
+            }
+            SidebarMessage::FlipHorizontal => {
+                self.commit_active_tool_changes();
+                self.sidebar_flip_horizontal();
+                Event::None
+            }
+            SidebarMessage::FlipVertical => {
+                self.commit_active_tool_changes();
+                self.sidebar_flip_vertical();
+                Event::None
+            }
+            SidebarMessage::SetCropRatio(ratio) => {
+                self.set_crop_ratio_from_sidebar(ratio);
+                Event::None
+            }
+            SidebarMessage::ApplyCrop => {
+                self.apply_crop_from_sidebar();
+                Event::None
+            }
+            SidebarMessage::ScaleChanged(percent) => {
+                self.sidebar_scale_changed(percent);
+                Event::None
+            }
+            SidebarMessage::WidthInputChanged(value) => {
+                self.sidebar_width_input_changed(value);
+                Event::None
+            }
+            SidebarMessage::HeightInputChanged(value) => {
+                self.sidebar_height_input_changed(value);
+                Event::None
+            }
+            SidebarMessage::ToggleLockAspect => {
+                self.sidebar_toggle_lock();
+                Event::None
+            }
+            SidebarMessage::ApplyResizePreset(percent) => {
+                self.sidebar_scale_changed(percent);
+                Event::None
+            }
+            SidebarMessage::ApplyResize => {
+                self.sidebar_apply_resize();
+                Event::None
+            }
+            SidebarMessage::Undo => {
+                self.commit_active_tool_changes();
+                self.sidebar_undo();
+                Event::None
+            }
+            SidebarMessage::Redo => {
+                self.commit_active_tool_changes();
+                self.sidebar_redo();
+                Event::None
+            }
+            SidebarMessage::NavigateNext => self.sidebar_navigate_next(),
+            SidebarMessage::NavigatePrevious => self.sidebar_navigate_previous(),
+            SidebarMessage::Save => self.sidebar_save(),
+            SidebarMessage::SaveAs => self.sidebar_save_as(),
+            SidebarMessage::Cancel => self.sidebar_cancel(),
+        }
+    }
+
+    pub(crate) fn handle_canvas_message(&mut self, message: CanvasMessage) -> Event {
+        self.handle_crop_canvas_message(message)
+    }
+
+    pub(crate) fn handle_raw_event(&mut self, event: iced::Event) -> Event {
+        match event {
+            iced::Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(keyboard::key::Named::Escape),
+                ..
+            }) => {
+                if self.has_unsaved_changes() {
+                    self.discard_changes();
+                    Event::None
+                } else {
+                    Event::ExitEditor
+                }
+            }
+            iced::Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
+                if modifiers.command() =>
+            {
+                match key {
+                    keyboard::Key::Character(ref c) if c.as_str() == "s" => {
+                        if self.has_unsaved_changes() {
+                            Event::SaveRequested {
+                                path: self.image_path.clone(),
+                                overwrite: true,
+                            }
+                        } else {
+                            Event::None
+                        }
+                    }
+                    keyboard::Key::Character(ref c) if c.as_str() == "z" => {
+                        self.commit_active_tool_changes();
+                        self.sidebar_undo();
+                        Event::None
+                    }
+                    keyboard::Key::Character(ref c) if c.as_str() == "y" => {
+                        self.commit_active_tool_changes();
+                        self.sidebar_redo();
+                        Event::None
+                    }
+                    _ => Event::None,
+                }
+            }
+            _ => Event::None,
+        }
+    }
+}
