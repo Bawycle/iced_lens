@@ -203,3 +203,16 @@ fi
 mkdir -p "$OUTPUT_DIR"
 mv "$NEW_APPIMAGE" "$OUTPUT_PATH"
 echo "AppImage created at $OUTPUT_PATH"
+
+# Generate SHA256 checksum for integrity verification
+CHECKSUM_FILE="${OUTPUT_PATH}.sha256"
+if command -v sha256sum >/dev/null 2>&1; then
+  (cd "$OUTPUT_DIR" && sha256sum "$(basename "$OUTPUT_PATH")") > "$CHECKSUM_FILE"
+  echo "SHA256 checksum: $CHECKSUM_FILE"
+elif command -v shasum >/dev/null 2>&1; then
+  # macOS fallback
+  (cd "$OUTPUT_DIR" && shasum -a 256 "$(basename "$OUTPUT_PATH")") > "$CHECKSUM_FILE"
+  echo "SHA256 checksum: $CHECKSUM_FILE"
+else
+  echo "Warning: sha256sum not found, checksum file not generated" >&2
+fi
