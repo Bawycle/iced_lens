@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Updated `image` crate from 0.24 to 0.25.9 for latest features and bug fixes
+- Updated `rfd` crate from 0.15 to 0.16.0 for improved file dialog functionality
+- Removed redundant `fluent-syntax` dependency (already included transitively via `fluent-bundle`)
+
 ## [0.1.0] - 2025-12-02
 
 ### Added
