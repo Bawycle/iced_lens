@@ -10,7 +10,7 @@ license = "MPL-2.0"
 keywords = ["image", "viewer", "editor", "gui", "iced"]
 categories = ["multimedia::images", "gui"]
 readme = "README.md"
-rust-version = "1.78"
+rust-version = "1.91.1"
 
 [dependencies]
 dirs = "6.0.0"
@@ -30,7 +30,7 @@ iced_core = "0.13.1"
 iced_widget = "0.13.1"
 
 [dev-dependencies]
-criterion = { version = "0.7.0", features = ["html_reports"] }
+criterion = { version = "0.8.0", features = ["html_reports"] }
 tempfile = "3.23.0"
 
 [[bench]]

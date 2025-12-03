@@ -8,8 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Updated MSRV (Minimum Supported Rust Version) from 1.78 to 1.91.1
 - Updated `image` crate from 0.24 to 0.25.9 for latest features and bug fixes
 - Updated `rfd` crate from 0.15 to 0.16.0 for improved file dialog functionality
+- Updated `criterion` crate from 0.7.0 to 0.8.0 for enhanced benchmarking capabilities
 - Removed redundant `fluent-syntax` dependency (already included transitively via `fluent-bundle`)
 
 ## [0.1.0] - 2025-12-02

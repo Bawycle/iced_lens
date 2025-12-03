@@ -4,7 +4,7 @@ Lightweight, internationalized image viewer and editor powered by the [Iced](htt
 
 [![Release](https://img.shields.io/badge/release-v0.1.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
-[![MSRV](https://img.shields.io/badge/Rust-1.78%2B-blue)](https://www.rust-lang.org)
+[![MSRV](https://img.shields.io/badge/Rust-1.91.1%2B-blue)](https://www.rust-lang.org)
 ![Locales](https://img.shields.io/badge/i18n-en--US|fr-green)
 ![Status: Pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange)
 
@@ -56,7 +56,7 @@ Screenshots will be added once UI stabilizes. Feel free to open an issue and pro
 
 ## 4. Installation & Requirements
 ### Rust Toolchain
-Requires Rust >= 1.78 (stable recommended). Install via:
+Requires Rust >= 1.91.1 (stable recommended). Install via:
 ```bash
 curl https://sh.rustup.rs -sSf | sh
 ```
