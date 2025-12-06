@@ -33,3 +33,10 @@ CLAUDE.md
 
 # External documentation
 .ext_doc/
+
+# Generated test videos (tests/data/ images are kept in git)
+tests/data/*.mp4
+tests/data/*.avi
+tests/data/*.webm
+tests/data/*.mov
+tests/data/*.mkv
