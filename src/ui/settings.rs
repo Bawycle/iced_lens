@@ -6,17 +6,23 @@
 //! The [`State`] struct owns the local UI state, while [`Event`] values
 //! bubble up for the parent application to handle side effects.
 
-use crate::config::{BackgroundTheme, SortOrder, DEFAULT_ZOOM_STEP_PERCENT};
+use crate::config::{
+    BackgroundTheme, SortOrder, DEFAULT_FRAME_CACHE_MB, DEFAULT_OVERLAY_TIMEOUT_SECS,
+    DEFAULT_ZOOM_STEP_PERCENT, MAX_FRAME_CACHE_MB, MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB,
+    MIN_OVERLAY_TIMEOUT_SECS,
+};
 use crate::i18n::fluent::I18n;
 use crate::ui::state::zoom::{
     format_number, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT, ZOOM_STEP_INVALID_KEY,
     ZOOM_STEP_RANGE_KEY,
 };
+use crate::ui::styles;
 use crate::ui::theme;
+use crate::ui::theming::ThemeMode;
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{button, text, text_input, Button, Column, Container, Row, Text},
-    Color, Element, Length,
+    widget::{button, scrollable, text, text_input, Button, Column, Container, Row, Slider, Text},
+    Element, Length,
 };
 use unic_langid::LanguageIdentifier;
 
@@ -25,15 +31,51 @@ pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
 }
 
+/// Configuration parameters for initializing settings state.
+///
+/// This struct groups all configuration options to avoid functions with too many arguments.
+/// Use `StateConfig::default()` for sensible defaults, then customize as needed.
+#[derive(Debug, Clone)]
+pub struct StateConfig {
+    pub zoom_step_percent: f32,
+    pub background_theme: BackgroundTheme,
+    pub sort_order: SortOrder,
+    pub overlay_timeout_secs: u32,
+    pub theme_mode: ThemeMode,
+    pub video_autoplay: bool,
+    pub audio_normalization: bool,
+    pub frame_cache_mb: u32,
+}
+
+impl Default for StateConfig {
+    fn default() -> Self {
+        Self {
+            zoom_step_percent: DEFAULT_ZOOM_STEP_PERCENT,
+            background_theme: BackgroundTheme::default(),
+            sort_order: SortOrder::default(),
+            overlay_timeout_secs: DEFAULT_OVERLAY_TIMEOUT_SECS,
+            theme_mode: ThemeMode::System,
+            video_autoplay: false,
+            audio_normalization: true,
+            frame_cache_mb: DEFAULT_FRAME_CACHE_MB,
+        }
+    }
+}
+
 /// Local UI state for the settings screen.
 #[derive(Debug, Clone)]
 pub struct State {
     background_theme: BackgroundTheme,
     sort_order: SortOrder,
+    theme_mode: ThemeMode,
     zoom_step_percent: f32,
     zoom_step_input: String,
     zoom_step_input_dirty: bool,
     zoom_step_error_key: Option<&'static str>,
+    overlay_timeout_secs: u32,
+    video_autoplay: bool,
+    audio_normalization: bool,
+    frame_cache_mb: u32,
 }
 
 /// Messages emitted directly by the settings widgets.
@@ -44,7 +86,12 @@ pub enum Message {
     ZoomStepInputChanged(String),
     ZoomStepSubmitted,
     BackgroundThemeSelected(BackgroundTheme),
+    ThemeModeSelected(ThemeMode),
     SortOrderSelected(SortOrder),
+    OverlayTimeoutChanged(u32),
+    VideoAutoplayChanged(bool),
+    AudioNormalizationChanged(bool),
+    FrameCacheMbChanged(u32),
 }
 
 /// Events propagated to the parent application for side effects.
@@ -56,7 +103,12 @@ pub enum Event {
     LanguageSelected(LanguageIdentifier),
     ZoomStepChanged(f32),
     BackgroundThemeSelected(BackgroundTheme),
+    ThemeModeSelected(ThemeMode),
     SortOrderSelected(SortOrder),
+    OverlayTimeoutChanged(u32),
+    VideoAutoplayChanged(bool),
+    AudioNormalizationChanged(bool),
+    FrameCacheMbChanged(u32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,28 +119,34 @@ pub(crate) enum ZoomStepError {
 
 impl Default for State {
     fn default() -> Self {
-        Self::new(
-            DEFAULT_ZOOM_STEP_PERCENT,
-            BackgroundTheme::default(),
-            SortOrder::default(),
-        )
+        Self::new(StateConfig::default())
     }
 }
 
 impl State {
-    pub fn new(
-        initial_zoom_step_percent: f32,
-        background_theme: BackgroundTheme,
-        sort_order: SortOrder,
-    ) -> Self {
-        let clamped = initial_zoom_step_percent.clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT);
+    /// Creates a new settings state from the given configuration.
+    pub fn new(config: StateConfig) -> Self {
+        let clamped = config
+            .zoom_step_percent
+            .clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT);
+        let clamped_timeout = config
+            .overlay_timeout_secs
+            .clamp(MIN_OVERLAY_TIMEOUT_SECS, MAX_OVERLAY_TIMEOUT_SECS);
+        let clamped_cache = config
+            .frame_cache_mb
+            .clamp(MIN_FRAME_CACHE_MB, MAX_FRAME_CACHE_MB);
         Self {
-            background_theme,
-            sort_order,
+            background_theme: config.background_theme,
+            sort_order: config.sort_order,
+            theme_mode: config.theme_mode,
             zoom_step_percent: clamped,
             zoom_step_input: format_number(clamped),
             zoom_step_input_dirty: false,
             zoom_step_error_key: None,
+            overlay_timeout_secs: clamped_timeout,
+            video_autoplay: config.video_autoplay,
+            audio_normalization: config.audio_normalization,
+            frame_cache_mb: clamped_cache,
         }
     }
 
@@ -100,8 +158,28 @@ impl State {
         self.sort_order
     }
 
+    pub fn theme_mode(&self) -> ThemeMode {
+        self.theme_mode
+    }
+
     pub fn zoom_step_percent(&self) -> f32 {
         self.zoom_step_percent
+    }
+
+    pub fn overlay_timeout_secs(&self) -> u32 {
+        self.overlay_timeout_secs
+    }
+
+    pub fn video_autoplay(&self) -> bool {
+        self.video_autoplay
+    }
+
+    pub fn audio_normalization(&self) -> bool {
+        self.audio_normalization
+    }
+
+    pub fn frame_cache_mb(&self) -> u32 {
+        self.frame_cache_mb
     }
 
     pub(crate) fn zoom_step_input_value(&self) -> &str {
@@ -175,11 +253,10 @@ impl State {
                 .into();
 
         if let Some(error_key) = self.zoom_step_error_key() {
-            let error_color = Color::from_rgb8(229, 57, 53);
             helper_text = Text::new(ctx.i18n.tr(error_key))
                 .size(14)
                 .style(move |_theme: &iced::Theme| text::Style {
-                    color: Some(error_color),
+                    color: Some(theme::error_text_color()),
                 })
                 .into();
         }
@@ -210,7 +287,23 @@ impl State {
             background_row = background_row.push(button);
         }
 
-        let section_style = theme::settings_panel_style;
+        let mut theme_mode_row = Row::new().spacing(8);
+        for (mode, key) in [
+            (ThemeMode::System, "settings-theme-system"),
+            (ThemeMode::Light, "settings-theme-light"),
+            (ThemeMode::Dark, "settings-theme-dark"),
+        ] {
+            let mut button =
+                Button::new(Text::new(ctx.i18n.tr(key))).on_press(Message::ThemeModeSelected(mode));
+            button = if self.theme_mode == mode {
+                button.style(button::primary)
+            } else {
+                button.style(button::secondary)
+            };
+            theme_mode_row = theme_mode_row.push(button);
+        }
+
+        let section_style = styles::container::panel;
 
         let language_section = Container::new(
             Column::new()
@@ -232,6 +325,17 @@ impl State {
                 .spacing(12)
                 .push(background_label)
                 .push(background_row),
+        )
+        .padding(16)
+        .width(Length::Fill)
+        .style(section_style);
+
+        let theme_mode_label = Text::new(ctx.i18n.tr("settings-theme-mode-label"));
+        let theme_mode_section = Container::new(
+            Column::new()
+                .spacing(12)
+                .push(theme_mode_label)
+                .push(theme_mode_row),
         )
         .padding(16)
         .width(Length::Fill)
@@ -264,7 +368,117 @@ impl State {
         .width(Length::Fill)
         .style(section_style);
 
-        Column::new()
+        let overlay_timeout_label = Text::new(ctx.i18n.tr("settings-overlay-timeout-label"));
+        let overlay_timeout_slider = Slider::new(
+            MIN_OVERLAY_TIMEOUT_SECS..=MAX_OVERLAY_TIMEOUT_SECS,
+            self.overlay_timeout_secs,
+            Message::OverlayTimeoutChanged,
+        )
+        .step(1u32);
+
+        let overlay_timeout_value_text = Text::new(format!(
+            "{} {}",
+            self.overlay_timeout_secs,
+            ctx.i18n.tr("seconds")
+        ));
+
+        let overlay_timeout_section = Container::new(
+            Column::new()
+                .spacing(12)
+                .push(overlay_timeout_label)
+                .push(overlay_timeout_slider)
+                .push(overlay_timeout_value_text)
+                .push(Text::new(ctx.i18n.tr("settings-overlay-timeout-hint")).size(14)),
+        )
+        .padding(16)
+        .width(Length::Fill)
+        .style(section_style);
+
+        // Video autoplay toggle
+        let video_autoplay_label = Text::new(ctx.i18n.tr("settings-video-autoplay-label"));
+        let mut video_autoplay_row = Row::new().spacing(8);
+        for (enabled, key) in [
+            (false, "settings-video-autoplay-disabled"),
+            (true, "settings-video-autoplay-enabled"),
+        ] {
+            let mut btn = Button::new(Text::new(ctx.i18n.tr(key)))
+                .on_press(Message::VideoAutoplayChanged(enabled));
+            btn = if self.video_autoplay == enabled {
+                btn.style(button::primary)
+            } else {
+                btn.style(button::secondary)
+            };
+            video_autoplay_row = video_autoplay_row.push(btn);
+        }
+
+        let video_autoplay_section = Container::new(
+            Column::new()
+                .spacing(12)
+                .push(video_autoplay_label)
+                .push(video_autoplay_row)
+                .push(Text::new(ctx.i18n.tr("settings-video-autoplay-hint")).size(14)),
+        )
+        .padding(16)
+        .width(Length::Fill)
+        .style(section_style);
+
+        // Audio normalization toggle
+        let audio_normalization_label =
+            Text::new(ctx.i18n.tr("settings-audio-normalization-label"));
+        let mut audio_normalization_row = Row::new().spacing(8);
+        for (enabled, key) in [
+            (false, "settings-audio-normalization-disabled"),
+            (true, "settings-audio-normalization-enabled"),
+        ] {
+            let mut btn = Button::new(Text::new(ctx.i18n.tr(key)))
+                .on_press(Message::AudioNormalizationChanged(enabled));
+            btn = if self.audio_normalization == enabled {
+                btn.style(button::primary)
+            } else {
+                btn.style(button::secondary)
+            };
+            audio_normalization_row = audio_normalization_row.push(btn);
+        }
+
+        let audio_normalization_section = Container::new(
+            Column::new()
+                .spacing(12)
+                .push(audio_normalization_label)
+                .push(audio_normalization_row)
+                .push(Text::new(ctx.i18n.tr("settings-audio-normalization-hint")).size(14)),
+        )
+        .padding(16)
+        .width(Length::Fill)
+        .style(section_style);
+
+        // Frame cache size slider
+        let frame_cache_label = Text::new(ctx.i18n.tr("settings-frame-cache-label"));
+        let frame_cache_slider = Slider::new(
+            MIN_FRAME_CACHE_MB..=MAX_FRAME_CACHE_MB,
+            self.frame_cache_mb,
+            Message::FrameCacheMbChanged,
+        )
+        .step(16u32);
+
+        let frame_cache_value_text = Text::new(format!(
+            "{} {}",
+            self.frame_cache_mb,
+            ctx.i18n.tr("megabytes")
+        ));
+
+        let frame_cache_section = Container::new(
+            Column::new()
+                .spacing(12)
+                .push(frame_cache_label)
+                .push(frame_cache_slider)
+                .push(frame_cache_value_text)
+                .push(Text::new(ctx.i18n.tr("settings-frame-cache-hint")).size(14)),
+        )
+        .padding(16)
+        .width(Length::Fill)
+        .style(section_style);
+
+        let content = Column::new()
             .width(Length::Fill)
             .spacing(24)
             .align_x(Horizontal::Left)
@@ -274,8 +488,14 @@ impl State {
             .push(language_section)
             .push(zoom_section)
             .push(background_section)
+            .push(theme_mode_section)
             .push(sort_order_section)
-            .into()
+            .push(overlay_timeout_section)
+            .push(video_autoplay_section)
+            .push(audio_normalization_section)
+            .push(frame_cache_section);
+
+        scrollable(content).into()
     }
 
     /// Update the state and emit an [`Event`] for the parent when needed.
@@ -324,6 +544,46 @@ impl State {
                 } else {
                     self.sort_order = order;
                     Event::SortOrderSelected(order)
+                }
+            }
+            Message::OverlayTimeoutChanged(timeout) => {
+                if self.overlay_timeout_secs == timeout {
+                    Event::None
+                } else {
+                    self.overlay_timeout_secs = timeout;
+                    Event::OverlayTimeoutChanged(timeout)
+                }
+            }
+            Message::ThemeModeSelected(mode) => {
+                if self.theme_mode == mode {
+                    Event::None
+                } else {
+                    self.theme_mode = mode;
+                    Event::ThemeModeSelected(mode)
+                }
+            }
+            Message::VideoAutoplayChanged(enabled) => {
+                if self.video_autoplay == enabled {
+                    Event::None
+                } else {
+                    self.video_autoplay = enabled;
+                    Event::VideoAutoplayChanged(enabled)
+                }
+            }
+            Message::AudioNormalizationChanged(enabled) => {
+                if self.audio_normalization == enabled {
+                    Event::None
+                } else {
+                    self.audio_normalization = enabled;
+                    Event::AudioNormalizationChanged(enabled)
+                }
+            }
+            Message::FrameCacheMbChanged(mb) => {
+                if self.frame_cache_mb == mb {
+                    Event::None
+                } else {
+                    self.frame_cache_mb = mb;
+                    Event::FrameCacheMbChanged(mb)
                 }
             }
         }
@@ -385,7 +645,13 @@ mod tests {
 
     #[test]
     fn new_state_clamps_zoom_step() {
-        let state = State::new(500.0, BackgroundTheme::Light, SortOrder::Alphabetical);
+        let config = StateConfig {
+            zoom_step_percent: 500.0,
+            background_theme: BackgroundTheme::Light,
+            sort_order: SortOrder::Alphabetical,
+            ..StateConfig::default()
+        };
+        let state = State::new(config);
         assert_eq!(state.zoom_step_percent, MAX_ZOOM_STEP_PERCENT);
         assert_eq!(state.zoom_step_input, format_number(MAX_ZOOM_STEP_PERCENT));
     }

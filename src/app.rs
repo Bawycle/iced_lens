@@ -9,16 +9,19 @@
 use crate::config;
 use crate::error::Error;
 use crate::i18n::fluent::I18n;
-use crate::image_handler::{self, ImageData};
 use crate::image_navigation::ImageNavigator;
+use crate::media::{self, MediaData};
 use crate::ui::editor::{self, Event as EditorEvent, State as EditorState};
 use crate::ui::settings::{
-    self, Event as SettingsEvent, State as SettingsState, ViewContext as SettingsViewContext,
+    self, Event as SettingsEvent, State as SettingsState, StateConfig as SettingsConfig,
+    ViewContext as SettingsViewContext,
 };
 use crate::ui::state::zoom::{MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT};
+use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
+use crate::video_player::{create_lufs_cache, SharedLufsCache};
 use iced::{
-    event,
+    event, time,
     widget::{Container, Text},
     window, Element, Length, Subscription, Task, Theme,
 };
@@ -30,18 +33,27 @@ use unic_langid::LanguageIdentifier;
 /// persisted preferences.
 pub struct App {
     pub i18n: I18n,
-    mode: AppMode,
+    screen: Screen,
     settings: SettingsState,
     viewer: component::State,
     editor: Option<EditorState>,
     image_navigator: ImageNavigator,
     fullscreen: bool,
     window_id: Option<window::Id>,
+    theme_mode: ThemeMode,
+    /// Whether videos should auto-play when loaded.
+    video_autoplay: bool,
+    /// Whether audio normalization is enabled for consistent volume levels.
+    audio_normalization: bool,
+    /// Shared cache for LUFS measurements to avoid re-analyzing files.
+    lufs_cache: SharedLufsCache,
+    /// Frame cache size in MB for video seek optimization.
+    frame_cache_mb: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Screens the user can navigate between.
-pub enum AppMode {
+pub enum Screen {
     Viewer,
     Settings,
     Editor,
@@ -50,8 +62,8 @@ pub enum AppMode {
 impl fmt::Debug for App {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("App")
-            .field("mode", &self.mode)
-            .field("viewer_has_image", &self.viewer.has_image())
+            .field("screen", &self.screen)
+            .field("viewer_has_image", &self.viewer.has_media())
             .finish()
     }
 }
@@ -61,11 +73,12 @@ impl fmt::Debug for App {
 #[derive(Debug, Clone)]
 pub enum Message {
     Viewer(component::Message),
-    SwitchMode(AppMode),
+    SwitchScreen(Screen),
     Settings(settings::Message),
     Editor(editor::Message),
-    EditorImageLoaded(Result<ImageData, Error>),
+    EditorImageLoaded(Result<MediaData, Error>),
     SaveAsDialogResult(Option<PathBuf>),
+    Tick(std::time::Instant), // Periodic tick for overlay auto-hide
 }
 
 /// Runtime flags passed in from the CLI or launcher to tweak startup behavior.
@@ -118,13 +131,18 @@ impl Default for App {
     fn default() -> Self {
         Self {
             i18n: I18n::default(),
-            mode: AppMode::Viewer,
+            screen: Screen::Viewer,
             settings: SettingsState::default(),
             viewer: component::State::new(),
             editor: None,
             image_navigator: ImageNavigator::new(),
             fullscreen: false,
             window_id: None,
+            theme_mode: ThemeMode::System,
+            video_autoplay: false,
+            audio_normalization: true, // Enabled by default - normalizes audio volume between media files
+            lufs_cache: create_lufs_cache(),
+            frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
         }
     }
 }
@@ -141,6 +159,8 @@ impl App {
             ..Self::default()
         };
 
+        app.theme_mode = config.theme_mode;
+
         if let Some(step) = config.zoom_step {
             let clamped = clamp_zoom_step(step);
             app.viewer.set_zoom_step_percent(clamped);
@@ -153,7 +173,28 @@ impl App {
 
         let theme = config.background_theme.unwrap_or_default();
         let sort_order = config.sort_order.unwrap_or_default();
-        app.settings = SettingsState::new(app.viewer.zoom_step_percent(), theme, sort_order);
+        let overlay_timeout_secs = config
+            .overlay_timeout_secs
+            .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
+        let video_autoplay = config.video_autoplay.unwrap_or(false);
+        let audio_normalization = config.audio_normalization.unwrap_or(true);
+        let frame_cache_mb = config
+            .frame_cache_mb
+            .unwrap_or(config::DEFAULT_FRAME_CACHE_MB);
+        app.frame_cache_mb = frame_cache_mb;
+        app.settings = SettingsState::new(SettingsConfig {
+            zoom_step_percent: app.viewer.zoom_step_percent(),
+            background_theme: theme,
+            sort_order,
+            overlay_timeout_secs,
+            theme_mode: config.theme_mode,
+            video_autoplay,
+            audio_normalization,
+            frame_cache_mb,
+        });
+        app.video_autoplay = video_autoplay;
+        app.audio_normalization = audio_normalization;
+        app.viewer.set_video_autoplay(video_autoplay);
 
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
@@ -168,10 +209,14 @@ impl App {
             // Synchronize viewer state
             app.viewer.current_image_path = Some(path.clone());
 
-            Task::perform(
-                async move { image_handler::load_image(&path_str) },
-                |result| Message::Viewer(component::Message::ImageLoaded(result)),
-            )
+            // Set loading state directly (before first render)
+            app.viewer.is_loading_media = true;
+            app.viewer.loading_started_at = Some(std::time::Instant::now());
+
+            // Load the media
+            Task::perform(async move { media::load_media(&path_str) }, |result| {
+                Message::Viewer(component::Message::ImageLoaded(result))
+            })
         } else {
             Task::none()
         };
@@ -184,39 +229,40 @@ impl App {
     }
 
     fn theme(&self) -> Theme {
-        Theme::default()
+        match self.theme_mode {
+            ThemeMode::Light => Theme::Light,
+            ThemeMode::Dark => Theme::Dark,
+            ThemeMode::System => Theme::Dark,
+        }
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        // Route events based on current mode
-        match self.mode {
-            AppMode::Editor => {
-                event::listen_with(|event, status, window_id| {
-                    if let event::Event::Window(window::Event::Resized(_)) = &event {
-                        return Some(Message::Viewer(component::Message::RawEvent {
-                            window: window_id,
-                            event: event.clone(),
-                        }));
-                    }
+        let event_subscription = match self.screen {
+            Screen::Editor => event::listen_with(|event, status, window_id| {
+                if let event::Event::Window(window::Event::Resized(_)) = &event {
+                    return Some(Message::Viewer(component::Message::RawEvent {
+                        window: window_id,
+                        event: event.clone(),
+                    }));
+                }
 
-                    // In editor mode, route keyboard events to editor
-                    if let event::Event::Keyboard(..) = &event {
-                        match status {
-                            event::Status::Ignored => {
-                                Some(Message::Editor(crate::ui::editor::Message::RawEvent {
-                                    window: window_id,
-                                    event: event.clone(),
-                                }))
-                            }
-                            event::Status::Captured => None,
+                // In editor screen, route keyboard events to editor
+                if let event::Event::Keyboard(..) = &event {
+                    match status {
+                        event::Status::Ignored => {
+                            Some(Message::Editor(crate::ui::editor::Message::RawEvent {
+                                window: window_id,
+                                event: event.clone(),
+                            }))
                         }
-                    } else {
-                        None
+                        event::Status::Captured => None,
                     }
-                })
-            }
-            _ => {
-                // In viewer or settings mode, route to viewer
+                } else {
+                    None
+                }
+            }),
+            Screen::Viewer => {
+                // In viewer screen, route all events including wheel scroll for zoom
                 event::listen_with(|event, status, window_id| {
                     if matches!(
                         event,
@@ -239,18 +285,72 @@ impl App {
                     }
                 })
             }
-        }
+            Screen::Settings => {
+                // In settings screen, only route non-wheel events to viewer
+                // (wheel events are used by settings scrollable)
+                event::listen_with(|event, status, window_id| {
+                    // Don't route wheel scroll to viewer - it's used by settings scroll
+                    if matches!(
+                        event,
+                        event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
+                    ) {
+                        return None;
+                    }
+
+                    match status {
+                        event::Status::Ignored => {
+                            Some(Message::Viewer(component::Message::RawEvent {
+                                window: window_id,
+                                event: event.clone(),
+                            }))
+                        }
+                        event::Status::Captured => None,
+                    }
+                })
+            }
+        };
+
+        // Add periodic tick when in fullscreen to update overlay auto-hide
+        // or when loading media to check for timeout
+        let tick_subscription = if self.fullscreen || self.viewer.is_loading_media() {
+            time::every(std::time::Duration::from_millis(100)).map(Message::Tick)
+        } else {
+            Subscription::none()
+        };
+
+        // Add video playback subscription with LUFS cache for audio normalization
+        let video_subscription = self
+            .viewer
+            .subscription(
+                Some(self.lufs_cache.clone()),
+                self.audio_normalization,
+                self.frame_cache_mb,
+            )
+            .map(Message::Viewer);
+
+        Subscription::batch([event_subscription, tick_subscription, video_subscription])
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Viewer(viewer_message) => self.handle_viewer_message(viewer_message),
-            Message::SwitchMode(mode) => self.handle_mode_switch(mode),
+            Message::SwitchScreen(target) => self.handle_screen_switch(target),
             Message::Settings(settings_message) => self.handle_settings_message(settings_message),
             Message::Editor(editor_message) => self.handle_editor_message(editor_message),
             Message::EditorImageLoaded(result) => {
                 match result {
-                    Ok(image_data) => {
+                    Ok(media_data) => {
+                        // Editor only supports images in v0.2, not videos
+                        // Extract ImageData from MediaData
+                        let image_data = match media_data {
+                            MediaData::Image(img) => img,
+                            MediaData::Video(_) => {
+                                // Video editing not supported in v0.2
+                                eprintln!("Video editing is not supported in this version");
+                                return Task::none();
+                            }
+                        };
+
                         // Create a new EditorState with the loaded image
                         if let Some(current_image_path) = self.image_navigator.current_image_path()
                         {
@@ -269,6 +369,15 @@ impl App {
                         eprintln!("Failed to load image for editor: {:?}", err);
                     }
                 }
+                Task::none()
+            }
+            Message::Tick(_instant) => {
+                // Periodic tick for overlay auto-hide - just trigger a view refresh
+                // The view() function will check elapsed time and hide controls if needed
+
+                // Also check for loading timeout
+                self.viewer.check_loading_timeout(&self.i18n);
+
                 Task::none()
             }
             Message::SaveAsDialogResult(path_opt) => {
@@ -305,10 +414,10 @@ impl App {
             component::Effect::ToggleFullscreen => self.toggle_fullscreen_task(),
             component::Effect::ExitFullscreen => self.update_fullscreen_mode(false),
             component::Effect::OpenSettings => {
-                self.mode = AppMode::Settings;
+                self.screen = Screen::Settings;
                 Task::none()
             }
-            component::Effect::EnterEditor => self.handle_mode_switch(AppMode::Editor),
+            component::Effect::EnterEditor => self.handle_screen_switch(Screen::Editor),
             component::Effect::NavigateNext => self.handle_navigate_next(),
             component::Effect::NavigatePrevious => self.handle_navigate_previous(),
             component::Effect::None => Task::none(),
@@ -316,32 +425,41 @@ impl App {
         Task::batch([viewer_task, side_effect])
     }
 
-    fn handle_mode_switch(&mut self, mode: AppMode) -> Task<Message> {
+    fn handle_screen_switch(&mut self, target: Screen) -> Task<Message> {
         // Handle Settings → Viewer transition
-        if matches!(mode, AppMode::Viewer) && matches!(self.mode, AppMode::Settings) {
+        if matches!(target, Screen::Viewer) && matches!(self.screen, Screen::Settings) {
             match self.settings.ensure_zoom_step_committed() {
                 Ok(Some(value)) => {
                     self.viewer.set_zoom_step_percent(value);
-                    self.mode = mode;
+                    self.screen = target;
                     return self.persist_preferences();
                 }
                 Ok(None) => {
-                    self.mode = mode;
+                    self.screen = target;
                     return Task::none();
                 }
                 Err(_) => {
-                    self.mode = AppMode::Settings;
+                    self.screen = Screen::Settings;
                     return Task::none();
                 }
             }
         }
 
         // Handle Viewer → Editor transition
-        if matches!(mode, AppMode::Editor) && matches!(self.mode, AppMode::Viewer) {
-            if let (Some(image_path), Some(image_data)) = (
+        if matches!(target, Screen::Editor) && matches!(self.screen, Screen::Viewer) {
+            if let (Some(image_path), Some(media_data)) = (
                 self.viewer.current_image_path.clone(),
-                self.viewer.image().cloned(),
+                self.viewer.media().cloned(),
             ) {
+                // Editor only supports images in v0.2, not videos
+                let image_data = match media_data {
+                    MediaData::Image(img) => img,
+                    MediaData::Video(_) => {
+                        eprintln!("Video editing is not supported in this version");
+                        return Task::none();
+                    }
+                };
+
                 // Synchronize image_navigator with viewer state before entering editor
                 let config = config::load().unwrap_or_default();
                 let sort_order = config.sort_order.unwrap_or_default();
@@ -352,27 +470,27 @@ impl App {
                 match EditorState::new(image_path, image_data) {
                     Ok(state) => {
                         self.editor = Some(state);
-                        self.mode = mode;
+                        self.screen = target;
                     }
                     Err(err) => {
-                        eprintln!("Failed to enter editor mode: {err:?}");
+                        eprintln!("Failed to enter editor screen: {err:?}");
                     }
                 }
                 return Task::none();
             } else {
-                // Can't enter editor mode without an image
+                // Can't enter editor screen without an image
                 return Task::none();
             }
         }
 
         // Handle Editor → Viewer transition
-        if matches!(mode, AppMode::Viewer) && matches!(self.mode, AppMode::Editor) {
+        if matches!(target, Screen::Viewer) && matches!(self.screen, Screen::Editor) {
             self.editor = None;
-            self.mode = mode;
+            self.screen = target;
             return Task::none();
         }
 
-        self.mode = mode;
+        self.screen = target;
         Task::none()
     }
 
@@ -380,12 +498,12 @@ impl App {
         match self.settings.update(message) {
             SettingsEvent::None => Task::none(),
             SettingsEvent::BackToViewer => {
-                self.mode = AppMode::Viewer;
+                self.screen = Screen::Viewer;
                 Task::none()
             }
             SettingsEvent::BackToViewerWithZoomChange(value) => {
                 self.viewer.set_zoom_step_percent(value);
-                self.mode = AppMode::Viewer;
+                self.screen = Screen::Viewer;
                 self.persist_preferences()
             }
             SettingsEvent::LanguageSelected(locale) => self.apply_language_change(locale),
@@ -394,7 +512,25 @@ impl App {
                 self.persist_preferences()
             }
             SettingsEvent::BackgroundThemeSelected(_) => self.persist_preferences(),
+            SettingsEvent::ThemeModeSelected(mode) => {
+                self.theme_mode = mode;
+                self.persist_preferences()
+            }
             SettingsEvent::SortOrderSelected(_) => self.persist_preferences(),
+            SettingsEvent::OverlayTimeoutChanged(_) => self.persist_preferences(),
+            SettingsEvent::VideoAutoplayChanged(enabled) => {
+                self.video_autoplay = enabled;
+                self.viewer.set_video_autoplay(enabled);
+                self.persist_preferences()
+            }
+            SettingsEvent::AudioNormalizationChanged(enabled) => {
+                self.audio_normalization = enabled;
+                self.persist_preferences()
+            }
+            SettingsEvent::FrameCacheMbChanged(mb) => {
+                self.frame_cache_mb = mb;
+                self.persist_preferences()
+            }
         }
     }
 
@@ -410,11 +546,15 @@ impl App {
                 let current_image_path = editor_state.image_path().to_path_buf();
 
                 self.editor = None;
-                self.mode = AppMode::Viewer;
+                self.screen = Screen::Viewer;
+
+                // Set loading state directly (before render)
+                self.viewer.is_loading_media = true;
+                self.viewer.loading_started_at = Some(std::time::Instant::now());
 
                 // Reload the image in the viewer to show any saved changes
                 Task::perform(
-                    async move { crate::image_handler::load_image(&current_image_path) },
+                    async move { crate::media::load_media(&current_image_path) },
                     |result| Message::Viewer(component::Message::ImageLoaded(result)),
                 )
             }
@@ -440,7 +580,7 @@ impl App {
 
                     // Load the next image and create a new EditorState
                     Task::perform(
-                        async move { crate::image_handler::load_image(&next_path) },
+                        async move { crate::media::load_media(&next_path) },
                         Message::EditorImageLoaded,
                     )
                 } else {
@@ -469,7 +609,7 @@ impl App {
 
                     // Load the previous image and create a new EditorState
                     Task::perform(
-                        async move { crate::image_handler::load_image(&prev_path) },
+                        async move { crate::media::load_media(&prev_path) },
                         Message::EditorImageLoaded,
                     )
                 } else {
@@ -539,9 +679,13 @@ impl App {
             // Also sync viewer.image_list from viewer.current_image_path
             let _ = self.viewer.scan_directory();
 
+            // Set loading state directly (before render)
+            self.viewer.is_loading_media = true;
+            self.viewer.loading_started_at = Some(std::time::Instant::now());
+
             // Load the next image
             Task::perform(
-                async move { crate::image_handler::load_image(&next_path) },
+                async move { crate::media::load_media(&next_path) },
                 |result| Message::Viewer(component::Message::ImageLoaded(result)),
             )
         } else {
@@ -570,9 +714,13 @@ impl App {
             // Also sync viewer.image_list from viewer.current_image_path
             let _ = self.viewer.scan_directory();
 
+            // Set loading state directly (before render)
+            self.viewer.is_loading_media = true;
+            self.viewer.loading_started_at = Some(std::time::Instant::now());
+
             // Load the previous image
             Task::perform(
-                async move { crate::image_handler::load_image(&prev_path) },
+                async move { crate::media::load_media(&prev_path) },
                 |result| Message::Viewer(component::Message::ImageLoaded(result)),
             )
         } else {
@@ -606,10 +754,16 @@ impl App {
         }
 
         let mut cfg = config::load().unwrap_or_default();
-        cfg.fit_to_window = Some(self.viewer.fit_to_window());
+        // Use image_fit_to_window() to only persist the image setting, not video
+        cfg.fit_to_window = Some(self.viewer.image_fit_to_window());
         cfg.zoom_step = Some(self.viewer.zoom_step_percent());
         cfg.background_theme = Some(self.settings.background_theme());
         cfg.sort_order = Some(self.settings.sort_order());
+        cfg.overlay_timeout_secs = Some(self.settings.overlay_timeout_secs());
+        cfg.theme_mode = self.theme_mode;
+        cfg.video_autoplay = Some(self.video_autoplay);
+        cfg.audio_normalization = Some(self.audio_normalization);
+        cfg.frame_cache_mb = Some(self.frame_cache_mb);
 
         if let Err(error) = config::save(&cfg) {
             eprintln!("Failed to save config: {:?}", error);
@@ -641,20 +795,29 @@ impl App {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let current_view: Element<'_, Message> = match self.mode {
-            AppMode::Viewer => self
-                .viewer
-                .view(component::ViewEnv {
-                    i18n: &self.i18n,
-                    background_theme: self.settings.background_theme(),
-                    show_controls: !self.fullscreen,
-                })
-                .map(Message::Viewer),
-            AppMode::Settings => self
+        let current_view: Element<'_, Message> = match self.screen {
+            Screen::Viewer => {
+                let config = config::load().unwrap_or_default();
+                let overlay_timeout_secs = config
+                    .overlay_timeout_secs
+                    .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
+
+                self.viewer
+                    .view(component::ViewEnv {
+                        i18n: &self.i18n,
+                        background_theme: self.settings.background_theme(),
+                        is_fullscreen: self.fullscreen,
+                        overlay_hide_delay: std::time::Duration::from_secs(
+                            overlay_timeout_secs as u64,
+                        ),
+                    })
+                    .map(Message::Viewer)
+            }
+            Screen::Settings => self
                 .settings
                 .view(SettingsViewContext { i18n: &self.i18n })
                 .map(Message::Settings),
-            AppMode::Editor => {
+            Screen::Editor => {
                 if let Some(editor_state) = &self.editor {
                     editor_state
                         .view(editor::ViewContext {
@@ -690,7 +853,7 @@ mod tests {
     use super::*;
     use crate::config::DEFAULT_ZOOM_STEP_PERCENT;
     use crate::error::Error;
-    use crate::image_handler::ImageData;
+    use crate::media::ImageData;
     use crate::ui::state::zoom::{
         format_number, DEFAULT_ZOOM_PERCENT, MAX_ZOOM_PERCENT, ZOOM_STEP_INVALID_KEY,
         ZOOM_STEP_RANGE_KEY,
@@ -736,6 +899,10 @@ mod tests {
         }
     }
 
+    fn sample_media_data() -> MediaData {
+        MediaData::Image(sample_image_data())
+    }
+
     fn build_image(width: u32, height: u32) -> ImageData {
         let pixel_count = (width * height * 4) as usize;
         let pixels = vec![255; pixel_count];
@@ -746,6 +913,10 @@ mod tests {
         }
     }
 
+    fn build_media(width: u32, height: u32) -> MediaData {
+        MediaData::Image(build_image(width, height))
+    }
+
     #[test]
     fn new_starts_in_viewer_mode_without_image() {
         with_temp_config_dir(|_| {
@@ -754,8 +925,8 @@ mod tests {
                 file_path: None,
                 i18n_dir: None,
             });
-            assert_eq!(app.mode, AppMode::Viewer);
-            assert!(!app.viewer.has_image());
+            assert_eq!(app.screen, Screen::Viewer);
+            assert!(!app.viewer.has_media());
         });
     }
 
@@ -765,11 +936,11 @@ mod tests {
         let data = sample_image_data();
 
         let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
-            data.clone()
+            MediaData::Image(data.clone()),
         ))));
 
-        assert!(app.viewer.has_image());
-        assert_eq!(app.viewer.image().unwrap().width, data.width);
+        assert!(app.viewer.has_media());
+        assert_eq!(app.viewer.media().unwrap().width(), data.width);
     }
 
     #[test]
@@ -791,16 +962,16 @@ mod tests {
     fn zoom_step_changes_commit_when_leaving_settings() {
         with_temp_config_dir(|_| {
             let mut app = App {
-                mode: AppMode::Settings,
+                screen: Screen::Settings,
                 ..App::default()
             };
             let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
                 "25".into(),
             )));
 
-            let _ = app.update(Message::SwitchMode(AppMode::Viewer));
+            let _ = app.update(Message::SwitchScreen(Screen::Viewer));
 
-            assert_eq!(app.mode, AppMode::Viewer);
+            assert_eq!(app.screen, Screen::Viewer);
             assert_eq!(app.viewer.zoom_step_percent(), 25.0);
             assert_eq!(app.settings.zoom_step_input_value(), "25");
             assert!(!app.settings.zoom_step_input_dirty());
@@ -812,16 +983,16 @@ mod tests {
     fn invalid_zoom_step_prevents_leaving_settings() {
         with_temp_config_dir(|_| {
             let mut app = App {
-                mode: AppMode::Settings,
+                screen: Screen::Settings,
                 ..App::default()
             };
             let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
                 "not-a-number".into(),
             )));
 
-            let _ = app.update(Message::SwitchMode(AppMode::Viewer));
+            let _ = app.update(Message::SwitchScreen(Screen::Viewer));
 
-            assert_eq!(app.mode, AppMode::Settings);
+            assert_eq!(app.screen, Screen::Settings);
             assert_eq!(
                 app.settings.zoom_step_error_key(),
                 Some(ZOOM_STEP_INVALID_KEY)
@@ -835,16 +1006,16 @@ mod tests {
     fn out_of_range_zoom_step_shows_error_and_stays_in_settings() {
         with_temp_config_dir(|_| {
             let mut app = App {
-                mode: AppMode::Settings,
+                screen: Screen::Settings,
                 ..App::default()
             };
             let _ = app.update(Message::Settings(settings::Message::ZoomStepInputChanged(
                 "500".into(),
             )));
 
-            let _ = app.update(Message::SwitchMode(AppMode::Viewer));
+            let _ = app.update(Message::SwitchScreen(Screen::Viewer));
 
-            assert_eq!(app.mode, AppMode::Settings);
+            assert_eq!(app.screen, Screen::Settings);
             assert_eq!(
                 app.settings.zoom_step_error_key(),
                 Some(ZOOM_STEP_RANGE_KEY)
@@ -858,14 +1029,14 @@ mod tests {
     fn update_image_loaded_err_clears_image_and_sets_error() {
         let mut app = App::default();
         let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
-            sample_image_data(),
+            sample_media_data(),
         ))));
 
         let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Err(
             Error::Io("boom".into()),
         ))));
 
-        assert!(!app.viewer.has_image());
+        assert!(!app.viewer.has_media());
         assert!(app
             .viewer
             .error()
@@ -953,7 +1124,7 @@ mod tests {
     fn toggling_fit_to_window_updates_zoom() {
         let mut app = App::default();
         let _ = app.viewer.handle_message(
-            component::Message::ImageLoaded(Ok(build_image(2000, 1000))),
+            component::Message::ImageLoaded(Ok(build_media(2000, 1000))),
             &app.i18n,
         );
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
@@ -1005,7 +1176,7 @@ mod tests {
         let zoom = app.viewer.zoom_state_mut();
         zoom.zoom_percent = 100.0;
         let _ = app.viewer.handle_message(
-            component::Message::ImageLoaded(Ok(build_image(800, 600))),
+            component::Message::ImageLoaded(Ok(build_media(800, 600))),
             &app.i18n,
         );
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
@@ -1037,7 +1208,7 @@ mod tests {
         zoom.manual_zoom_percent = 150.0;
         zoom.fit_to_window = false;
         let _ = app.viewer.handle_message(
-            component::Message::ImageLoaded(Ok(build_image(800, 600))),
+            component::Message::ImageLoaded(Ok(build_media(800, 600))),
             &app.i18n,
         );
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
@@ -1116,7 +1287,7 @@ mod tests {
 
         let mut app = App::default();
         let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
-            sample_image_data(),
+            sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img1_path.clone());
         app.viewer
@@ -1158,7 +1329,7 @@ mod tests {
 
         let mut app = App::default();
         let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
-            sample_image_data(),
+            sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
         app.viewer
@@ -1200,7 +1371,7 @@ mod tests {
 
         let mut app = App::default();
         let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
-            sample_image_data(),
+            sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
         app.viewer
@@ -1243,7 +1414,7 @@ mod tests {
 
             let mut app = App::default();
             let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
-                sample_image_data(),
+                sample_media_data(),
             ))));
             app.viewer.current_image_path = Some(img1_path.clone());
             app.viewer
@@ -1299,7 +1470,7 @@ mod tests {
         let mut app = App::default();
 
         // Load first image in viewer
-        let img1_data = image_handler::load_image(&img1_path).expect("failed to load img1");
+        let img1_data = media::load_media(&img1_path).expect("failed to load img1");
         let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
             img1_data.clone(),
         ))));
@@ -1308,8 +1479,8 @@ mod tests {
             .scan_directory()
             .expect("failed to scan directory");
 
-        // Switch to editor mode
-        let _ = app.update(Message::SwitchMode(AppMode::Editor));
+        // Switch to editor screen
+        let _ = app.update(Message::SwitchScreen(Screen::Editor));
 
         // Navigate to next image
         let _ = app.update(Message::Editor(editor::Message::Sidebar(
@@ -1325,7 +1496,7 @@ mod tests {
             .unwrap_or(false));
 
         // Simulate the async image loading completing
-        let img2_data = image_handler::load_image(&img2_path).expect("failed to load img2");
+        let img2_data = media::load_media(&img2_path).expect("failed to load img2");
         let _ = app.update(Message::EditorImageLoaded(Ok(img2_data)));
 
         // Verify editor has loaded the second image
@@ -1354,7 +1525,7 @@ mod tests {
         let mut app = App::default();
 
         // Load second image in viewer
-        let img2_data = image_handler::load_image(&img2_path).expect("failed to load img2");
+        let img2_data = media::load_media(&img2_path).expect("failed to load img2");
         let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
             img2_data.clone(),
         ))));
@@ -1363,8 +1534,8 @@ mod tests {
             .scan_directory()
             .expect("failed to scan directory");
 
-        // Switch to editor mode
-        let _ = app.update(Message::SwitchMode(AppMode::Editor));
+        // Switch to editor screen
+        let _ = app.update(Message::SwitchScreen(Screen::Editor));
 
         // Navigate to previous image
         let _ = app.update(Message::Editor(editor::Message::Sidebar(
@@ -1380,7 +1551,7 @@ mod tests {
             .unwrap_or(false));
 
         // Simulate the async image loading completing
-        let img1_data = image_handler::load_image(&img1_path).expect("failed to load img1");
+        let img1_data = media::load_media(&img1_path).expect("failed to load img1");
         let _ = app.update(Message::EditorImageLoaded(Ok(img1_data)));
 
         // Verify editor has loaded the first image

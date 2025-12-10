@@ -3,7 +3,7 @@
 
 use crate::config::BackgroundTheme;
 use crate::error::{Error, Result};
-use crate::image_handler::ImageData;
+use crate::media::ImageData;
 use iced::{Element, Rectangle};
 use image_rs;
 use std::path::PathBuf;

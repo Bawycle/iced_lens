@@ -2,7 +2,7 @@
 //! Image transformation functions for rotate, crop, and resize operations.
 
 use crate::error::Result;
-use crate::image_handler::ImageData;
+use crate::media::ImageData;
 use image_rs::{imageops::FilterType, DynamicImage, GenericImageView};
 
 /// Rotate an image 90 degrees counter-clockwise (left).

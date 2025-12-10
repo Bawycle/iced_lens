@@ -1,6 +1,11 @@
+pub mod components;
+pub mod design_tokens;
 pub mod editor;
+pub mod icons;
 pub mod settings;
 pub mod state;
+pub mod styles;
 pub mod theme;
+pub mod theming;
 pub mod viewer;
 pub mod widgets;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize tool panel for the editor sidebar.
 
-use crate::ui::theme;
+use crate::ui::styles;
 use iced::widget::{button, checkbox, container, slider, text, text_input, Column, Row};
 use iced::{Element, Length};
 
@@ -92,6 +92,6 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
     )
     .padding(12)
     .width(Length::Fill)
-    .style(theme::settings_panel_style)
+    .style(styles::editor::settings_panel)
     .into()
 }

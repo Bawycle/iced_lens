@@ -2,11 +2,15 @@
 //! Viewer controls: zoom inputs, buttons, and fit-to-window toggle.
 
 use crate::i18n::fluent::I18n;
+use crate::ui::icons;
 use crate::ui::state::zoom::ZoomState;
+use crate::ui::styles;
+use crate::ui::theme;
+use crate::ui::viewer::shared_styles;
 use iced::{
     alignment::Vertical,
-    widget::{button, checkbox, svg, text_input, tooltip, Column, Row, Space, Text},
-    Element, Length,
+    widget::{button, text, text_input, tooltip, Column, Row, Space, Text},
+    Element, Length, Theme,
 };
 
 #[derive(Clone)]
@@ -26,13 +30,11 @@ pub enum Message {
     DeleteCurrentImage,
 }
 
-const DELETE_ICON_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none'><path d='M9 3v1H4v2h1v13a2 2 0 002 2h10a2 2 0 002-2V6h1V4h-5V3H9zm2 4h2v11h-2V7zm-4 0h2v11H7V7zm8 0h2v11h-2V7z' fill='currentColor'/></svg>"#;
-const ZOOM_IN_ICON_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none'><path d='M11 4a7 7 0 015.657 11.113l4.115 4.115-1.414 1.414-4.115-4.115A7 7 0 1111 4zm0 2a5 5 0 100 10 5 5 0 000-10zm1 2v2h2v2h-2v2h-2v-2H8v-2h2V8h2z' fill='currentColor'/></svg>"#;
-const ZOOM_OUT_ICON_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none'><path d='M11 4a7 7 0 015.657 11.113l4.115 4.115-1.414 1.414-4.115-4.115A7 7 0 1111 4zm0 2a5 5 0 100 10 5 5 0 000-10zm-3 4h6v2H8v-2z' fill='currentColor'/></svg>"#;
-const FULLSCREEN_ICON_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none'><path d='M4 9V4h5V2H2v7h2zm15-5h-5V2h7v7h-2zm-5 15h5v-5h2v7h-7v-2zM4 15v5h5v2H2v-7h2z' fill='currentColor'/></svg>"#;
-const ICON_BUTTON_SIZE: f32 = 32.0;
-
-pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Message> {
+pub fn view<'a>(
+    ctx: ViewContext<'a>,
+    zoom: &'a ZoomState,
+    effective_fit_to_window: bool,
+) -> Element<'a, Message> {
     let zoom_placeholder = ctx.i18n.tr("viewer-zoom-input-placeholder");
     let zoom_label = Text::new(ctx.i18n.tr("viewer-zoom-label"));
 
@@ -41,23 +43,30 @@ pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Messag
         .on_submit(Message::ZoomInputSubmitted)
         .padding(6)
         .size(16)
-        .width(Length::Fixed(90.0));
+        .width(Length::Fixed(60.0));
 
-    let reset_button = button(Text::new(ctx.i18n.tr("viewer-zoom-reset-button")))
+    let zoom_percent_label = Text::new("%").size(16);
+
+    let reset_tooltip = ctx.i18n.tr("viewer-zoom-reset-button");
+    let reset_button_content: Element<'_, Message> = button(icons::fill(icons::refresh()))
         .on_press(Message::ResetZoom)
-        .padding([6, 12]);
+        .padding(4)
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE))
+        .into();
+    let reset_button = tooltip(
+        reset_button_content,
+        Text::new(reset_tooltip),
+        tooltip::Position::Bottom,
+    )
+    .gap(4);
 
     let zoom_out_tooltip = ctx.i18n.tr("viewer-zoom-out-tooltip");
-    let zoom_out_icon = svg::Svg::new(svg::Handle::from_memory(
-        ZOOM_OUT_ICON_SVG.as_bytes().to_vec(),
-    ))
-    .width(Length::Fill)
-    .height(Length::Fill);
-    let zoom_out_button_content: Element<'_, Message> = button(zoom_out_icon)
+    let zoom_out_button_content: Element<'_, Message> = button(icons::fill(icons::zoom_out()))
         .on_press(Message::ZoomOut)
         .padding(4)
-        .width(Length::Fixed(ICON_BUTTON_SIZE))
-        .height(Length::Fixed(ICON_BUTTON_SIZE))
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE))
         .into();
     let zoom_out_button = tooltip(
         zoom_out_button_content,
@@ -67,16 +76,11 @@ pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Messag
     .gap(4);
 
     let zoom_in_tooltip = ctx.i18n.tr("viewer-zoom-in-tooltip");
-    let zoom_in_icon = svg::Svg::new(svg::Handle::from_memory(
-        ZOOM_IN_ICON_SVG.as_bytes().to_vec(),
-    ))
-    .width(Length::Fill)
-    .height(Length::Fill);
-    let zoom_in_button_content: Element<'_, Message> = button(zoom_in_icon)
+    let zoom_in_button_content: Element<'_, Message> = button(icons::fill(icons::zoom_in()))
         .on_press(Message::ZoomIn)
         .padding(4)
-        .width(Length::Fixed(ICON_BUTTON_SIZE))
-        .height(Length::Fixed(ICON_BUTTON_SIZE))
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE))
         .into();
     let zoom_in_button = tooltip(
         zoom_in_button_content,
@@ -85,24 +89,37 @@ pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Messag
     )
     .gap(4);
 
-    let fit_toggle = checkbox(
-        ctx.i18n.tr("viewer-fit-to-window-toggle"),
-        zoom.fit_to_window,
+    let fit_tooltip = ctx.i18n.tr("viewer-fit-to-window-toggle");
+    let fit_icon = if effective_fit_to_window {
+        icons::fill(icons::compress())
+    } else {
+        icons::fill(icons::expand())
+    };
+    let fit_button = button(fit_icon)
+        .on_press(Message::SetFitToWindow(!effective_fit_to_window))
+        .padding(4)
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE));
+
+    // Apply different style when fit is active (highlighted)
+    let fit_button_content: Element<'_, Message> = if effective_fit_to_window {
+        fit_button.style(styles::button_primary).into()
+    } else {
+        fit_button.into()
+    };
+    let fit_toggle = tooltip(
+        fit_button_content,
+        Text::new(fit_tooltip),
+        tooltip::Position::Bottom,
     )
-    .on_toggle(Message::SetFitToWindow)
-    .text_wrapping(iced::widget::text::Wrapping::Word);
+    .gap(4);
 
     let fullscreen_tooltip = ctx.i18n.tr("viewer-fullscreen-tooltip");
-    let fullscreen_icon = svg::Svg::new(svg::Handle::from_memory(
-        FULLSCREEN_ICON_SVG.as_bytes().to_vec(),
-    ))
-    .width(Length::Fill)
-    .height(Length::Fill);
-    let fullscreen_button_content: Element<'_, Message> = button(fullscreen_icon)
+    let fullscreen_button_content: Element<'_, Message> = button(icons::fill(icons::fullscreen()))
         .on_press(Message::ToggleFullscreen)
         .padding(4)
-        .width(Length::Fixed(ICON_BUTTON_SIZE))
-        .height(Length::Fixed(ICON_BUTTON_SIZE))
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE))
         .into();
     let fullscreen_button = tooltip(
         fullscreen_button_content,
@@ -112,16 +129,11 @@ pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Messag
     .gap(4);
 
     let delete_tooltip = ctx.i18n.tr("viewer-delete-tooltip");
-    let delete_icon = svg::Svg::new(svg::Handle::from_memory(
-        DELETE_ICON_SVG.as_bytes().to_vec(),
-    ))
-    .width(Length::Fill)
-    .height(Length::Fill);
-    let delete_button_content: Element<'_, Message> = button(delete_icon)
+    let delete_button_content: Element<'_, Message> = button(icons::fill(icons::trash()))
         .on_press(Message::DeleteCurrentImage)
         .padding(4)
-        .width(Length::Fixed(ICON_BUTTON_SIZE))
-        .height(Length::Fixed(ICON_BUTTON_SIZE))
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE))
         .into();
     let delete_button = tooltip(
         delete_button_content,
@@ -131,22 +143,28 @@ pub fn view<'a>(ctx: ViewContext<'a>, zoom: &'a ZoomState) -> Element<'a, Messag
     .gap(4);
 
     let zoom_controls_row = Row::new()
-        .spacing(10)
+        .spacing(shared_styles::CONTROL_SPACING)
         .align_y(Vertical::Center)
         .push(zoom_label)
         .push(zoom_input)
+        .push(zoom_percent_label)
         .push(zoom_out_button)
-        .push(reset_button)
         .push(zoom_in_button)
+        .push(reset_button)
         .push(Space::new(Length::Fixed(16.0), Length::Shrink))
         .push(fit_toggle)
+        .push(Space::new(Length::Fixed(16.0), Length::Shrink))
         .push(delete_button)
         .push(fullscreen_button);
 
     let mut zoom_controls = Column::new().spacing(4).push(zoom_controls_row);
 
     if let Some(error_key) = zoom.zoom_input_error_key {
-        let error_text = Text::new(ctx.i18n.tr(error_key)).size(14);
+        let error_text = Text::new(ctx.i18n.tr(error_key))
+            .size(14)
+            .style(|_theme: &Theme| text::Style {
+                color: Some(theme::error_text_color()),
+            });
         zoom_controls = zoom_controls.push(error_text);
     }
 
@@ -163,6 +181,6 @@ mod tests {
     fn controls_view_renders() {
         let i18n = I18n::default();
         let zoom = ZoomState::default();
-        let _element = view(ViewContext { i18n: &i18n }, &zoom);
+        let _element = view(ViewContext { i18n: &i18n }, &zoom, true);
     }
 }

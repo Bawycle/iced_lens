@@ -2,7 +2,7 @@
 //! Crop tool panel for the editor sidebar.
 
 use crate::ui::editor::state::{CropRatio, CropState};
-use crate::ui::theme;
+use crate::ui::styles;
 use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length};
 
@@ -79,7 +79,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
     )
     .padding(12)
     .width(Length::Fill)
-    .style(theme::settings_panel_style)
+    .style(styles::editor::settings_panel)
     .into()
 }
 

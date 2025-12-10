@@ -2,6 +2,7 @@
 //! Crop overlay renderer for interactive crop selection.
 
 use crate::ui::editor::{CanvasMessage, Message};
+use crate::ui::theme;
 
 /// Canvas program used to draw and interact with the crop overlay.
 pub struct CropOverlayRenderer {
@@ -142,7 +143,6 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
         _cursor: iced::mouse::Cursor,
     ) -> Vec<iced::widget::canvas::Geometry> {
         use iced::widget::canvas::{Frame, Path, Stroke};
-        use iced::Color;
 
         let mut frame = Frame::new(renderer, bounds.size());
 
@@ -176,7 +176,7 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
         let crop_screen_height = self.crop_height as f32 * scale_y;
 
         // Draw darkened overlay outside crop area
-        let dark_overlay = Color::from_rgba8(0, 0, 0, 0.5);
+        let dark_overlay = crate::ui::theme::crop_overlay_outside_color();
 
         // Top rectangle
         if crop_screen_y > img_offset_y {
@@ -229,11 +229,13 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
         );
         frame.stroke(
             &crop_rect,
-            Stroke::default().with_width(2.0).with_color(Color::WHITE),
+            Stroke::default()
+                .with_width(2.0)
+                .with_color(theme::crop_overlay_handle_color()),
         );
 
         // Draw rule-of-thirds grid
-        let grid_color = Color::from_rgba8(255, 255, 255, 0.5);
+        let grid_color = theme::crop_overlay_grid_color();
         let third_width = crop_screen_width / 3.0;
         let third_height = crop_screen_height / 3.0;
 
@@ -265,7 +267,7 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
 
         // Draw resize handles
         let handle_size = 10.0;
-        let handle_color = Color::WHITE;
+        let handle_color = theme::crop_overlay_handle_color();
         let handles = [
             (crop_screen_x, crop_screen_y),                           // TopLeft
             (crop_screen_x + crop_screen_width / 2.0, crop_screen_y), // Top
@@ -294,7 +296,9 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
             frame.fill(&handle, handle_color);
             frame.stroke(
                 &handle,
-                Stroke::default().with_width(1.0).with_color(Color::BLACK),
+                Stroke::default()
+                    .with_width(1.0)
+                    .with_color(theme::crop_overlay_handle_border_color()),
             );
         }
 

@@ -2,7 +2,8 @@
 //! Image canvas composition with overlays.
 
 use crate::config::BackgroundTheme;
-use crate::image_handler::ImageData;
+use crate::media::ImageData;
+use crate::ui::components::checkerboard;
 use crate::ui::theme;
 use iced::widget::{container, image, Canvas, Stack};
 use iced::{Element, Length};
@@ -94,7 +95,7 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
     };
 
     if theme::is_checkerboard(background_theme) {
-        theme::wrap_with_checkerboard(build_image_surface())
+        checkerboard::wrap(build_image_surface())
     } else {
         let bg_color = match background_theme {
             BackgroundTheme::Light => theme::viewer_light_surface_color(),
@@ -103,10 +104,7 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
         };
 
         build_image_surface()
-            .style(move |_theme: &iced::Theme| iced::widget::container::Style {
-                background: Some(iced::Background::Color(bg_color)),
-                ..Default::default()
-            })
+            .style(theme::editor_canvas_style(bg_color))
             .into()
     }
 }

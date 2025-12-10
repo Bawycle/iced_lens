@@ -1,25 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! This module is responsible for loading and decoding image files from various
-//! formats (e.g., PNG, JPEG, GIF, SVG). It provides a unified `ImageData`
-//! structure that can be used by the UI to display images.
-//!
-//! # Examples
-//!
-//! ```no_run
-//! use iced_lens::image_handler::{self, ImageData};
-//! use iced_lens::error::Result;
-//! use std::path::PathBuf;
-//!
-//! # fn main() -> Result<()> {
-//! let image_path = PathBuf::from("./path/to/your/image.png");
-//! let image_data: ImageData = image_handler::load_image(&image_path)?;
-//!
-//! println!("Loaded image: {}x{}", image_data.width, image_data.height);
-//! # Ok(())
-//! # }
-//! ```
-
-pub mod transform;
+//! Image loading and decoding from various formats (PNG, JPEG, GIF, SVG, etc.).
 
 use crate::error::{Error, Result};
 use iced::widget::image;

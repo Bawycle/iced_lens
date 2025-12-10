@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Top toolbar for the editor surface.
 
-use crate::ui::theme;
+use crate::ui::styles;
 use iced::widget::{button, container, Row, Text};
-use iced::{Alignment, Background, Border, Element, Length};
+use iced::{Alignment, Element, Length};
 
 use super::super::{Message, State, ToolbarMessage, ViewContext};
 
@@ -37,13 +37,6 @@ pub fn view<'a>(model: &ToolbarModel, ctx: &ViewContext<'a>) -> Element<'a, Mess
             .padding(8),
     )
     .width(Length::Fill)
-    .style(|_theme: &iced::Theme| iced::widget::container::Style {
-        background: Some(Background::Color(theme::viewer_toolbar_background())),
-        border: Border {
-            width: 0.0,
-            ..Default::default()
-        },
-        ..Default::default()
-    })
+    .style(styles::editor::toolbar)
     .into()
 }

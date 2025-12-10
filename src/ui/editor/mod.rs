@@ -5,7 +5,7 @@
 //! and viewer modules. The editor operates on a copy of the original image and only
 //! modifies the source file when the user explicitly saves.
 
-use crate::image_handler::ImageData;
+use crate::media::ImageData;
 use crate::ui::state::ViewportState;
 
 mod component;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Transformation history bookkeeping (undo/redo).
 
-use crate::image_handler::transform;
+use crate::media::image_transform;
 use crate::ui::editor::{State, Transformation};
 
 impl State {
@@ -56,16 +56,16 @@ impl State {
             }
 
             working_image = match &self.transformation_history[i] {
-                Transformation::RotateLeft => transform::rotate_left(&working_image),
-                Transformation::RotateRight => transform::rotate_right(&working_image),
-                Transformation::FlipHorizontal => transform::flip_horizontal(&working_image),
-                Transformation::FlipVertical => transform::flip_vertical(&working_image),
+                Transformation::RotateLeft => image_transform::rotate_left(&working_image),
+                Transformation::RotateRight => image_transform::rotate_right(&working_image),
+                Transformation::FlipHorizontal => image_transform::flip_horizontal(&working_image),
+                Transformation::FlipVertical => image_transform::flip_vertical(&working_image),
                 Transformation::Crop { rect } => {
                     let x = rect.x.max(0.0) as u32;
                     let y = rect.y.max(0.0) as u32;
                     let width = rect.width.max(1.0) as u32;
                     let height = rect.height.max(1.0) as u32;
-                    match transform::crop(&working_image, x, y, width, height) {
+                    match image_transform::crop(&working_image, x, y, width, height) {
                         Some(cropped) => cropped,
                         None => {
                             eprintln!("Failed to apply crop during replay: invalid crop area");
@@ -74,14 +74,14 @@ impl State {
                     }
                 }
                 Transformation::Resize { width, height } => {
-                    transform::resize(&working_image, *width, *height)
+                    image_transform::resize(&working_image, *width, *height)
                 }
             };
         }
 
         // Update current state with replayed image
         self.working_image = working_image;
-        match transform::dynamic_to_image_data(&self.working_image) {
+        match image_transform::dynamic_to_image_data(&self.working_image) {
             Ok(image_data) => {
                 self.current_image = image_data;
                 self.sync_resize_state_dimensions();
@@ -97,7 +97,7 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::image_handler::ImageData;
+    use crate::media::ImageData;
     use iced::widget::image;
     use image_rs::{Rgba, RgbaImage};
     use tempfile::TempDir;

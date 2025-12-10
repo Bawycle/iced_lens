@@ -5,32 +5,13 @@ pub mod crop_panel;
 pub mod resize_panel;
 
 use crate::ui::editor::state::{CropState, ResizeState};
-use crate::ui::theme;
+use crate::ui::icons;
+use crate::ui::styles;
 use iced::widget::scrollable::{Direction, Scrollbar};
-use iced::widget::{
-    button, container, horizontal_rule, svg, text, tooltip, Column, Row, Scrollable,
-};
-use iced::{alignment::Vertical, Background, Border, Element, Length};
+use iced::widget::{button, container, horizontal_rule, text, tooltip, Column, Row, Scrollable};
+use iced::{alignment::Vertical, Element, Length};
 
 use super::super::{EditorTool, Message, SidebarMessage, State, ViewContext};
-
-const ROTATE_LEFT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
-<path d='M11 5v-3l-4 4 4 4V7c3.309 0 6 2.691 6 6 0 1.262-.389 2.432-1.053 3.403l1.553 1.234C18.42 16.299 19 14.729 19 13c0-4.411-3.589-8-8-8z' fill='currentColor'/>
-</svg>"#;
-
-const ROTATE_RIGHT_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
-<path d='M13 5V3l4 4-4 4V7c-3.309 0-6 2.691-6 6 0 1.262.389 2.432 1.053 3.403l-1.553 1.234C5.58 16.299 5 14.729 5 13c0-4.411-3.589-8 8-8z' fill='currentColor'/>
-</svg>"#;
-
-const FLIP_HORIZONTAL_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
-<path d='M15 21h2v-2h-2v2zm4-12h2V7h-2v2zM3 5v14c0 1.1.9 2 2 2h4v-2H5V5h4V3H5c-1.1 0-2 .9-2 2zm16-2v2h2c0-1.1-.9-2-2-2zm-8 20h2V1h-2v22zm8-6h2v-2h-2v2zM15 5h2V3h-2v2zm4 8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2z' fill='currentColor'/>
-</svg>"#;
-
-const FLIP_VERTICAL_SVG: &str = r#"<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'>
-<g transform='rotate(90 12 12)'>
-<path d='M15 21h2v-2h-2v2zm4-12h2V7h-2v2zM3 5v14c0 1.1.9 2 2 2h4v-2H5V5h4V3H5c-1.1 0-2 .9-2 2zm16-2v2h2c0-1.1-.9-2-2-2zm-8 20h2V1h-2v22zm8-6h2v-2h-2v2zM15 5h2V3h-2v2zm4 8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2z' fill='currentColor'/>
-</g>
-</svg>"#;
 
 const SIDEBAR_WIDTH: f32 = 290.0;
 
@@ -103,14 +84,7 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
     container(layout)
         .width(Length::Fixed(SIDEBAR_WIDTH))
         .height(Length::Fill)
-        .style(|_theme: &iced::Theme| iced::widget::container::Style {
-            background: Some(Background::Color(theme::viewer_toolbar_background())),
-            border: Border {
-                width: 0.0,
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .style(styles::editor::toolbar)
         .into()
 }
 
@@ -119,19 +93,11 @@ pub fn collapsed<'a>() -> Element<'a, Message> {
         .on_press(SidebarMessage::ToggleSidebar.into())
         .padding(12);
 
-    let collapsed_bg = theme::viewer_toolbar_background();
     container(toggle_button)
         .width(Length::Fixed(60.0))
         .height(Length::Fill)
         .padding(10)
-        .style(move |_theme: &iced::Theme| iced::widget::container::Style {
-            background: Some(Background::Color(collapsed_bg)),
-            border: Border {
-                width: 0.0,
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .style(styles::editor::toolbar)
         .into()
 }
 
@@ -197,20 +163,15 @@ fn undo_redo_section<'a>(
     container(Column::new().spacing(6).push(title).push(controls))
         .padding(12)
         .width(Length::Fill)
-        .style(theme::settings_panel_style)
+        .style(styles::container::panel)
         .into()
 }
 
 fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let rotate_left_icon = svg::Svg::new(svg::Handle::from_memory(ROTATE_LEFT_SVG.as_bytes()))
-        .width(Length::Fixed(28.0))
-        .height(Length::Fixed(28.0));
-    let rotate_right_icon = svg::Svg::new(svg::Handle::from_memory(ROTATE_RIGHT_SVG.as_bytes()))
-        .width(Length::Fixed(28.0))
-        .height(Length::Fixed(28.0));
+    let icon_size = 28.0;
 
     let rotate_left_btn = tooltip::Tooltip::new(
-        button(rotate_left_icon)
+        button(icons::sized(icons::rotate_left(), icon_size))
             .on_press(SidebarMessage::RotateLeft.into())
             .padding(8)
             .width(Length::Fill)
@@ -222,7 +183,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     .padding(6);
 
     let rotate_right_btn = tooltip::Tooltip::new(
-        button(rotate_right_icon)
+        button(icons::sized(icons::rotate_right(), icon_size))
             .on_press(SidebarMessage::RotateRight.into())
             .padding(8)
             .width(Length::Fill)
@@ -242,21 +203,15 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     container(Column::new().spacing(6).push(title).push(controls))
         .padding(12)
         .width(Length::Fill)
-        .style(theme::settings_panel_style)
+        .style(styles::container::panel)
         .into()
 }
 
 fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let flip_horizontal_icon =
-        svg::Svg::new(svg::Handle::from_memory(FLIP_HORIZONTAL_SVG.as_bytes()))
-            .width(Length::Fixed(28.0))
-            .height(Length::Fixed(28.0));
-    let flip_vertical_icon = svg::Svg::new(svg::Handle::from_memory(FLIP_VERTICAL_SVG.as_bytes()))
-        .width(Length::Fixed(28.0))
-        .height(Length::Fixed(28.0));
+    let icon_size = 28.0;
 
     let flip_horizontal_btn = tooltip::Tooltip::new(
-        button(flip_horizontal_icon)
+        button(icons::sized(icons::flip_horizontal(), icon_size))
             .on_press(SidebarMessage::FlipHorizontal.into())
             .padding(8)
             .width(Length::Fill)
@@ -268,7 +223,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     .padding(6);
 
     let flip_vertical_btn = tooltip::Tooltip::new(
-        button(flip_vertical_icon)
+        button(icons::sized(icons::flip_vertical(), icon_size))
             .on_press(SidebarMessage::FlipVertical.into())
             .padding(8)
             .width(Length::Fill)
@@ -288,7 +243,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     container(Column::new().spacing(6).push(title).push(controls))
         .padding(12)
         .width(Length::Fill)
-        .style(theme::settings_panel_style)
+        .style(styles::container::panel)
         .into()
 }
 

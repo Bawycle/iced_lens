@@ -3,7 +3,7 @@
 
 use super::{CropDragState, CropRatio};
 use crate::error::{Error, Result};
-use crate::image_handler::transform;
+use crate::media::image_transform;
 use crate::ui::editor::State;
 
 impl State {
@@ -41,7 +41,7 @@ impl State {
         match image_rs::open(&self.image_path) {
             Ok(fresh_image) => {
                 self.working_image = fresh_image;
-                match transform::dynamic_to_image_data(&self.working_image) {
+                match image_transform::dynamic_to_image_data(&self.working_image) {
                     Ok(image_data) => {
                         self.current_image = image_data.clone();
                         self.sync_resize_state_dimensions();

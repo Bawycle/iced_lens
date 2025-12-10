@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Small helper methods that keep the editor facade lean.
 
-use crate::image_handler::transform;
+use crate::media::image_transform;
 use crate::ui::editor::{EditorTool, State, Transformation};
 use image_rs::DynamicImage;
 
@@ -14,7 +14,7 @@ impl State {
         F: Fn(&DynamicImage) -> DynamicImage,
     {
         let updated = operation(&self.working_image);
-        match transform::dynamic_to_image_data(&updated) {
+        match image_transform::dynamic_to_image_data(&updated) {
             Ok(image_data) => {
                 self.working_image = updated;
                 self.current_image = image_data;

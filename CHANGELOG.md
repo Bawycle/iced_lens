@@ -7,12 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - In Development
+
+> **Note:** This version is currently under active development on the `feature/video_player` branch.
+> Features listed here are planned or partially implemented but not yet released.
+
+### Added
+- **Video playback:** full video player with play/pause, seek bar, volume control, mute, and loop toggle for MP4, AVI, MOV, MKV, and WebM files.
+- **Animated format support:** animated GIF and WebP files are detected and play automatically with the same video controls.
+- **Audio normalization:** optional setting to normalize audio levels across videos.
+- **Video frame caching:** configurable frame cache size (16–512 MB) to optimize playback performance.
+- **Fullscreen video controls:** video playback controls (play/pause, seek, volume) available in fullscreen mode alongside zoom and fit-to-window options; controls appear on mouse movement and auto-hide after a configurable delay.
+- **Navigation feedback:** loop indicators on navigation arrows at list boundaries and a position counter (e.g. `3/12`) in fullscreen.
+- **Application theme mode:** configurable theme mode (System / Light / Dark) stored in `settings.toml` and editable from the Settings view.
+- **Scrollable settings:** settings screen now scrolls vertically to accommodate video-related options.
+
 ### Changed
-- Updated MSRV (Minimum Supported Rust Version) from 1.78 to 1.91.1
-- Updated `image` crate from 0.24 to 0.25.9 for latest features and bug fixes
-- Updated `rfd` crate from 0.15 to 0.16.0 for improved file dialog functionality
-- Updated `criterion` crate from 0.7.0 to 0.8.0 for enhanced benchmarking capabilities
-- Removed redundant `fluent-syntax` dependency (already included transitively via `fluent-bundle`)
+- Edit button is disabled when viewing videos (editing not supported for video files).
+
+### Fixed
+- Keyboard shortcuts work correctly in fullscreen mode.
+- Overlay arrows and HUD remain visible across all viewer background themes (light, dark, checkerboard).
 
 ## [0.1.0] - 2025-12-02
 

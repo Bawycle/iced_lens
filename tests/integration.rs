@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
-use iced_lens::config::{self, Config, DEFAULT_ZOOM_STEP_PERCENT};
+use iced_lens::config::{
+    self, Config, DEFAULT_FRAME_CACHE_MB, DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT,
+};
 use iced_lens::i18n::fluent::I18n;
+use iced_lens::ui::theming::ThemeMode;
 use tempfile::tempdir;
 
 #[test]
@@ -24,6 +27,13 @@ fn test_language_change_via_config() {
         zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
         background_theme: Some(config::BackgroundTheme::Dark),
         sort_order: Some(config::SortOrder::Alphabetical),
+        overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
+        theme_mode: ThemeMode::System,
+        video_autoplay: Some(false),
+        video_volume: Some(config::DEFAULT_VOLUME),
+        video_muted: Some(false),
+        audio_normalization: Some(true),
+        frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
     };
     config::save_to_path(&initial_config, &temp_config_file_path)
         .expect("Failed to write initial config file");
@@ -41,6 +51,13 @@ fn test_language_change_via_config() {
         zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
         background_theme: Some(config::BackgroundTheme::Dark),
         sort_order: Some(config::SortOrder::Alphabetical),
+        overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
+        theme_mode: ThemeMode::System,
+        video_autoplay: Some(false),
+        video_volume: Some(config::DEFAULT_VOLUME),
+        video_muted: Some(false),
+        audio_normalization: Some(true),
+        frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
     };
     config::save_to_path(&french_config, &temp_config_file_path)
         .expect("Failed to write french config file");

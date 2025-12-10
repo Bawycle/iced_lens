@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize overlay renderer showing original and target dimensions.
 
+use crate::ui::design_tokens::palette::WHITE;
 use crate::ui::editor::Message;
+use crate::ui::theme;
 
 /// Canvas program used to draw resize previews.
 pub struct ResizeOverlayRenderer {
@@ -36,7 +38,6 @@ impl iced::widget::canvas::Program<Message> for ResizeOverlayRenderer {
         _cursor: iced::mouse::Cursor,
     ) -> Vec<iced::widget::canvas::Geometry> {
         use iced::widget::canvas::{Frame, Path, Stroke, Text};
-        use iced::Color;
 
         let mut frame = Frame::new(renderer, bounds.size());
 
@@ -86,7 +87,7 @@ impl iced::widget::canvas::Program<Message> for ResizeOverlayRenderer {
         );
         frame.stroke(
             &original_rect,
-            Stroke::default().with_width(3.0).with_color(Color::WHITE),
+            Stroke::default().with_width(3.0).with_color(WHITE),
         );
 
         // Draw the resized image area on top (blue stroke only, no fill to see through)
@@ -98,11 +99,11 @@ impl iced::widget::canvas::Program<Message> for ResizeOverlayRenderer {
             &new_rect,
             Stroke::default()
                 .with_width(3.0)
-                .with_color(Color::from_rgb8(100, 150, 255)),
+                .with_color(theme::resize_overlay_color()),
         );
 
         // Draw dimension labels
-        let label_color = Color::WHITE;
+        let label_color = WHITE;
         let font_size = 16.0;
 
         // Original dimensions label (top-left of original rect)
@@ -120,7 +121,7 @@ impl iced::widget::canvas::Program<Message> for ResizeOverlayRenderer {
         frame.fill_text(Text {
             content: new_label,
             position: iced::Point::new(new_x, new_y + new_screen_height + 5.0),
-            color: Color::from_rgb8(100, 150, 255),
+            color: theme::resize_overlay_color(),
             size: font_size.into(),
             ..Text::default()
         });

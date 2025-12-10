@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Crop tool state and helpers.
 
-use crate::image_handler::{transform, ImageData};
+use crate::media::{image_transform, ImageData};
 use crate::ui::editor::{CanvasMessage, Event, State, Transformation};
 use iced::Rectangle;
 
@@ -240,8 +240,8 @@ impl State {
         }
 
         // Apply crop transformation from base image
-        if let Some(cropped) = transform::crop(base_image, x, y, width, height) {
-            match transform::dynamic_to_image_data(&cropped) {
+        if let Some(cropped) = image_transform::crop(base_image, x, y, width, height) {
+            match image_transform::dynamic_to_image_data(&cropped) {
                 Ok(image_data) => {
                     self.working_image = cropped;
                     self.current_image = image_data;

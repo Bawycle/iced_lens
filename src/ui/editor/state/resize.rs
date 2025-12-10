@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize tool state and helpers.
 
-use crate::image_handler::{transform, ImageData};
+use crate::media::{image_transform, ImageData};
 use crate::ui::editor::{State, Transformation};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -210,7 +210,7 @@ impl State {
                 width: target_width,
                 height: target_height,
             },
-            move |image| transform::resize(image, target_width, target_height),
+            move |image| image_transform::resize(image, target_width, target_height),
         );
 
         self.resize_state
@@ -226,8 +226,9 @@ impl State {
             return;
         }
 
-        let preview_dynamic = transform::resize(&self.working_image, target_width, target_height);
-        match transform::dynamic_to_image_data(&preview_dynamic) {
+        let preview_dynamic =
+            image_transform::resize(&self.working_image, target_width, target_height);
+        match image_transform::dynamic_to_image_data(&preview_dynamic) {
             Ok(image_data) => {
                 self.preview_image = Some(image_data);
             }
