@@ -4,6 +4,7 @@
 //! This module provides a common interface for loading, displaying, and manipulating
 //! both image and video files.
 
+pub mod frame_export;
 pub mod image;
 pub mod image_transform;
 pub mod video;

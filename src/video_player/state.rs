@@ -447,6 +447,61 @@ impl VideoPlayer {
             .map(|s| s.has_audio())
             .unwrap_or(false)
     }
+
+    /// Steps forward one frame (only when paused).
+    ///
+    /// Calculates the next frame position based on the video's FPS and seeks to it.
+    /// Only works when the video is paused.
+    pub fn step_forward(&mut self) {
+        if let PlaybackState::Paused { position_secs } = &self.state {
+            let frame_duration = 1.0 / self.video_data.fps;
+            let next_position =
+                (*position_secs + frame_duration).min(self.video_data.duration_secs);
+
+            // Seek to next frame position (will stay paused after seek)
+            self.state = PlaybackState::Seeking {
+                target_secs: next_position,
+                resume_playing: false,
+            };
+
+            // Update sync clock to the new position
+            self.sync_clock.seek(next_position);
+
+            // Send Seek command to decoder
+            if let Some(sender) = &self.command_sender {
+                let _ = sender.send(DecoderCommand::Seek {
+                    target_secs: next_position,
+                });
+            }
+        }
+    }
+
+    /// Steps backward one frame (only when paused).
+    ///
+    /// Calculates the previous frame position based on the video's FPS and seeks to it.
+    /// Only works when the video is paused.
+    pub fn step_backward(&mut self) {
+        if let PlaybackState::Paused { position_secs } = &self.state {
+            let frame_duration = 1.0 / self.video_data.fps;
+            let prev_position = (*position_secs - frame_duration).max(0.0);
+
+            // Seek to previous frame position (will stay paused after seek)
+            self.state = PlaybackState::Seeking {
+                target_secs: prev_position,
+                resume_playing: false,
+            };
+
+            // Update sync clock to the new position
+            self.sync_clock.seek(prev_position);
+
+            // Send Seek command to decoder
+            if let Some(sender) = &self.command_sender {
+                let _ = sender.send(DecoderCommand::Seek {
+                    target_secs: prev_position,
+                });
+            }
+        }
+    }
 }
 
 #[cfg(test)]

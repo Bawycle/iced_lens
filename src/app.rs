@@ -78,6 +78,10 @@ pub enum Message {
     Editor(editor::Message),
     EditorImageLoaded(Result<MediaData, Error>),
     SaveAsDialogResult(Option<PathBuf>),
+    FrameCaptureDialogResult {
+        path: Option<PathBuf>,
+        frame: Option<crate::media::frame_export::ExportableFrame>,
+    },
     Tick(std::time::Instant), // Periodic tick for overlay auto-hide
 }
 
@@ -399,6 +403,24 @@ impl App {
                 // User cancelled or error occurred, do nothing
                 Task::none()
             }
+            Message::FrameCaptureDialogResult { path, frame } => {
+                if let (Some(path), Some(frame)) = (path, frame) {
+                    // Determine export format from file extension
+                    let format = crate::media::frame_export::ExportFormat::from_path(&path);
+
+                    match frame.save_to_file(&path, format) {
+                        Ok(()) => {
+                            eprintln!("Frame captured successfully to: {:?}", path);
+                            // TODO: Show success notification to user
+                        }
+                        Err(err) => {
+                            eprintln!("Failed to capture frame: {:?}", err);
+                            // TODO: Show error notification to user
+                        }
+                    }
+                }
+                Task::none()
+            }
         }
     }
 
@@ -420,6 +442,10 @@ impl App {
             component::Effect::EnterEditor => self.handle_screen_switch(Screen::Editor),
             component::Effect::NavigateNext => self.handle_navigate_next(),
             component::Effect::NavigatePrevious => self.handle_navigate_previous(),
+            component::Effect::CaptureFrame {
+                video_path,
+                position_secs,
+            } => self.handle_capture_frame(video_path, position_secs),
             component::Effect::None => Task::none(),
         };
         Task::batch([viewer_task, side_effect])
@@ -726,6 +752,46 @@ impl App {
         } else {
             Task::none()
         }
+    }
+
+    /// Handles frame capture: opens a file dialog and saves the current video frame.
+    fn handle_capture_frame(&self, video_path: PathBuf, position_secs: f64) -> Task<Message> {
+        use crate::media::frame_export::{generate_default_filename, ExportFormat};
+
+        // Get the exportable frame from the viewer
+        let frame = match self.viewer.exportable_frame() {
+            Some(f) => f,
+            None => {
+                eprintln!("No frame available for capture");
+                return Task::none();
+            }
+        };
+
+        // Generate default filename
+        let default_filename =
+            generate_default_filename(&video_path, position_secs, ExportFormat::Png);
+
+        // Move both frame and default_filename into the async block
+        // Return both the selected path and the frame together
+        Task::perform(
+            async move {
+                let path = rfd::AsyncFileDialog::new()
+                    .set_file_name(&default_filename)
+                    .add_filter("PNG Image", &["png"])
+                    .add_filter("JPEG Image", &["jpg", "jpeg"])
+                    .add_filter("WebP Image", &["webp"])
+                    .save_file()
+                    .await
+                    .map(|h| h.path().to_path_buf());
+
+                // Return both path and frame
+                (path, frame)
+            },
+            |(path, frame)| Message::FrameCaptureDialogResult {
+                path,
+                frame: Some(frame),
+            },
+        )
     }
 
     /// Applies the newly selected locale, persists it to config, and refreshes

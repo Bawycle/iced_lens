@@ -37,6 +37,15 @@ pub enum Message {
 
     /// Toggle loop mode.
     ToggleLoop,
+
+    /// Capture current frame and export to file.
+    CaptureFrame,
+
+    /// Step forward one frame (only when paused).
+    StepForward,
+
+    /// Step backward one frame (only when paused).
+    StepBackward,
 }
 
 /// View context for rendering video controls.
@@ -183,6 +192,69 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         .width(Length::Fixed(80.0))
         .step(0.01);
 
+    // Step backward button (only enabled when paused)
+    let step_back_button_content: Element<'_, Message> = if !state.is_playing {
+        button(icons::sized(icons::step_backward(), icon_size))
+            .on_press(Message::StepBackward)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .into()
+    } else {
+        button(icons::sized(icons::step_backward(), icon_size))
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .style(styles::button::disabled())
+            .into()
+    };
+    let step_back_button = tooltip(
+        step_back_button_content,
+        Text::new(ctx.i18n.tr("video-step-backward-tooltip")),
+        tooltip::Position::Top,
+    )
+    .gap(4);
+
+    // Step forward button (only enabled when paused)
+    let step_forward_button_content: Element<'_, Message> = if !state.is_playing {
+        button(icons::sized(icons::step_forward(), icon_size))
+            .on_press(Message::StepForward)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .into()
+    } else {
+        button(icons::sized(icons::step_forward(), icon_size))
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .style(styles::button::disabled())
+            .into()
+    };
+    let step_forward_button = tooltip(
+        step_forward_button_content,
+        Text::new(ctx.i18n.tr("video-step-forward-tooltip")),
+        tooltip::Position::Top,
+    )
+    .gap(4);
+
+    // Capture frame button with tooltip
+    let capture_tooltip = ctx.i18n.tr("video-capture-tooltip");
+    let capture_button_content: Element<'_, Message> =
+        button(icons::sized(icons::camera(), icon_size))
+            .on_press(Message::CaptureFrame)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .into();
+
+    let capture_button = tooltip(
+        capture_button_content,
+        Text::new(capture_tooltip),
+        tooltip::Position::Top,
+    )
+    .gap(4);
+
     // Loop button with tooltip
     let loop_tooltip = ctx.i18n.tr("video-loop-tooltip");
     let loop_button_base = button(icons::sized(icons::loop_icon(), icon_size))
@@ -206,9 +278,12 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     .gap(4);
 
     let controls: Row<'a, Message> = row![
+        step_back_button,
         play_pause_button,
+        step_forward_button,
         timeline,
         time_display,
+        capture_button,
         volume_button_tooltip,
         volume_slider,
         loop_button,

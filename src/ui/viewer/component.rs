@@ -50,7 +50,7 @@ pub enum Message {
 }
 
 /// Side effects the application should perform after handling a viewer message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Effect {
     None,
     PersistPreferences,
@@ -60,6 +60,12 @@ pub enum Effect {
     EnterEditor,
     NavigateNext,
     NavigatePrevious,
+    /// Capture current frame and export to file.
+    /// Contains the video path and current position for default filename generation.
+    CaptureFrame {
+        video_path: PathBuf,
+        position_secs: f64,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -318,6 +324,11 @@ impl State {
             self.image_list = ImageList::scan_directory(path, sort_order)?;
         }
         Ok(())
+    }
+
+    /// Returns an exportable frame from the video canvas, if available.
+    pub fn exportable_frame(&self) -> Option<crate::media::frame_export::ExportableFrame> {
+        self.video_canvas.exportable_frame()
     }
 
     /// Returns true if media is currently being loaded.
@@ -644,6 +655,39 @@ impl State {
                         if let Some(player) = &mut self.video_player {
                             let current = player.is_loop_enabled();
                             player.set_loop(!current);
+                        }
+                    }
+                    VM::CaptureFrame => {
+                        // Capture current frame and request export
+                        if let Some(video_path) = &self.current_video_path {
+                            let position_secs = self
+                                .video_player
+                                .as_ref()
+                                .and_then(|p| p.state().position())
+                                .unwrap_or(0.0);
+                            return (
+                                Effect::CaptureFrame {
+                                    video_path: video_path.clone(),
+                                    position_secs,
+                                },
+                                Task::none(),
+                            );
+                        }
+                    }
+                    VM::StepForward => {
+                        // Step forward one frame (only when paused)
+                        if let Some(player) = &mut self.video_player {
+                            if player.state().is_paused() {
+                                player.step_forward();
+                            }
+                        }
+                    }
+                    VM::StepBackward => {
+                        // Step backward one frame (only when paused)
+                        if let Some(player) = &mut self.video_player {
+                            if player.state().is_paused() {
+                                player.step_backward();
+                            }
                         }
                     }
                 }
@@ -1208,6 +1252,40 @@ impl State {
                     } else {
                         (Effect::None, Task::none())
                     }
+                }
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(ref c),
+                    modifiers,
+                    ..
+                } if c.as_str() == ","
+                    && !modifiers.command()
+                    && !modifiers.alt()
+                    && !modifiers.shift() =>
+                {
+                    // Comma key: Step backward one frame (only when video is paused)
+                    if let Some(player) = &mut self.video_player {
+                        if !player.state().is_playing_or_will_resume() {
+                            player.step_backward();
+                        }
+                    }
+                    (Effect::None, Task::none())
+                }
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(ref c),
+                    modifiers,
+                    ..
+                } if c.as_str() == "."
+                    && !modifiers.command()
+                    && !modifiers.alt()
+                    && !modifiers.shift() =>
+                {
+                    // Period key: Step forward one frame (only when video is paused)
+                    if let Some(player) = &mut self.video_player {
+                        if !player.state().is_playing_or_will_resume() {
+                            player.step_forward();
+                        }
+                    }
+                    (Effect::None, Task::none())
                 }
                 keyboard::Event::ModifiersChanged(modifiers) => {
                     if modifiers.command() {

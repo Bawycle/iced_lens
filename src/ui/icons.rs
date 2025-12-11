@@ -56,6 +56,24 @@ pub fn loop_icon<'a>() -> Svg<'a> {
     Svg::new(Handle::from_memory(DATA))
 }
 
+/// Camera icon: for frame capture/screenshot.
+pub fn camera<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/camera.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
+/// Step forward icon: advance one frame.
+pub fn step_forward<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/step_forward.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
+/// Step backward icon: go back one frame.
+pub fn step_backward<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/step_backward.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
 // =============================================================================
 // Status & Feedback Icons
 // =============================================================================
@@ -239,6 +257,9 @@ mod tests {
         let _ = globe();
         let _ = image();
         let _ = cog();
+        let _ = camera();
+        let _ = step_forward();
+        let _ = step_backward();
     }
 
     #[test]
