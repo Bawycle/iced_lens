@@ -458,6 +458,13 @@ impl State {
 
                         self.media = Some(media);
                         self.error = None;
+
+                        // Reset zoom to 100% for images when fit-to-window is disabled
+                        if !self.is_video() && !self.image_fit_to_window() {
+                            self.zoom
+                                .apply_manual_zoom(crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT);
+                        }
+
                         self.refresh_fit_zoom();
                         // Scan directory on successful image load
                         let _ = self.scan_directory();

@@ -1341,14 +1341,19 @@ mod tests {
     fn wheel_scroll_ignored_when_cursor_not_over_image() {
         let mut app = App::default();
         app.viewer.set_zoom_step_percent(20.0);
-        let zoom = app.viewer.zoom_state_mut();
-        zoom.zoom_percent = 150.0;
-        zoom.manual_zoom_percent = 150.0;
-        zoom.fit_to_window = false;
+
+        // Load image first (this will reset zoom to 100% if fit_to_window is false)
         let _ = app.viewer.handle_message(
             component::Message::ImageLoaded(Ok(build_media(800, 600))),
             &app.i18n,
         );
+
+        // Configure zoom after loading to set up test state
+        let zoom = app.viewer.zoom_state_mut();
+        zoom.zoom_percent = 150.0;
+        zoom.manual_zoom_percent = 150.0;
+        zoom.fit_to_window = false;
+
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
             Point::new(0.0, 0.0),
             Size::new(400.0, 300.0),
