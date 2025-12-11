@@ -39,6 +39,7 @@ IcedLens aims to provide a simple, privacy‑friendly image viewer and editor fo
 - **Videos:** MP4, AVI, MOV, MKV, WebM (plus animated GIF/WebP)
 - Zoom, pan, fit-to-window, fullscreen with auto-hiding controls
 - Multi-media browsing with keyboard navigation
+- Frame-by-frame video navigation and frame capture
 - Fluent-based localization (en-US, fr)
 
 ### Editing
@@ -135,7 +136,7 @@ ARGS:
 User config is stored in a platform‑appropriate directory (TOML file). Configurable via the Settings screen:
 - Language, theme, background, sort order
 - Zoom step, fit-to-window
-- Video: autoplay, volume, audio normalization, frame cache size
+- Video: autoplay, volume, audio normalization, frame cache size, frame history size
 
 Resetting: remove the config file and restart; defaults will regenerate.
 

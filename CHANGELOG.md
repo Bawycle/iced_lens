@@ -15,8 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Video playback:** full video player with play/pause, seek bar, volume control, mute, and loop toggle for MP4, AVI, MOV, MKV, and WebM files.
 - **Animated format support:** animated GIF and WebP files are detected and play automatically with the same video controls.
+- **Frame-by-frame navigation:** step forward/backward through video frames when paused; backward stepping uses a frame history buffer.
+- **Frame capture:** capture current video frame and open it in the editor for saving (PNG, JPEG, WebP).
 - **Audio normalization:** optional setting to normalize audio levels across videos.
 - **Video frame caching:** configurable frame cache size (16–512 MB) to optimize playback performance.
+- **Frame history size:** configurable memory (32–512 MB) for backward frame stepping.
 - **Fullscreen video controls:** video playback controls (play/pause, seek, volume) available in fullscreen mode alongside zoom and fit-to-window options; controls appear on mouse movement and auto-hide after a configurable delay.
 - **Navigation feedback:** loop indicators on navigation arrows at list boundaries and a position counter (e.g. `3/12`) in fullscreen.
 - **Application theme mode:** configurable theme mode (System / Light / Dark) stored in `settings.toml` and editable from the Settings view.
