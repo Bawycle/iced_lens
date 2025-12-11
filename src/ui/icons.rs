@@ -145,6 +145,28 @@ pub fn flip_vertical<'a>() -> Svg<'a> {
 }
 
 // =============================================================================
+// Settings Section Icons
+// =============================================================================
+
+/// Globe icon: world/international (for general settings).
+pub fn globe<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/globe.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
+/// Image icon: picture frame (for display settings).
+pub fn image<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/image.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
+/// Cog icon: gear/settings.
+pub fn cog<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/cog.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
+// =============================================================================
 // HUD Indicator Icons
 // =============================================================================
 
@@ -214,6 +236,9 @@ mod tests {
         let _ = magnifier();
         let _ = video_camera();
         let _ = video_camera_audio();
+        let _ = globe();
+        let _ = image();
+        let _ = cog();
     }
 
     #[test]
