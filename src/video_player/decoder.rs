@@ -220,15 +220,15 @@ impl AsyncDecoder {
                     first_pts = None;
                 }
                 Ok(DecoderCommand::Seek { target_secs }) => {
-                    // Check cache first for instant seek (only when paused, not during playback)
-                    // Only use cache if we have a keyframe within 0.5 seconds of target
-                    // This avoids showing a frame too far from where user seeked
+                    // Check cache first for instant preview (only when paused)
+                    // This provides immediate visual feedback while FFmpeg seeks
                     const CACHE_TOLERANCE_SECS: f64 = 0.5;
+                    let mut cache_hit = false;
                     if !is_playing {
                         if let Some(cached_frame) = frame_cache.get_at_or_before(target_secs) {
                             let distance = target_secs - cached_frame.pts_secs;
                             if distance <= CACHE_TOLERANCE_SECS {
-                                // Cache hit - send cached frame immediately
+                                // Cache hit - send cached frame immediately for instant preview
                                 let decoded = DecodedFrame {
                                     rgba_data: Arc::clone(&cached_frame.rgba_data),
                                     width: cached_frame.width,
@@ -236,13 +236,14 @@ impl AsyncDecoder {
                                     pts_secs: cached_frame.pts_secs,
                                 };
                                 let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
-                                // Skip FFmpeg seek - we already have the frame
-                                continue;
+                                cache_hit = true;
+                                // Don't skip FFmpeg seek - we still need to position the demuxer
+                                // for subsequent playback (e.g., when restarting from end)
                             }
                         }
                     }
 
-                    // Cache miss or playing - do FFmpeg seek
+                    // Always do FFmpeg seek to position demuxer correctly
                     // Convert seconds to AV_TIME_BASE (microseconds)
                     let timestamp = (target_secs * 1_000_000.0) as i64;
                     if let Err(e) = ictx.seek(timestamp, ..timestamp) {
@@ -253,9 +254,12 @@ impl AsyncDecoder {
                         // Reset timing after seek
                         playback_start_time = Some(std::time::Instant::now());
                         first_pts = None;
-                        let _ = event_tx.blocking_send(DecoderEvent::Buffering);
-                        // If paused, decode one frame to show the seek result
-                        if !is_playing {
+                        if !cache_hit {
+                            // Only send Buffering if we didn't already send a cached frame
+                            let _ = event_tx.blocking_send(DecoderEvent::Buffering);
+                        }
+                        // If paused and no cache hit, decode one frame to show the seek result
+                        if !is_playing && !cache_hit {
                             decode_single_frame = true;
                         }
                     }
