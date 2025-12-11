@@ -195,6 +195,7 @@ This project does not process untrusted remote input; images are opened from loc
 ### Planned / Aspirational
 Future items (subject to change based on community feedback):
 - Basic image/video metadata panel (EXIF, codec info)
+- Temporary rotation in viewer (90° increments, session-only)
 - Additional edit tools: flip (horizontal/vertical), brightness/contrast adjustments
 - Filters: grayscale, sepia, blur, sharpen
 - Video editing: trim, basic cuts
