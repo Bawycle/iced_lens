@@ -2,7 +2,7 @@
 //! Small helper methods that keep the editor facade lean.
 
 use crate::media::image_transform;
-use crate::ui::editor::{EditorTool, State, Transformation};
+use crate::ui::image_editor::{EditorTool, State, Transformation};
 use image_rs::DynamicImage;
 
 impl State {

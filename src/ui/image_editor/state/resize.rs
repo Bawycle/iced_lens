@@ -2,7 +2,7 @@
 //! Resize tool state and helpers.
 
 use crate::media::{image_transform, ImageData};
-use crate::ui::editor::{State, Transformation};
+use crate::ui::image_editor::{State, Transformation};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResizeState {

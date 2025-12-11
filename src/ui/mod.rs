@@ -1,7 +1,7 @@
 pub mod components;
 pub mod design_tokens;
-pub mod editor;
 pub mod icons;
+pub mod image_editor;
 pub mod settings;
 pub mod state;
 pub mod styles;

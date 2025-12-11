@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Crop tool panel for the editor sidebar.
 
-use crate::ui::editor::state::{CropRatio, CropState};
+use crate::ui::image_editor::state::{CropRatio, CropState};
 use crate::ui::styles;
 use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length};
 
 use super::super::ViewContext;
-use crate::ui::editor::{Message, SidebarMessage};
+use crate::ui::image_editor::{Message, SidebarMessage};
 
 pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let title = text(ctx.i18n.tr("editor-crop-section-title")).size(14);

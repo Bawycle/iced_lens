@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Crop overlay renderer for interactive crop selection.
 
-use crate::ui::editor::{CanvasMessage, Message};
+use crate::ui::image_editor::{CanvasMessage, Message};
 use crate::ui::theme;
 
 /// Canvas program used to draw and interact with the crop overlay.

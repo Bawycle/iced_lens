@@ -11,7 +11,7 @@ use crate::error::Error;
 use crate::i18n::fluent::I18n;
 use crate::image_navigation::ImageNavigator;
 use crate::media::{self, MediaData};
-use crate::ui::editor::{self, Event as EditorEvent, State as EditorState};
+use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
 use crate::ui::settings::{
     self, Event as SettingsEvent, State as SettingsState, StateConfig as SettingsConfig,
     ViewContext as SettingsViewContext,
@@ -36,7 +36,7 @@ pub struct App {
     screen: Screen,
     settings: SettingsState,
     viewer: component::State,
-    editor: Option<EditorState>,
+    image_editor: Option<ImageEditorState>,
     image_navigator: ImageNavigator,
     fullscreen: bool,
     window_id: Option<window::Id>,
@@ -58,7 +58,7 @@ pub struct App {
 pub enum Screen {
     Viewer,
     Settings,
-    Editor,
+    ImageEditor,
 }
 
 impl fmt::Debug for App {
@@ -77,15 +77,15 @@ pub enum Message {
     Viewer(component::Message),
     SwitchScreen(Screen),
     Settings(settings::Message),
-    Editor(editor::Message),
-    EditorImageLoaded(Result<MediaData, Error>),
+    ImageEditor(image_editor::Message),
+    ImageEditorLoaded(Result<MediaData, Error>),
     SaveAsDialogResult(Option<PathBuf>),
     FrameCaptureDialogResult {
         path: Option<PathBuf>,
         frame: Option<crate::media::frame_export::ExportableFrame>,
     },
-    /// Open the editor with a captured video frame.
-    OpenEditorWithFrame {
+    /// Open the image editor with a captured video frame.
+    OpenImageEditorWithFrame {
         frame: crate::media::frame_export::ExportableFrame,
         video_path: PathBuf,
         position_secs: f64,
@@ -146,7 +146,7 @@ impl Default for App {
             screen: Screen::Viewer,
             settings: SettingsState::default(),
             viewer: component::State::new(),
-            editor: None,
+            image_editor: None,
             image_navigator: ImageNavigator::new(),
             fullscreen: false,
             window_id: None,
@@ -256,7 +256,7 @@ impl App {
 
     fn subscription(&self) -> Subscription<Message> {
         let event_subscription = match self.screen {
-            Screen::Editor => event::listen_with(|event, status, window_id| {
+            Screen::ImageEditor => event::listen_with(|event, status, window_id| {
                 if let event::Event::Window(window::Event::Resized(_)) = &event {
                     return Some(Message::Viewer(component::Message::RawEvent {
                         window: window_id,
@@ -267,12 +267,12 @@ impl App {
                 // In editor screen, route keyboard events to editor
                 if let event::Event::Keyboard(..) = &event {
                     match status {
-                        event::Status::Ignored => {
-                            Some(Message::Editor(crate::ui::editor::Message::RawEvent {
+                        event::Status::Ignored => Some(Message::ImageEditor(
+                            crate::ui::image_editor::Message::RawEvent {
                                 window: window_id,
                                 event: event.clone(),
-                            }))
-                        }
+                            },
+                        )),
                         event::Status::Captured => None,
                     }
                 } else {
@@ -354,8 +354,8 @@ impl App {
             Message::Viewer(viewer_message) => self.handle_viewer_message(viewer_message),
             Message::SwitchScreen(target) => self.handle_screen_switch(target),
             Message::Settings(settings_message) => self.handle_settings_message(settings_message),
-            Message::Editor(editor_message) => self.handle_editor_message(editor_message),
-            Message::EditorImageLoaded(result) => {
+            Message::ImageEditor(editor_message) => self.handle_editor_message(editor_message),
+            Message::ImageEditorLoaded(result) => {
                 match result {
                     Ok(media_data) => {
                         // Editor only supports images in v0.2, not videos
@@ -369,13 +369,13 @@ impl App {
                             }
                         };
 
-                        // Create a new EditorState with the loaded image
+                        // Create a new ImageEditorState with the loaded image
                         if let Some(current_image_path) = self.image_navigator.current_image_path()
                         {
                             let path = current_image_path.to_path_buf();
-                            match editor::State::new(path, image_data) {
+                            match image_editor::State::new(path, image_data) {
                                 Ok(new_editor_state) => {
-                                    self.editor = Some(new_editor_state);
+                                    self.image_editor = Some(new_editor_state);
                                 }
                                 Err(err) => {
                                     eprintln!("Failed to create editor state: {:?}", err);
@@ -401,7 +401,7 @@ impl App {
             Message::SaveAsDialogResult(path_opt) => {
                 if let Some(path) = path_opt {
                     // User selected a path, save the image there
-                    if let Some(editor) = self.editor.as_mut() {
+                    if let Some(editor) = self.image_editor.as_mut() {
                         match editor.save_image(&path) {
                             Ok(()) => {
                                 eprintln!("Image saved successfully to: {:?}", path);
@@ -438,15 +438,15 @@ impl App {
                 }
                 Task::none()
             }
-            Message::OpenEditorWithFrame {
+            Message::OpenImageEditorWithFrame {
                 frame,
                 video_path,
                 position_secs,
             } => {
-                match EditorState::from_captured_frame(frame, video_path, position_secs) {
+                match ImageEditorState::from_captured_frame(frame, video_path, position_secs) {
                     Ok(state) => {
-                        self.editor = Some(state);
-                        self.screen = Screen::Editor;
+                        self.image_editor = Some(state);
+                        self.screen = Screen::ImageEditor;
                     }
                     Err(err) => {
                         eprintln!("Failed to open editor with captured frame: {err:?}");
@@ -472,7 +472,7 @@ impl App {
                 self.screen = Screen::Settings;
                 Task::none()
             }
-            component::Effect::EnterEditor => self.handle_screen_switch(Screen::Editor),
+            component::Effect::EnterEditor => self.handle_screen_switch(Screen::ImageEditor),
             component::Effect::NavigateNext => self.handle_navigate_next(),
             component::Effect::NavigatePrevious => self.handle_navigate_previous(),
             component::Effect::CaptureFrame {
@@ -506,7 +506,7 @@ impl App {
         }
 
         // Handle Viewer → Editor transition
-        if matches!(target, Screen::Editor) && matches!(self.screen, Screen::Viewer) {
+        if matches!(target, Screen::ImageEditor) && matches!(self.screen, Screen::Viewer) {
             if let (Some(image_path), Some(media_data)) = (
                 self.viewer.current_image_path.clone(),
                 self.viewer.media().cloned(),
@@ -527,9 +527,9 @@ impl App {
                     eprintln!("Failed to scan directory: {:?}", err);
                 }
 
-                match EditorState::new(image_path, image_data) {
+                match ImageEditorState::new(image_path, image_data) {
                     Ok(state) => {
-                        self.editor = Some(state);
+                        self.image_editor = Some(state);
                         self.screen = target;
                     }
                     Err(err) => {
@@ -544,8 +544,8 @@ impl App {
         }
 
         // Handle Editor → Viewer transition
-        if matches!(target, Screen::Viewer) && matches!(self.screen, Screen::Editor) {
-            self.editor = None;
+        if matches!(target, Screen::Viewer) && matches!(self.screen, Screen::ImageEditor) {
+            self.image_editor = None;
             self.screen = target;
             return Task::none();
         }
@@ -598,24 +598,24 @@ impl App {
         }
     }
 
-    fn handle_editor_message(&mut self, message: editor::Message) -> Task<Message> {
-        let Some(editor_state) = self.editor.as_mut() else {
+    fn handle_editor_message(&mut self, message: image_editor::Message) -> Task<Message> {
+        let Some(editor_state) = self.image_editor.as_mut() else {
             return Task::none();
         };
 
         match editor_state.update(message) {
-            EditorEvent::None => Task::none(),
-            EditorEvent::ExitEditor => {
+            ImageEditorEvent::None => Task::none(),
+            ImageEditorEvent::ExitEditor => {
                 // Get the image source before dropping the editor
                 let image_source = editor_state.image_source().clone();
 
-                self.editor = None;
+                self.image_editor = None;
                 self.screen = Screen::Viewer;
 
                 // For file mode: reload the image in the viewer to show any saved changes
                 // For captured frame mode: just return to viewer without reloading
                 match image_source {
-                    editor::ImageSource::File(current_image_path) => {
+                    image_editor::ImageSource::File(current_image_path) => {
                         // Set loading state directly (before render)
                         self.viewer.is_loading_media = true;
                         self.viewer.loading_started_at = Some(std::time::Instant::now());
@@ -626,13 +626,13 @@ impl App {
                             |result| Message::Viewer(component::Message::ImageLoaded(result)),
                         )
                     }
-                    editor::ImageSource::CapturedFrame { .. } => {
+                    image_editor::ImageSource::CapturedFrame { .. } => {
                         // Just return to viewer, no need to reload anything
                         Task::none()
                     }
                 }
             }
-            EditorEvent::NavigateNext => {
+            ImageEditorEvent::NavigateNext => {
                 // Rescan directory to handle added/removed images
                 if let Some(current_path) = self
                     .image_navigator
@@ -652,16 +652,16 @@ impl App {
                     self.viewer.current_image_path = Some(next_path.clone());
                     self.viewer.image_list.set_current(&next_path);
 
-                    // Load the next image and create a new EditorState
+                    // Load the next image and create a new ImageEditorState
                     Task::perform(
                         async move { crate::media::load_media(&next_path) },
-                        Message::EditorImageLoaded,
+                        Message::ImageEditorLoaded,
                     )
                 } else {
                     Task::none()
                 }
             }
-            EditorEvent::NavigatePrevious => {
+            ImageEditorEvent::NavigatePrevious => {
                 // Rescan directory to handle added/removed images
                 if let Some(current_path) = self
                     .image_navigator
@@ -681,18 +681,18 @@ impl App {
                     self.viewer.current_image_path = Some(prev_path.clone());
                     self.viewer.image_list.set_current(&prev_path);
 
-                    // Load the previous image and create a new EditorState
+                    // Load the previous image and create a new ImageEditorState
                     Task::perform(
                         async move { crate::media::load_media(&prev_path) },
-                        Message::EditorImageLoaded,
+                        Message::ImageEditorLoaded,
                     )
                 } else {
                     Task::none()
                 }
             }
-            EditorEvent::SaveRequested { path, overwrite: _ } => {
+            ImageEditorEvent::SaveRequested { path, overwrite: _ } => {
                 // Save the edited image
-                if let Some(editor) = self.editor.as_mut() {
+                if let Some(editor) = self.image_editor.as_mut() {
                     match editor.save_image(&path) {
                         Ok(()) => {
                             eprintln!("Image saved successfully to: {:?}", path);
@@ -706,7 +706,7 @@ impl App {
                 }
                 Task::none()
             }
-            EditorEvent::SaveAsRequested => {
+            ImageEditorEvent::SaveAsRequested => {
                 // Open file picker dialog for "Save As"
                 use crate::media::frame_export::{generate_default_filename, ExportFormat};
 
@@ -722,12 +722,12 @@ impl App {
 
                 // Generate filename based on image source, with selected format extension
                 let filename = match &image_source {
-                    editor::ImageSource::File(path) => {
+                    image_editor::ImageSource::File(path) => {
                         // Replace extension with selected format
                         let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
                         format!("{}.{}", stem, export_format.extension())
                     }
-                    editor::ImageSource::CapturedFrame {
+                    image_editor::ImageSource::CapturedFrame {
                         video_path,
                         position_secs,
                     } => generate_default_filename(video_path, *position_secs, export_format),
@@ -825,7 +825,7 @@ impl App {
         video_path: PathBuf,
         position_secs: f64,
     ) -> Task<Message> {
-        Task::done(Message::OpenEditorWithFrame {
+        Task::done(Message::OpenImageEditorWithFrame {
             frame,
             video_path,
             position_secs,
@@ -955,14 +955,14 @@ impl App {
                 .settings
                 .view(SettingsViewContext { i18n: &self.i18n })
                 .map(Message::Settings),
-            Screen::Editor => {
-                if let Some(editor_state) = &self.editor {
+            Screen::ImageEditor => {
+                if let Some(editor_state) = &self.image_editor {
                     editor_state
-                        .view(editor::ViewContext {
+                        .view(image_editor::ViewContext {
                             i18n: &self.i18n,
                             background_theme: self.settings.background_theme(),
                         })
-                        .map(Message::Editor)
+                        .map(Message::ImageEditor)
                 } else {
                     // Fallback if editor state is missing
                     Container::new(Text::new("Editor error"))
@@ -1623,11 +1623,11 @@ mod tests {
             .expect("failed to scan directory");
 
         // Switch to editor screen
-        let _ = app.update(Message::SwitchScreen(Screen::Editor));
+        let _ = app.update(Message::SwitchScreen(Screen::ImageEditor));
 
         // Navigate to next image
-        let _ = app.update(Message::Editor(editor::Message::Sidebar(
-            crate::ui::editor::SidebarMessage::NavigateNext,
+        let _ = app.update(Message::ImageEditor(image_editor::Message::Sidebar(
+            crate::ui::image_editor::SidebarMessage::NavigateNext,
         )));
 
         // Verify the viewer's current image path has changed to the next image
@@ -1640,11 +1640,11 @@ mod tests {
 
         // Simulate the async image loading completing
         let img2_data = media::load_media(&img2_path).expect("failed to load img2");
-        let _ = app.update(Message::EditorImageLoaded(Ok(img2_data)));
+        let _ = app.update(Message::ImageEditorLoaded(Ok(img2_data)));
 
         // Verify editor has loaded the second image
-        assert!(app.editor.is_some(), "Editor should still be active");
-        if let Some(editor) = &app.editor {
+        assert!(app.image_editor.is_some(), "Editor should still be active");
+        if let Some(editor) = &app.image_editor {
             assert_eq!(
                 editor.image_path(),
                 Some(img2_path.as_path()),
@@ -1678,11 +1678,11 @@ mod tests {
             .expect("failed to scan directory");
 
         // Switch to editor screen
-        let _ = app.update(Message::SwitchScreen(Screen::Editor));
+        let _ = app.update(Message::SwitchScreen(Screen::ImageEditor));
 
         // Navigate to previous image
-        let _ = app.update(Message::Editor(editor::Message::Sidebar(
-            crate::ui::editor::SidebarMessage::NavigatePrevious,
+        let _ = app.update(Message::ImageEditor(image_editor::Message::Sidebar(
+            crate::ui::image_editor::SidebarMessage::NavigatePrevious,
         )));
 
         // Verify the viewer's current image path has changed to the previous image
@@ -1695,11 +1695,11 @@ mod tests {
 
         // Simulate the async image loading completing
         let img1_data = media::load_media(&img1_path).expect("failed to load img1");
-        let _ = app.update(Message::EditorImageLoaded(Ok(img1_data)));
+        let _ = app.update(Message::ImageEditorLoaded(Ok(img1_data)));
 
         // Verify editor has loaded the first image
-        assert!(app.editor.is_some(), "Editor should still be active");
-        if let Some(editor) = &app.editor {
+        assert!(app.image_editor.is_some(), "Editor should still be active");
+        if let Some(editor) = &app.image_editor {
             assert_eq!(
                 editor.image_path(),
                 Some(img1_path.as_path()),

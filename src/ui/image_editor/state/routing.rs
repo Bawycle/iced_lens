@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Message routing helpers that keep the editor facade slim.
 
-use crate::ui::editor::{
+use crate::ui::image_editor::{
     CanvasMessage, EditorTool, Event, ImageSource, SidebarMessage, State, ToolbarMessage,
 };
 use iced::{self, keyboard};

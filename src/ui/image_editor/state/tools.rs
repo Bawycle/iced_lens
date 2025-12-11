@@ -2,7 +2,7 @@
 //! Generic editor tool helpers (e.g., rotation).
 
 use crate::media::image_transform;
-use crate::ui::editor::{State, Transformation};
+use crate::ui::image_editor::{State, Transformation};
 
 impl State {
     pub(crate) fn sidebar_rotate_left(&mut self) {

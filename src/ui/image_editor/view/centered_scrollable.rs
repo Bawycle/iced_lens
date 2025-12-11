@@ -8,7 +8,7 @@
 //! This module provides a simple scrollable that works correctly for large images.
 //! Small images will be visible but positioned at top-left instead of centered.
 
-use crate::ui::editor::Message;
+use crate::ui::image_editor::Message;
 use iced::widget::scrollable::{Direction, Id, Scrollbar, Viewport};
 use iced::widget::Scrollable;
 use iced::{Element, Length};

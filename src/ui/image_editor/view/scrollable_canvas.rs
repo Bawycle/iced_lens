@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Scrollable canvas widget for editor using custom centered widget.
 
-use crate::ui::editor::Message;
+use crate::ui::image_editor::Message;
 use iced::Element;
 
 use super::centered_scrollable;

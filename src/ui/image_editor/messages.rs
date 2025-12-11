@@ -2,7 +2,7 @@
 //! Editor message/event types re-exported by the facade.
 
 use crate::media::frame_export::ExportFormat;
-use crate::ui::editor::{state::CropRatio, EditorTool};
+use crate::ui::image_editor::{state::CropRatio, EditorTool};
 use iced;
 use iced::widget::scrollable::AbsoluteOffset;
 use iced::Rectangle;

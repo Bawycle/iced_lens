@@ -2,7 +2,7 @@
 //! Crop tool state and helpers.
 
 use crate::media::{image_transform, ImageData};
-use crate::ui::editor::{CanvasMessage, Event, State, Transformation};
+use crate::ui::image_editor::{CanvasMessage, Event, State, Transformation};
 use iced::Rectangle;
 
 /// Crop aspect ratio constraints.

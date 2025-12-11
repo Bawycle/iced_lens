@@ -2,7 +2,7 @@
 //! Resize overlay renderer showing original and target dimensions.
 
 use crate::ui::design_tokens::palette::WHITE;
-use crate::ui::editor::Message;
+use crate::ui::image_editor::Message;
 use crate::ui::theme;
 
 /// Canvas program used to draw resize previews.

@@ -5,8 +5,8 @@ pub mod crop_panel;
 pub mod resize_panel;
 
 use crate::media::frame_export::ExportFormat;
-use crate::ui::editor::state::{CropState, ResizeState};
 use crate::ui::icons;
+use crate::ui::image_editor::state::{CropState, ResizeState};
 use crate::ui::styles;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, container, horizontal_rule, text, tooltip, Column, Row, Scrollable};

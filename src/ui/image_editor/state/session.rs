@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Navigation/save helpers that keep the editor facade slim.
 
-use crate::ui::editor::{Event, ImageSource, State};
+use crate::ui::image_editor::{Event, ImageSource, State};
 
 impl State {
     pub(crate) fn toolbar_back_to_viewer(&mut self) -> Event {

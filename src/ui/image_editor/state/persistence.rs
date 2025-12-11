@@ -4,7 +4,7 @@
 use super::{CropDragState, CropRatio};
 use crate::error::{Error, Result};
 use crate::media::image_transform;
-use crate::ui::editor::{ImageSource, State};
+use crate::ui::image_editor::{ImageSource, State};
 
 impl State {
     /// Save the edited image to a file, preserving the original format.

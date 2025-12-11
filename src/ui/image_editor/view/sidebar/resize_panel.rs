@@ -6,8 +6,8 @@ use iced::widget::{button, checkbox, container, slider, text, text_input, Column
 use iced::{Element, Length};
 
 use super::super::ViewContext;
-use crate::ui::editor::state::ResizeState;
-use crate::ui::editor::{Message, SidebarMessage};
+use crate::ui::image_editor::state::ResizeState;
+use crate::ui::image_editor::{Message, SidebarMessage};
 
 pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let scale_section = Column::new()

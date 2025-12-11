@@ -2,7 +2,7 @@
 //! Transformation history bookkeeping (undo/redo).
 
 use crate::media::image_transform;
-use crate::ui::editor::{State, Transformation};
+use crate::ui::image_editor::{State, Transformation};
 
 impl State {
     /// Returns true when the user has applied at least one transformation since load/save.
