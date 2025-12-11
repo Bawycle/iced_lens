@@ -7,8 +7,9 @@
 //! bubble up for the parent application to handle side effects.
 
 use crate::config::{
-    BackgroundTheme, SortOrder, DEFAULT_FRAME_CACHE_MB, DEFAULT_OVERLAY_TIMEOUT_SECS,
-    DEFAULT_ZOOM_STEP_PERCENT, MAX_FRAME_CACHE_MB, MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB,
+    BackgroundTheme, SortOrder, DEFAULT_FRAME_CACHE_MB, DEFAULT_FRAME_HISTORY_MB,
+    DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT, MAX_FRAME_CACHE_MB,
+    MAX_FRAME_HISTORY_MB, MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB, MIN_FRAME_HISTORY_MB,
     MIN_OVERLAY_TIMEOUT_SECS,
 };
 use crate::i18n::fluent::I18n;
@@ -50,6 +51,7 @@ pub struct StateConfig {
     pub video_autoplay: bool,
     pub audio_normalization: bool,
     pub frame_cache_mb: u32,
+    pub frame_history_mb: u32,
 }
 
 impl Default for StateConfig {
@@ -63,6 +65,7 @@ impl Default for StateConfig {
             video_autoplay: false,
             audio_normalization: true,
             frame_cache_mb: DEFAULT_FRAME_CACHE_MB,
+            frame_history_mb: DEFAULT_FRAME_HISTORY_MB,
         }
     }
 }
@@ -81,6 +84,7 @@ pub struct State {
     video_autoplay: bool,
     audio_normalization: bool,
     frame_cache_mb: u32,
+    frame_history_mb: u32,
 }
 
 /// Messages emitted directly by the settings widgets.
@@ -97,6 +101,7 @@ pub enum Message {
     VideoAutoplayChanged(bool),
     AudioNormalizationChanged(bool),
     FrameCacheMbChanged(u32),
+    FrameHistoryMbChanged(u32),
 }
 
 /// Events propagated to the parent application for side effects.
@@ -114,6 +119,7 @@ pub enum Event {
     VideoAutoplayChanged(bool),
     AudioNormalizationChanged(bool),
     FrameCacheMbChanged(u32),
+    FrameHistoryMbChanged(u32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,6 +146,9 @@ impl State {
         let clamped_cache = config
             .frame_cache_mb
             .clamp(MIN_FRAME_CACHE_MB, MAX_FRAME_CACHE_MB);
+        let clamped_history = config
+            .frame_history_mb
+            .clamp(MIN_FRAME_HISTORY_MB, MAX_FRAME_HISTORY_MB);
         Self {
             background_theme: config.background_theme,
             sort_order: config.sort_order,
@@ -152,6 +161,7 @@ impl State {
             video_autoplay: config.video_autoplay,
             audio_normalization: config.audio_normalization,
             frame_cache_mb: clamped_cache,
+            frame_history_mb: clamped_history,
         }
     }
 
@@ -185,6 +195,10 @@ impl State {
 
     pub fn frame_cache_mb(&self) -> u32 {
         self.frame_cache_mb
+    }
+
+    pub fn frame_history_mb(&self) -> u32 {
+        self.frame_history_mb
     }
 
     pub(crate) fn zoom_step_input_value(&self) -> &str {
@@ -498,11 +512,43 @@ impl State {
             cache_control.into(),
         );
 
+        // Frame history slider (for frame-by-frame backward stepping)
+        let history_slider = Slider::new(
+            MIN_FRAME_HISTORY_MB..=MAX_FRAME_HISTORY_MB,
+            self.frame_history_mb,
+            Message::FrameHistoryMbChanged,
+        )
+        .step(16u32)
+        .width(Length::Fixed(200.0));
+
+        let history_value = Text::new(format!(
+            "{} {}",
+            self.frame_history_mb,
+            ctx.i18n.tr("megabytes")
+        ));
+
+        let history_control = Row::new()
+            .spacing(spacing::SM)
+            .align_y(Vertical::Center)
+            .push(history_slider)
+            .push(history_value);
+
+        let history_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-frame-history-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-frame-history-hint"))
+                    .size(13)
+                    .into(),
+            ),
+            history_control.into(),
+        );
+
         let content = Column::new()
             .spacing(spacing::MD)
             .push(autoplay_setting)
             .push(normalization_setting)
-            .push(cache_setting);
+            .push(cache_setting)
+            .push(history_setting);
 
         build_section(
             icons::video_camera(),
@@ -654,6 +700,14 @@ impl State {
                 } else {
                     self.frame_cache_mb = mb;
                     Event::FrameCacheMbChanged(mb)
+                }
+            }
+            Message::FrameHistoryMbChanged(mb) => {
+                if self.frame_history_mb == mb {
+                    Event::None
+                } else {
+                    self.frame_history_mb = mb;
+                    Event::FrameHistoryMbChanged(mb)
                 }
             }
         }

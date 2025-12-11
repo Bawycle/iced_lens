@@ -48,6 +48,14 @@ pub enum DecoderCommand {
     /// Seek to a specific timestamp and pause.
     Seek { target_secs: f64 },
 
+    /// Step forward one frame (decode next frame without seeking).
+    /// Used for frame-by-frame navigation when paused.
+    StepFrame,
+
+    /// Step backward one frame (return previous frame from history).
+    /// Used for frame-by-frame backward navigation when paused.
+    StepBackward,
+
     /// Stop decoding and clean up resources.
     Stop,
 }
@@ -198,9 +206,16 @@ impl AsyncDecoder {
         let mut playback_start_time: Option<std::time::Instant> = None;
         let mut first_pts: Option<f64> = None;
         let mut decode_single_frame = false; // Flag to decode one frame after seek while paused
+        let mut in_stepping_mode = false; // True when user is stepping through frames
+        let mut last_paused_frame: Option<DecodedFrame> = None; // Frame displayed after seek (for history)
 
         // Frame cache for optimized seeking
         let mut frame_cache = FrameCache::new(cache_config);
+
+        // Frame history for backward stepping
+        // Default to 128MB - convert from cache's max_bytes to MB
+        let history_mb = (cache_config.max_bytes / (1024 * 1024)).clamp(32, 512) as u32;
+        let mut frame_history = FrameHistory::new(history_mb);
 
         // Main loop: process commands and decode frames
         loop {
@@ -212,6 +227,10 @@ impl AsyncDecoder {
                     is_playing = true;
                     playback_start_time = Some(std::time::Instant::now());
                     first_pts = None;
+                    // Exit stepping mode and clear history on play
+                    in_stepping_mode = false;
+                    frame_history.clear();
+                    last_paused_frame = None;
                     let _ = event_tx.blocking_send(DecoderEvent::Buffering);
                 }
                 Ok(DecoderCommand::Pause) => {
@@ -254,6 +273,10 @@ impl AsyncDecoder {
                         // Reset timing after seek
                         playback_start_time = Some(std::time::Instant::now());
                         first_pts = None;
+                        // Clear frame history on seek - frames after seek won't be sequential
+                        in_stepping_mode = false;
+                        frame_history.clear();
+                        last_paused_frame = None;
                         if !cache_hit {
                             // Only send Buffering if we didn't already send a cached frame
                             let _ = event_tx.blocking_send(DecoderEvent::Buffering);
@@ -261,6 +284,48 @@ impl AsyncDecoder {
                         // If paused and no cache hit, decode one frame to show the seek result
                         if !is_playing && !cache_hit {
                             decode_single_frame = true;
+                        }
+                    }
+                }
+                Ok(DecoderCommand::StepFrame) => {
+                    // Step forward one frame without seeking
+                    // This decodes the next frame in sequence
+                    eprintln!("[DEBUG] DECODER: StepFrame command received");
+                    if !is_playing {
+                        // When entering stepping mode, add the current frame to history first
+                        // This allows stepping backward to the frame shown before stepping started
+                        if !in_stepping_mode {
+                            if let Some(ref initial_frame) = last_paused_frame {
+                                eprintln!(
+                                    "[DEBUG] DECODER: Adding initial frame to history at PTS {}",
+                                    initial_frame.pts_secs
+                                );
+                                frame_history.push(initial_frame.clone());
+                            }
+                        }
+                        in_stepping_mode = true;
+                        decode_single_frame = true;
+                    }
+                }
+                Ok(DecoderCommand::StepBackward) => {
+                    // Step backward one frame using frame history
+                    eprintln!("[DEBUG] DECODER: StepBackward command received");
+                    if !is_playing && in_stepping_mode {
+                        if let Some(prev_frame) = frame_history.step_back() {
+                            eprintln!(
+                                "[DEBUG] DECODER: Got previous frame from history at PTS {}",
+                                prev_frame.pts_secs
+                            );
+                            // Send the previous frame
+                            let decoded = DecodedFrame {
+                                rgba_data: Arc::clone(&prev_frame.rgba_data),
+                                width: prev_frame.width,
+                                height: prev_frame.height,
+                                pts_secs: prev_frame.pts_secs,
+                            };
+                            let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
+                        } else {
+                            eprintln!("[DEBUG] DECODER: No previous frame in history");
                         }
                     }
                 }
@@ -355,6 +420,22 @@ impl AsyncDecoder {
                         frame_cache.insert(decoded.clone(), true);
                     }
 
+                    // Store the frame shown while paused (for stepping mode history)
+                    // This allows backward stepping to return to the frame shown before stepping started
+                    if !is_playing && !in_stepping_mode {
+                        eprintln!("[DEBUG] DECODER: Storing paused frame at PTS {}", pts_secs);
+                        last_paused_frame = Some(decoded.clone());
+                    }
+
+                    // Store frame in history during stepping mode for backward navigation
+                    if in_stepping_mode {
+                        eprintln!(
+                            "[DEBUG] DECODER: Adding frame to history at PTS {}",
+                            pts_secs
+                        );
+                        frame_history.push(decoded.clone());
+                    }
+
                     if event_tx
                         .blocking_send(DecoderEvent::FrameReady(decoded))
                         .is_err()
@@ -398,6 +479,91 @@ impl AsyncDecoder {
         }
 
         rgba_bytes
+    }
+}
+
+/// Ring buffer for storing recent decoded frames during stepping mode.
+///
+/// This allows backward frame stepping by keeping a history of recently
+/// decoded frames. The history is only populated during stepping mode
+/// to save memory during normal playback.
+struct FrameHistory {
+    /// Frames stored in order (oldest to newest).
+    frames: std::collections::VecDeque<DecodedFrame>,
+    /// Current position in the history (for backward navigation).
+    /// When stepping forward, frames are added and position is at end.
+    /// When stepping backward, position moves toward front.
+    position: usize,
+    /// Maximum total bytes for all frames.
+    max_bytes: usize,
+    /// Current total bytes.
+    current_bytes: usize,
+}
+
+impl FrameHistory {
+    /// Creates a new frame history with the given max size in MB.
+    fn new(max_mb: u32) -> Self {
+        Self {
+            frames: std::collections::VecDeque::new(),
+            position: 0,
+            max_bytes: (max_mb as usize) * 1024 * 1024,
+            current_bytes: 0,
+        }
+    }
+
+    /// Clears all frames from history.
+    fn clear(&mut self) {
+        self.frames.clear();
+        self.position = 0;
+        self.current_bytes = 0;
+    }
+
+    /// Adds a frame to the history during forward stepping.
+    ///
+    /// If we're not at the end of history (after stepping backward),
+    /// truncate everything after current position before adding.
+    fn push(&mut self, frame: DecodedFrame) {
+        let frame_size = frame.size_bytes();
+
+        // If we stepped backward, truncate frames after current position
+        if self.position < self.frames.len() {
+            // Remove frames after current position
+            while self.frames.len() > self.position {
+                if let Some(removed) = self.frames.pop_back() {
+                    self.current_bytes = self.current_bytes.saturating_sub(removed.size_bytes());
+                }
+            }
+        }
+
+        // Remove oldest frames if we'd exceed max size
+        while self.current_bytes + frame_size > self.max_bytes && !self.frames.is_empty() {
+            if let Some(removed) = self.frames.pop_front() {
+                self.current_bytes = self.current_bytes.saturating_sub(removed.size_bytes());
+                // Adjust position since we removed from front
+                self.position = self.position.saturating_sub(1);
+            }
+        }
+
+        // Add new frame
+        self.frames.push_back(frame);
+        self.current_bytes += frame_size;
+        self.position = self.frames.len();
+    }
+
+    /// Gets the previous frame (for backward stepping).
+    ///
+    /// Returns None if we're already at the beginning of history.
+    fn step_back(&mut self) -> Option<&DecodedFrame> {
+        if self.position > 1 {
+            // Move to previous frame (position - 2 because position is 1-indexed after last frame)
+            self.position -= 1;
+            self.frames.get(self.position - 1)
+        } else if self.position == 1 && !self.frames.is_empty() {
+            // Already at first frame, return it again (can't go further back)
+            self.frames.front()
+        } else {
+            None
+        }
     }
 }
 

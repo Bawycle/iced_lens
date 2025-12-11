@@ -99,6 +99,32 @@ impl PlaybackState {
             _ => false,
         }
     }
+
+    /// Returns true if the video is effectively paused (paused or seeking without resume).
+    ///
+    /// This is useful for frame-by-frame stepping which should work when:
+    /// - Video is paused
+    /// - Video is seeking but will stay paused after seek completes
+    pub fn is_effectively_paused(&self) -> bool {
+        match self {
+            Self::Paused { .. } => true,
+            Self::Seeking { resume_playing, .. } => !*resume_playing,
+            _ => false,
+        }
+    }
+
+    /// Returns the effective position for operations like frame stepping.
+    ///
+    /// Returns the current position when paused, or the target position when seeking.
+    pub fn effective_position(&self) -> Option<f64> {
+        match self {
+            Self::Paused { position_secs } => Some(*position_secs),
+            Self::Seeking { target_secs, .. } => Some(*target_secs),
+            Self::Playing { position_secs } => Some(*position_secs),
+            Self::Buffering { position_secs } => Some(*position_secs),
+            _ => None,
+        }
+    }
 }
 
 /// Video player that manages playback state and frame delivery.
@@ -118,6 +144,12 @@ pub struct VideoPlayer {
     /// Sync clock for audio/video synchronization.
     /// Shared with audio output to track playback position.
     sync_clock: SharedSyncClock,
+
+    /// Current position in frame history (1-indexed).
+    /// 0 = not in stepping mode, 1 = first frame, 2+ = can step backward.
+    /// Reset to 0 on play/seek/stop, incremented on step_frame,
+    /// decremented on step_backward.
+    history_position: usize,
 }
 
 impl VideoPlayer {
@@ -132,6 +164,7 @@ impl VideoPlayer {
             loop_enabled: false,
             command_sender: None,
             sync_clock: Arc::new(SyncClock::new()),
+            history_position: 0,
         })
     }
 
@@ -171,6 +204,22 @@ impl VideoPlayer {
         self.loop_enabled = enabled;
     }
 
+    /// Returns whether the player is in stepping mode.
+    ///
+    /// Stepping mode is entered when step_frame() is called, and exited
+    /// when play(), seek(), or stop() is called.
+    pub fn is_in_stepping_mode(&self) -> bool {
+        self.history_position > 0
+    }
+
+    /// Returns whether backward stepping is available.
+    ///
+    /// Backward stepping is available after at least 1 step forward,
+    /// because the initial frame (shown before stepping) is also added to history.
+    pub fn can_step_backward(&self) -> bool {
+        self.history_position >= 1
+    }
+
     /// Starts or resumes playback.
     ///
     /// State transitions:
@@ -180,6 +229,7 @@ impl VideoPlayer {
     ///
     /// Sends Play command to decoder if it exists.
     /// Also starts/resumes the sync clock for A/V synchronization.
+    /// Exits stepping mode (clears frame history in decoder).
     pub fn play(&mut self) {
         let position = match &self.state {
             PlaybackState::Stopped => {
@@ -207,6 +257,9 @@ impl VideoPlayer {
                 return;
             }
         };
+
+        // Exit stepping mode - reset history position
+        self.history_position = 0;
 
         // Start or resume sync clock
         if position == 0.0 {
@@ -255,8 +308,12 @@ impl VideoPlayer {
     ///
     /// Sends Stop command to decoder via command sender.
     /// Also stops and resets the sync clock.
+    /// Exits stepping mode.
     pub fn stop(&mut self) {
         self.state = PlaybackState::Stopped;
+
+        // Exit stepping mode - reset history position
+        self.history_position = 0;
 
         // Stop sync clock
         self.sync_clock.stop();
@@ -290,8 +347,12 @@ impl VideoPlayer {
     ///
     /// Sends Seek command to decoder via command sender.
     /// Also updates the sync clock to the seek position.
+    /// Exits stepping mode (clears frame history in decoder).
     pub fn seek(&mut self, target_secs: f64) {
         let clamped_target = target_secs.max(0.0).min(self.video_data.duration_secs);
+
+        // Exit stepping mode - seek breaks frame continuity
+        self.history_position = 0;
 
         // Remember if we should resume playing after seek.
         // Use is_playing_or_will_resume() to handle chained seeks correctly:
@@ -326,8 +387,12 @@ impl VideoPlayer {
     ///
     /// Unlike `seek()`, this always resumes playback after the seek completes,
     /// regardless of the current state. Used when restarting from end of video.
+    /// Exits stepping mode (clears frame history in decoder).
     pub fn seek_and_play(&mut self, target_secs: f64) {
         let clamped_target = target_secs.max(0.0).min(self.video_data.duration_secs);
+
+        // Exit stepping mode - seek breaks frame continuity
+        self.history_position = 0;
 
         self.state = PlaybackState::Seeking {
             target_secs: clamped_target,
@@ -448,57 +513,51 @@ impl VideoPlayer {
             .unwrap_or(false)
     }
 
-    /// Steps forward one frame (only when paused).
+    /// Steps forward one frame by decoding the next frame sequentially.
     ///
-    /// Calculates the next frame position based on the video's FPS and seeks to it.
-    /// Only works when the video is paused.
-    pub fn step_forward(&mut self) {
-        if let PlaybackState::Paused { position_secs } = &self.state {
-            let frame_duration = 1.0 / self.video_data.fps;
-            let next_position =
-                (*position_secs + frame_duration).min(self.video_data.duration_secs);
+    /// This sends a StepFrame command to the decoder, which decodes the next
+    /// frame in the video stream without seeking. This is the correct way to
+    /// advance frame-by-frame since seek() only goes to keyframes.
+    /// Increments history position (enables backward stepping after 2+ steps).
+    pub fn step_frame(&mut self) {
+        if !self.state.is_paused() {
+            return;
+        }
 
-            // Seek to next frame position (will stay paused after seek)
-            self.state = PlaybackState::Seeking {
-                target_secs: next_position,
-                resume_playing: false,
-            };
+        // Increment history position - enables backward stepping after 2+ steps
+        self.history_position += 1;
 
-            // Update sync clock to the new position
-            self.sync_clock.seek(next_position);
-
-            // Send Seek command to decoder
-            if let Some(sender) = &self.command_sender {
-                let _ = sender.send(DecoderCommand::Seek {
-                    target_secs: next_position,
-                });
-            }
+        // Send StepFrame command to decoder
+        if let Some(sender) = &self.command_sender {
+            let _ = sender.send(DecoderCommand::StepFrame);
         }
     }
 
-    /// Steps backward one frame (only when paused).
+    /// Steps forward one frame (only when paused).
     ///
-    /// Calculates the previous frame position based on the video's FPS and seeks to it.
-    /// Only works when the video is paused.
+    /// Deprecated: Use step_frame() instead which decodes sequentially.
+    pub fn step_forward(&mut self) {
+        self.step_frame();
+    }
+
+    /// Steps backward one frame by retrieving from frame history.
+    ///
+    /// This sends a StepBackward command to the decoder, which retrieves the
+    /// previous frame from the frame history buffer. Frame history is only
+    /// populated during stepping mode to save memory.
+    /// Decrements history position (minimum 0 - can't go before initial frame).
     pub fn step_backward(&mut self) {
-        if let PlaybackState::Paused { position_secs } = &self.state {
-            let frame_duration = 1.0 / self.video_data.fps;
-            let prev_position = (*position_secs - frame_duration).max(0.0);
+        if !self.state.is_paused() {
+            return;
+        }
 
-            // Seek to previous frame position (will stay paused after seek)
-            self.state = PlaybackState::Seeking {
-                target_secs: prev_position,
-                resume_playing: false,
-            };
+        // Only step backward if we have history to go back to
+        if self.history_position >= 1 {
+            self.history_position -= 1;
 
-            // Update sync clock to the new position
-            self.sync_clock.seek(prev_position);
-
-            // Send Seek command to decoder
+            // Send StepBackward command to decoder
             if let Some(sender) = &self.command_sender {
-                let _ = sender.send(DecoderCommand::Seek {
-                    target_secs: prev_position,
-                });
+                let _ = sender.send(DecoderCommand::StepBackward);
             }
         }
     }

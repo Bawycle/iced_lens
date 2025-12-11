@@ -55,6 +55,12 @@ pub const DEFAULT_FRAME_CACHE_MB: u32 = 64;
 pub const MIN_FRAME_CACHE_MB: u32 = 16;
 pub const MAX_FRAME_CACHE_MB: u32 = 512;
 
+// Frame history constants (for frame-by-frame backward stepping)
+// This is separate from frame cache - it stores recently decoded frames for stepping backward
+pub const DEFAULT_FRAME_HISTORY_MB: u32 = 128;
+pub const MIN_FRAME_HISTORY_MB: u32 = 32;
+pub const MAX_FRAME_HISTORY_MB: u32 = 512;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum BackgroundTheme {
@@ -113,10 +119,20 @@ pub struct Config {
     /// Defaults to 64 MB.
     #[serde(default = "default_frame_cache_mb")]
     pub frame_cache_mb: Option<u32>,
+    /// Frame history size in megabytes for frame-by-frame backward stepping.
+    /// Higher values allow stepping back further but use more memory.
+    /// Only used during frame stepping mode, not during normal playback.
+    /// Defaults to 128 MB.
+    #[serde(default = "default_frame_history_mb")]
+    pub frame_history_mb: Option<u32>,
 }
 
 fn default_frame_cache_mb() -> Option<u32> {
     Some(DEFAULT_FRAME_CACHE_MB)
+}
+
+fn default_frame_history_mb() -> Option<u32> {
+    Some(DEFAULT_FRAME_HISTORY_MB)
 }
 
 fn default_audio_normalization() -> Option<bool> {
@@ -157,6 +173,7 @@ impl Default for Config {
             video_muted: Some(false),
             audio_normalization: default_audio_normalization(),
             frame_cache_mb: default_frame_cache_mb(),
+            frame_history_mb: default_frame_history_mb(),
         }
     }
 }
@@ -237,6 +254,7 @@ mod tests {
             video_muted: Some(false),
             audio_normalization: Some(true),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
+            frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("nested").join("settings.toml");
@@ -280,6 +298,7 @@ mod tests {
             video_muted: Some(true),
             audio_normalization: Some(false),
             frame_cache_mb: Some(128),
+            frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
         };
 
         save_to_path(&config, &config_path).expect("save should create directories");
@@ -316,6 +335,7 @@ mod tests {
             video_muted: Some(false),
             audio_normalization: Some(true),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
+            frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("settings.toml");
@@ -356,6 +376,7 @@ mod tests {
             video_muted: Some(false),
             audio_normalization: Some(true),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
+            frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("settings.toml");
@@ -389,6 +410,7 @@ mod tests {
             video_muted: Some(true),
             audio_normalization: Some(false),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
+            frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("settings.toml");

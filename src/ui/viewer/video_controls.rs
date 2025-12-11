@@ -7,7 +7,7 @@
 use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{sizing, spacing};
 use crate::ui::{icons, styles};
-use iced::widget::{button, container, row, slider, text, tooltip, Row, Text};
+use iced::widget::{button, column, container, row, slider, text, tooltip, Column, Row, Text};
 use iced::{Element, Length};
 
 /// Messages emitted by video control widgets.
@@ -46,6 +46,9 @@ pub enum Message {
 
     /// Step backward one frame (only when paused).
     StepBackward,
+
+    /// Toggle the overflow menu (advanced controls).
+    ToggleOverflowMenu,
 }
 
 /// View context for rendering video controls.
@@ -77,6 +80,13 @@ pub struct PlaybackState {
     /// Preview position during seek drag (0.0 to 1.0), if any.
     /// When Some, the slider shows this position instead of actual playback position.
     pub seek_preview_position: Option<f32>,
+
+    /// Is the overflow menu (advanced controls) open?
+    pub overflow_menu_open: bool,
+
+    /// Can step backward (in stepping mode with frame history available)?
+    /// When false, the step backward button is disabled.
+    pub can_step_backward: bool,
 }
 
 impl Default for PlaybackState {
@@ -89,6 +99,8 @@ impl Default for PlaybackState {
             muted: false,
             loop_enabled: false,
             seek_preview_position: None,
+            overflow_menu_open: false,
+            can_step_backward: false,
         }
     }
 }
@@ -192,65 +204,22 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         .width(Length::Fixed(80.0))
         .step(0.01);
 
-    // Step backward button (only enabled when paused)
-    let step_back_button_content: Element<'_, Message> = if !state.is_playing {
-        button(icons::sized(icons::step_backward(), icon_size))
-            .on_press(Message::StepBackward)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .into()
+    // More button (overflow menu toggle)
+    let more_button_base = button(icons::sized(icons::more(), icon_size))
+        .on_press(Message::ToggleOverflowMenu)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height));
+
+    let more_button_content: Element<'_, Message> = if state.overflow_menu_open {
+        more_button_base.style(styles::button_primary).into()
     } else {
-        button(icons::sized(icons::step_backward(), icon_size))
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .style(styles::button::disabled())
-            .into()
+        more_button_base.into()
     };
-    let step_back_button = tooltip(
-        step_back_button_content,
-        Text::new(ctx.i18n.tr("video-step-backward-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
 
-    // Step forward button (only enabled when paused)
-    let step_forward_button_content: Element<'_, Message> = if !state.is_playing {
-        button(icons::sized(icons::step_forward(), icon_size))
-            .on_press(Message::StepForward)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .into()
-    } else {
-        button(icons::sized(icons::step_forward(), icon_size))
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .style(styles::button::disabled())
-            .into()
-    };
-    let step_forward_button = tooltip(
-        step_forward_button_content,
-        Text::new(ctx.i18n.tr("video-step-forward-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
-
-    // Capture frame button with tooltip
-    let capture_tooltip = ctx.i18n.tr("video-capture-tooltip");
-    let capture_button_content: Element<'_, Message> =
-        button(icons::sized(icons::camera(), icon_size))
-            .on_press(Message::CaptureFrame)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .into();
-
-    let capture_button = tooltip(
-        capture_button_content,
-        Text::new(capture_tooltip),
+    let more_button = tooltip(
+        more_button_content,
+        Text::new(ctx.i18n.tr("video-more-tooltip")),
         tooltip::Position::Top,
     )
     .gap(4);
@@ -277,25 +246,120 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     )
     .gap(4);
 
+    // Main controls row (simplified - advanced controls in overflow menu)
     let controls: Row<'a, Message> = row![
-        step_back_button,
         play_pause_button,
-        step_forward_button,
         timeline,
         time_display,
-        capture_button,
         volume_button_tooltip,
         volume_slider,
         loop_button,
+        more_button,
     ]
     .spacing(spacing::XS)
     .padding(spacing::XS)
     .align_y(iced::Alignment::Center);
 
-    container(controls)
-        .width(Length::Fill)
-        .padding(spacing::XXS)
-        .into()
+    // Build overflow menu content if open
+    if state.overflow_menu_open {
+        let overflow_content = build_overflow_menu(ctx, state, icon_size, button_height);
+
+        // Stack: overflow menu above main controls
+        let stacked: Column<'a, Message> = column![overflow_content, controls]
+            .spacing(spacing::XXS)
+            .width(Length::Fill);
+
+        container(stacked)
+            .width(Length::Fill)
+            .padding(spacing::XXS)
+            .into()
+    } else {
+        container(controls)
+            .width(Length::Fill)
+            .padding(spacing::XXS)
+            .into()
+    }
+}
+
+/// Builds the overflow menu with advanced controls.
+fn build_overflow_menu<'a>(
+    ctx: ViewContext<'a>,
+    state: &PlaybackState,
+    icon_size: f32,
+    button_height: f32,
+) -> Element<'a, Message> {
+    // Step backward button (only enabled when paused AND in stepping mode)
+    let step_back_content: Element<'_, Message> = if !state.is_playing && state.can_step_backward {
+        button(icons::sized(icons::step_backward(), icon_size))
+            .on_press(Message::StepBackward)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .into()
+    } else {
+        button(icons::sized(icons::step_backward(), icon_size))
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .style(styles::button::disabled())
+            .into()
+    };
+    let step_back_button = tooltip(
+        step_back_content,
+        Text::new(ctx.i18n.tr("video-step-backward-tooltip")),
+        tooltip::Position::Top,
+    )
+    .gap(4);
+
+    // Step forward button (only enabled when paused)
+    let step_forward_content: Element<'_, Message> = if !state.is_playing {
+        button(icons::sized(icons::step_forward(), icon_size))
+            .on_press(Message::StepForward)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .into()
+    } else {
+        button(icons::sized(icons::step_forward(), icon_size))
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .style(styles::button::disabled())
+            .into()
+    };
+    let step_forward_button = tooltip(
+        step_forward_content,
+        Text::new(ctx.i18n.tr("video-step-forward-tooltip")),
+        tooltip::Position::Top,
+    )
+    .gap(4);
+
+    // Capture frame button
+    let capture_content: Element<'_, Message> = button(icons::sized(icons::camera(), icon_size))
+        .on_press(Message::CaptureFrame)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .into();
+    let capture_button = tooltip(
+        capture_content,
+        Text::new(ctx.i18n.tr("video-capture-tooltip")),
+        tooltip::Position::Top,
+    )
+    .gap(4);
+
+    // Overflow menu container - align to the right
+    let menu_content: Row<'a, Message> = row![
+        iced::widget::horizontal_space(),
+        step_back_button,
+        step_forward_button,
+        capture_button,
+    ]
+    .spacing(spacing::XS)
+    .padding(spacing::XS)
+    .align_y(iced::Alignment::Center);
+
+    container(menu_content).width(Length::Fill).into()
 }
 
 /// Formats duration in MM:SS or HH:MM:SS format.
@@ -387,6 +451,8 @@ mod tests {
             muted: false,
             loop_enabled: false,
             seek_preview_position: None,
+            overflow_menu_open: false,
+            can_step_backward: false,
         };
 
         let position = if state.duration_secs > 0.0 {
@@ -408,6 +474,8 @@ mod tests {
             muted: false,
             loop_enabled: false,
             seek_preview_position: None,
+            overflow_menu_open: false,
+            can_step_backward: false,
         };
 
         let position = if state.duration_secs > 0.0 {
@@ -429,6 +497,8 @@ mod tests {
             muted: false,
             loop_enabled: false,
             seek_preview_position: Some(0.75),
+            overflow_menu_open: false,
+            can_step_backward: false,
         };
 
         // When seek_preview_position is set, it should be used instead of calculated position

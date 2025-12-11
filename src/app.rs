@@ -49,6 +49,8 @@ pub struct App {
     lufs_cache: SharedLufsCache,
     /// Frame cache size in MB for video seek optimization.
     frame_cache_mb: u32,
+    /// Frame history size in MB for backward frame stepping.
+    frame_history_mb: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -153,6 +155,7 @@ impl Default for App {
             audio_normalization: true, // Enabled by default - normalizes audio volume between media files
             lufs_cache: create_lufs_cache(),
             frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
+            frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
         }
     }
 }
@@ -191,7 +194,11 @@ impl App {
         let frame_cache_mb = config
             .frame_cache_mb
             .unwrap_or(config::DEFAULT_FRAME_CACHE_MB);
+        let frame_history_mb = config
+            .frame_history_mb
+            .unwrap_or(config::DEFAULT_FRAME_HISTORY_MB);
         app.frame_cache_mb = frame_cache_mb;
+        app.frame_history_mb = frame_history_mb;
         app.settings = SettingsState::new(SettingsConfig {
             zoom_step_percent: app.viewer.zoom_step_percent(),
             background_theme: theme,
@@ -201,6 +208,7 @@ impl App {
             video_autoplay,
             audio_normalization,
             frame_cache_mb,
+            frame_history_mb,
         });
         app.video_autoplay = video_autoplay;
         app.audio_normalization = audio_normalization;
@@ -583,6 +591,10 @@ impl App {
                 self.frame_cache_mb = mb;
                 self.persist_preferences()
             }
+            SettingsEvent::FrameHistoryMbChanged(mb) => {
+                self.frame_history_mb = mb;
+                self.persist_preferences()
+            }
         }
     }
 
@@ -712,10 +724,7 @@ impl App {
                 let filename = match &image_source {
                     editor::ImageSource::File(path) => {
                         // Replace extension with selected format
-                        let stem = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("image");
+                        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
                         format!("{}.{}", stem, export_format.extension())
                     }
                     editor::ImageSource::CapturedFrame {
@@ -864,7 +873,9 @@ impl App {
                 let config = config::load().unwrap_or_default();
                 let sort_order = config.sort_order.unwrap_or_default();
                 if let Some(current_path) = self.viewer.current_image_path.clone() {
-                    let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+                    let _ = self
+                        .image_navigator
+                        .scan_directory(&current_path, sort_order);
                 }
             }
         }
@@ -890,6 +901,7 @@ impl App {
         cfg.video_autoplay = Some(self.video_autoplay);
         cfg.audio_normalization = Some(self.audio_normalization);
         cfg.frame_cache_mb = Some(self.frame_cache_mb);
+        cfg.frame_history_mb = Some(self.frame_history_mb);
 
         if let Err(error) = config::save(&cfg) {
             eprintln!("Failed to save config: {:?}", error);

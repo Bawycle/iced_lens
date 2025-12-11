@@ -162,6 +162,20 @@ impl WebpAnimDecoder {
                         decode_single_frame = true;
                     }
                 }
+                Ok(DecoderCommand::StepFrame) => {
+                    // Step forward one frame in WebP animation
+                    if !is_playing {
+                        decode_single_frame = true;
+                    }
+                }
+                Ok(DecoderCommand::StepBackward) => {
+                    // Step backward one frame in WebP animation
+                    // WebP animations have random access to all frames, so we can just go back
+                    if !is_playing && current_frame_idx > 0 {
+                        current_frame_idx -= 1;
+                        decode_single_frame = true;
+                    }
+                }
                 Ok(DecoderCommand::Stop) => {
                     break;
                 }

@@ -373,20 +373,30 @@ pub fn video_playback(
                                                 // Clear audio buffer on seek
                                                 let _ = audio_out.stop();
                                             }
+                                            DecoderCommand::StepFrame => {
+                                                // No audio action needed for frame stepping
+                                            }
+                                            DecoderCommand::StepBackward => {
+                                                // No audio action needed for backward stepping
+                                            }
                                         }
                                     }
 
                                     // Forward command to audio decoder for timing sync
                                     if let Some(ref audio_dec) = audio_decoder {
                                         let audio_cmd = match &command {
-                                            DecoderCommand::Play { .. } => AudioDecoderCommand::Play,
-                                            DecoderCommand::Pause => AudioDecoderCommand::Pause,
+                                            DecoderCommand::Play { .. } => Some(AudioDecoderCommand::Play),
+                                            DecoderCommand::Pause => Some(AudioDecoderCommand::Pause),
                                             DecoderCommand::Seek { target_secs } => {
-                                                AudioDecoderCommand::Seek { target_secs: *target_secs }
+                                                Some(AudioDecoderCommand::Seek { target_secs: *target_secs })
                                             }
-                                            DecoderCommand::Stop => AudioDecoderCommand::Stop,
+                                            DecoderCommand::Stop => Some(AudioDecoderCommand::Stop),
+                                            DecoderCommand::StepFrame => None, // No audio sync for frame stepping
+                                            DecoderCommand::StepBackward => None, // No audio sync for backward stepping
                                         };
-                                        let _ = audio_dec.send_command(audio_cmd);
+                                        if let Some(cmd) = audio_cmd {
+                                            let _ = audio_dec.send_command(cmd);
+                                        }
                                     }
 
                                     // Forward command to video decoder
