@@ -12,6 +12,8 @@ use crate::config::{
     MIN_OVERLAY_TIMEOUT_SECS,
 };
 use crate::i18n::fluent::I18n;
+use crate::ui::design_tokens::{radius, sizing, spacing};
+use crate::ui::icons;
 use crate::ui::state::zoom::{
     format_number, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT, ZOOM_STEP_INVALID_KEY,
     ZOOM_STEP_RANGE_KEY,
@@ -21,8 +23,11 @@ use crate::ui::theme;
 use crate::ui::theming::ThemeMode;
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{button, scrollable, text, text_input, Button, Column, Container, Row, Slider, Text},
-    Element, Length,
+    widget::{
+        button, container, horizontal_rule, scrollable, svg::Svg, text, text_input, Button, Column,
+        Container, Row, Slider, Text,
+    },
+    Border, Element, Length, Theme,
 };
 use unic_langid::LanguageIdentifier;
 
@@ -208,7 +213,45 @@ impl State {
 
         let title = Text::new(ctx.i18n.tr("settings-title")).size(30);
 
-        let mut language_selection_row = Row::new().spacing(10).align_y(Vertical::Center);
+        // =========================================================================
+        // SECTION: General (Language, Theme)
+        // =========================================================================
+        let general_section = self.build_general_section(&ctx);
+
+        // =========================================================================
+        // SECTION: Display (Background, Zoom step, Sort order)
+        // =========================================================================
+        let display_section = self.build_display_section(&ctx);
+
+        // =========================================================================
+        // SECTION: Video (Autoplay, Audio normalization, Frame cache)
+        // =========================================================================
+        let video_section = self.build_video_section(&ctx);
+
+        // =========================================================================
+        // SECTION: Fullscreen (Overlay timeout)
+        // =========================================================================
+        let fullscreen_section = self.build_fullscreen_section(&ctx);
+
+        let content = Column::new()
+            .width(Length::Fill)
+            .spacing(spacing::LG)
+            .align_x(Horizontal::Left)
+            .padding(spacing::MD)
+            .push(back_button)
+            .push(title)
+            .push(general_section)
+            .push(display_section)
+            .push(video_section)
+            .push(fullscreen_section);
+
+        scrollable(content).into()
+    }
+
+    /// Build the General section (Language, Theme mode).
+    fn build_general_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+        // Language selection
+        let mut language_row = Row::new().spacing(spacing::XS).align_y(Vertical::Center);
         for locale in &ctx.i18n.available_locales {
             let display_name = locale.to_string();
             let translated_name_key = format!("language-name-{}", locale);
@@ -219,56 +262,62 @@ impl State {
                 format!("{} ({})", translated_name, display_name)
             };
 
-            let is_current_locale = ctx.i18n.current_locale() == locale;
-            let mut button = Button::new(Text::new(button_text))
-                .on_press(Message::LanguageSelected(locale.clone()));
-            button = if is_current_locale {
-                button.style(button::primary)
-            } else {
-                button.style(button::secondary)
-            };
-            language_selection_row = language_selection_row.push(button);
+            let is_current = ctx.i18n.current_locale() == locale;
+            let btn = Button::new(Text::new(button_text))
+                .on_press(Message::LanguageSelected(locale.clone()))
+                .style(if is_current {
+                    button::primary
+                } else {
+                    button::secondary
+                });
+            language_row = language_row.push(btn);
         }
 
-        let zoom_step_label = Text::new(ctx.i18n.tr("settings-zoom-step-label"));
-        let zoom_step_input = text_input(
-            &ctx.i18n.tr("settings-zoom-step-placeholder"),
-            self.zoom_step_input_value(),
+        let language_setting = self.build_setting_row(
+            ctx.i18n.tr("select-language-label"),
+            None,
+            language_row.into(),
+        );
+
+        // Theme mode selection
+        let mut theme_row = Row::new().spacing(spacing::XS);
+        for (mode, key) in [
+            (ThemeMode::System, "settings-theme-system"),
+            (ThemeMode::Light, "settings-theme-light"),
+            (ThemeMode::Dark, "settings-theme-dark"),
+        ] {
+            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
+                .on_press(Message::ThemeModeSelected(mode))
+                .style(if self.theme_mode == mode {
+                    button::primary
+                } else {
+                    button::secondary
+                });
+            theme_row = theme_row.push(btn);
+        }
+
+        let theme_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-theme-mode-label"),
+            None,
+            theme_row.into(),
+        );
+
+        let content = Column::new()
+            .spacing(spacing::MD)
+            .push(language_setting)
+            .push(theme_setting);
+
+        build_section(
+            icons::globe(),
+            ctx.i18n.tr("settings-section-general"),
+            content.into(),
         )
-        .on_input(Message::ZoomStepInputChanged)
-        .on_submit(Message::ZoomStepSubmitted)
-        .padding(6)
-        .width(Length::Fixed(120.0));
+    }
 
-        let zoom_step_input_row = Row::new()
-            .spacing(8)
-            .align_y(Vertical::Center)
-            .push(zoom_step_input)
-            .push(Text::new("%"));
-
-        let zoom_input_element: Element<'_, Message> = zoom_step_input_row.into();
-        let mut helper_text: Element<'_, Message> =
-            Text::new(ctx.i18n.tr("settings-zoom-step-hint"))
-                .size(14)
-                .into();
-
-        if let Some(error_key) = self.zoom_step_error_key() {
-            helper_text = Text::new(ctx.i18n.tr(error_key))
-                .size(14)
-                .style(move |_theme: &iced::Theme| text::Style {
-                    color: Some(theme::error_text_color()),
-                })
-                .into();
-        }
-
-        let zoom_content = Column::new()
-            .spacing(8)
-            .push(zoom_step_label)
-            .push(zoom_input_element)
-            .push(helper_text);
-
-        let background_label = Text::new(ctx.i18n.tr("settings-background-label"));
-        let mut background_row = Row::new().spacing(8);
+    /// Build the Display section (Background, Zoom step, Sort order).
+    fn build_display_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+        // Background selection
+        let mut background_row = Row::new().spacing(spacing::XS);
         for (theme, key) in [
             (BackgroundTheme::Light, "settings-background-light"),
             (BackgroundTheme::Dark, "settings-background-dark"),
@@ -277,225 +326,246 @@ impl State {
                 "settings-background-checkerboard",
             ),
         ] {
-            let mut button = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::BackgroundThemeSelected(theme));
-            button = if self.background_theme == theme {
-                button.style(button::primary)
-            } else {
-                button.style(button::secondary)
-            };
-            background_row = background_row.push(button);
+            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
+                .on_press(Message::BackgroundThemeSelected(theme))
+                .style(if self.background_theme == theme {
+                    button::primary
+                } else {
+                    button::secondary
+                });
+            background_row = background_row.push(btn);
         }
 
-        let mut theme_mode_row = Row::new().spacing(8);
-        for (mode, key) in [
-            (ThemeMode::System, "settings-theme-system"),
-            (ThemeMode::Light, "settings-theme-light"),
-            (ThemeMode::Dark, "settings-theme-dark"),
-        ] {
-            let mut button =
-                Button::new(Text::new(ctx.i18n.tr(key))).on_press(Message::ThemeModeSelected(mode));
-            button = if self.theme_mode == mode {
-                button.style(button::primary)
-            } else {
-                button.style(button::secondary)
-            };
-            theme_mode_row = theme_mode_row.push(button);
-        }
+        let background_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-background-label"),
+            None,
+            background_row.into(),
+        );
 
-        let section_style = styles::container::panel;
-
-        let language_section = Container::new(
-            Column::new()
-                .spacing(12)
-                .push(Text::new(ctx.i18n.tr("select-language-label")).size(18))
-                .push(language_selection_row),
+        // Zoom step input
+        let zoom_input = text_input(
+            &ctx.i18n.tr("settings-zoom-step-placeholder"),
+            self.zoom_step_input_value(),
         )
-        .padding(16)
-        .width(Length::Fill)
-        .style(section_style);
+        .on_input(Message::ZoomStepInputChanged)
+        .on_submit(Message::ZoomStepSubmitted)
+        .padding(6)
+        .width(Length::Fixed(100.0));
 
-        let zoom_section = Container::new(zoom_content)
-            .padding(16)
-            .width(Length::Fill)
-            .style(section_style);
+        let zoom_input_row = Row::new()
+            .spacing(spacing::XS)
+            .align_y(Vertical::Center)
+            .push(zoom_input)
+            .push(Text::new("%"));
 
-        let background_section = Container::new(
-            Column::new()
-                .spacing(12)
-                .push(background_label)
-                .push(background_row),
-        )
-        .padding(16)
-        .width(Length::Fill)
-        .style(section_style);
+        let zoom_hint: Element<'_, Message> = if let Some(error_key) = self.zoom_step_error_key() {
+            Text::new(ctx.i18n.tr(error_key))
+                .size(13)
+                .style(move |_theme: &Theme| text::Style {
+                    color: Some(theme::error_text_color()),
+                })
+                .into()
+        } else {
+            Text::new(ctx.i18n.tr("settings-zoom-step-hint"))
+                .size(13)
+                .into()
+        };
 
-        let theme_mode_label = Text::new(ctx.i18n.tr("settings-theme-mode-label"));
-        let theme_mode_section = Container::new(
-            Column::new()
-                .spacing(12)
-                .push(theme_mode_label)
-                .push(theme_mode_row),
-        )
-        .padding(16)
-        .width(Length::Fill)
-        .style(section_style);
+        let zoom_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-zoom-step-label"),
+            Some(zoom_hint),
+            zoom_input_row.into(),
+        );
 
-        let sort_order_label = Text::new(ctx.i18n.tr("settings-sort-order-label"));
-        let mut sort_order_row = Row::new().spacing(8);
+        // Sort order selection
+        let mut sort_row = Row::new().spacing(spacing::XS);
         for (order, key) in [
             (SortOrder::Alphabetical, "settings-sort-alphabetical"),
             (SortOrder::ModifiedDate, "settings-sort-modified"),
             (SortOrder::CreatedDate, "settings-sort-created"),
         ] {
-            let mut button = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::SortOrderSelected(order));
-            button = if self.sort_order == order {
-                button.style(button::primary)
-            } else {
-                button.style(button::secondary)
-            };
-            sort_order_row = sort_order_row.push(button);
+            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
+                .on_press(Message::SortOrderSelected(order))
+                .style(if self.sort_order == order {
+                    button::primary
+                } else {
+                    button::secondary
+                });
+            sort_row = sort_row.push(btn);
         }
 
-        let sort_order_section = Container::new(
-            Column::new()
-                .spacing(12)
-                .push(sort_order_label)
-                .push(sort_order_row),
+        let sort_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-sort-order-label"),
+            None,
+            sort_row.into(),
+        );
+
+        let content = Column::new()
+            .spacing(spacing::MD)
+            .push(background_setting)
+            .push(zoom_setting)
+            .push(sort_setting);
+
+        build_section(
+            icons::image(),
+            ctx.i18n.tr("settings-section-display"),
+            content.into(),
         )
-        .padding(16)
-        .width(Length::Fill)
-        .style(section_style);
+    }
 
-        let overlay_timeout_label = Text::new(ctx.i18n.tr("settings-overlay-timeout-label"));
-        let overlay_timeout_slider = Slider::new(
-            MIN_OVERLAY_TIMEOUT_SECS..=MAX_OVERLAY_TIMEOUT_SECS,
-            self.overlay_timeout_secs,
-            Message::OverlayTimeoutChanged,
-        )
-        .step(1u32);
-
-        let overlay_timeout_value_text = Text::new(format!(
-            "{} {}",
-            self.overlay_timeout_secs,
-            ctx.i18n.tr("seconds")
-        ));
-
-        let overlay_timeout_section = Container::new(
-            Column::new()
-                .spacing(12)
-                .push(overlay_timeout_label)
-                .push(overlay_timeout_slider)
-                .push(overlay_timeout_value_text)
-                .push(Text::new(ctx.i18n.tr("settings-overlay-timeout-hint")).size(14)),
-        )
-        .padding(16)
-        .width(Length::Fill)
-        .style(section_style);
-
+    /// Build the Video section (Autoplay, Audio normalization, Frame cache).
+    fn build_video_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         // Video autoplay toggle
-        let video_autoplay_label = Text::new(ctx.i18n.tr("settings-video-autoplay-label"));
-        let mut video_autoplay_row = Row::new().spacing(8);
+        let mut autoplay_row = Row::new().spacing(spacing::XS);
         for (enabled, key) in [
             (false, "settings-video-autoplay-disabled"),
             (true, "settings-video-autoplay-enabled"),
         ] {
-            let mut btn = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::VideoAutoplayChanged(enabled));
-            btn = if self.video_autoplay == enabled {
-                btn.style(button::primary)
-            } else {
-                btn.style(button::secondary)
-            };
-            video_autoplay_row = video_autoplay_row.push(btn);
+            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
+                .on_press(Message::VideoAutoplayChanged(enabled))
+                .style(if self.video_autoplay == enabled {
+                    button::primary
+                } else {
+                    button::secondary
+                });
+            autoplay_row = autoplay_row.push(btn);
         }
 
-        let video_autoplay_section = Container::new(
-            Column::new()
-                .spacing(12)
-                .push(video_autoplay_label)
-                .push(video_autoplay_row)
-                .push(Text::new(ctx.i18n.tr("settings-video-autoplay-hint")).size(14)),
-        )
-        .padding(16)
-        .width(Length::Fill)
-        .style(section_style);
+        let autoplay_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-video-autoplay-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-video-autoplay-hint"))
+                    .size(13)
+                    .into(),
+            ),
+            autoplay_row.into(),
+        );
 
         // Audio normalization toggle
-        let audio_normalization_label =
-            Text::new(ctx.i18n.tr("settings-audio-normalization-label"));
-        let mut audio_normalization_row = Row::new().spacing(8);
+        let mut normalization_row = Row::new().spacing(spacing::XS);
         for (enabled, key) in [
             (false, "settings-audio-normalization-disabled"),
             (true, "settings-audio-normalization-enabled"),
         ] {
-            let mut btn = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::AudioNormalizationChanged(enabled));
-            btn = if self.audio_normalization == enabled {
-                btn.style(button::primary)
-            } else {
-                btn.style(button::secondary)
-            };
-            audio_normalization_row = audio_normalization_row.push(btn);
+            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
+                .on_press(Message::AudioNormalizationChanged(enabled))
+                .style(if self.audio_normalization == enabled {
+                    button::primary
+                } else {
+                    button::secondary
+                });
+            normalization_row = normalization_row.push(btn);
         }
 
-        let audio_normalization_section = Container::new(
-            Column::new()
-                .spacing(12)
-                .push(audio_normalization_label)
-                .push(audio_normalization_row)
-                .push(Text::new(ctx.i18n.tr("settings-audio-normalization-hint")).size(14)),
-        )
-        .padding(16)
-        .width(Length::Fill)
-        .style(section_style);
+        let normalization_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-audio-normalization-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-audio-normalization-hint"))
+                    .size(13)
+                    .into(),
+            ),
+            normalization_row.into(),
+        );
 
-        // Frame cache size slider
-        let frame_cache_label = Text::new(ctx.i18n.tr("settings-frame-cache-label"));
-        let frame_cache_slider = Slider::new(
+        // Frame cache slider
+        let cache_slider = Slider::new(
             MIN_FRAME_CACHE_MB..=MAX_FRAME_CACHE_MB,
             self.frame_cache_mb,
             Message::FrameCacheMbChanged,
         )
-        .step(16u32);
+        .step(16u32)
+        .width(Length::Fixed(200.0));
 
-        let frame_cache_value_text = Text::new(format!(
+        let cache_value = Text::new(format!(
             "{} {}",
             self.frame_cache_mb,
             ctx.i18n.tr("megabytes")
         ));
 
-        let frame_cache_section = Container::new(
-            Column::new()
-                .spacing(12)
-                .push(frame_cache_label)
-                .push(frame_cache_slider)
-                .push(frame_cache_value_text)
-                .push(Text::new(ctx.i18n.tr("settings-frame-cache-hint")).size(14)),
-        )
-        .padding(16)
-        .width(Length::Fill)
-        .style(section_style);
+        let cache_control = Row::new()
+            .spacing(spacing::SM)
+            .align_y(Vertical::Center)
+            .push(cache_slider)
+            .push(cache_value);
+
+        let cache_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-frame-cache-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-frame-cache-hint"))
+                    .size(13)
+                    .into(),
+            ),
+            cache_control.into(),
+        );
 
         let content = Column::new()
-            .width(Length::Fill)
-            .spacing(24)
-            .align_x(Horizontal::Left)
-            .padding(10)
-            .push(back_button)
-            .push(title)
-            .push(language_section)
-            .push(zoom_section)
-            .push(background_section)
-            .push(theme_mode_section)
-            .push(sort_order_section)
-            .push(overlay_timeout_section)
-            .push(video_autoplay_section)
-            .push(audio_normalization_section)
-            .push(frame_cache_section);
+            .spacing(spacing::MD)
+            .push(autoplay_setting)
+            .push(normalization_setting)
+            .push(cache_setting);
 
-        scrollable(content).into()
+        build_section(
+            icons::video_camera(),
+            ctx.i18n.tr("settings-section-video"),
+            content.into(),
+        )
+    }
+
+    /// Build the Fullscreen section (Overlay timeout).
+    fn build_fullscreen_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+        let timeout_slider = Slider::new(
+            MIN_OVERLAY_TIMEOUT_SECS..=MAX_OVERLAY_TIMEOUT_SECS,
+            self.overlay_timeout_secs,
+            Message::OverlayTimeoutChanged,
+        )
+        .step(1u32)
+        .width(Length::Fixed(200.0));
+
+        let timeout_value = Text::new(format!(
+            "{} {}",
+            self.overlay_timeout_secs,
+            ctx.i18n.tr("seconds")
+        ));
+
+        let timeout_control = Row::new()
+            .spacing(spacing::SM)
+            .align_y(Vertical::Center)
+            .push(timeout_slider)
+            .push(timeout_value);
+
+        let timeout_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-overlay-timeout-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-overlay-timeout-hint"))
+                    .size(13)
+                    .into(),
+            ),
+            timeout_control.into(),
+        );
+
+        let content = Column::new().spacing(spacing::MD).push(timeout_setting);
+
+        build_section(
+            icons::fullscreen(),
+            ctx.i18n.tr("settings-section-fullscreen"),
+            content.into(),
+        )
+    }
+
+    /// Build a single setting row with label, optional hint, and control.
+    fn build_setting_row<'a>(
+        &self,
+        label: String,
+        hint: Option<Element<'a, Message>>,
+        control: Element<'a, Message>,
+    ) -> Element<'a, Message> {
+        let mut col = Column::new().spacing(spacing::XS);
+        col = col.push(Text::new(label).size(14));
+        col = col.push(control);
+        if let Some(hint_element) = hint {
+            col = col.push(hint_element);
+        }
+        col.into()
     }
 
     /// Update the state and emit an [`Event`] for the parent when needed.
@@ -617,6 +687,40 @@ impl State {
             Err(ZoomStepError::InvalidInput)
         }
     }
+}
+
+/// Build a settings section with icon, title, and content.
+fn build_section<'a>(
+    icon: Svg<'a>,
+    title: String,
+    content: Element<'a, Message>,
+) -> Element<'a, Message> {
+    let icon_sized = icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
+
+    let header = Row::new()
+        .spacing(spacing::SM)
+        .align_y(Vertical::Center)
+        .push(icon_sized)
+        .push(Text::new(title).size(18));
+
+    let inner = Column::new()
+        .spacing(spacing::SM)
+        .push(header)
+        .push(horizontal_rule(1))
+        .push(content);
+
+    Container::new(inner)
+        .padding(spacing::MD)
+        .width(Length::Fill)
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.extended_palette().background.weak.color.into()),
+            border: Border {
+                radius: radius::MD.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
 }
 
 fn parse_number(input: &str) -> Option<f32> {
