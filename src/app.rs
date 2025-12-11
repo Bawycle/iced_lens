@@ -398,6 +398,9 @@ impl App {
                             Ok(()) => {
                                 eprintln!("Image saved successfully to: {:?}", path);
                                 // TODO: Show success notification to user
+
+                                // Rescan directory if saved in the same folder as viewer
+                                self.rescan_directory_if_same(&path);
                             }
                             Err(err) => {
                                 eprintln!("Failed to save image: {:?}", err);
@@ -841,6 +844,37 @@ impl App {
 
         self.viewer.refresh_error_translation(&self.i18n);
         Task::none()
+    }
+
+    /// Rescans the viewer's directory if the given path is in the same folder.
+    ///
+    /// This is called after Save As to update the file list when a new image
+    /// is saved in the currently viewed directory. The current media remains
+    /// selected (no auto-switch to the new file).
+    fn rescan_directory_if_same(&mut self, saved_path: &std::path::Path) {
+        let saved_dir = saved_path.parent();
+
+        // Get the viewer's current directory
+        let viewer_dir = self
+            .viewer
+            .current_image_path
+            .as_ref()
+            .and_then(|p| p.parent());
+
+        // Only rescan if both directories exist and match
+        if let (Some(saved), Some(viewer)) = (saved_dir, viewer_dir) {
+            if saved == viewer {
+                // Rescan the viewer's image list
+                let _ = self.viewer.scan_directory();
+
+                // Also rescan the image navigator
+                let config = config::load().unwrap_or_default();
+                let sort_order = config.sort_order.unwrap_or_default();
+                if let Some(current_path) = self.viewer.current_image_path.clone() {
+                    let _ = self.image_navigator.scan_directory(&current_path, sort_order);
+                }
+            }
+        }
     }
 
     /// Persists the current viewer + settings preferences to disk.
