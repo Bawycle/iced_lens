@@ -153,7 +153,7 @@ Code contributions should follow the project's development practices and quality
 
 ### Prerequisites
 
-- **Rust 1.91.1 or newer** (install via [rustup](https://rustup.rs/))
+- **Rust 1.92.0 or newer** (install via [rustup](https://rustup.rs/))
 - Familiarity with the [Iced GUI framework](https://iced.rs/)
 - Understanding of the project structure (see below)
 
