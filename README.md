@@ -200,7 +200,6 @@ Future items (subject to change based on community feedback):
 - Filters: grayscale, sepia, blur, sharpen
 - Video editing: trim, basic cuts
 - Batch operations
-- Richer argument parsing (additional flags)
 - Hardware-accelerated video decoding (VAAPI/NVDEC)
 
 ## 14. Contributing

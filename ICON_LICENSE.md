@@ -4,8 +4,37 @@ Version: 1.0
 Date: 2025-11-22
 
 Files Covered:
-- `assets/icons/iced_lens.svg`
+- `assets/icons/iced_lens.svg` (application icon)
 - All PNG exports generated from that SVG (e.g. `assets/icons/iced_lens_16.png`, `iced_lens_24.png`, …)
+- All UI icons in `assets/icons/`:
+  - `camera.svg`
+  - `cog.svg`
+  - `compress.svg`
+  - `crosshair.svg`
+  - `expand.svg`
+  - `flip_horizontal.svg`
+  - `flip_vertical.svg`
+  - `fullscreen.svg`
+  - `globe.svg`
+  - `image.svg`
+  - `loop.svg`
+  - `magnifier.svg`
+  - `more.svg`
+  - `pause.svg`
+  - `play.svg`
+  - `refresh.svg`
+  - `rotate_left.svg`
+  - `rotate_right.svg`
+  - `step_backward.svg`
+  - `step_forward.svg`
+  - `trash.svg`
+  - `video_camera.svg`
+  - `video_camera_audio.svg`
+  - `volume.svg`
+  - `volume_mute.svg`
+  - `warning.svg`
+  - `zoom_in.svg`
+  - `zoom_out.svg`
 
 ## Grant of Permission
 You are granted a non-exclusive, worldwide, royalty-free permission to copy and redistribute **unmodified** copies of the IcedLens icon files solely for the following purposes:
