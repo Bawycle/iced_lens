@@ -290,16 +290,11 @@ impl AsyncDecoder {
                 Ok(DecoderCommand::StepFrame) => {
                     // Step forward one frame without seeking
                     // This decodes the next frame in sequence
-                    eprintln!("[DEBUG] DECODER: StepFrame command received");
                     if !is_playing {
                         // When entering stepping mode, add the current frame to history first
                         // This allows stepping backward to the frame shown before stepping started
                         if !in_stepping_mode {
                             if let Some(ref initial_frame) = last_paused_frame {
-                                eprintln!(
-                                    "[DEBUG] DECODER: Adding initial frame to history at PTS {}",
-                                    initial_frame.pts_secs
-                                );
                                 frame_history.push(initial_frame.clone());
                             }
                         }
@@ -309,13 +304,8 @@ impl AsyncDecoder {
                 }
                 Ok(DecoderCommand::StepBackward) => {
                     // Step backward one frame using frame history
-                    eprintln!("[DEBUG] DECODER: StepBackward command received");
                     if !is_playing && in_stepping_mode {
                         if let Some(prev_frame) = frame_history.step_back() {
-                            eprintln!(
-                                "[DEBUG] DECODER: Got previous frame from history at PTS {}",
-                                prev_frame.pts_secs
-                            );
                             // Send the previous frame
                             let decoded = DecodedFrame {
                                 rgba_data: Arc::clone(&prev_frame.rgba_data),
@@ -324,8 +314,6 @@ impl AsyncDecoder {
                                 pts_secs: prev_frame.pts_secs,
                             };
                             let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
-                        } else {
-                            eprintln!("[DEBUG] DECODER: No previous frame in history");
                         }
                     }
                 }
@@ -423,16 +411,11 @@ impl AsyncDecoder {
                     // Store the frame shown while paused (for stepping mode history)
                     // This allows backward stepping to return to the frame shown before stepping started
                     if !is_playing && !in_stepping_mode {
-                        eprintln!("[DEBUG] DECODER: Storing paused frame at PTS {}", pts_secs);
                         last_paused_frame = Some(decoded.clone());
                     }
 
                     // Store frame in history during stepping mode for backward navigation
                     if in_stepping_mode {
-                        eprintln!(
-                            "[DEBUG] DECODER: Adding frame to history at PTS {}",
-                            pts_secs
-                        );
                         frame_history.push(decoded.clone());
                     }
 

@@ -576,18 +576,14 @@ impl State {
                             match player.state() {
                                 crate::video_player::PlaybackState::Playing { .. }
                                 | crate::video_player::PlaybackState::Buffering { .. } => {
-                                    eprintln!("[DEBUG] PAUSE - state before: {:?}", player.state());
                                     player.pause();
-                                    eprintln!("[DEBUG] PAUSE - state after: {:?}", player.state());
                                 }
                                 _ => {
                                     // Resume playback - do NOT increment session ID
                                     // The existing subscription must stay active to receive commands
                                     // Clear seek preview so step operations use actual position
-                                    eprintln!("[DEBUG] PLAY - state before: {:?}, seek_preview_position: {:?}", player.state(), self.seek_preview_position);
                                     self.seek_preview_position = None;
                                     player.play();
-                                    eprintln!("[DEBUG] PLAY - state after: {:?}", player.state());
                                 }
                             }
                         } else if let Some(MediaData::Video(ref video_data)) = self.media {
@@ -619,20 +615,11 @@ impl State {
                         // Perform actual seek to preview position
                         // Don't clear seek_preview_position here - it will be cleared
                         // when we receive a frame near the seek target
-                        eprintln!(
-                            "[DEBUG] SEEK_COMMIT (slider) - seek_preview_position: {:?}",
-                            self.seek_preview_position
-                        );
                         if let Some(position) = self.seek_preview_position {
                             if let Some(player) = &mut self.video_player {
                                 if let Some(MediaData::Video(ref video_data)) = self.media {
                                     let target_secs = position as f64 * video_data.duration_secs;
-                                    eprintln!("[DEBUG] SEEK_COMMIT - target_secs: {:.3}, state before: {:?}", target_secs, player.state());
                                     player.seek(target_secs);
-                                    eprintln!(
-                                        "[DEBUG] SEEK_COMMIT - state after: {:?}",
-                                        player.state()
-                                    );
                                 }
                             }
                         }
@@ -709,38 +696,23 @@ impl State {
                     VM::StepForward => {
                         // Step forward one frame (only when paused)
                         // Uses StepFrame command to decode next frame sequentially
-                        eprintln!("[DEBUG] STEP_FORWARD called");
                         if let Some(player) = &mut self.video_player {
-                            eprintln!("[DEBUG] STEP_FORWARD - player state: {:?}", player.state());
                             if player.state().is_paused() {
-                                eprintln!("[DEBUG] STEP_FORWARD - sending StepFrame command");
                                 // Clear seek_preview_position since we're using sequential decoding
                                 self.seek_preview_position = None;
                                 player.step_frame();
-                            } else {
-                                eprintln!("[DEBUG] STEP_FORWARD - NOT paused, skipping");
                             }
-                        } else {
-                            eprintln!("[DEBUG] STEP_FORWARD - no video player");
                         }
                     }
                     VM::StepBackward => {
                         // Step backward one frame (only when paused)
-                        // Note: Stepping backward requires seeking to a previous keyframe
-                        // since video codecs can only decode forward from keyframes.
-                        eprintln!("[DEBUG] STEP_BACKWARD called");
+                        // Uses frame history buffer for backward navigation
                         if let Some(player) = &mut self.video_player {
-                            eprintln!("[DEBUG] STEP_BACKWARD - player state: {:?}", player.state());
                             if player.state().is_paused() {
-                                eprintln!("[DEBUG] STEP_BACKWARD - calling step_backward");
                                 // Clear seek_preview_position
                                 self.seek_preview_position = None;
                                 player.step_backward();
-                            } else {
-                                eprintln!("[DEBUG] STEP_BACKWARD - NOT paused, skipping");
                             }
-                        } else {
-                            eprintln!("[DEBUG] STEP_BACKWARD - no video player");
                         }
                     }
                     VM::ToggleOverflowMenu => {
@@ -772,20 +744,12 @@ impl State {
                         height,
                         pts_secs,
                     } => {
-                        eprintln!("[DEBUG] FRAME_READY - pts_secs: {:.3}", pts_secs);
-
                         // Update canvas with new frame
                         self.video_canvas.set_frame(rgba_data, width, height);
 
                         // Update player position
                         if let Some(ref mut player) = self.video_player {
-                            let state_before = format!("{:?}", player.state());
                             player.update_position(pts_secs);
-                            eprintln!(
-                                "[DEBUG] FRAME_READY - state before: {}, state after: {:?}",
-                                state_before,
-                                player.state()
-                            );
                         }
 
                         // Clear seek preview if we received a frame near the seek target
@@ -794,13 +758,9 @@ impl State {
                             if let Some(MediaData::Video(ref video_data)) = self.media {
                                 let preview_secs = preview_pos as f64 * video_data.duration_secs;
                                 let diff = (pts_secs - preview_secs).abs();
-                                eprintln!("[DEBUG] FRAME_READY - preview_secs: {:.3}, diff: {:.3}, clearing: {}", preview_secs, diff, diff < 0.5);
                                 // Clear preview if frame is within 0.5 seconds of target
                                 if diff < 0.5 {
                                     self.seek_preview_position = None;
-                                    eprintln!(
-                                        "[DEBUG] FRAME_READY - seek_preview_position cleared"
-                                    );
                                 }
                             }
                         }

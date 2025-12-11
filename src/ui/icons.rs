@@ -74,6 +74,12 @@ pub fn step_backward<'a>() -> Svg<'a> {
     Svg::new(Handle::from_memory(DATA))
 }
 
+/// More options icon: horizontal ellipsis (three dots).
+pub fn more<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/more.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
 // =============================================================================
 // Status & Feedback Icons
 // =============================================================================
@@ -260,6 +266,7 @@ mod tests {
         let _ = camera();
         let _ = step_forward();
         let _ = step_backward();
+        let _ = more();
     }
 
     #[test]
