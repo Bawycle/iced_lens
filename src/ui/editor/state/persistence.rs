@@ -4,7 +4,7 @@
 use super::{CropDragState, CropRatio};
 use crate::error::{Error, Result};
 use crate::media::image_transform;
-use crate::ui::editor::State;
+use crate::ui::editor::{ImageSource, State};
 
 impl State {
     /// Save the edited image to a file, preserving the original format.
@@ -36,9 +36,22 @@ impl State {
     }
 
     /// Discard all changes and reset to original image state.
+    /// For captured frames, this does nothing (no source to reload from).
     pub fn discard_changes(&mut self) {
+        let image_path = match &self.image_source {
+            ImageSource::File(path) => path.clone(),
+            ImageSource::CapturedFrame { .. } => {
+                // For captured frames, we can't reload from disk.
+                // Just clear the transformation history.
+                self.transformation_history.clear();
+                self.history_index = 0;
+                self.preview_image = None;
+                return;
+            }
+        };
+
         // Reload the working image from disk
-        match image_rs::open(&self.image_path) {
+        match image_rs::open(&image_path) {
             Ok(fresh_image) => {
                 self.working_image = fresh_image;
                 match image_transform::dynamic_to_image_data(&self.working_image) {

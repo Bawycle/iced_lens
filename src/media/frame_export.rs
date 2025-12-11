@@ -72,7 +72,7 @@ impl ExportFormat {
 }
 
 /// Data for a frame ready to be exported.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExportableFrame {
     /// RGBA pixel data.
     pub rgba_data: Vec<u8>,
@@ -89,6 +89,25 @@ impl ExportableFrame {
             rgba_data,
             width,
             height,
+        }
+    }
+
+    /// Converts to a DynamicImage for use with image editing.
+    pub fn to_dynamic_image(&self) -> Option<image_rs::DynamicImage> {
+        ImageBuffer::<Rgba<u8>, _>::from_raw(self.width, self.height, self.rgba_data.clone())
+            .map(image_rs::DynamicImage::ImageRgba8)
+    }
+
+    /// Converts to ImageData for display in the UI.
+    pub fn to_image_data(&self) -> crate::media::ImageData {
+        crate::media::ImageData {
+            handle: iced::widget::image::Handle::from_rgba(
+                self.width,
+                self.height,
+                self.rgba_data.clone(),
+            ),
+            width: self.width,
+            height: self.height,
         }
     }
 

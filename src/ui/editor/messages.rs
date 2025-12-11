@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Editor message/event types re-exported by the facade.
 
+use crate::media::frame_export::ExportFormat;
 use crate::ui::editor::{state::CropRatio, EditorTool};
 use iced;
 use iced::widget::scrollable::AbsoluteOffset;
@@ -37,6 +38,8 @@ pub enum SidebarMessage {
     Save,
     SaveAs,
     Cancel,
+    /// Set the export format for Save As.
+    SetExportFormat(ExportFormat),
 }
 
 /// Canvas overlay interaction messages.

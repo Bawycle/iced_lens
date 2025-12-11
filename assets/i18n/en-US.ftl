@@ -96,6 +96,7 @@ editor-crop-apply = Apply crop
 editor-undo-redo-section-title = Last modification
 editor-undo = Undo
 editor-redo = Redo
+editor-export-format-label = Export format
 error-delete-image-io = We couldn't delete this file. Make sure it isn't open elsewhere and that you can remove it.
 media-loading = Loading...
 error-loading-timeout = Loading timed out. The file may be too large or inaccessible.

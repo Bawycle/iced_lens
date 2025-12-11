@@ -82,6 +82,12 @@ pub enum Message {
         path: Option<PathBuf>,
         frame: Option<crate::media::frame_export::ExportableFrame>,
     },
+    /// Open the editor with a captured video frame.
+    OpenEditorWithFrame {
+        frame: crate::media::frame_export::ExportableFrame,
+        video_path: PathBuf,
+        position_secs: f64,
+    },
     Tick(std::time::Instant), // Periodic tick for overlay auto-hide
 }
 
@@ -421,6 +427,22 @@ impl App {
                 }
                 Task::none()
             }
+            Message::OpenEditorWithFrame {
+                frame,
+                video_path,
+                position_secs,
+            } => {
+                match EditorState::from_captured_frame(frame, video_path, position_secs) {
+                    Ok(state) => {
+                        self.editor = Some(state);
+                        self.screen = Screen::Editor;
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to open editor with captured frame: {err:?}");
+                    }
+                }
+                Task::none()
+            }
         }
     }
 
@@ -443,9 +465,10 @@ impl App {
             component::Effect::NavigateNext => self.handle_navigate_next(),
             component::Effect::NavigatePrevious => self.handle_navigate_previous(),
             component::Effect::CaptureFrame {
+                frame,
                 video_path,
                 position_secs,
-            } => self.handle_capture_frame(video_path, position_secs),
+            } => self.handle_capture_frame(frame, video_path, position_secs),
             component::Effect::None => Task::none(),
         };
         Task::batch([viewer_task, side_effect])
@@ -568,21 +591,31 @@ impl App {
         match editor_state.update(message) {
             EditorEvent::None => Task::none(),
             EditorEvent::ExitEditor => {
-                // Get the current image path before dropping the editor
-                let current_image_path = editor_state.image_path().to_path_buf();
+                // Get the image source before dropping the editor
+                let image_source = editor_state.image_source().clone();
 
                 self.editor = None;
                 self.screen = Screen::Viewer;
 
-                // Set loading state directly (before render)
-                self.viewer.is_loading_media = true;
-                self.viewer.loading_started_at = Some(std::time::Instant::now());
+                // For file mode: reload the image in the viewer to show any saved changes
+                // For captured frame mode: just return to viewer without reloading
+                match image_source {
+                    editor::ImageSource::File(current_image_path) => {
+                        // Set loading state directly (before render)
+                        self.viewer.is_loading_media = true;
+                        self.viewer.loading_started_at = Some(std::time::Instant::now());
 
-                // Reload the image in the viewer to show any saved changes
-                Task::perform(
-                    async move { crate::media::load_media(&current_image_path) },
-                    |result| Message::Viewer(component::Message::ImageLoaded(result)),
-                )
+                        // Reload the image in the viewer to show any saved changes
+                        Task::perform(
+                            async move { crate::media::load_media(&current_image_path) },
+                            |result| Message::Viewer(component::Message::ImageLoaded(result)),
+                        )
+                    }
+                    editor::ImageSource::CapturedFrame { .. } => {
+                        // Just return to viewer, no need to reload anything
+                        Task::none()
+                    }
+                }
             }
             EditorEvent::NavigateNext => {
                 // Rescan directory to handle added/removed images
@@ -660,20 +693,46 @@ impl App {
             }
             EditorEvent::SaveAsRequested => {
                 // Open file picker dialog for "Save As"
-                let current_path = editor_state.image_path().to_path_buf();
+                use crate::media::frame_export::{generate_default_filename, ExportFormat};
+
+                let image_source = editor_state.image_source().clone();
+                let export_format = editor_state.export_format();
+
+                // Generate filename and filter based on image source
+                let (filename, filter_name, filter_ext) = match &image_source {
+                    editor::ImageSource::File(path) => {
+                        let filename = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("image.png")
+                            .to_string();
+                        (
+                            filename,
+                            "Image Files",
+                            vec!["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico"],
+                        )
+                    }
+                    editor::ImageSource::CapturedFrame {
+                        video_path,
+                        position_secs,
+                    } => {
+                        // Use selected export format for captured frames
+                        let filename =
+                            generate_default_filename(video_path, *position_secs, export_format);
+                        let (filter_name, filter_ext) = match export_format {
+                            ExportFormat::Png => ("PNG Image", vec!["png"]),
+                            ExportFormat::Jpeg => ("JPEG Image", vec!["jpg", "jpeg"]),
+                            ExportFormat::WebP => ("WebP Image", vec!["webp"]),
+                        };
+                        (filename, filter_name, filter_ext)
+                    }
+                };
+
                 Task::perform(
                     async move {
                         rfd::AsyncFileDialog::new()
-                            .set_file_name(
-                                current_path
-                                    .file_name()
-                                    .and_then(|n| n.to_str())
-                                    .unwrap_or("image.png"),
-                            )
-                            .add_filter(
-                                "Image Files",
-                                &["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico"],
-                            )
+                            .set_file_name(&filename)
+                            .add_filter(filter_name, &filter_ext)
                             .save_file()
                             .await
                             .map(|h| h.path().to_path_buf())
@@ -754,44 +813,18 @@ impl App {
         }
     }
 
-    /// Handles frame capture: opens a file dialog and saves the current video frame.
-    fn handle_capture_frame(&self, video_path: PathBuf, position_secs: f64) -> Task<Message> {
-        use crate::media::frame_export::{generate_default_filename, ExportFormat};
-
-        // Get the exportable frame from the viewer
-        let frame = match self.viewer.exportable_frame() {
-            Some(f) => f,
-            None => {
-                eprintln!("No frame available for capture");
-                return Task::none();
-            }
-        };
-
-        // Generate default filename
-        let default_filename =
-            generate_default_filename(&video_path, position_secs, ExportFormat::Png);
-
-        // Move both frame and default_filename into the async block
-        // Return both the selected path and the frame together
-        Task::perform(
-            async move {
-                let path = rfd::AsyncFileDialog::new()
-                    .set_file_name(&default_filename)
-                    .add_filter("PNG Image", &["png"])
-                    .add_filter("JPEG Image", &["jpg", "jpeg"])
-                    .add_filter("WebP Image", &["webp"])
-                    .save_file()
-                    .await
-                    .map(|h| h.path().to_path_buf());
-
-                // Return both path and frame
-                (path, frame)
-            },
-            |(path, frame)| Message::FrameCaptureDialogResult {
-                path,
-                frame: Some(frame),
-            },
-        )
+    /// Handles frame capture: opens the editor with the captured frame.
+    fn handle_capture_frame(
+        &self,
+        frame: crate::media::frame_export::ExportableFrame,
+        video_path: PathBuf,
+        position_secs: f64,
+    ) -> Task<Message> {
+        Task::done(Message::OpenEditorWithFrame {
+            frame,
+            video_path,
+            position_secs,
+        })
     }
 
     /// Applies the newly selected locale, persists it to config, and refreshes
@@ -1570,7 +1603,7 @@ mod tests {
         if let Some(editor) = &app.editor {
             assert_eq!(
                 editor.image_path(),
-                img2_path.as_path(),
+                Some(img2_path.as_path()),
                 "Editor should have loaded b.png"
             );
         }
@@ -1625,7 +1658,7 @@ mod tests {
         if let Some(editor) = &app.editor {
             assert_eq!(
                 editor.image_path(),
-                img1_path.as_path(),
+                Some(img1_path.as_path()),
                 "Editor should have loaded a.png"
             );
         }

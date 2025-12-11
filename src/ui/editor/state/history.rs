@@ -43,11 +43,8 @@ impl State {
     }
 
     pub(crate) fn replay_transformations_up_to_index(&mut self) {
-        // Reload the original image from disk
-        let Ok(mut working_image) = image_rs::open(&self.image_path) else {
-            eprintln!("Failed to reload original image for replay");
-            return;
-        };
+        // Start from the original image (stored at editor creation)
+        let mut working_image = self.original_image.clone();
 
         // Apply transformations up to history_index
         for i in 0..self.history_index {

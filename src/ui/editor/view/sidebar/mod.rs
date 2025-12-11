@@ -4,6 +4,7 @@
 pub mod crop_panel;
 pub mod resize_panel;
 
+use crate::media::frame_export::ExportFormat;
 use crate::ui::editor::state::{CropState, ResizeState};
 use crate::ui::icons;
 use crate::ui::styles;
@@ -22,6 +23,10 @@ pub struct SidebarModel<'a> {
     pub can_undo: bool,
     pub can_redo: bool,
     pub has_unsaved_changes: bool,
+    /// True if editing a captured video frame (no source file).
+    pub is_captured_frame: bool,
+    /// Selected export format for Save As.
+    pub export_format: ExportFormat,
 }
 
 impl<'a> SidebarModel<'a> {
@@ -33,6 +38,8 @@ impl<'a> SidebarModel<'a> {
             can_undo: state.can_undo(),
             can_redo: state.can_redo(),
             has_unsaved_changes: state.has_unsaved_changes(),
+            is_captured_frame: state.is_captured_frame(),
+            export_format: state.export_format(),
         }
     }
 }
@@ -79,7 +86,12 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
         .width(Length::Fixed(SIDEBAR_WIDTH))
         .push(header_section(ctx))
         .push(scrollable)
-        .push(footer_section(model.has_unsaved_changes, ctx));
+        .push(footer_section(
+            model.has_unsaved_changes,
+            model.is_captured_frame,
+            model.export_format,
+            ctx,
+        ));
 
     container(layout)
         .width(Length::Fixed(SIDEBAR_WIDTH))
@@ -247,37 +259,49 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .into()
 }
 
-fn footer_section<'a>(has_changes: bool, ctx: &ViewContext<'a>) -> Column<'a, Message> {
-    let prev_btn = button(
-        container(text("◀").size(20))
-            .center_x(Length::Fill)
-            .center_y(Length::Shrink),
-    )
-    .padding([8, 16])
-    .width(Length::Fill)
-    .height(Length::Shrink);
-    let prev_btn = if has_changes {
-        prev_btn
-    } else {
-        prev_btn.on_press(SidebarMessage::NavigatePrevious.into())
-    };
+fn footer_section<'a>(
+    has_changes: bool,
+    is_captured_frame: bool,
+    export_format: ExportFormat,
+    ctx: &ViewContext<'a>,
+) -> Column<'a, Message> {
+    let mut footer = Column::new().spacing(8).push(horizontal_rule(1));
 
-    let next_btn = button(
-        container(text("▶").size(20))
-            .center_x(Length::Fill)
-            .center_y(Length::Shrink),
-    )
-    .padding([8, 16])
-    .width(Length::Fill)
-    .height(Length::Shrink);
-    let next_btn = if has_changes {
-        next_btn
-    } else {
-        next_btn.on_press(SidebarMessage::NavigateNext.into())
-    };
+    // Navigation buttons - only for file mode, not captured frames
+    if !is_captured_frame {
+        let prev_btn = button(
+            container(text("◀").size(20))
+                .center_x(Length::Fill)
+                .center_y(Length::Shrink),
+        )
+        .padding([8, 16])
+        .width(Length::Fill)
+        .height(Length::Shrink);
+        let prev_btn = if has_changes {
+            prev_btn
+        } else {
+            prev_btn.on_press(SidebarMessage::NavigatePrevious.into())
+        };
 
-    let nav_row = Row::new().spacing(8).push(prev_btn).push(next_btn);
+        let next_btn = button(
+            container(text("▶").size(20))
+                .center_x(Length::Fill)
+                .center_y(Length::Shrink),
+        )
+        .padding([8, 16])
+        .width(Length::Fill)
+        .height(Length::Shrink);
+        let next_btn = if has_changes {
+            next_btn
+        } else {
+            next_btn.on_press(SidebarMessage::NavigateNext.into())
+        };
 
+        let nav_row = Row::new().spacing(8).push(prev_btn).push(next_btn);
+        footer = footer.push(nav_row).push(horizontal_rule(1));
+    }
+
+    // Cancel button - always available when there are changes
     let cancel_btn = button(text(ctx.i18n.tr("editor-cancel")).size(16))
         .padding(12)
         .width(Length::Fill)
@@ -287,33 +311,80 @@ fn footer_section<'a>(has_changes: bool, ctx: &ViewContext<'a>) -> Column<'a, Me
     } else {
         cancel_btn
     };
+    footer = footer.push(cancel_btn);
 
-    let save_btn = button(text(ctx.i18n.tr("editor-save")).size(16))
-        .padding(12)
-        .width(Length::Fill)
-        .style(iced::widget::button::primary);
-    let save_btn = if has_changes {
-        save_btn.on_press(SidebarMessage::Save.into())
-    } else {
-        save_btn
-    };
+    // Save button - only for file mode, not captured frames
+    if !is_captured_frame {
+        let save_btn = button(text(ctx.i18n.tr("editor-save")).size(16))
+            .padding(12)
+            .width(Length::Fill)
+            .style(iced::widget::button::primary);
+        let save_btn = if has_changes {
+            save_btn.on_press(SidebarMessage::Save.into())
+        } else {
+            save_btn
+        };
+        footer = footer.push(save_btn);
+    }
 
+    // Export format selector - only for captured frames, before Save As
+    if is_captured_frame {
+        footer = footer.push(export_format_section(export_format, ctx));
+    }
+
+    // Save As button - always available
     let save_as_btn = button(text(ctx.i18n.tr("editor-save-as")).size(16))
         .padding(12)
         .width(Length::Fill)
-        .style(iced::widget::button::secondary);
-    let save_as_btn = if has_changes {
+        .style(iced::widget::button::primary);
+    // For captured frames, Save As is always enabled (it's the only way to save)
+    let save_as_btn = if is_captured_frame || has_changes {
         save_as_btn.on_press(SidebarMessage::SaveAs.into())
     } else {
         save_as_btn
     };
+    footer = footer.push(save_as_btn);
 
-    Column::new()
-        .spacing(8)
-        .push(horizontal_rule(1))
-        .push(nav_row)
-        .push(horizontal_rule(1))
-        .push(cancel_btn)
-        .push(save_btn)
-        .push(save_as_btn)
+    footer
+}
+
+/// Export format selector for captured frames.
+fn export_format_section<'a>(
+    current_format: ExportFormat,
+    ctx: &ViewContext<'a>,
+) -> Element<'a, Message> {
+    let format_label = text(ctx.i18n.tr("editor-export-format-label")).size(14);
+
+    let format_buttons: Vec<Element<'a, Message>> = ExportFormat::all()
+        .iter()
+        .map(|&format| {
+            let is_selected = format == current_format;
+            let label = match format {
+                ExportFormat::Png => "PNG",
+                ExportFormat::Jpeg => "JPEG",
+                ExportFormat::WebP => "WebP",
+            };
+
+            button(text(label).size(14))
+                .padding([8, 12])
+                .width(Length::FillPortion(1))
+                .style(if is_selected {
+                    iced::widget::button::primary
+                } else {
+                    iced::widget::button::secondary
+                })
+                .on_press(SidebarMessage::SetExportFormat(format).into())
+                .into()
+        })
+        .collect();
+
+    let format_row = Row::with_children(format_buttons)
+        .spacing(4)
+        .width(Length::Fill);
+
+    container(Column::new().spacing(6).push(format_label).push(format_row))
+        .padding(12)
+        .width(Length::Fill)
+        .style(styles::container::panel)
+        .into()
 }

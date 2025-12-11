@@ -60,9 +60,10 @@ pub enum Effect {
     EnterEditor,
     NavigateNext,
     NavigatePrevious,
-    /// Capture current frame and export to file.
-    /// Contains the video path and current position for default filename generation.
+    /// Capture current frame and open editor.
+    /// Contains the captured frame data and metadata for filename generation.
     CaptureFrame {
+        frame: crate::media::frame_export::ExportableFrame,
         video_path: PathBuf,
         position_secs: f64,
     },
@@ -658,20 +659,30 @@ impl State {
                         }
                     }
                     VM::CaptureFrame => {
-                        // Capture current frame and request export
+                        // Pause the video if playing
+                        if let Some(player) = &mut self.video_player {
+                            if player.state().is_playing_or_will_resume() {
+                                player.pause();
+                            }
+                        }
+
+                        // Capture current frame and open editor
                         if let Some(video_path) = &self.current_video_path {
-                            let position_secs = self
-                                .video_player
-                                .as_ref()
-                                .and_then(|p| p.state().position())
-                                .unwrap_or(0.0);
-                            return (
-                                Effect::CaptureFrame {
-                                    video_path: video_path.clone(),
-                                    position_secs,
-                                },
-                                Task::none(),
-                            );
+                            if let Some(frame) = self.exportable_frame() {
+                                let position_secs = self
+                                    .video_player
+                                    .as_ref()
+                                    .and_then(|p| p.state().position())
+                                    .unwrap_or(0.0);
+                                return (
+                                    Effect::CaptureFrame {
+                                        frame,
+                                        video_path: video_path.clone(),
+                                        position_secs,
+                                    },
+                                    Task::none(),
+                                );
+                            }
                         }
                     }
                     VM::StepForward => {

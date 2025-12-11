@@ -5,6 +5,7 @@
 //! and viewer modules. The editor operates on a copy of the original image and only
 //! modifies the source file when the user explicitly saves.
 
+use crate::media::frame_export::ExportFormat;
 use crate::media::ImageData;
 use crate::ui::state::ViewportState;
 
@@ -22,11 +23,28 @@ use image_rs::DynamicImage;
 pub use messages::{CanvasMessage, Event, Message, SidebarMessage, ToolbarMessage};
 use std::path::PathBuf;
 
+/// Source of the image being edited.
+#[derive(Debug, Clone)]
+pub enum ImageSource {
+    /// Image loaded from a file on disk.
+    File(PathBuf),
+    /// Captured video frame (no source file).
+    CapturedFrame {
+        /// Original video path (for default filename generation).
+        video_path: PathBuf,
+        /// Position in seconds when frame was captured.
+        position_secs: f64,
+    },
+}
+
 /// Local UI state for the editor screen.
 #[derive(Clone)]
 pub struct State {
-    /// Path to the image being edited
-    image_path: PathBuf,
+    /// Source of the image being edited (file or captured frame).
+    image_source: ImageSource,
+    /// Original image (for undo/redo replay).
+    /// For files, this is loaded from disk. For captured frames, stored at creation.
+    original_image: DynamicImage,
     /// Current edited image (after applying transformations, for display)
     current_image: ImageData,
     /// Working image for transformations (DynamicImage from image_rs crate)
@@ -53,16 +71,19 @@ pub struct State {
     preview_image: Option<ImageData>,
     /// Viewport state for tracking canvas bounds and scroll position
     pub viewport: ViewportState,
+    /// Export format for Save As (used when editing captured frames).
+    export_format: ExportFormat,
 }
 
 impl std::fmt::Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("State")
-            .field("image_path", &self.image_path)
+            .field("image_source", &self.image_source)
             .field("active_tool", &self.active_tool)
             .field("transformation_history", &self.transformation_history)
             .field("history_index", &self.history_index)
             .field("sidebar_expanded", &self.sidebar_expanded)
+            .field("export_format", &self.export_format)
             .finish()
     }
 }
@@ -89,9 +110,22 @@ impl State {
         &self.current_image
     }
 
-    /// Get the image file path.
-    pub fn image_path(&self) -> &std::path::Path {
-        &self.image_path
+    /// Get the image source.
+    pub fn image_source(&self) -> &ImageSource {
+        &self.image_source
+    }
+
+    /// Get the image file path (if editing a file).
+    pub fn image_path(&self) -> Option<&std::path::Path> {
+        match &self.image_source {
+            ImageSource::File(path) => Some(path),
+            ImageSource::CapturedFrame { .. } => None,
+        }
+    }
+
+    /// Check if editing a captured frame (no source file).
+    pub fn is_captured_frame(&self) -> bool {
+        matches!(self.image_source, ImageSource::CapturedFrame { .. })
     }
 
     /// Get the active tool.
@@ -102,6 +136,16 @@ impl State {
     /// Check if sidebar is expanded.
     pub fn is_sidebar_expanded(&self) -> bool {
         self.sidebar_expanded
+    }
+
+    /// Get the selected export format.
+    pub fn export_format(&self) -> ExportFormat {
+        self.export_format
+    }
+
+    /// Set the export format.
+    pub fn set_export_format(&mut self, format: ExportFormat) {
+        self.export_format = format;
     }
 }
 

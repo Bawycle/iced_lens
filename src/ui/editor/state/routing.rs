@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Message routing helpers that keep the editor facade slim.
 
-use crate::ui::editor::{CanvasMessage, EditorTool, Event, SidebarMessage, State, ToolbarMessage};
+use crate::ui::editor::{
+    CanvasMessage, EditorTool, Event, ImageSource, SidebarMessage, State, ToolbarMessage,
+};
 use iced::{self, keyboard};
 
 impl State {
@@ -115,6 +117,10 @@ impl State {
             SidebarMessage::Save => self.sidebar_save(),
             SidebarMessage::SaveAs => self.sidebar_save_as(),
             SidebarMessage::Cancel => self.sidebar_cancel(),
+            SidebarMessage::SetExportFormat(format) => {
+                self.set_export_format(format);
+                Event::None
+            }
         }
     }
 
@@ -140,14 +146,16 @@ impl State {
             {
                 match key {
                     keyboard::Key::Character(ref c) if c.as_str() == "s" => {
-                        if self.has_unsaved_changes() {
-                            Event::SaveRequested {
-                                path: self.image_path.clone(),
-                                overwrite: true,
+                        // Ctrl+S only works for file mode, not captured frames
+                        if let ImageSource::File(path) = &self.image_source {
+                            if self.has_unsaved_changes() {
+                                return Event::SaveRequested {
+                                    path: path.clone(),
+                                    overwrite: true,
+                                };
                             }
-                        } else {
-                            Event::None
                         }
+                        Event::None
                     }
                     keyboard::Key::Character(ref c) if c.as_str() == "z" => {
                         self.commit_active_tool_changes();

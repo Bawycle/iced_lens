@@ -96,6 +96,7 @@ editor-crop-apply = Appliquer le rognage
 editor-undo-redo-section-title = Dernière modification
 editor-undo = Annuler
 editor-redo = Rétablir
+editor-export-format-label = Format d'export
 error-delete-image-io = Impossible de supprimer ce fichier. Vérifiez qu'il n'est pas en cours d'utilisation et que vous disposez des permissions nécessaires.
 media-loading = Chargement...
 error-loading-timeout = Le chargement a expiré. Le fichier est peut-être trop volumineux ou inaccessible.
