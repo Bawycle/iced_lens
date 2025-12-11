@@ -11,6 +11,7 @@ pub mod video_controls;
 use self::component::Message;
 use crate::i18n::fluent::I18n;
 use crate::media::MediaData;
+use crate::ui::components::error_display::{centered_error_view, ErrorDisplay, ErrorSeverity};
 use crate::ui::design_tokens::{sizing, spacing};
 use crate::ui::state::ZoomState;
 use crate::ui::styles;
@@ -106,60 +107,19 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
 }
 
 fn error_view<'a>(i18n: &'a I18n, error: ErrorContext<'a>) -> Element<'a, Message> {
-    let heading = Container::new(Text::new(i18n.tr("error-load-image-heading")).size(24))
-        .width(Length::Fill)
-        .align_x(alignment::Horizontal::Center);
-
-    let summary = Container::new(Text::new(error.friendly_text).width(Length::Fill))
-        .width(Length::Fill)
-        .align_x(alignment::Horizontal::Center);
-
-    let toggle_label = if error.show_details {
-        i18n.tr("error-details-hide")
-    } else {
-        i18n.tr("error-details-show")
-    };
-
-    let toggle_button =
-        Container::new(button(Text::new(toggle_label)).on_press(Message::ToggleErrorDetails))
-            .align_x(alignment::Horizontal::Center);
-
-    let mut error_content = Column::new()
-        .spacing(12)
-        .width(Length::Fill)
-        .align_x(alignment::Horizontal::Center)
-        .push(heading)
-        .push(summary)
-        .push(toggle_button);
-
-    if error.show_details {
-        let details_heading =
-            Container::new(Text::new(i18n.tr("error-details-technical-heading")).size(16))
-                .width(Length::Fill)
-                .align_x(alignment::Horizontal::Center);
-
-        let details_body = Container::new(Text::new(error.details).width(Length::Fill))
-            .width(Length::Fill)
-            .align_x(alignment::Horizontal::Left);
-
-        let details_column = Column::new()
-            .spacing(8)
-            .width(Length::Fill)
-            .push(details_heading)
-            .push(details_body);
-
-        error_content = error_content.push(
-            Container::new(details_column)
-                .width(Length::Fill)
-                .padding(16),
+    let error_display = ErrorDisplay::new(ErrorSeverity::Error)
+        .title(i18n.tr("error-load-image-heading"))
+        .message(error.friendly_text)
+        .details(error.details)
+        .details_visible(error.show_details)
+        .on_toggle_details(Message::ToggleErrorDetails)
+        .details_labels(
+            i18n.tr("error-details-show"),
+            i18n.tr("error-details-hide"),
+            i18n.tr("error-details-technical-heading"),
         );
-    }
 
-    Container::new(error_content)
-        .width(Length::Fill)
-        .align_x(alignment::Horizontal::Center)
-        .align_y(alignment::Vertical::Center)
-        .into()
+    centered_error_view(error_display)
 }
 
 fn loading_view<'a>(i18n: &'a I18n, rotation: f32) -> Element<'a, Message> {

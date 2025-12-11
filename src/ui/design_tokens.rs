@@ -64,6 +64,8 @@ pub mod palette {
 
     // Semantic colors
     pub const ERROR_500: Color = Color::from_rgb(0.898, 0.224, 0.208);
+    pub const WARNING_500: Color = Color::from_rgb(0.945, 0.651, 0.125);
+    pub const SUCCESS_500: Color = Color::from_rgb(0.263, 0.702, 0.404);
     pub const INFO_500: Color = Color::from_rgb(0.392, 0.588, 1.0);
 }
 
