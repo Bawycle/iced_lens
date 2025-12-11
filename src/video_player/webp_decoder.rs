@@ -125,7 +125,11 @@ impl WebpAnimDecoder {
         loop {
             // Check for commands (non-blocking)
             match command_rx.try_recv() {
-                Ok(DecoderCommand::Play) => {
+                Ok(DecoderCommand::Play {
+                    resume_position_secs: _,
+                }) => {
+                    // Note: WebP animations don't support precise position resume,
+                    // they restart from current frame index which is preserved on pause
                     is_playing = true;
                     playback_start_time = Some(std::time::Instant::now());
                     let _ = event_tx.blocking_send(DecoderEvent::Buffering);
@@ -341,7 +345,11 @@ mod tests {
         let mut decoder = WebpAnimDecoder::new(webp_path).unwrap();
 
         // Send play command
-        decoder.send_command(DecoderCommand::Play).unwrap();
+        decoder
+            .send_command(DecoderCommand::Play {
+                resume_position_secs: None,
+            })
+            .unwrap();
 
         // Wait for event (with timeout)
         let event = tokio::time::timeout(Duration::from_millis(500), decoder.recv_event()).await;

@@ -37,8 +37,10 @@ impl DecodedFrame {
 /// Commands sent to the decoder task.
 #[derive(Debug, Clone)]
 pub enum DecoderCommand {
-    /// Start decoding from the beginning.
-    Play,
+    /// Start or resume playback.
+    /// If `resume_position_secs` is Some, seek to that position before playing.
+    /// If None, start from the beginning.
+    Play { resume_position_secs: Option<f64> },
 
     /// Pause decoding (stop sending frames).
     Pause,
@@ -195,7 +197,6 @@ impl AsyncDecoder {
         let mut is_playing = false;
         let mut playback_start_time: Option<std::time::Instant> = None;
         let mut first_pts: Option<f64> = None;
-        let mut current_pts_secs: f64 = 0.0; // Track current position for pause/resume
         let mut decode_single_frame = false; // Flag to decode one frame after seek while paused
 
         // Frame cache for optimized seeking
@@ -205,29 +206,15 @@ impl AsyncDecoder {
         loop {
             // Check for commands (non-blocking)
             match command_rx.try_recv() {
-                Ok(DecoderCommand::Play) => {
-                    // If resuming from pause, seek to the paused position
-                    if !is_playing && current_pts_secs > 0.0 {
-                        // Convert seconds to AV_TIME_BASE (microseconds)
-                        // FFmpeg seek uses AV_TIME_BASE which is 1_000_000
-                        let timestamp = (current_pts_secs * 1_000_000.0) as i64;
-                        // Use RangeTo (..timestamp) to allow FFmpeg to seek backward to keyframe
-                        if let Err(e) = ictx.seek(timestamp, ..timestamp) {
-                            let _ = event_tx.blocking_send(DecoderEvent::Error(format!(
-                                "Resume seek failed: {}",
-                                e
-                            )));
-                        } else {
-                            decoder.flush();
-                        }
-                    }
+                Ok(DecoderCommand::Play { .. }) => {
+                    // No seek needed on resume - the demuxer maintains its position.
+                    // Just like audio, we continue from where we were.
                     is_playing = true;
                     playback_start_time = Some(std::time::Instant::now());
                     first_pts = None;
                     let _ = event_tx.blocking_send(DecoderEvent::Buffering);
                 }
                 Ok(DecoderCommand::Pause) => {
-                    // Keep current_pts_secs for resume - do NOT reset it
                     is_playing = false;
                     playback_start_time = None;
                     first_pts = None;
@@ -242,7 +229,6 @@ impl AsyncDecoder {
                             let distance = target_secs - cached_frame.pts_secs;
                             if distance <= CACHE_TOLERANCE_SECS {
                                 // Cache hit - send cached frame immediately
-                                current_pts_secs = cached_frame.pts_secs;
                                 let decoded = DecodedFrame {
                                     rgba_data: Arc::clone(&cached_frame.rgba_data),
                                     width: cached_frame.width,
@@ -264,8 +250,6 @@ impl AsyncDecoder {
                             .blocking_send(DecoderEvent::Error(format!("Seek failed: {}", e)));
                     } else {
                         decoder.flush();
-                        // Update current position to seek target
-                        current_pts_secs = target_secs;
                         // Reset timing after seek
                         playback_start_time = Some(std::time::Instant::now());
                         first_pts = None;
@@ -349,9 +333,6 @@ impl AsyncDecoder {
                             }
                         }
                     }
-
-                    // Update current position for pause/resume
-                    current_pts_secs = pts_secs;
 
                     // Check if this is a keyframe for caching
                     let is_keyframe = decoded_frame.is_key();
@@ -447,7 +428,11 @@ mod tests {
         let decoder = AsyncDecoder::new(&video_path, CacheConfig::default()).unwrap();
 
         // Send commands (should not error)
-        assert!(decoder.send_command(DecoderCommand::Play).is_ok());
+        assert!(decoder
+            .send_command(DecoderCommand::Play {
+                resume_position_secs: None
+            })
+            .is_ok());
         assert!(decoder.send_command(DecoderCommand::Pause).is_ok());
         assert!(decoder
             .send_command(DecoderCommand::Seek { target_secs: 5.0 })
@@ -467,7 +452,11 @@ mod tests {
         let mut decoder = AsyncDecoder::new(video_path, CacheConfig::default()).unwrap();
 
         // Send play command
-        decoder.send_command(DecoderCommand::Play).unwrap();
+        decoder
+            .send_command(DecoderCommand::Play {
+                resume_position_secs: None,
+            })
+            .unwrap();
 
         // Wait for event (with timeout)
         let event = tokio::time::timeout(Duration::from_millis(500), decoder.recv_event()).await;

@@ -194,7 +194,9 @@ fn test_video_decoding(path: &str, format_name: &str) {
 
         // Send play command
         decoder
-            .send_command(DecoderCommand::Play)
+            .send_command(DecoderCommand::Play {
+                resume_position_secs: None,
+            })
             .expect("Should send Play command");
 
         // Wait for at least one frame (with timeout)
@@ -305,7 +307,9 @@ fn test_decode_corrupted_file() {
         match AsyncDecoder::new(path, CacheConfig::disabled()) {
             Ok(mut decoder) => {
                 decoder
-                    .send_command(DecoderCommand::Play)
+                    .send_command(DecoderCommand::Play {
+                        resume_position_secs: None,
+                    })
                     .expect("Should send Play command");
 
                 // Should get an error event, not a valid frame
@@ -412,7 +416,9 @@ fn test_decode_performance() {
             };
 
             decoder
-                .send_command(DecoderCommand::Play)
+                .send_command(DecoderCommand::Play {
+                    resume_position_secs: None,
+                })
                 .expect("Should send Play command");
 
             let mut decoder = decoder;

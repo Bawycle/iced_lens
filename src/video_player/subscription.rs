@@ -363,7 +363,7 @@ pub fn video_playback(
                                             DecoderCommand::Pause => {
                                                 let _ = audio_out.pause();
                                             }
-                                            DecoderCommand::Play => {
+                                            DecoderCommand::Play { .. } => {
                                                 let _ = audio_out.resume();
                                             }
                                             DecoderCommand::Stop => {
@@ -379,7 +379,7 @@ pub fn video_playback(
                                     // Forward command to audio decoder for timing sync
                                     if let Some(ref audio_dec) = audio_decoder {
                                         let audio_cmd = match &command {
-                                            DecoderCommand::Play => AudioDecoderCommand::Play,
+                                            DecoderCommand::Play { .. } => AudioDecoderCommand::Play,
                                             DecoderCommand::Pause => AudioDecoderCommand::Pause,
                                             DecoderCommand::Seek { target_secs } => {
                                                 AudioDecoderCommand::Seek { target_secs: *target_secs }

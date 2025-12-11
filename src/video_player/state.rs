@@ -215,9 +215,12 @@ impl VideoPlayer {
             self.sync_clock.resume();
         }
 
-        // Send Play command to decoder via command sender
+        // Send Play command to decoder via command sender with resume position
         if let Some(sender) = &self.command_sender {
-            let _ = sender.send(DecoderCommand::Play);
+            let resume_position = if position > 0.0 { Some(position) } else { None };
+            let _ = sender.send(DecoderCommand::Play {
+                resume_position_secs: resume_position,
+            });
         }
     }
 
@@ -310,8 +313,11 @@ impl VideoPlayer {
             });
 
             // If we should resume playing, send Play command after seek
+            // No need to pass position since Seek already positioned the decoder
             if should_resume {
-                let _ = sender.send(DecoderCommand::Play);
+                let _ = sender.send(DecoderCommand::Play {
+                    resume_position_secs: None,
+                });
             }
         }
     }
@@ -338,7 +344,10 @@ impl VideoPlayer {
             });
 
             // Always send Play command after seek
-            let _ = sender.send(DecoderCommand::Play);
+            // No need to pass position since Seek already positioned the decoder
+            let _ = sender.send(DecoderCommand::Play {
+                resume_position_secs: None,
+            });
         }
     }
 
