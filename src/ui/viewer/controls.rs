@@ -34,6 +34,7 @@ pub fn view<'a>(
     ctx: ViewContext<'a>,
     zoom: &'a ZoomState,
     effective_fit_to_window: bool,
+    is_fullscreen: bool,
 ) -> Element<'a, Message> {
     let zoom_placeholder = ctx.i18n.tr("viewer-zoom-input-placeholder");
     let zoom_label = Text::new(ctx.i18n.tr("viewer-zoom-label"));
@@ -115,13 +116,19 @@ pub fn view<'a>(
     .gap(4);
 
     let fullscreen_tooltip = ctx.i18n.tr("viewer-fullscreen-tooltip");
-    let fullscreen_button_content: Element<'_, Message> = button(icons::fill(icons::fullscreen()))
+    let fullscreen_button = button(icons::fill(icons::fullscreen()))
         .on_press(Message::ToggleFullscreen)
         .padding(4)
         .width(Length::Fixed(shared_styles::ICON_SIZE))
-        .height(Length::Fixed(shared_styles::ICON_SIZE))
-        .into();
-    let fullscreen_button = tooltip(
+        .height(Length::Fixed(shared_styles::ICON_SIZE));
+
+    // Apply different style when fullscreen is active (highlighted)
+    let fullscreen_button_content: Element<'_, Message> = if is_fullscreen {
+        fullscreen_button.style(styles::button_primary).into()
+    } else {
+        fullscreen_button.into()
+    };
+    let fullscreen_toggle = tooltip(
         fullscreen_button_content,
         Text::new(fullscreen_tooltip),
         tooltip::Position::Bottom,
@@ -155,7 +162,7 @@ pub fn view<'a>(
         .push(fit_toggle)
         .push(Space::new(Length::Fixed(16.0), Length::Shrink))
         .push(delete_button)
-        .push(fullscreen_button);
+        .push(fullscreen_toggle);
 
     let mut zoom_controls = Column::new().spacing(4).push(zoom_controls_row);
 
@@ -181,6 +188,6 @@ mod tests {
     fn controls_view_renders() {
         let i18n = I18n::default();
         let zoom = ZoomState::default();
-        let _element = view(ViewContext { i18n: &i18n }, &zoom, true);
+        let _element = view(ViewContext { i18n: &i18n }, &zoom, true, false);
     }
 }

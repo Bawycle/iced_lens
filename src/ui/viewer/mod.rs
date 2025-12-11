@@ -161,9 +161,13 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
 
         // Layer 2: Overlay controls (if visible)
         if ctx.controls_visible {
-            let controls_view =
-                controls::view(ctx.controls_context, ctx.zoom, ctx.effective_fit_to_window)
-                    .map(Message::Controls);
+            let controls_view = controls::view(
+                ctx.controls_context,
+                ctx.zoom,
+                ctx.effective_fit_to_window,
+                ctx.is_fullscreen,
+            )
+            .map(Message::Controls);
 
             let mut controls_column = Column::new().spacing(8);
             controls_column = controls_column.push(controls_view);
@@ -215,9 +219,13 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
                     .style(styles::editor::toolbar),
             );
 
-            let controls_view =
-                controls::view(ctx.controls_context, ctx.zoom, ctx.effective_fit_to_window)
-                    .map(Message::Controls);
+            let controls_view = controls::view(
+                ctx.controls_context,
+                ctx.zoom,
+                ctx.effective_fit_to_window,
+                ctx.is_fullscreen,
+            )
+            .map(Message::Controls);
             column = column.push(controls_view);
 
             // Add video controls if video is playing/paused
