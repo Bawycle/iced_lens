@@ -701,34 +701,27 @@ impl App {
                 let image_source = editor_state.image_source().clone();
                 let export_format = editor_state.export_format();
 
-                // Generate filename and filter based on image source
-                let (filename, filter_name, filter_ext) = match &image_source {
+                // Get filter based on selected export format
+                let (filter_name, filter_ext): (&str, Vec<&str>) = match export_format {
+                    ExportFormat::Png => ("PNG Image", vec!["png"]),
+                    ExportFormat::Jpeg => ("JPEG Image", vec!["jpg", "jpeg"]),
+                    ExportFormat::WebP => ("WebP Image", vec!["webp"]),
+                };
+
+                // Generate filename based on image source, with selected format extension
+                let filename = match &image_source {
                     editor::ImageSource::File(path) => {
-                        let filename = path
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                            .unwrap_or("image.png")
-                            .to_string();
-                        (
-                            filename,
-                            "Image Files",
-                            vec!["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico"],
-                        )
+                        // Replace extension with selected format
+                        let stem = path
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("image");
+                        format!("{}.{}", stem, export_format.extension())
                     }
                     editor::ImageSource::CapturedFrame {
                         video_path,
                         position_secs,
-                    } => {
-                        // Use selected export format for captured frames
-                        let filename =
-                            generate_default_filename(video_path, *position_secs, export_format);
-                        let (filter_name, filter_ext) = match export_format {
-                            ExportFormat::Png => ("PNG Image", vec!["png"]),
-                            ExportFormat::Jpeg => ("JPEG Image", vec!["jpg", "jpeg"]),
-                            ExportFormat::WebP => ("WebP Image", vec!["webp"]),
-                        };
-                        (filename, filter_name, filter_ext)
-                    }
+                    } => generate_default_filename(video_path, *position_secs, export_format),
                 };
 
                 Task::perform(

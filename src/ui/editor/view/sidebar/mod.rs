@@ -327,10 +327,8 @@ fn footer_section<'a>(
         footer = footer.push(save_btn);
     }
 
-    // Export format selector - only for captured frames, before Save As
-    if is_captured_frame {
-        footer = footer.push(export_format_section(export_format, ctx));
-    }
+    // Export format selector - shown before Save As button
+    footer = footer.push(export_format_section(export_format, ctx));
 
     // Save As button - always available
     let save_as_btn = button(text(ctx.i18n.tr("editor-save-as")).size(16))
@@ -348,7 +346,7 @@ fn footer_section<'a>(
     footer
 }
 
-/// Export format selector for captured frames.
+/// Export format selector for Save As operations.
 fn export_format_section<'a>(
     current_format: ExportFormat,
     ctx: &ViewContext<'a>,
