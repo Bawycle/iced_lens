@@ -6,7 +6,7 @@ use iced::Element;
 
 use super::centered_scrollable;
 
-const EDITOR_CANVAS_SCROLLABLE_ID: &str = "editor-canvas-scrollable";
+const EDITOR_CANVAS_SCROLLABLE_ID: &str = "image-editor-canvas-scrollable";
 
 /// Creates a scrollable canvas for the editor with automatic centering.
 ///

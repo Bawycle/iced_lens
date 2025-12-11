@@ -21,7 +21,7 @@ impl ToolbarModel {
 
 pub fn view<'a>(model: &ToolbarModel, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let has_changes = model.has_unsaved_changes;
-    let back_label = format!("← {}", ctx.i18n.tr("editor-back-to-viewer"));
+    let back_label = format!("← {}", ctx.i18n.tr("image-editor-back-to-viewer"));
 
     let back_btn = button(Text::new(back_label).size(14)).padding([8, 12]);
     let back_btn = if has_changes {

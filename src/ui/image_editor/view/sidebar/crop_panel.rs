@@ -10,19 +10,19 @@ use super::super::ViewContext;
 use crate::ui::image_editor::{Message, SidebarMessage};
 
 pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let title = text(ctx.i18n.tr("editor-crop-section-title")).size(14);
-    let ratio_label = text(ctx.i18n.tr("editor-crop-ratio-label")).size(13);
+    let title = text(ctx.i18n.tr("image-editor-crop-section-title")).size(14);
+    let ratio_label = text(ctx.i18n.tr("image-editor-crop-ratio-label")).size(13);
 
     let ratios_row1 = Row::new()
         .spacing(4)
         .push(ratio_button(
             crop,
-            ctx.i18n.tr("editor-crop-ratio-free"),
+            ctx.i18n.tr("image-editor-crop-ratio-free"),
             CropRatio::Free,
         ))
         .push(ratio_button(
             crop,
-            ctx.i18n.tr("editor-crop-ratio-square"),
+            ctx.i18n.tr("image-editor-crop-ratio-square"),
             CropRatio::Square,
         ));
 
@@ -30,12 +30,12 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
         .spacing(4)
         .push(ratio_button(
             crop,
-            ctx.i18n.tr("editor-crop-ratio-landscape"),
+            ctx.i18n.tr("image-editor-crop-ratio-landscape"),
             CropRatio::Landscape,
         ))
         .push(ratio_button(
             crop,
-            ctx.i18n.tr("editor-crop-ratio-portrait"),
+            ctx.i18n.tr("image-editor-crop-ratio-portrait"),
             CropRatio::Portrait,
         ));
 
@@ -43,19 +43,19 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
         .spacing(4)
         .push(ratio_button(
             crop,
-            ctx.i18n.tr("editor-crop-ratio-photo"),
+            ctx.i18n.tr("image-editor-crop-ratio-photo"),
             CropRatio::Photo,
         ))
         .push(ratio_button(
             crop,
-            ctx.i18n.tr("editor-crop-ratio-photo-portrait"),
+            ctx.i18n.tr("image-editor-crop-ratio-photo-portrait"),
             CropRatio::PhotoPortrait,
         ));
 
     let crop_info = text(format!("{}×{} px", crop.width, crop.height)).size(12);
 
     let apply_btn = {
-        let btn = button(text(ctx.i18n.tr("editor-crop-apply")).size(14))
+        let btn = button(text(ctx.i18n.tr("image-editor-crop-apply")).size(14))
             .padding(8)
             .width(Length::Fill)
             .style(iced::widget::button::primary);

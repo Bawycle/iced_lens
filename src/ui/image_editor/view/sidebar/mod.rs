@@ -56,7 +56,7 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
     scrollable_section = scrollable_section.push(horizontal_rule(1));
 
     let crop_button = tool_button(
-        ctx.i18n.tr("editor-tool-crop"),
+        ctx.i18n.tr("image-editor-tool-crop"),
         SidebarMessage::SelectTool(EditorTool::Crop),
         model.active_tool == Some(EditorTool::Crop),
     );
@@ -66,7 +66,7 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
     }
 
     let resize_button = tool_button(
-        ctx.i18n.tr("editor-tool-resize"),
+        ctx.i18n.tr("image-editor-tool-resize"),
         SidebarMessage::SelectTool(EditorTool::Resize),
         model.active_tool == Some(EditorTool::Resize),
     );
@@ -126,7 +126,7 @@ fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
                 .spacing(8)
                 .align_y(Vertical::Center)
                 .push(toggle_button)
-                .push(text(ctx.i18n.tr("editor-title")).size(18)),
+                .push(text(ctx.i18n.tr("image-editor-title")).size(18)),
         )
         .push(horizontal_rule(1))
 }
@@ -149,7 +149,7 @@ fn undo_redo_section<'a>(
     can_redo: bool,
     ctx: &ViewContext<'a>,
 ) -> Element<'a, Message> {
-    let undo_btn = button(text(ctx.i18n.tr("editor-undo")).size(16))
+    let undo_btn = button(text(ctx.i18n.tr("image-editor-undo")).size(16))
         .padding(8)
         .width(Length::Fill)
         .style(iced::widget::button::secondary);
@@ -159,7 +159,7 @@ fn undo_redo_section<'a>(
         undo_btn
     };
 
-    let redo_btn = button(text(ctx.i18n.tr("editor-redo")).size(16))
+    let redo_btn = button(text(ctx.i18n.tr("image-editor-redo")).size(16))
         .padding(8)
         .width(Length::Fill)
         .style(iced::widget::button::secondary);
@@ -170,7 +170,7 @@ fn undo_redo_section<'a>(
     };
 
     let controls = Row::new().spacing(8).push(undo_btn).push(redo_btn);
-    let title = text(ctx.i18n.tr("editor-undo-redo-section-title")).size(14);
+    let title = text(ctx.i18n.tr("image-editor-undo-redo-section-title")).size(14);
 
     container(Column::new().spacing(6).push(title).push(controls))
         .padding(12)
@@ -188,7 +188,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             .padding(8)
             .width(Length::Fill)
             .style(iced::widget::button::secondary),
-        text(ctx.i18n.tr("editor-rotate-left-tooltip")),
+        text(ctx.i18n.tr("image-editor-rotate-left-tooltip")),
         tooltip::Position::FollowCursor,
     )
     .gap(4)
@@ -200,7 +200,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             .padding(8)
             .width(Length::Fill)
             .style(iced::widget::button::secondary),
-        text(ctx.i18n.tr("editor-rotate-right-tooltip")),
+        text(ctx.i18n.tr("image-editor-rotate-right-tooltip")),
         tooltip::Position::FollowCursor,
     )
     .gap(4)
@@ -210,7 +210,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .spacing(8)
         .push(rotate_left_btn)
         .push(rotate_right_btn);
-    let title = text(ctx.i18n.tr("editor-rotate-section-title")).size(14);
+    let title = text(ctx.i18n.tr("image-editor-rotate-section-title")).size(14);
 
     container(Column::new().spacing(6).push(title).push(controls))
         .padding(12)
@@ -228,7 +228,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             .padding(8)
             .width(Length::Fill)
             .style(iced::widget::button::secondary),
-        text(ctx.i18n.tr("editor-flip-horizontal-tooltip")),
+        text(ctx.i18n.tr("image-editor-flip-horizontal-tooltip")),
         tooltip::Position::FollowCursor,
     )
     .gap(4)
@@ -240,7 +240,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             .padding(8)
             .width(Length::Fill)
             .style(iced::widget::button::secondary),
-        text(ctx.i18n.tr("editor-flip-vertical-tooltip")),
+        text(ctx.i18n.tr("image-editor-flip-vertical-tooltip")),
         tooltip::Position::FollowCursor,
     )
     .gap(4)
@@ -250,7 +250,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .spacing(8)
         .push(flip_horizontal_btn)
         .push(flip_vertical_btn);
-    let title = text(ctx.i18n.tr("editor-flip-section-title")).size(14);
+    let title = text(ctx.i18n.tr("image-editor-flip-section-title")).size(14);
 
     container(Column::new().spacing(6).push(title).push(controls))
         .padding(12)
@@ -302,7 +302,7 @@ fn footer_section<'a>(
     }
 
     // Cancel button - always available when there are changes
-    let cancel_btn = button(text(ctx.i18n.tr("editor-cancel")).size(16))
+    let cancel_btn = button(text(ctx.i18n.tr("image-editor-cancel")).size(16))
         .padding(12)
         .width(Length::Fill)
         .style(iced::widget::button::secondary);
@@ -315,7 +315,7 @@ fn footer_section<'a>(
 
     // Save button - only for file mode, not captured frames
     if !is_captured_frame {
-        let save_btn = button(text(ctx.i18n.tr("editor-save")).size(16))
+        let save_btn = button(text(ctx.i18n.tr("image-editor-save")).size(16))
             .padding(12)
             .width(Length::Fill)
             .style(iced::widget::button::primary);
@@ -331,7 +331,7 @@ fn footer_section<'a>(
     footer = footer.push(export_format_section(export_format, ctx));
 
     // Save As button - always available
-    let save_as_btn = button(text(ctx.i18n.tr("editor-save-as")).size(16))
+    let save_as_btn = button(text(ctx.i18n.tr("image-editor-save-as")).size(16))
         .padding(12)
         .width(Length::Fill)
         .style(iced::widget::button::primary);
@@ -351,7 +351,7 @@ fn export_format_section<'a>(
     current_format: ExportFormat,
     ctx: &ViewContext<'a>,
 ) -> Element<'a, Message> {
-    let format_label = text(ctx.i18n.tr("editor-export-format-label")).size(14);
+    let format_label = text(ctx.i18n.tr("image-editor-export-format-label")).size(14);
 
     let format_buttons: Vec<Element<'a, Message>> = ExportFormat::all()
         .iter()
