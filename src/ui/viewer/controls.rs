@@ -2,6 +2,7 @@
 //! Viewer controls: zoom inputs, buttons, and fit-to-window toggle.
 
 use crate::i18n::fluent::I18n;
+use crate::ui::design_tokens::spacing;
 use crate::ui::icons;
 use crate::ui::state::zoom::ZoomState;
 use crate::ui::styles;
@@ -151,6 +152,7 @@ pub fn view<'a>(
 
     let zoom_controls_row = Row::new()
         .spacing(shared_styles::CONTROL_SPACING)
+        .padding([0.0, shared_styles::CONTROL_PADDING])
         .align_y(Vertical::Center)
         .push(zoom_label)
         .push(zoom_input)
@@ -158,13 +160,19 @@ pub fn view<'a>(
         .push(zoom_out_button)
         .push(zoom_in_button)
         .push(reset_button)
-        .push(Space::new(Length::Fixed(16.0), Length::Shrink))
+        .push(Space::new(
+            Length::Fixed(shared_styles::CONTROL_PADDING),
+            Length::Shrink,
+        ))
         .push(fit_toggle)
-        .push(Space::new(Length::Fixed(16.0), Length::Shrink))
+        .push(Space::new(
+            Length::Fixed(shared_styles::CONTROL_PADDING),
+            Length::Shrink,
+        ))
         .push(delete_button)
         .push(fullscreen_toggle);
 
-    let mut zoom_controls = Column::new().spacing(4).push(zoom_controls_row);
+    let mut zoom_controls = Column::new().spacing(spacing::XXS).push(zoom_controls_row);
 
     if let Some(error_key) = zoom.zoom_input_error_key {
         let error_text = Text::new(ctx.i18n.tr(error_key))
