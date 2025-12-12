@@ -33,7 +33,13 @@ pub struct ViewContext<'a> {
 /// Renders the current application view based on the active screen.
 pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
     let current_view: Element<'_, Message> = match ctx.screen {
-        Screen::Viewer => view_viewer(ctx.viewer, ctx.i18n, ctx.settings, ctx.fullscreen, ctx.menu_open),
+        Screen::Viewer => view_viewer(
+            ctx.viewer,
+            ctx.i18n,
+            ctx.settings,
+            ctx.fullscreen,
+            ctx.menu_open,
+        ),
         Screen::Settings => view_settings(ctx.settings, ctx.i18n),
         Screen::ImageEditor => view_image_editor(ctx.image_editor, ctx.i18n, ctx.settings),
         Screen::Help => view_help(ctx.help_state, ctx.i18n),

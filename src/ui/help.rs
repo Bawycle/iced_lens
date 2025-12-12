@@ -483,14 +483,10 @@ fn build_tool_title<'a>(title: String) -> Element<'a, Message> {
 fn build_tool_item<'a>(name: String, description: String) -> Element<'a, Message> {
     Row::new()
         .spacing(spacing::SM)
-        .push(
-            Text::new(format!("• {}:", name))
-                .size(14)
-                .font(Font {
-                    weight: Weight::Bold,
-                    ..Font::default()
-                }),
-        )
+        .push(Text::new(format!("• {}:", name)).size(14).font(Font {
+            weight: Weight::Bold,
+            ..Font::default()
+        }))
         .push(Text::new(description).size(14))
         .into()
 }

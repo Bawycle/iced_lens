@@ -54,12 +54,10 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                 }
 
                 match status {
-                    event::Status::Ignored => {
-                        Some(Message::Viewer(component::Message::RawEvent {
-                            window: window_id,
-                            event: event.clone(),
-                        }))
-                    }
+                    event::Status::Ignored => Some(Message::Viewer(component::Message::RawEvent {
+                        window: window_id,
+                        event: event.clone(),
+                    })),
                     event::Status::Captured => None,
                 }
             })
@@ -77,12 +75,10 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                 }
 
                 match status {
-                    event::Status::Ignored => {
-                        Some(Message::Viewer(component::Message::RawEvent {
-                            window: window_id,
-                            event: event.clone(),
-                        }))
-                    }
+                    event::Status::Ignored => Some(Message::Viewer(component::Message::RawEvent {
+                        window: window_id,
+                        event: event.clone(),
+                    })),
                     event::Status::Captured => None,
                 }
             })

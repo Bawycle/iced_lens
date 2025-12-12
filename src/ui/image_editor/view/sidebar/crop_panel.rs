@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Crop tool panel for the editor sidebar.
 
+use crate::ui::design_tokens::spacing;
 use crate::ui::image_editor::state::{CropRatio, CropState};
 use crate::ui::styles;
-use crate::ui::design_tokens::spacing;
 use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length};
 

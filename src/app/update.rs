@@ -39,7 +39,10 @@ pub struct UpdateContext<'a> {
 }
 
 /// Handles viewer component messages.
-pub fn handle_viewer_message(ctx: &mut UpdateContext<'_>, message: component::Message) -> Task<Message> {
+pub fn handle_viewer_message(
+    ctx: &mut UpdateContext<'_>,
+    message: component::Message,
+) -> Task<Message> {
     if let component::Message::RawEvent { window, .. } = &message {
         *ctx.window_id = Some(*window);
     }
@@ -57,7 +60,9 @@ pub fn handle_viewer_message(ctx: &mut UpdateContext<'_>, message: component::Me
             ctx.frame_history_mb,
         ),
         component::Effect::ToggleFullscreen => toggle_fullscreen(ctx.fullscreen, ctx.window_id),
-        component::Effect::ExitFullscreen => update_fullscreen_mode(ctx.fullscreen, ctx.window_id, false),
+        component::Effect::ExitFullscreen => {
+            update_fullscreen_mode(ctx.fullscreen, ctx.window_id, false)
+        }
         component::Effect::OpenSettings => {
             *ctx.screen = Screen::Settings;
             Task::none()
@@ -154,7 +159,10 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
 }
 
 /// Handles settings component messages.
-pub fn handle_settings_message(ctx: &mut UpdateContext<'_>, message: settings::Message) -> Task<Message> {
+pub fn handle_settings_message(
+    ctx: &mut UpdateContext<'_>,
+    message: settings::Message,
+) -> Task<Message> {
     match ctx.settings.update(message) {
         SettingsEvent::None => Task::none(),
         SettingsEvent::BackToViewer => {
@@ -275,7 +283,10 @@ pub fn handle_settings_message(ctx: &mut UpdateContext<'_>, message: settings::M
 }
 
 /// Handles image editor component messages.
-pub fn handle_editor_message(ctx: &mut UpdateContext<'_>, message: image_editor::Message) -> Task<Message> {
+pub fn handle_editor_message(
+    ctx: &mut UpdateContext<'_>,
+    message: image_editor::Message,
+) -> Task<Message> {
     let Some(editor_state) = ctx.image_editor.as_mut() else {
         return Task::none();
     };
@@ -375,10 +386,16 @@ fn handle_save_as_dialog(editor_state: &ImageEditorState) -> Task<Message> {
 /// Handles editor navigation to next image.
 fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Rescan directory to handle added/removed images
-    if let Some(current_path) = ctx.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+    if let Some(current_path) = ctx
+        .image_navigator
+        .current_image_path()
+        .map(|p| p.to_path_buf())
+    {
         let config = config::load().unwrap_or_default();
         let sort_order = config.sort_order.unwrap_or_default();
-        let _ = ctx.image_navigator.scan_directory(&current_path, sort_order);
+        let _ = ctx
+            .image_navigator
+            .scan_directory(&current_path, sort_order);
     }
 
     // Navigate to next image in the list
@@ -400,10 +417,16 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 /// Handles editor navigation to previous image.
 fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Rescan directory to handle added/removed images
-    if let Some(current_path) = ctx.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+    if let Some(current_path) = ctx
+        .image_navigator
+        .current_image_path()
+        .map(|p| p.to_path_buf())
+    {
         let config = config::load().unwrap_or_default();
         let sort_order = config.sort_order.unwrap_or_default();
-        let _ = ctx.image_navigator.scan_directory(&current_path, sort_order);
+        let _ = ctx
+            .image_navigator
+            .scan_directory(&current_path, sort_order);
     }
 
     // Navigate to previous image in the list
@@ -423,7 +446,10 @@ fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message>
 }
 
 /// Handles navbar component messages.
-pub fn handle_navbar_message(ctx: &mut UpdateContext<'_>, message: navbar::Message) -> Task<Message> {
+pub fn handle_navbar_message(
+    ctx: &mut UpdateContext<'_>,
+    message: navbar::Message,
+) -> Task<Message> {
     match navbar::update(message, ctx.menu_open) {
         NavbarEvent::None => Task::none(),
         NavbarEvent::OpenSettings => {
@@ -467,10 +493,16 @@ pub fn handle_about_message(ctx: &mut UpdateContext<'_>, message: about::Message
 /// Handles navigation to next image.
 pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Rescan directory to handle added/removed images
-    if let Some(current_path) = ctx.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+    if let Some(current_path) = ctx
+        .image_navigator
+        .current_image_path()
+        .map(|p| p.to_path_buf())
+    {
         let config = config::load().unwrap_or_default();
         let sort_order = config.sort_order.unwrap_or_default();
-        let _ = ctx.image_navigator.scan_directory(&current_path, sort_order);
+        let _ = ctx
+            .image_navigator
+            .scan_directory(&current_path, sort_order);
     }
 
     // Navigate to next image
@@ -485,10 +517,9 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         ctx.viewer.loading_started_at = Some(std::time::Instant::now());
 
         // Load the next image
-        Task::perform(
-            async move { media::load_media(&next_path) },
-            |result| Message::Viewer(component::Message::ImageLoaded(result)),
-        )
+        Task::perform(async move { media::load_media(&next_path) }, |result| {
+            Message::Viewer(component::Message::ImageLoaded(result))
+        })
     } else {
         Task::none()
     }
@@ -497,10 +528,16 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 /// Handles navigation to previous image.
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Rescan directory to handle added/removed images
-    if let Some(current_path) = ctx.image_navigator.current_image_path().map(|p| p.to_path_buf()) {
+    if let Some(current_path) = ctx
+        .image_navigator
+        .current_image_path()
+        .map(|p| p.to_path_buf())
+    {
         let config = config::load().unwrap_or_default();
         let sort_order = config.sort_order.unwrap_or_default();
-        let _ = ctx.image_navigator.scan_directory(&current_path, sort_order);
+        let _ = ctx
+            .image_navigator
+            .scan_directory(&current_path, sort_order);
     }
 
     // Navigate to previous image
@@ -515,10 +552,9 @@ pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         ctx.viewer.loading_started_at = Some(std::time::Instant::now());
 
         // Load the previous image
-        Task::perform(
-            async move { media::load_media(&prev_path) },
-            |result| Message::Viewer(component::Message::ImageLoaded(result)),
-        )
+        Task::perform(async move { media::load_media(&prev_path) }, |result| {
+            Message::Viewer(component::Message::ImageLoaded(result))
+        })
     } else {
         Task::none()
     }

@@ -254,7 +254,9 @@ impl App {
         };
 
         match message {
-            Message::Viewer(viewer_message) => update::handle_viewer_message(&mut ctx, viewer_message),
+            Message::Viewer(viewer_message) => {
+                update::handle_viewer_message(&mut ctx, viewer_message)
+            }
             Message::SwitchScreen(target) => update::handle_screen_switch(&mut ctx, target),
             Message::Settings(settings_message) => {
                 update::handle_settings_message(&mut ctx, settings_message)
@@ -262,7 +264,9 @@ impl App {
             Message::ImageEditor(editor_message) => {
                 update::handle_editor_message(&mut ctx, editor_message)
             }
-            Message::Navbar(navbar_message) => update::handle_navbar_message(&mut ctx, navbar_message),
+            Message::Navbar(navbar_message) => {
+                update::handle_navbar_message(&mut ctx, navbar_message)
+            }
             Message::Help(help_message) => update::handle_help_message(&mut ctx, help_message),
             Message::About(about_message) => update::handle_about_message(&mut ctx, about_message),
             Message::ImageEditorLoaded(result) => self.handle_image_editor_loaded(result),

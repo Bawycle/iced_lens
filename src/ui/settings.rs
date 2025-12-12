@@ -665,24 +665,32 @@ impl State {
                 Ok(value) => Event::ZoomStepChanged(value),
                 Err(_) => Event::None,
             },
-            Message::BackgroundThemeSelected(theme) => {
-                update_if_changed(&mut self.background_theme, theme, Event::BackgroundThemeSelected)
-            }
+            Message::BackgroundThemeSelected(theme) => update_if_changed(
+                &mut self.background_theme,
+                theme,
+                Event::BackgroundThemeSelected,
+            ),
             Message::SortOrderSelected(order) => {
                 update_if_changed(&mut self.sort_order, order, Event::SortOrderSelected)
             }
-            Message::OverlayTimeoutChanged(timeout) => {
-                update_if_changed(&mut self.overlay_timeout_secs, timeout, Event::OverlayTimeoutChanged)
-            }
+            Message::OverlayTimeoutChanged(timeout) => update_if_changed(
+                &mut self.overlay_timeout_secs,
+                timeout,
+                Event::OverlayTimeoutChanged,
+            ),
             Message::ThemeModeSelected(mode) => {
                 update_if_changed(&mut self.theme_mode, mode, Event::ThemeModeSelected)
             }
-            Message::VideoAutoplayChanged(enabled) => {
-                update_if_changed(&mut self.video_autoplay, enabled, Event::VideoAutoplayChanged)
-            }
-            Message::AudioNormalizationChanged(enabled) => {
-                update_if_changed(&mut self.audio_normalization, enabled, Event::AudioNormalizationChanged)
-            }
+            Message::VideoAutoplayChanged(enabled) => update_if_changed(
+                &mut self.video_autoplay,
+                enabled,
+                Event::VideoAutoplayChanged,
+            ),
+            Message::AudioNormalizationChanged(enabled) => update_if_changed(
+                &mut self.audio_normalization,
+                enabled,
+                Event::AudioNormalizationChanged,
+            ),
             Message::FrameCacheMbChanged(mb) => {
                 update_if_changed(&mut self.frame_cache_mb, mb, Event::FrameCacheMbChanged)
             }

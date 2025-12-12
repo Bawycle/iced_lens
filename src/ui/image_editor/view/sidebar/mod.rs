@@ -170,14 +170,22 @@ fn undo_redo_section<'a>(
         redo_btn
     };
 
-    let controls = Row::new().spacing(spacing::XS).push(undo_btn).push(redo_btn);
+    let controls = Row::new()
+        .spacing(spacing::XS)
+        .push(undo_btn)
+        .push(redo_btn);
     let title = text(ctx.i18n.tr("image-editor-undo-redo-section-title")).size(14);
 
-    container(Column::new().spacing(spacing::XXS).push(title).push(controls))
-        .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(styles::container::panel)
-        .into()
+    container(
+        Column::new()
+            .spacing(spacing::XXS)
+            .push(title)
+            .push(controls),
+    )
+    .padding(spacing::SM)
+    .width(Length::Fill)
+    .style(styles::container::panel)
+    .into()
 }
 
 fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
@@ -213,11 +221,16 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(rotate_right_btn);
     let title = text(ctx.i18n.tr("image-editor-rotate-section-title")).size(14);
 
-    container(Column::new().spacing(spacing::XXS).push(title).push(controls))
-        .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(styles::container::panel)
-        .into()
+    container(
+        Column::new()
+            .spacing(spacing::XXS)
+            .push(title)
+            .push(controls),
+    )
+    .padding(spacing::SM)
+    .width(Length::Fill)
+    .style(styles::container::panel)
+    .into()
 }
 
 fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
@@ -253,11 +266,16 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(flip_vertical_btn);
     let title = text(ctx.i18n.tr("image-editor-flip-section-title")).size(14);
 
-    container(Column::new().spacing(spacing::XXS).push(title).push(controls))
-        .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(styles::container::panel)
-        .into()
+    container(
+        Column::new()
+            .spacing(spacing::XXS)
+            .push(title)
+            .push(controls),
+    )
+    .padding(spacing::SM)
+    .width(Length::Fill)
+    .style(styles::container::panel)
+    .into()
 }
 
 fn footer_section<'a>(
@@ -298,7 +316,10 @@ fn footer_section<'a>(
             next_btn.on_press(SidebarMessage::NavigateNext.into())
         };
 
-        let nav_row = Row::new().spacing(spacing::XS).push(prev_btn).push(next_btn);
+        let nav_row = Row::new()
+            .spacing(spacing::XS)
+            .push(prev_btn)
+            .push(next_btn);
         footer = footer.push(nav_row).push(horizontal_rule(1));
     }
 
@@ -381,9 +402,14 @@ fn export_format_section<'a>(
         .spacing(spacing::XXS)
         .width(Length::Fill);
 
-    container(Column::new().spacing(spacing::XXS).push(format_label).push(format_row))
-        .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(styles::container::panel)
-        .into()
+    container(
+        Column::new()
+            .spacing(spacing::XXS)
+            .push(format_label)
+            .push(format_row),
+    )
+    .padding(spacing::SM)
+    .width(Length::Fill)
+    .style(styles::container::panel)
+    .into()
 }

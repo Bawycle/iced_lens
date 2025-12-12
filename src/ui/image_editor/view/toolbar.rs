@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Top toolbar for the editor surface.
 
-use crate::ui::styles;
 use crate::ui::design_tokens::spacing;
+use crate::ui::styles;
 use iced::widget::{button, container, Row, Text};
 use iced::{Alignment, Element, Length};
 
