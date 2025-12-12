@@ -281,27 +281,78 @@ Key files and directories:
 ```
 iced_lens/
 ├── src/
-│   ├── app.rs              # Main application logic and state
-│   ├── config/             # Configuration persistence
-│   ├── i18n/               # Internationalization system
-│   ├── image_handler/      # Image loading and decoding
-│   ├── ui/                 # UI components (viewer, settings, editor)
-│   │   ├── design_tokens.rs    # Base design tokens (colors, spacing, etc.)
+│   ├── main.rs                 # Entry point
+│   ├── app/                    # Main application logic and state machine
+│   │   ├── mod.rs              # App struct and Message enum
+│   │   ├── state.rs            # AppState machine (Browsing, Viewing, Editing)
+│   │   ├── update.rs           # Message handling
+│   │   └── view.rs             # UI rendering dispatch
+│   ├── config/                 # Configuration persistence
+│   ├── i18n/                   # Internationalization system (Fluent)
+│   ├── media/                  # Media loading and transforms
+│   │   ├── image/              # Image loading, decoding, caching
+│   │   └── video/              # Video file detection and metadata
+│   ├── video_player/           # Video playback engine
+│   │   ├── mod.rs              # VideoPlayer public API
+│   │   ├── state.rs            # Playback state machine
+│   │   ├── decoder.rs          # FFmpeg video decoding thread
+│   │   ├── audio.rs            # Audio decoding and playback (cpal)
+│   │   ├── sync.rs             # A/V synchronization (audio-master)
+│   │   ├── frame_cache.rs      # Decoded frame caching
+│   │   └── time_units.rs       # Time conversion utilities
+│   ├── ui/                     # UI components
+│   │   ├── viewer/             # Image/video viewer component
+│   │   │   ├── component.rs    # Main viewer widget
+│   │   │   ├── video_controls.rs # Playback controls toolbar
+│   │   │   └── overlays.rs     # Loading, error, info overlays
+│   │   ├── image_editor/       # Image editing (crop, resize, rotate)
+│   │   ├── widgets/            # Custom reusable widgets
+│   │   ├── styles/             # Component-specific styles
+│   │   ├── design_tokens.rs    # Base design tokens (colors, spacing)
 │   │   ├── theming.rs          # Theme system (light/dark modes)
 │   │   ├── theme.rs            # Color helpers for viewer/editor
-│   │   └── styles/             # Component-specific styles
-│   ├── error.rs            # Error types
-│   └── icon.rs             # Application icon loading
+│   │   ├── settings.rs         # Settings panel
+│   │   ├── help.rs             # Help/keyboard shortcuts panel
+│   │   └── navbar.rs           # Navigation bar
+│   ├── directory_scanner.rs    # Async directory scanning
+│   ├── image_navigation.rs     # Image list navigation logic
+│   └── error.rs                # Error types
 ├── assets/
-│   ├── i18n/               # Translation files (.ftl)
-│   └── icons/              # Application icons
-├── tests/                  # Integration tests
-├── benches/                # Performance benchmarks
-├── CONTRIBUTING.md         # This file
-├── CHANGELOG.md            # Release notes
-├── README.md               # User-facing documentation
-└── Cargo.toml              # Project metadata and dependencies
+│   ├── i18n/                   # Translation files (.ftl)
+│   └── icons/                  # SVG icons
+├── tests/                      # Integration tests
+├── benches/                    # Performance benchmarks
+├── CONTRIBUTING.md             # This file
+├── CHANGELOG.md                # Release notes
+├── README.md                   # User-facing documentation
+└── Cargo.toml                  # Project metadata and dependencies
 ```
+
+### Key Modules
+
+#### `app/` - Application Core
+The main application state machine with three states:
+- **Browsing**: File browser view
+- **Viewing**: Image/video viewer (includes video playback)
+- **Editing**: Image editor with crop, resize, rotate tools
+
+#### `video_player/` - Video Playback Engine
+Handles video and audio decoding with A/V synchronization:
+- Uses FFmpeg (via `ffmpeg-next`) for decoding
+- Audio playback via `cpal` with `rubato` for resampling
+- Audio-master sync model (video frames sync to audio PTS)
+- Frame caching for smooth playback and frame stepping
+
+#### `media/` - Media Handling
+Loads and transforms images and video metadata:
+- Image formats via `image` crate
+- Video detection and metadata extraction
+- EXIF orientation handling
+
+#### `config/` - Configuration
+User preferences and application settings:
+- **`defaults.rs`**: Centralized default values for all constants (zoom, volume, cache sizes, etc.). **Always add new defaults here** rather than scattering them across the codebase. Includes compile-time validation to ensure constraints are valid.
+- **`mod.rs`**: User settings persistence (`settings.toml`)
 
 ## Style Architecture
 
