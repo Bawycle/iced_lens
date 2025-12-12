@@ -209,6 +209,10 @@ impl AsyncDecoder {
         let mut in_stepping_mode = false; // True when user is stepping through frames
         let mut last_paused_frame: Option<DecodedFrame> = None; // Frame displayed after seek (for history)
 
+        // Precise seeking: target PTS to reach after keyframe seek
+        // When set, decoder skips frames until reaching this target
+        let mut seek_target_secs: Option<f64> = None;
+
         // Frame cache for optimized seeking
         let mut frame_cache = FrameCache::new(cache_config);
 
@@ -231,6 +235,8 @@ impl AsyncDecoder {
                     in_stepping_mode = false;
                     frame_history.clear();
                     last_paused_frame = None;
+                    // Clear any pending seek target
+                    seek_target_secs = None;
                     let _ = event_tx.blocking_send(DecoderEvent::Buffering);
                 }
                 Ok(DecoderCommand::Pause) => {
@@ -239,30 +245,8 @@ impl AsyncDecoder {
                     first_pts = None;
                 }
                 Ok(DecoderCommand::Seek { target_secs }) => {
-                    // Check cache first for instant preview (only when paused)
-                    // This provides immediate visual feedback while FFmpeg seeks
-                    const CACHE_TOLERANCE_SECS: f64 = 0.5;
-                    let mut cache_hit = false;
-                    if !is_playing {
-                        if let Some(cached_frame) = frame_cache.get_at_or_before(target_secs) {
-                            let distance = target_secs - cached_frame.pts_secs;
-                            if distance <= CACHE_TOLERANCE_SECS {
-                                // Cache hit - send cached frame immediately for instant preview
-                                let decoded = DecodedFrame {
-                                    rgba_data: Arc::clone(&cached_frame.rgba_data),
-                                    width: cached_frame.width,
-                                    height: cached_frame.height,
-                                    pts_secs: cached_frame.pts_secs,
-                                };
-                                let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
-                                cache_hit = true;
-                                // Don't skip FFmpeg seek - we still need to position the demuxer
-                                // for subsequent playback (e.g., when restarting from end)
-                            }
-                        }
-                    }
-
                     // Always do FFmpeg seek to position demuxer correctly
+                    // FFmpeg seeks to the nearest keyframe BEFORE the target
                     // Convert seconds to AV_TIME_BASE (microseconds)
                     let timestamp = (target_secs * 1_000_000.0) as i64;
                     if let Err(e) = ictx.seek(timestamp, ..timestamp) {
@@ -277,12 +261,15 @@ impl AsyncDecoder {
                         in_stepping_mode = false;
                         frame_history.clear();
                         last_paused_frame = None;
-                        if !cache_hit {
-                            // Only send Buffering if we didn't already send a cached frame
-                            let _ = event_tx.blocking_send(DecoderEvent::Buffering);
-                        }
-                        // If paused and no cache hit, decode one frame to show the seek result
-                        if !is_playing && !cache_hit {
+
+                        // Set precise seek target - decoder will skip frames until reaching this PTS
+                        // This enables frame-accurate seeking instead of keyframe-only seeking
+                        seek_target_secs = Some(target_secs);
+
+                        let _ = event_tx.blocking_send(DecoderEvent::Buffering);
+
+                        // Start decoding to reach the target frame
+                        if !is_playing {
                             decode_single_frame = true;
                         }
                     }
@@ -291,6 +278,8 @@ impl AsyncDecoder {
                     // Step forward one frame without seeking
                     // This decodes the next frame in sequence
                     if !is_playing {
+                        // Clear any pending seek target - stepping uses sequential decoding
+                        seek_target_secs = None;
                         // When entering stepping mode, add the current frame to history first
                         // This allows stepping backward to the frame shown before stepping started
                         if !in_stepping_mode {
@@ -305,6 +294,8 @@ impl AsyncDecoder {
                 Ok(DecoderCommand::StepBackward) => {
                     // Step backward one frame using frame history
                     if !is_playing && in_stepping_mode {
+                        // Clear any pending seek target
+                        seek_target_secs = None;
                         if let Some(prev_frame) = frame_history.step_back() {
                             // Send the previous frame
                             let decoded = DecodedFrame {
@@ -337,6 +328,9 @@ impl AsyncDecoder {
 
             // Decode next frame
             let mut frame_decoded = false;
+            // Track last decoded frame for end-of-stream during precise seek
+            let mut last_decoded_for_seek: Option<(ffmpeg_next::frame::Video, f64, bool)> = None;
+
             for (stream, packet) in ictx.packets() {
                 if stream.index() != video_stream_index {
                     continue;
@@ -352,7 +346,29 @@ impl AsyncDecoder {
                 // Try to receive decoded frame
                 let mut decoded_frame = ffmpeg_next::frame::Video::empty();
                 if decoder.receive_frame(&mut decoded_frame).is_ok() {
-                    // Convert to RGBA
+                    // Calculate PTS FIRST (before scaling) for seek target comparison
+                    let pts_secs = if let Some(pts) = decoded_frame.timestamp() {
+                        pts as f64 * time_base_f64
+                    } else {
+                        0.0
+                    };
+
+                    let is_keyframe = decoded_frame.is_key();
+
+                    // Precise seeking: skip frames before target PTS
+                    // Only scale and emit frames at or after the seek target
+                    if let Some(target) = seek_target_secs {
+                        if pts_secs < target {
+                            // Frame is before target - save it (in case we hit end of stream)
+                            // but don't scale or emit yet, continue decoding
+                            last_decoded_for_seek = Some((decoded_frame, pts_secs, is_keyframe));
+                            continue;
+                        }
+                        // Frame is at or after target - clear seek target and emit this frame
+                        seek_target_secs = None;
+                    }
+
+                    // Convert to RGBA (only for frames we'll actually emit)
                     let mut rgb_frame = ffmpeg_next::frame::Video::empty();
                     if let Err(e) = scaler.run(&decoded_frame, &mut rgb_frame) {
                         let _ = event_tx
@@ -363,36 +379,28 @@ impl AsyncDecoder {
                     // Extract RGBA data
                     let rgba_data = Self::extract_rgba_data(&rgb_frame);
 
-                    // Calculate PTS in seconds
-                    let pts_secs = if let Some(pts) = decoded_frame.timestamp() {
-                        pts as f64 * time_base_f64
-                    } else {
-                        0.0
-                    };
+                    // Frame pacing: wait until the frame should be displayed (only during playback)
+                    if is_playing {
+                        if let Some(start_time) = playback_start_time {
+                            // Store first frame PTS as reference
+                            if first_pts.is_none() {
+                                first_pts = Some(pts_secs);
+                            }
 
-                    // Frame pacing: wait until the frame should be displayed
-                    if let Some(start_time) = playback_start_time {
-                        // Store first frame PTS as reference
-                        if first_pts.is_none() {
-                            first_pts = Some(pts_secs);
-                        }
+                            if let Some(first) = first_pts {
+                                // Calculate when this frame should be displayed relative to playback start
+                                let frame_delay = pts_secs - first;
+                                let target_time =
+                                    start_time + std::time::Duration::from_secs_f64(frame_delay);
+                                let now = std::time::Instant::now();
 
-                        if let Some(first) = first_pts {
-                            // Calculate when this frame should be displayed relative to playback start
-                            let frame_delay = pts_secs - first;
-                            let target_time =
-                                start_time + std::time::Duration::from_secs_f64(frame_delay);
-                            let now = std::time::Instant::now();
-
-                            // Wait until target time
-                            if target_time > now {
-                                std::thread::sleep(target_time - now);
+                                // Wait until target time
+                                if target_time > now {
+                                    std::thread::sleep(target_time - now);
+                                }
                             }
                         }
                     }
-
-                    // Check if this is a keyframe for caching
-                    let is_keyframe = decoded_frame.is_key();
 
                     // Send frame event
                     let decoded = DecodedFrame {
@@ -436,7 +444,38 @@ impl AsyncDecoder {
 
             // If no frame was decoded, we've reached end of stream
             if !frame_decoded {
-                let _ = event_tx.blocking_send(DecoderEvent::EndOfStream);
+                // If we were seeking and have a last decoded frame, emit it
+                // This handles the case where seek target is beyond the last frame
+                if let Some((last_frame, pts_secs, is_keyframe)) = last_decoded_for_seek {
+                    seek_target_secs = None;
+
+                    // Scale the last frame we decoded during seek
+                    let mut rgb_frame = ffmpeg_next::frame::Video::empty();
+                    if scaler.run(&last_frame, &mut rgb_frame).is_ok() {
+                        let rgba_data = Self::extract_rgba_data(&rgb_frame);
+                        let decoded = DecodedFrame {
+                            rgba_data: Arc::new(rgba_data),
+                            width,
+                            height,
+                            pts_secs,
+                        };
+
+                        if is_keyframe {
+                            frame_cache.insert(decoded.clone(), true);
+                        }
+
+                        if !is_playing && !in_stepping_mode {
+                            last_paused_frame = Some(decoded.clone());
+                        }
+
+                        let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
+                        frame_decoded = true;
+                    }
+                }
+
+                if !frame_decoded {
+                    let _ = event_tx.blocking_send(DecoderEvent::EndOfStream);
+                }
                 is_playing = false;
                 playback_start_time = None;
                 first_pts = None;
