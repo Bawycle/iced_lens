@@ -128,6 +128,25 @@ pub(crate) enum ZoomStepError {
     OutOfRange,
 }
 
+/// Helper to update a field and emit an event only if the value changed.
+///
+/// This reduces boilerplate in settings update handlers where we need to:
+/// 1. Check if the new value differs from the current one
+/// 2. Update the field if changed
+/// 3. Return the appropriate event
+fn update_if_changed<T: PartialEq + Clone>(
+    current: &mut T,
+    new_value: T,
+    make_event: impl FnOnce(T) -> Event,
+) -> Event {
+    if *current == new_value {
+        Event::None
+    } else {
+        *current = new_value.clone();
+        make_event(new_value)
+    }
+}
+
 impl Default for State {
     fn default() -> Self {
         Self::new(StateConfig::default())
@@ -647,68 +666,28 @@ impl State {
                 Err(_) => Event::None,
             },
             Message::BackgroundThemeSelected(theme) => {
-                if self.background_theme == theme {
-                    Event::None
-                } else {
-                    self.background_theme = theme;
-                    Event::BackgroundThemeSelected(theme)
-                }
+                update_if_changed(&mut self.background_theme, theme, Event::BackgroundThemeSelected)
             }
             Message::SortOrderSelected(order) => {
-                if self.sort_order == order {
-                    Event::None
-                } else {
-                    self.sort_order = order;
-                    Event::SortOrderSelected(order)
-                }
+                update_if_changed(&mut self.sort_order, order, Event::SortOrderSelected)
             }
             Message::OverlayTimeoutChanged(timeout) => {
-                if self.overlay_timeout_secs == timeout {
-                    Event::None
-                } else {
-                    self.overlay_timeout_secs = timeout;
-                    Event::OverlayTimeoutChanged(timeout)
-                }
+                update_if_changed(&mut self.overlay_timeout_secs, timeout, Event::OverlayTimeoutChanged)
             }
             Message::ThemeModeSelected(mode) => {
-                if self.theme_mode == mode {
-                    Event::None
-                } else {
-                    self.theme_mode = mode;
-                    Event::ThemeModeSelected(mode)
-                }
+                update_if_changed(&mut self.theme_mode, mode, Event::ThemeModeSelected)
             }
             Message::VideoAutoplayChanged(enabled) => {
-                if self.video_autoplay == enabled {
-                    Event::None
-                } else {
-                    self.video_autoplay = enabled;
-                    Event::VideoAutoplayChanged(enabled)
-                }
+                update_if_changed(&mut self.video_autoplay, enabled, Event::VideoAutoplayChanged)
             }
             Message::AudioNormalizationChanged(enabled) => {
-                if self.audio_normalization == enabled {
-                    Event::None
-                } else {
-                    self.audio_normalization = enabled;
-                    Event::AudioNormalizationChanged(enabled)
-                }
+                update_if_changed(&mut self.audio_normalization, enabled, Event::AudioNormalizationChanged)
             }
             Message::FrameCacheMbChanged(mb) => {
-                if self.frame_cache_mb == mb {
-                    Event::None
-                } else {
-                    self.frame_cache_mb = mb;
-                    Event::FrameCacheMbChanged(mb)
-                }
+                update_if_changed(&mut self.frame_cache_mb, mb, Event::FrameCacheMbChanged)
             }
             Message::FrameHistoryMbChanged(mb) => {
-                if self.frame_history_mb == mb {
-                    Event::None
-                } else {
-                    self.frame_history_mb = mb;
-                    Event::FrameHistoryMbChanged(mb)
-                }
+                update_if_changed(&mut self.frame_history_mb, mb, Event::FrameHistoryMbChanged)
             }
         }
     }
