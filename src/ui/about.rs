@@ -1,0 +1,243 @@
+// SPDX-License-Identifier: MPL-2.0
+//! About screen module displaying application information and licenses.
+//!
+//! This module shows application details, copyright information, license
+//! notices (MPL-2.0 for the code, custom license for the icon), credits
+//! for dependencies, and links to the project repository.
+
+use crate::i18n::fluent::I18n;
+use crate::ui::design_tokens::{radius, sizing, spacing};
+use crate::ui::icons;
+use crate::ui::styles;
+use iced::{
+    alignment::{Horizontal, Vertical},
+    widget::{button, container, horizontal_rule, scrollable, text, Column, Container, Row, Text},
+    Border, Element, Length, Theme,
+};
+
+/// Application version from Cargo.toml.
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Repository URL.
+const REPOSITORY_URL: &str = "https://codeberg.org/Bawycle/iced_lens";
+
+/// Issues URL.
+const ISSUES_URL: &str = "https://codeberg.org/Bawycle/iced_lens/issues";
+
+/// Contextual data needed to render the about screen.
+pub struct ViewContext<'a> {
+    pub i18n: &'a I18n,
+}
+
+/// Messages emitted by the about screen.
+#[derive(Debug, Clone)]
+pub enum Message {
+    BackToViewer,
+}
+
+/// Events propagated to the parent application.
+#[derive(Debug, Clone)]
+pub enum Event {
+    None,
+    BackToViewer,
+}
+
+/// Process an about screen message and return the corresponding event.
+pub fn update(message: Message) -> Event {
+    match message {
+        Message::BackToViewer => Event::BackToViewer,
+    }
+}
+
+/// Render the about screen.
+pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
+    let back_button =
+        button(text(format!("← {}", ctx.i18n.tr("about-back-to-viewer-button"))).size(14))
+            .on_press(Message::BackToViewer);
+
+    let title = Text::new(ctx.i18n.tr("about-title")).size(30);
+
+    // Build sections
+    let app_section = build_app_section(&ctx);
+    let license_section = build_license_section(&ctx);
+    let icon_license_section = build_icon_license_section(&ctx);
+    let credits_section = build_credits_section(&ctx);
+    let links_section = build_links_section(&ctx);
+
+    let content = Column::new()
+        .width(Length::Fill)
+        .spacing(spacing::LG)
+        .align_x(Horizontal::Left)
+        .padding(spacing::MD)
+        .push(back_button)
+        .push(title)
+        .push(app_section)
+        .push(license_section)
+        .push(icon_license_section)
+        .push(credits_section)
+        .push(links_section);
+
+    scrollable(content).into()
+}
+
+/// Build the application info section.
+fn build_app_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let app_name = Text::new(ctx.i18n.tr("about-app-name")).size(20);
+    let version = Text::new(format!("v{}", APP_VERSION)).size(14);
+    let description = Text::new(ctx.i18n.tr("about-app-description")).size(14);
+
+    let content = Column::new()
+        .spacing(spacing::XS)
+        .push(
+            Row::new()
+                .spacing(spacing::SM)
+                .align_y(Vertical::Center)
+                .push(app_name)
+                .push(version),
+        )
+        .push(description);
+
+    build_section(
+        icons::info(),
+        ctx.i18n.tr("about-section-app"),
+        content.into(),
+    )
+}
+
+/// Build the license section (MPL-2.0).
+fn build_license_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let license_name = Text::new(ctx.i18n.tr("about-license-name")).size(16);
+    let license_summary = Text::new(ctx.i18n.tr("about-license-summary")).size(14);
+
+    let content = Column::new()
+        .spacing(spacing::SM)
+        .push(license_name)
+        .push(license_summary);
+
+    build_section(
+        icons::globe(),
+        ctx.i18n.tr("about-section-license"),
+        content.into(),
+    )
+}
+
+/// Build the icon license section.
+fn build_icon_license_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let license_name = Text::new(ctx.i18n.tr("about-icon-license-name")).size(16);
+    let license_summary = Text::new(ctx.i18n.tr("about-icon-license-summary")).size(14);
+
+    let content = Column::new()
+        .spacing(spacing::SM)
+        .push(license_name)
+        .push(license_summary);
+
+    build_section(
+        icons::image(),
+        ctx.i18n.tr("about-section-icon-license"),
+        content.into(),
+    )
+}
+
+/// Build the credits section.
+fn build_credits_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let content = Column::new()
+        .spacing(spacing::XS)
+        .push(build_credit_item(ctx.i18n.tr("about-credits-iced")))
+        .push(build_credit_item(ctx.i18n.tr("about-credits-ffmpeg")))
+        .push(build_credit_item(ctx.i18n.tr("about-credits-fluent")));
+
+    build_section(
+        icons::cog(),
+        ctx.i18n.tr("about-section-credits"),
+        content.into(),
+    )
+}
+
+/// Build a single credit item.
+fn build_credit_item<'a>(description: String) -> Element<'a, Message> {
+    Text::new(format!("• {}", description)).size(14).into()
+}
+
+/// Build the links section.
+fn build_links_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let repo_label = ctx.i18n.tr("about-link-repository");
+    let issues_label = ctx.i18n.tr("about-link-issues");
+
+    let content = Column::new()
+        .spacing(spacing::SM)
+        .push(build_link_item(&repo_label, REPOSITORY_URL))
+        .push(build_link_item(&issues_label, ISSUES_URL));
+
+    build_section(
+        icons::globe(),
+        ctx.i18n.tr("about-section-links"),
+        content.into(),
+    )
+}
+
+/// Build a link item with label and URL.
+fn build_link_item<'a>(label: &str, url: &'a str) -> Element<'a, Message> {
+    Row::new()
+        .spacing(spacing::SM)
+        .push(Text::new(format!("{}:", label)).size(14))
+        .push(Text::new(url).size(14))
+        .into()
+}
+
+/// Build a section with icon, title, and content (same pattern as settings/help).
+fn build_section<'a>(
+    icon: iced::widget::Svg<'a>,
+    title: String,
+    content: Element<'a, Message>,
+) -> Element<'a, Message> {
+    let icon_sized = icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
+
+    let header = Row::new()
+        .spacing(spacing::SM)
+        .align_y(Vertical::Center)
+        .push(icon_sized)
+        .push(Text::new(title).size(18));
+
+    let inner = Column::new()
+        .spacing(spacing::SM)
+        .push(header)
+        .push(horizontal_rule(1))
+        .push(content);
+
+    Container::new(inner)
+        .padding(spacing::MD)
+        .width(Length::Fill)
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.extended_palette().background.weak.color.into()),
+            border: Border {
+                radius: radius::MD.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::i18n::fluent::I18n;
+
+    #[test]
+    fn about_view_renders() {
+        let i18n = I18n::default();
+        let ctx = ViewContext { i18n: &i18n };
+        let _element = view(ctx);
+    }
+
+    #[test]
+    fn back_to_viewer_emits_event() {
+        let event = update(Message::BackToViewer);
+        assert!(matches!(event, Event::BackToViewer));
+    }
+
+    #[test]
+    fn app_version_is_valid() {
+        assert!(!APP_VERSION.is_empty());
+    }
+}

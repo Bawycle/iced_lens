@@ -3,42 +3,95 @@
 //! background, cursor interaction, and position indicator.
 
 use crate::config::BackgroundTheme;
-use crate::image_handler::ImageData;
+use crate::media::MediaData;
+use crate::ui::components::checkerboard;
+use crate::ui::design_tokens::{opacity, radius, sizing, spacing};
+use crate::ui::icons;
+use crate::ui::styles;
 use crate::ui::theme;
-use crate::ui::viewer::component::Message;
-use crate::ui::widgets::wheel_blocking_scrollable::wheel_blocking_scrollable;
+use crate::ui::viewer::{component::Message, HudIconKind, HudLine};
+use crate::ui::widgets::{wheel_blocking_scrollable::wheel_blocking_scrollable, AnimatedSpinner};
 use iced::mouse;
-use iced::widget::{button, mouse_area, Column, Container, Scrollable, Stack, Text};
+use iced::widget::{button, mouse_area, Column, Container, Row, Scrollable, Stack, Text};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::scrollable::{Direction, Id, Scrollbar, Viewport},
-    Background, Border, Color, Element, Length, Padding, Shadow, Theme,
+    Background, Element, Length, Padding, Theme,
 };
 
-pub struct ViewContext {
+pub struct ViewContext<'a> {
     pub background_theme: BackgroundTheme,
-    pub hud_lines: Vec<String>,
+    pub hud_lines: Vec<HudLine>,
     pub scrollable_id: &'static str,
+    pub i18n: &'a crate::i18n::fluent::I18n,
 }
 
 pub struct ViewModel<'a> {
-    pub image: &'a ImageData,
+    pub media: &'a MediaData,
     pub zoom_percent: f32,
     pub padding: Padding,
     pub is_dragging: bool,
-    pub cursor_over_image: bool,
+    pub cursor_over_media: bool,
     pub arrows_visible: bool,
+    pub overlay_visible: bool,
     pub has_next: bool,
     pub has_previous: bool,
     pub at_first: bool,
     pub at_last: bool,
+    pub current_index: Option<usize>,
+    pub total_count: usize,
+    pub position_counter_visible: bool,
+    pub hud_visible: bool,
+    pub video_canvas: Option<&'a crate::ui::widgets::VideoCanvas<super::component::Message>>,
+    pub is_video_playing: bool,
+    pub is_loading_media: bool,
+    pub spinner_rotation: f32,
+    pub video_error: Option<&'a str>,
 }
 
-pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> {
-    let image_viewer = super::view_image(model.image, model.zoom_percent);
-    let image_container = Container::new(image_viewer).padding(model.padding);
+pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Message> {
+    // Determine arrow colors based on background theme for optimal visibility
+    // Following UX best practices: semi-transparent backgrounds with strong shadows
+    let (arrow_text_color, arrow_bg_alpha_normal, arrow_bg_alpha_hover, svg_color) =
+        match ctx.background_theme {
+            BackgroundTheme::Light => {
+                // Light background: dark arrows with light background on hover
+                (
+                    theme::overlay_arrow_dark_color(),
+                    0.0,
+                    0.2,
+                    theme::overlay_arrow_dark_color(),
+                )
+            }
+            BackgroundTheme::Dark | BackgroundTheme::Checkerboard => {
+                // Dark/checkerboard: white arrows with dark background on hover
+                (
+                    theme::overlay_arrow_light_color(),
+                    0.0,
+                    0.5,
+                    theme::overlay_arrow_light_color(),
+                )
+            }
+        };
 
-    let scrollable = Scrollable::new(image_container)
+    // Use video canvas if it has a frame (playing OR paused with frame),
+    // otherwise show static media (image or video thumbnail before playback starts)
+    let media_viewer = if let Some(canvas) = model.video_canvas {
+        if canvas.has_frame() {
+            // Show the canvas frame (whether playing or paused)
+            canvas.view()
+        } else {
+            // No frame yet, show thumbnail
+            super::view_media(model.media, model.zoom_percent)
+        }
+    } else {
+        // Not a video or no canvas, show static media
+        super::view_media(model.media, model.zoom_percent)
+    };
+
+    let media_container = Container::new(media_viewer).padding(model.padding);
+
+    let scrollable = Scrollable::new(media_container)
         .id(Id::new(ctx.scrollable_id))
         .width(Length::Fill)
         .height(Length::Fill)
@@ -58,7 +111,7 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
 
     let cursor_interaction = if model.is_dragging {
         mouse::Interaction::Grabbing
-    } else if model.cursor_over_image {
+    } else if model.cursor_over_media {
         mouse::Interaction::Grab
     } else {
         mouse::Interaction::default()
@@ -92,7 +145,7 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
                 })
                 .into()
         }
-        BackgroundTheme::Checkerboard => theme::wrap_with_checkerboard(scrollable_container),
+        BackgroundTheme::Checkerboard => checkerboard::wrap(scrollable_container),
     };
 
     let mut stack = Stack::new().push(base_surface);
@@ -100,110 +153,276 @@ pub fn view<'a>(ctx: ViewContext, model: ViewModel<'a>) -> Element<'a, Message> 
     // Add navigation arrows if visible
     if model.arrows_visible {
         if model.has_previous {
-            // Reduce opacity at boundaries to indicate loop behavior
-            let opacity_factor = if model.at_first { 0.5 } else { 1.0 };
-            let left_arrow = button(Text::new("◀").size(28))
+            // Show loop icon at boundaries to indicate wrap-around behavior
+            let button_content: Element<'_, Message> = if model.at_first {
+                let loop_icon = icons::sized(icons::loop_icon(), 20.0)
+                    .style(styles::overlay::loop_icon(svg_color));
+                Row::new()
+                    .spacing(spacing::XXS)
+                    .align_y(Vertical::Center)
+                    .push(loop_icon)
+                    .push(Text::new("◀").size(28))
+                    .into()
+            } else {
+                Text::new("◀").size(28).into()
+            };
+            let left_arrow = button(button_content)
                 .on_press(Message::NavigatePrevious)
-                .padding(12)
-                .style(
-                    move |_theme: &Theme, _status: button::Status| button::Style {
-                        background: Some(Background::Color(Color::from_rgba(
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.5 * opacity_factor,
-                        ))),
-                        text_color: Color::from_rgba(1.0, 1.0, 1.0, opacity_factor),
-                        border: Border {
-                            radius: 24.0.into(),
-                            width: 1.0,
-                            color: Color::from_rgba(1.0, 1.0, 1.0, 0.2 * opacity_factor),
-                        },
-                        shadow: Shadow {
-                            color: Color::from_rgba(0.0, 0.0, 0.0, 0.3 * opacity_factor),
-                            offset: iced::Vector::new(0.0, 2.0),
-                            blur_radius: 8.0,
-                        },
-                    },
-                );
+                .padding(spacing::SM)
+                .style(styles::button_overlay(
+                    arrow_text_color,
+                    arrow_bg_alpha_normal,
+                    arrow_bg_alpha_hover,
+                ));
 
             stack = stack.push(
                 Container::new(left_arrow)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .padding(16)
+                    .padding(spacing::MD)
                     .align_x(Horizontal::Left)
                     .align_y(Vertical::Center),
             );
         }
 
         if model.has_next {
-            // Reduce opacity at boundaries to indicate loop behavior
-            let opacity_factor = if model.at_last { 0.5 } else { 1.0 };
-            let right_arrow = button(Text::new("▶").size(28))
+            // Show loop icon at boundaries to indicate wrap-around behavior
+            let button_content: Element<'_, Message> = if model.at_last {
+                let loop_icon = icons::sized(icons::loop_icon(), 20.0)
+                    .style(styles::overlay::loop_icon(svg_color));
+                Row::new()
+                    .spacing(spacing::XXS)
+                    .align_y(Vertical::Center)
+                    .push(Text::new("▶").size(28))
+                    .push(loop_icon)
+                    .into()
+            } else {
+                Text::new("▶").size(28).into()
+            };
+            let right_arrow = button(button_content)
                 .on_press(Message::NavigateNext)
-                .padding(12)
-                .style(
-                    move |_theme: &Theme, _status: button::Status| button::Style {
-                        background: Some(Background::Color(Color::from_rgba(
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.5 * opacity_factor,
-                        ))),
-                        text_color: Color::from_rgba(1.0, 1.0, 1.0, opacity_factor),
-                        border: Border {
-                            radius: 24.0.into(),
-                            width: 1.0,
-                            color: Color::from_rgba(1.0, 1.0, 1.0, 0.2 * opacity_factor),
-                        },
-                        shadow: Shadow {
-                            color: Color::from_rgba(0.0, 0.0, 0.0, 0.3 * opacity_factor),
-                            offset: iced::Vector::new(0.0, 2.0),
-                            blur_radius: 8.0,
-                        },
-                    },
-                );
+                .padding(spacing::SM)
+                .style(styles::button_overlay(
+                    arrow_text_color,
+                    arrow_bg_alpha_normal,
+                    arrow_bg_alpha_hover,
+                ));
 
             stack = stack.push(
                 Container::new(right_arrow)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .padding(16)
+                    .padding(spacing::MD)
                     .align_x(Horizontal::Right)
                     .align_y(Vertical::Center),
             );
         }
     }
 
-    // Add HUD indicator if present
-    if !ctx.hud_lines.is_empty() {
-        let mut hud_column: Column<'_, Message> = Column::new().spacing(4);
-        for line in &ctx.hud_lines {
-            hud_column = hud_column.push(Text::new(line.clone()).size(12));
+    // Add loading overlay if media is being loaded
+    if model.is_loading_media {
+        let spinner =
+            AnimatedSpinner::new(theme::overlay_arrow_light_color(), model.spinner_rotation)
+                .into_element();
+
+        let loading_text = Text::new(ctx.i18n.tr("media-loading")).size(sizing::ICON_SM);
+
+        let loading_content = Column::new()
+            .spacing(spacing::SM)
+            .align_x(Horizontal::Center)
+            .push(spinner)
+            .push(loading_text);
+
+        let loading_overlay =
+            Container::new(loading_content)
+                .padding(spacing::MD)
+                .style(move |_theme: &Theme| iced::widget::container::Style {
+                    background: Some(Background::Color(iced::Color {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: opacity::OVERLAY_MEDIUM,
+                    })),
+                    border: iced::Border {
+                        radius: radius::MD.into(),
+                        ..Default::default()
+                    },
+                    text_color: Some(theme::overlay_arrow_light_color()),
+                    ..Default::default()
+                });
+
+        stack = stack.push(
+            Container::new(loading_overlay)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Center),
+        );
+    }
+
+    // Add video error overlay if there's an error
+    if let Some(error_msg) = model.video_error {
+        use crate::error::VideoError;
+
+        // Parse error message to get appropriate i18n key and user-friendly message
+        let video_error = VideoError::from_message(error_msg);
+        let error_text = ctx.i18n.tr(video_error.i18n_key());
+        let heading = ctx.i18n.tr("error-load-video-heading");
+
+        let error_icon = icons::sized(icons::warning(), 32.0)
+            .style(styles::overlay::play_icon(theme::error_color()));
+
+        let error_content = Column::new()
+            .spacing(spacing::SM)
+            .align_x(Horizontal::Center)
+            .push(error_icon)
+            .push(Text::new(heading).size(sizing::ICON_MD))
+            .push(Text::new(error_text).size(sizing::ICON_SM));
+
+        let error_overlay = Container::new(error_content)
+            .padding(spacing::LG)
+            .max_width(400.0)
+            .style(move |_theme: &Theme| iced::widget::container::Style {
+                background: Some(Background::Color(iced::Color {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: opacity::OVERLAY_STRONG,
+                })),
+                border: iced::Border {
+                    radius: radius::MD.into(),
+                    ..Default::default()
+                },
+                text_color: Some(theme::overlay_arrow_light_color()),
+                ..Default::default()
+            });
+
+        stack = stack.push(
+            Container::new(error_overlay)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Center),
+        );
+    }
+
+    // Add play/pause button overlay for videos
+    if let MediaData::Video(_) = model.media {
+        // Show play button when paused and not loading and no error
+        if model.overlay_visible
+            && !model.is_loading_media
+            && !model.is_video_playing
+            && model.video_error.is_none()
+        {
+            let play_icon = icons::sized(icons::play(), 32.0).style(styles::overlay::play_icon(
+                theme::overlay_arrow_light_color(),
+            ));
+
+            let play_button = button(play_icon)
+                .on_press(Message::InitiatePlayback)
+                .style(styles::button::video_play_overlay())
+                .width(Length::Fixed(64.0))
+                .height(Length::Fixed(64.0));
+
+            stack = stack.push(
+                Container::new(play_button)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(Horizontal::Center)
+                    .align_y(Vertical::Center),
+            );
+        }
+        // Show pause button when playing and overlay is visible and no error
+        else if model.overlay_visible && model.is_video_playing && model.video_error.is_none() {
+            let pause_icon = icons::sized(icons::pause(), 32.0).style(styles::overlay::play_icon(
+                theme::overlay_arrow_light_color(),
+            ));
+
+            // This should send a message to pause the video
+            // For now, we'll reuse InitiatePlayback which should toggle
+            let pause_button = button(pause_icon)
+                .on_press(Message::InitiatePlayback)
+                .style(styles::button::video_play_overlay())
+                .width(Length::Fixed(64.0))
+                .height(Length::Fixed(64.0));
+
+            stack = stack.push(
+                Container::new(pause_button)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(Horizontal::Center)
+                    .align_y(Vertical::Center),
+            );
+        }
+    }
+
+    // Add HUD indicator if present and visible
+    if model.hud_visible && !ctx.hud_lines.is_empty() {
+        const HUD_ICON_SIZE: f32 = 14.0;
+
+        let mut hud_column: Column<'_, Message> = Column::new().spacing(spacing::XXS);
+        for hud_line in &ctx.hud_lines {
+            let icon = match hud_line.icon {
+                HudIconKind::Position => icons::crosshair(),
+                HudIconKind::Zoom => icons::magnifier(),
+                HudIconKind::Video { has_audio } => {
+                    if has_audio {
+                        icons::video_camera_audio()
+                    } else {
+                        icons::video_camera()
+                    }
+                }
+            };
+
+            let styled_icon = icons::sized(icon, HUD_ICON_SIZE).style(styles::overlay::loop_icon(
+                theme::overlay_arrow_light_color(),
+            ));
+
+            let line_row = Row::new()
+                .spacing(spacing::XXS)
+                .align_y(Vertical::Center)
+                .push(styled_icon)
+                .push(Text::new(hud_line.text.clone()).size(12));
+
+            hud_column = hud_column.push(line_row);
         }
 
         let indicator = Container::new(hud_column)
-            .padding(6)
-            .style(|_theme: &Theme| iced::widget::container::Style {
-                background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.7))),
-                text_color: Some(Color::WHITE),
-                border: Border {
-                    color: Color::from_rgba(1.0, 1.0, 1.0, 0.2),
-                    width: 1.0,
-                    radius: 4.0.into(),
-                },
-                ..Default::default()
-            });
+            .padding(spacing::XXS)
+            .style(styles::overlay::indicator(4.0));
 
         stack = stack.push(
             Container::new(indicator)
                 .width(Length::Fill)
                 .height(Length::Fill)
-                .padding(10)
+                .padding(spacing::SM)
                 .align_x(Horizontal::Right)
                 .align_y(Vertical::Bottom),
         );
+    }
+
+    // Add position counter at bottom center if there are multiple images and it should be visible
+    if model.position_counter_visible && model.total_count > 1 {
+        if let Some(current) = model.current_index {
+            let position_text = format!("{}/{}", current + 1, model.total_count);
+            let position_indicator = Container::new(Text::new(position_text).size(14))
+                .padding(Padding {
+                    top: spacing::XXS,
+                    right: spacing::XS,
+                    bottom: spacing::XXS,
+                    left: spacing::XS,
+                })
+                .style(styles::overlay::indicator(12.0));
+
+            stack = stack.push(
+                Container::new(position_indicator)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .padding(spacing::SM)
+                    .align_x(Horizontal::Center)
+                    .align_y(Vertical::Bottom),
+            );
+        }
     }
 
     stack.into()

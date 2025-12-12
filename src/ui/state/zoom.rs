@@ -7,17 +7,10 @@
 //! - Zoom step configuration
 //! - Zoom input validation and error handling
 
-use crate::config::DEFAULT_ZOOM_STEP_PERCENT;
-
-pub const MIN_ZOOM_PERCENT: f32 = 10.0;
-pub const MAX_ZOOM_PERCENT: f32 = 800.0;
-pub const DEFAULT_ZOOM_PERCENT: f32 = 100.0;
-pub const MIN_ZOOM_STEP_PERCENT: f32 = 1.0;
-pub const MAX_ZOOM_STEP_PERCENT: f32 = 200.0;
-
-const _: () = {
-    assert!(MIN_ZOOM_PERCENT < DEFAULT_ZOOM_PERCENT);
-    assert!(MAX_ZOOM_PERCENT > DEFAULT_ZOOM_PERCENT);
+// Re-export zoom constants from centralized config for backward compatibility
+pub use crate::config::{
+    DEFAULT_ZOOM_PERCENT, DEFAULT_ZOOM_STEP_PERCENT, MAX_ZOOM_PERCENT, MAX_ZOOM_STEP_PERCENT,
+    MIN_ZOOM_PERCENT, MIN_ZOOM_STEP_PERCENT,
 };
 
 pub const ZOOM_INPUT_INVALID_KEY: &str = "viewer-zoom-input-error-invalid";

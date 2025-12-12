@@ -1,114 +1,98 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Shared UI color helpers to keep major surfaces visually consistent.
+//! Shared UI color helpers and overlay styles for the viewer and editor.
 
 use crate::config::BackgroundTheme;
-use iced::widget::{canvas, container, Container, Stack};
-use iced::{mouse, Background, Border, Color, Element, Length, Rectangle, Theme};
+use crate::ui::design_tokens::{
+    opacity,
+    palette::{self, BLACK, GRAY_100, GRAY_900, WHITE},
+};
+use iced::widget::container;
+use iced::{Color, Theme};
 
 /// Background color used by the viewer toolbar/header.
 pub fn viewer_toolbar_background() -> Color {
-    Color::from_rgb8(32, 33, 36)
+    GRAY_900
 }
 
 /// Flat color used when the viewer/editor background theme is set to "Light".
 pub fn viewer_light_surface_color() -> Color {
-    Color::from_rgb8(245, 245, 245)
+    GRAY_100
 }
 
 /// Flat color used when the viewer/editor background theme is set to "Dark".
 pub fn viewer_dark_surface_color() -> Color {
-    Color::from_rgb8(32, 33, 36)
+    GRAY_900
 }
 
-/// Match the settings panel surface styling so other panels can stay in sync.
-pub fn settings_panel_style(theme: &Theme) -> container::Style {
-    let palette = theme.extended_palette();
-    let base = palette.background.base.color;
-    let luminance = base.r + base.g + base.b;
-    let (r, g, b) = if luminance < 1.5 {
-        (
-            (base.r + 0.10).min(1.0),
-            (base.g + 0.10).min(1.0),
-            (base.b + 0.10).min(1.0),
-        )
-    } else {
-        (
-            (base.r - 0.06).max(0.0),
-            (base.g - 0.06).max(0.0),
-            (base.b - 0.06).max(0.0),
-        )
-    };
+/// Standard color for error text.
+pub fn error_text_color() -> Color {
+    palette::ERROR_500
+}
 
-    container::Style {
-        background: Some(Background::Color(Color::from_rgba(r, g, b, 0.95))),
-        border: Border {
-            radius: 12.0.into(),
-            width: 0.0,
-            ..Default::default()
-        },
+/// Standard color for error icons and accents.
+pub fn error_color() -> Color {
+    palette::ERROR_500
+}
+
+// ============================================================================
+// Fullscreen Overlay Styles
+// ============================================================================
+// Shared colors and styling for overlay elements (navigation arrows, HUD, counters)
+// in fullscreen mode, ensuring consistent visual appearance across all overlays.
+
+/// Dark text color for navigation arrows on light backgrounds.
+pub fn overlay_arrow_dark_color() -> Color {
+    GRAY_900
+}
+/// White text color for navigation arrows on dark backgrounds.
+pub fn overlay_arrow_light_color() -> Color {
+    WHITE
+}
+
+/// Style for the editor canvas background.
+pub fn editor_canvas_style(background_color: Color) -> impl Fn(&Theme) -> container::Style {
+    move |_theme: &Theme| container::Style {
+        background: Some(iced::Background::Color(background_color)),
         ..Default::default()
     }
+}
+
+// ============================================================================
+// Editor Overlay Styles
+// ============================================================================
+
+/// Color for the resize overlay preview rectangle and text.
+pub fn resize_overlay_color() -> Color {
+    palette::INFO_500
+}
+
+/// Color of the darkened overlay outside the crop area.
+pub fn crop_overlay_outside_color() -> Color {
+    Color {
+        a: opacity::OVERLAY_MEDIUM,
+        ..BLACK
+    }
+}
+
+/// Color of the rule-of-thirds grid in the crop overlay.
+pub fn crop_overlay_grid_color() -> Color {
+    Color {
+        a: opacity::OVERLAY_MEDIUM,
+        ..WHITE
+    }
+}
+
+/// Fill color for crop resize handles.
+pub fn crop_overlay_handle_color() -> Color {
+    WHITE
+}
+
+/// Border color for crop resize handles.
+pub fn crop_overlay_handle_border_color() -> Color {
+    BLACK
 }
 
 /// Returns `true` if the configured background theme expects a checkerboard surface.
 pub fn is_checkerboard(theme: BackgroundTheme) -> bool {
     matches!(theme, BackgroundTheme::Checkerboard)
-}
-
-/// Helper to wrap content with a checkerboard backdrop.
-pub fn wrap_with_checkerboard<'a, Message: 'a>(
-    content: Container<'a, Message>,
-) -> Element<'a, Message> {
-    Stack::new()
-        .push(
-            canvas::Canvas::new(CheckerboardBackground)
-                .width(Length::Fill)
-                .height(Length::Fill),
-        )
-        .push(content)
-        .into()
-}
-
-/// Lightweight checkerboard pattern shared across viewer/editor backgrounds.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct CheckerboardBackground;
-
-impl CheckerboardBackground {
-    const TILE: f32 = 20.0;
-}
-
-impl<Message> canvas::Program<Message> for CheckerboardBackground {
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &Self::State,
-        renderer: &iced::Renderer,
-        _theme: &Theme,
-        bounds: Rectangle,
-        _cursor: mouse::Cursor,
-    ) -> Vec<canvas::Geometry> {
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-        let tile = Self::TILE;
-        let light = Color::from_rgb(0.85, 0.85, 0.85);
-        let dark = Color::from_rgb(0.75, 0.75, 0.75);
-
-        let cols = ((bounds.width / tile).ceil() as i32).max(1);
-        let rows = ((bounds.height / tile).ceil() as i32).max(1);
-
-        for row in 0..rows {
-            for col in 0..cols {
-                let color = if (row + col) % 2 == 0 { light } else { dark };
-                let x = col as f32 * tile;
-                let y = row as f32 * tile;
-                let path = canvas::Path::rectangle(
-                    iced::Point::new(x, y),
-                    iced::Size::new(tile + 0.5, tile + 0.5),
-                );
-                frame.fill(&path, color);
-            }
-        }
-
-        vec![frame.into_geometry()]
-    }
 }

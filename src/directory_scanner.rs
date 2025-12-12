@@ -6,7 +6,7 @@
 
 use crate::config::SortOrder;
 use crate::error::Result;
-use crate::image_handler::SUPPORTED_EXTENSIONS;
+use crate::media;
 use std::path::{Path, PathBuf};
 
 /// Represents a list of image files in a directory with navigation capabilities.
@@ -39,7 +39,7 @@ impl ImageList {
             let entry = entry?;
             let path = entry.path();
 
-            if path.is_file() && is_supported_image(&path) {
+            if path.is_file() && is_supported_media(&path) {
                 images.push(path);
             }
         }
@@ -148,12 +148,9 @@ impl Default for ImageList {
     }
 }
 
-/// Checks if a file has a supported image extension.
-fn is_supported_image(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| SUPPORTED_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
-        .unwrap_or(false)
+/// Checks if a file has a supported media extension (images or videos).
+fn is_supported_media(path: &Path) -> bool {
+    media::detect_media_type(path).is_some()
 }
 
 /// Sorts a list of image paths according to the specified sort order.
@@ -207,26 +204,12 @@ mod tests {
         path
     }
 
-    #[test]
-    fn is_supported_image_recognizes_valid_extensions() {
-        assert!(is_supported_image(Path::new("test.jpg")));
-        assert!(is_supported_image(Path::new("test.JPEG")));
-        assert!(is_supported_image(Path::new("test.png")));
-        assert!(is_supported_image(Path::new("test.gif")));
-        assert!(is_supported_image(Path::new("test.svg")));
-        assert!(is_supported_image(Path::new("test.webp")));
-        assert!(is_supported_image(Path::new("test.bmp")));
-        assert!(is_supported_image(Path::new("test.ico")));
-        assert!(is_supported_image(Path::new("test.tiff")));
-        assert!(is_supported_image(Path::new("test.tif")));
-    }
-
-    #[test]
-    fn is_supported_image_rejects_invalid_extensions() {
-        assert!(!is_supported_image(Path::new("test.txt")));
-        assert!(!is_supported_image(Path::new("test.pdf")));
-        assert!(!is_supported_image(Path::new("test.doc")));
-        assert!(!is_supported_image(Path::new("test")));
+    fn create_test_video(dir: &Path, name: &str) -> PathBuf {
+        let path = dir.join(name);
+        let mut file = fs::File::create(&path).expect("failed to create test file");
+        file.write_all(b"fake video data")
+            .expect("failed to write test file");
+        path
     }
 
     #[test]
@@ -333,5 +316,72 @@ mod tests {
         assert_eq!(list.previous(), Some(img1.as_path()));
         assert!(list.is_at_first());
         assert!(list.is_at_last());
+    }
+
+    // TDD tests for mixed image/video navigation support
+    #[test]
+    fn is_supported_media_recognizes_video_extensions() {
+        assert!(is_supported_media(Path::new("test.mp4")));
+        assert!(is_supported_media(Path::new("test.MP4")));
+        assert!(is_supported_media(Path::new("test.avi")));
+        assert!(is_supported_media(Path::new("test.mov")));
+        assert!(is_supported_media(Path::new("test.mkv")));
+        assert!(is_supported_media(Path::new("test.webm")));
+        assert!(is_supported_media(Path::new("test.m4v")));
+    }
+
+    #[test]
+    fn is_supported_media_recognizes_image_extensions() {
+        assert!(is_supported_media(Path::new("test.jpg")));
+        assert!(is_supported_media(Path::new("test.png")));
+        assert!(is_supported_media(Path::new("test.gif")));
+    }
+
+    #[test]
+    fn is_supported_media_rejects_unsupported_formats() {
+        assert!(!is_supported_media(Path::new("test.txt")));
+        assert!(!is_supported_media(Path::new("test.pdf")));
+        assert!(!is_supported_media(Path::new("test.doc")));
+    }
+
+    #[test]
+    fn scan_directory_finds_both_images_and_videos() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let _img2 = create_test_image(temp_dir.path(), "c.png");
+        let _vid2 = create_test_video(temp_dir.path(), "d.avi");
+        create_test_image(temp_dir.path(), "not_media.txt");
+
+        let list = ImageList::scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("failed to scan directory");
+
+        // Should find 4 media files (2 images + 2 videos)
+        assert_eq!(list.len(), 4, "Should find both images and videos");
+    }
+
+    #[test]
+    fn navigation_works_across_images_and_videos() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let img2 = create_test_image(temp_dir.path(), "c.png");
+
+        let mut list = ImageList::scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("failed to scan directory");
+
+        // Start at first image
+        assert_eq!(list.current(), Some(img1.as_path()));
+
+        // Next should be video
+        assert_eq!(list.next(), Some(vid1.as_path()));
+
+        // Set current to video and check next
+        list.set_current(&vid1);
+        assert_eq!(list.current(), Some(vid1.as_path()));
+        assert_eq!(list.next(), Some(img2.as_path()));
+
+        // Previous from video should go back to image
+        assert_eq!(list.previous(), Some(img1.as_path()));
     }
 }

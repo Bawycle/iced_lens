@@ -12,6 +12,8 @@ Thank you for your interest in contributing to IcedLens! We welcome contribution
 6. [Code Contributions](#code-contributions)
 7. [Development Workflow](#development-workflow)
 8. [Pull Request Process](#pull-request-process)
+9. [Project Structure](#project-structure)
+10. [Style Architecture](#style-architecture)
 
 ## Code of Conduct
 
@@ -151,7 +153,7 @@ Code contributions should follow the project's development practices and quality
 
 ### Prerequisites
 
-- **Rust 1.78 or newer** (install via [rustup](https://rustup.rs/))
+- **Rust 1.92.0 or newer** (install via [rustup](https://rustup.rs/))
 - Familiarity with the [Iced GUI framework](https://iced.rs/)
 - Understanding of the project structure (see below)
 
@@ -279,22 +281,217 @@ Key files and directories:
 ```
 iced_lens/
 ├── src/
-│   ├── app.rs              # Main application logic and state
-│   ├── config/             # Configuration persistence
-│   ├── i18n/               # Internationalization system
-│   ├── image_handler/      # Image loading and decoding
-│   ├── ui/                 # UI components (viewer, settings, editor)
-│   ├── error.rs            # Error types
-│   └── icon.rs             # Application icon loading
+│   ├── main.rs                 # Entry point
+│   ├── app/                    # Main application logic and state machine
+│   │   ├── mod.rs              # App struct and Message enum
+│   │   ├── state.rs            # AppState machine (Browsing, Viewing, Editing)
+│   │   ├── update.rs           # Message handling
+│   │   └── view.rs             # UI rendering dispatch
+│   ├── config/                 # Configuration persistence
+│   ├── i18n/                   # Internationalization system (Fluent)
+│   ├── media/                  # Media loading and transforms
+│   │   ├── image/              # Image loading, decoding, caching
+│   │   └── video/              # Video file detection and metadata
+│   ├── video_player/           # Video playback engine
+│   │   ├── mod.rs              # VideoPlayer public API
+│   │   ├── state.rs            # Playback state machine
+│   │   ├── decoder.rs          # FFmpeg video decoding thread
+│   │   ├── audio.rs            # Audio decoding and playback (cpal)
+│   │   ├── sync.rs             # A/V synchronization (audio-master)
+│   │   ├── frame_cache.rs      # Decoded frame caching
+│   │   └── time_units.rs       # Time conversion utilities
+│   ├── ui/                     # UI components
+│   │   ├── viewer/             # Image/video viewer component
+│   │   │   ├── component.rs    # Main viewer widget
+│   │   │   ├── video_controls.rs # Playback controls toolbar
+│   │   │   └── overlays.rs     # Loading, error, info overlays
+│   │   ├── image_editor/       # Image editing (crop, resize, rotate)
+│   │   ├── widgets/            # Custom reusable widgets
+│   │   ├── styles/             # Component-specific styles
+│   │   ├── design_tokens.rs    # Base design tokens (colors, spacing)
+│   │   ├── theming.rs          # Theme system (light/dark modes)
+│   │   ├── theme.rs            # Color helpers for viewer/editor
+│   │   ├── settings.rs         # Settings panel
+│   │   ├── help.rs             # Help/keyboard shortcuts panel
+│   │   └── navbar.rs           # Navigation bar
+│   ├── directory_scanner.rs    # Async directory scanning
+│   ├── image_navigation.rs     # Image list navigation logic
+│   └── error.rs                # Error types
 ├── assets/
-│   ├── i18n/               # Translation files (.ftl)
-│   └── icons/              # Application icons
-├── tests/                  # Integration tests
-├── benches/                # Performance benchmarks
-├── CONTRIBUTING.md         # This file
-├── CHANGELOG.md            # Release notes
-├── README.md               # User-facing documentation
-└── Cargo.toml              # Project metadata and dependencies
+│   ├── i18n/                   # Translation files (.ftl)
+│   └── icons/                  # SVG icons
+├── tests/                      # Integration tests
+├── benches/                    # Performance benchmarks
+├── CONTRIBUTING.md             # This file
+├── CHANGELOG.md                # Release notes
+├── README.md                   # User-facing documentation
+└── Cargo.toml                  # Project metadata and dependencies
+```
+
+### Key Modules
+
+#### `app/` - Application Core
+The main application state machine with three states:
+- **Browsing**: File browser view
+- **Viewing**: Image/video viewer (includes video playback)
+- **Editing**: Image editor with crop, resize, rotate tools
+
+#### `video_player/` - Video Playback Engine
+Handles video and audio decoding with A/V synchronization:
+- Uses FFmpeg (via `ffmpeg-next`) for decoding
+- Audio playback via `cpal` with `rubato` for resampling
+- Audio-master sync model (video frames sync to audio PTS)
+- Frame caching for smooth playback and frame stepping
+
+#### `media/` - Media Handling
+Loads and transforms images and video metadata:
+- Image formats via `image` crate
+- Video detection and metadata extraction
+- EXIF orientation handling
+
+#### `config/` - Configuration
+User preferences and application settings:
+- **`defaults.rs`**: Centralized default values for all constants (zoom, volume, cache sizes, etc.). **Always add new defaults here** rather than scattering them across the codebase. Includes compile-time validation to ensure constraints are valid.
+- **`mod.rs`**: User settings persistence (`settings.toml`)
+
+## Style Architecture
+
+IcedLens uses a layered design system to ensure visual consistency. Understanding this architecture is essential before modifying colors, spacing, or component styles.
+
+### Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Component Styles                         │
+│              (src/ui/styles/*.rs)                          │
+│         Button, Container, Overlay, Editor styles          │
+├─────────────────────────────────────────────────────────────┤
+│                    Theme System                             │
+│     theming.rs (ColorScheme, AppTheme, ThemeMode)          │
+│     theme.rs (viewer/editor color helpers)                 │
+├─────────────────────────────────────────────────────────────┤
+│                    Design Tokens                            │
+│              (src/ui/design_tokens.rs)                     │
+│     palette, opacity, spacing, sizing, radius, shadow      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Module Responsibilities
+
+#### 1. Design Tokens (`src/ui/design_tokens.rs`)
+
+The foundation layer. Defines all primitive values following the W3C Design Tokens standard:
+
+| Module | Purpose | Example |
+|--------|---------|---------|
+| `palette` | Base colors | `palette::PRIMARY_500`, `palette::GRAY_900` |
+| `opacity` | Opacity scale | `opacity::OVERLAY_STRONG` (0.7) |
+| `spacing` | 8px grid spacing | `spacing::MD` (16.0) |
+| `sizing` | Component sizes | `sizing::ICON_LG` (32.0) |
+| `radius` | Border radii | `radius::SM` (4.0) |
+| `shadow` | Shadow definitions | `shadow::MD` |
+
+**Usage:**
+```rust
+use crate::ui::design_tokens::{palette, spacing, opacity};
+
+// Create a semi-transparent overlay
+let overlay_bg = Color { a: opacity::OVERLAY_STRONG, ..palette::BLACK };
+
+// Use consistent spacing
+let padding = spacing::MD; // 16px
+```
+
+#### 2. Theme System (`src/ui/theming.rs`)
+
+Manages light/dark mode with semantic color mappings:
+
+- **`ColorScheme`**: Defines surface, text, brand, semantic, and overlay colors
+- **`ThemeMode`**: Enum for Light, Dark, or System detection
+- **`AppTheme`**: Combines ColorScheme with current mode
+
+**Usage:**
+```rust
+use crate::ui::theming::{AppTheme, ThemeMode};
+
+let theme = AppTheme::new(ThemeMode::Dark);
+let bg_color = theme.colors.surface_primary;
+let text_color = theme.colors.text_primary;
+```
+
+#### 3. Color Helpers (`src/ui/theme.rs`)
+
+Utility functions for viewer/editor-specific colors:
+
+- `viewer_toolbar_background()` - Toolbar background
+- `viewer_light_surface_color()` / `viewer_dark_surface_color()` - Canvas backgrounds
+- `error_text_color()` - Error text styling
+- `crop_overlay_*()` - Crop tool colors
+
+#### 4. Component Styles (`src/ui/styles/`)
+
+Ready-to-use style functions for Iced widgets:
+
+| File | Purpose |
+|------|---------|
+| `button.rs` | `primary()`, `overlay()`, `disabled()`, `video_play_overlay()` |
+| `container.rs` | `panel()` for settings/editor panels |
+| `overlay.rs` | `indicator()`, `controls_container()`, icon styles |
+| `editor.rs` | `toolbar()`, `settings_panel()` |
+
+**Usage:**
+```rust
+use crate::ui::styles::button;
+
+Button::new("Click me")
+    .style(button::primary)
+```
+
+### Guidelines for Contributors
+
+#### Adding a New Color
+
+1. **Check if it exists** in `design_tokens::palette` first
+2. **Add to palette** if it's a new base color:
+   ```rust
+   // In design_tokens.rs
+   pub const SUCCESS_500: Color = Color::from_rgb(0.3, 0.7, 0.3);
+   ```
+3. **Add to ColorScheme** if it's semantic (used differently in light/dark):
+   ```rust
+   // In theming.rs ColorScheme
+   pub success: Color,
+   ```
+
+#### Adding a New Component Style
+
+1. Create a function in the appropriate `styles/*.rs` file
+2. Use design tokens, not hard-coded values:
+   ```rust
+   // ✅ Good
+   border: Border { radius: radius::SM.into(), .. }
+
+   // ❌ Bad
+   border: Border { radius: 4.0.into(), .. }
+   ```
+3. Add a test to verify the style compiles and uses expected tokens
+
+#### Modifying Spacing or Sizing
+
+1. **Check impact**: Tokens are used across many components
+2. **Maintain ratios**: `spacing::MD` should equal `spacing::XS * 2`
+3. **Run validation**: `cargo test` includes compile-time assertions
+
+### Testing Styles
+
+Integration tests in `tests/style_integration.rs` verify:
+- All button styles compile correctly
+- Design tokens are accessible
+- Theme switching works (light ↔ dark)
+
+Run style tests:
+```bash
+cargo test style_integration
 ```
 
 ## Getting Help
