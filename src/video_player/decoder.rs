@@ -236,8 +236,10 @@ impl AsyncDecoder {
                     in_stepping_mode = false;
                     frame_history.clear();
                     last_paused_frame = None;
-                    // Clear any pending seek target
-                    seek_target_secs = None;
+                    // IMPORTANT: Don't clear seek_target_secs here!
+                    // When Play follows Seek (for resume), we must preserve the seek target
+                    // so precise seeking can complete. The target is cleared automatically
+                    // when the frame at/after target PTS is decoded (line ~371).
                     let _ = event_tx.blocking_send(DecoderEvent::Buffering);
                 }
                 Ok(DecoderCommand::Pause) => {

@@ -10,9 +10,7 @@ use crate::ui::viewer::{
     self, controls, pane, state as geometry, video_controls, HudIconKind, HudLine,
 };
 use crate::ui::widgets::VideoCanvas;
-use crate::video_player::{
-    subscription::PlaybackMessage, time_units, SharedLufsCache, VideoPlayer,
-};
+use crate::video_player::{subscription::PlaybackMessage, SharedLufsCache, VideoPlayer};
 use iced::widget::scrollable::{self, AbsoluteOffset, Id, RelativeOffset};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
 use std::path::PathBuf;
@@ -624,10 +622,8 @@ impl State {
                         // Perform actual seek to preview position
                         // Don't clear seek_preview_position here - it will be cleared
                         // when we receive a frame near the seek target
-                        if let Some(position_micros) = self.seek_preview_position {
+                        if let Some(target_secs) = self.seek_preview_position {
                             if let Some(player) = &mut self.video_player {
-                                // Convert microseconds to seconds for seek API
-                                let target_secs = time_units::micros_to_secs(position_micros);
                                 player.seek(target_secs);
                             }
                         }
@@ -752,8 +748,7 @@ impl State {
 
                         // Clear seek preview if we received a frame near the seek target
                         // This ensures the slider stays at the new position after seek completes
-                        if let Some(preview_micros) = self.seek_preview_position {
-                            let preview_secs = time_units::micros_to_secs(preview_micros);
+                        if let Some(preview_secs) = self.seek_preview_position {
                             let diff = (pts_secs - preview_secs).abs();
                             // Clear preview if frame is within 0.5 seconds of target
                             if diff < 0.5 {
@@ -975,7 +970,6 @@ impl State {
                         is_playing,
                         position_secs,
                         duration_secs: video_data.duration_secs,
-                        duration_micros: time_units::secs_to_micros(video_data.duration_secs),
                         volume: self.video_volume,
                         muted: self.video_muted,
                         loop_enabled,

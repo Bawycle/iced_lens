@@ -2,20 +2,15 @@
 //! Time unit conversion utilities for video playback.
 //!
 //! Provides conversion functions between seconds and microseconds for:
-//! - Slider positioning (f64 for precision)
 //! - Frame cache indexing (i64 for PTS keys)
+//! - Internal timing calculations
 //!
 //! # Constants
 //!
 //! - `MICROS_PER_SECOND`: 1,000,000 (f64 for calculations)
-//! - `SLIDER_STEP_MICROS`: 1,000 (1ms step for sub-frame precision)
 
-/// Microseconds per second as f64 for slider calculations.
+/// Microseconds per second as f64 for calculations.
 pub const MICROS_PER_SECOND: f64 = 1_000_000.0;
-
-/// Slider step in microseconds (1ms for sub-frame precision).
-/// Allows positioning between frames for smoother seeking.
-pub const SLIDER_STEP_MICROS: f64 = 1_000.0;
 
 /// Converts seconds to microseconds (f64 for slider precision).
 ///
@@ -130,11 +125,6 @@ mod tests {
         let back = micros_to_pts(micros);
         // Should be accurate to microsecond precision
         assert!((pts_secs - back).abs() < 0.000001);
-    }
-
-    #[test]
-    fn slider_step_is_1ms() {
-        assert_eq!(SLIDER_STEP_MICROS, 1_000.0);
     }
 
     #[test]

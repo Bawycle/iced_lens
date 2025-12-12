@@ -275,8 +275,10 @@ impl AudioDecoder {
                     playback_start_time = Some(std::time::Instant::now());
                     // Don't reset first_pts here - preserve seek target if set
                     // Pause already resets it, and decode loop sets it if None
-                    // Clear seek target - playback from current position
-                    seek_target_secs = None;
+                    // IMPORTANT: Don't clear seek_target_secs here!
+                    // When Play follows Seek (for resume), we must preserve the seek target
+                    // so precise seeking can complete. The target is cleared automatically
+                    // when the frame at/after target PTS is decoded (line ~380).
                 }
                 Ok(AudioDecoderCommand::Pause) => {
                     is_playing = false;
