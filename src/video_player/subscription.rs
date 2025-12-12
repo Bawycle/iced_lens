@@ -370,8 +370,9 @@ pub fn video_playback(
                                                 let _ = audio_out.stop();
                                             }
                                             DecoderCommand::Seek { .. } => {
-                                                // Clear audio buffer on seek
-                                                let _ = audio_out.stop();
+                                                // Clear audio buffer on seek without pausing
+                                                // This allows audio to continue if video was playing
+                                                let _ = audio_out.clear_buffer();
                                             }
                                             DecoderCommand::StepFrame => {
                                                 // No audio action needed for frame stepping
@@ -429,8 +430,8 @@ pub fn video_playback(
                                             let _ = audio_out.pause();
                                         }
                                         AudioDecoderCommand::Seek { .. } => {
-                                            // Clear buffer and pause on seek, decoder will restart
-                                            let _ = audio_out.stop();
+                                            // Clear buffer on seek without pausing
+                                            let _ = audio_out.clear_buffer();
                                         }
                                         AudioDecoderCommand::Stop => {
                                             let _ = audio_out.stop();

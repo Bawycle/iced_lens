@@ -30,6 +30,10 @@ pub enum AudioOutputCommand {
     /// Stop playback and clear buffer.
     Stop,
 
+    /// Clear buffer without changing pause state.
+    /// Used during seek to discard old audio without interrupting playback.
+    ClearBuffer,
+
     /// Set volume (0.0 to 1.0).
     SetVolume(f32),
 
@@ -170,6 +174,13 @@ impl AudioOutput {
                         }
                         shared_for_task.set_paused(true);
                     }
+                    AudioOutputCommand::ClearBuffer => {
+                        // Clear buffer without changing pause state
+                        // Used during seek to discard old audio
+                        if let Ok(mut buf) = buffer_for_task.lock() {
+                            buf.clear();
+                        }
+                    }
                     AudioOutputCommand::SetVolume(vol) => {
                         shared_for_task.set_volume(vol.clamp(0.0, 1.0));
                     }
@@ -301,6 +312,12 @@ impl AudioOutput {
     /// Stops playback and clears the buffer.
     pub fn stop(&self) -> Result<()> {
         self.send_command(AudioOutputCommand::Stop)
+    }
+
+    /// Clears the audio buffer without changing pause state.
+    /// Used during seek to discard old audio without interrupting playback.
+    pub fn clear_buffer(&self) -> Result<()> {
+        self.send_command(AudioOutputCommand::ClearBuffer)
     }
 
     /// Sets the volume (0.0 to 1.0).
