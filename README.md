@@ -194,6 +194,7 @@ This project does not process untrusted remote input; images are opened from loc
 
 ### Planned / Aspirational
 Future items (subject to change based on community feedback):
+- Migrate to iced 0.14
 - Basic image/video metadata panel (EXIF, codec info)
 - Temporary rotation in viewer (90° increments, session-only)
 - Additional edit tools: flip (horizontal/vertical), brightness/contrast adjustments
