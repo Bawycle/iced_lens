@@ -1,10 +1,10 @@
 # IcedLens
 
-Lightweight, internationalized image viewer and editor powered by the [Iced](https://iced.rs/) GUI toolkit.
+Lightweight, internationalized image and video viewer with image editing, powered by the [Iced](https://iced.rs/) GUI toolkit.
 
 [![Release](https://img.shields.io/badge/release-v0.1.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
-[![MSRV](https://img.shields.io/badge/Rust-1.78%2B-blue)](https://www.rust-lang.org)
+[![MSRV](https://img.shields.io/badge/Rust-1.92.0%2B-blue)](https://www.rust-lang.org)
 ![Locales](https://img.shields.io/badge/i18n-en--US|fr-green)
 ![Status: Pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange)
 
@@ -35,13 +35,12 @@ IcedLens aims to provide a simple, privacy‑friendly image viewer and editor fo
 
 ## 2. Features
 ### Viewing
-- Common raster formats (JPEG/PNG/GIF/WebP/TIFF/BMP/ICO) plus SVG rasterization
-- Wheel or toolbar zoom, fit‑to‑window toggle, and grab‑to‑pan navigation
-- Lightweight multi-image browsing (arrow keys or overlay arrows, looping, auto-refresh)
-- Persistent preferences for language, zoom, fit, background theme, and sort order
+- **Images:** JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, SVG
+- **Videos:** MP4, AVI, MOV, MKV, WebM (plus animated GIF/WebP)
+- Zoom, pan, fit-to-window, fullscreen with auto-hiding controls
+- Multi-media browsing with keyboard navigation
+- Frame-by-frame video navigation and frame capture
 - Fluent-based localization (en-US, fr)
-- Selectable viewer background themes
-- Distraction-free fullscreen with HUD indicators (button, double-click, F11, Esc)
 
 ### Editing
 - **Non-destructive pipeline** with undo/redo history and Save / Save As flows
@@ -56,7 +55,7 @@ Screenshots will be added once UI stabilizes. Feel free to open an issue and pro
 
 ## 4. Installation & Requirements
 ### Rust Toolchain
-Requires Rust >= 1.78 (stable recommended). Install via:
+Requires Rust >= 1.92.0 (stable recommended). Install via:
 ```bash
 curl https://sh.rustup.rs -sSf | sh
 ```
@@ -120,10 +119,12 @@ ARGS:
 
 ### Keyboard Shortcuts
 **Viewer Mode:**
-- **E**: Enter editor mode
+- **E**: Enter editor mode (images only)
 - **F11**: Toggle fullscreen
 - **Esc**: Exit fullscreen
-- **← / →**: Navigate to previous/next image
+- **← / →**: Navigate media or seek video
+- **Space**: Play/pause video
+- **M**: Toggle mute
 
 **Editor Mode:**
 - **Ctrl+S** (Cmd+S on macOS): Save current image
@@ -132,16 +133,12 @@ ARGS:
 - **Esc**: Cancel changes (if unsaved) or exit editor (if no changes)
 
 ## 6. Configuration & Preferences
-User config is stored in a platform‑appropriate directory (implementation detail: uses a TOML file). Currently persisted:
-- `language` - UI language (en-US, fr)
-- `fit_to_window` - Auto-fit image to viewport
-- `zoom_step` - Percentage increment for zoom in/out (1-200%)
-- `background_theme` - Viewer background (light, dark, checkerboard)
-- `sort_order` - Image navigation sort order (alphabetical, modified-date, created-date)
+User config is stored in a platform‑appropriate directory (TOML file). Configurable via the Settings screen:
+- Language, theme, background, sort order
+- Zoom step, fit-to-window
+- Video: autoplay, volume, audio normalization, frame cache size, frame history size
 
-All preferences can be configured through the Settings screen (accessible via the toolbar).
-
-Resetting config: remove the file and restart; defaults will regenerate.
+Resetting: remove the config file and restart; defaults will regenerate.
 
 ## 7. Internationalization (i18n)
 Localization powered by [Fluent](https://projectfluent.org/).
@@ -194,20 +191,17 @@ cargo audit
 This project does not process untrusted remote input; images are opened from local paths. Still, malformed files could trigger decoding edge cases in dependencies. Please report potential vulnerabilities via a private issue or (future) `SECURITY.md` contact channel.
 
 ## 13. Roadmap
-### Implemented ✓
-- ✅ Non-destructive image editing (rotate, crop, resize)
-- ✅ Save & Save As with format preservation
-- ✅ Undo/Redo with transformation replay
-- ✅ Keyboard shortcuts for editor workflow
 
 ### Planned / Aspirational
 Future items (subject to change based on community feedback):
-- Animated GIF/WebP frame playback
-- Basic image metadata panel (EXIF)
+- Migrate to iced 0.14
+- Basic image/video metadata panel (EXIF, codec info)
+- Temporary rotation in viewer (90° increments, session-only)
 - Additional edit tools: flip (horizontal/vertical), brightness/contrast adjustments
 - Filters: grayscale, sepia, blur, sharpen
+- Video editing: trim, basic cuts
 - Batch operations
-- Richer argument parsing (additional flags)
+- Hardware-accelerated video decoding (VAAPI/NVDEC)
 
 ## 14. Contributing
 Contributions welcome! Start by reading [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -235,7 +229,7 @@ The application icon (`assets/icons/iced_lens.svg` and its PNG exports) is **not
 
 **Does it support Windows/macOS?** Yes, via Iced's cross‑platform backends; primary development on Linux.
 
-**Does it have editing capabilities?** Yes! IcedLens now includes a non-destructive editor with rotate, crop, and resize tools, plus undo/redo support. Access it by pressing **E** in viewer mode or clicking the "✏ Edit" button.
+**Does it have editing capabilities?** Yes, for images: rotate, crop, resize with undo/redo. Video editing is not yet supported.
 
 **How does editing work?** Editing is non-destructive—changes are only applied when you save. You can undo/redo transformations, and the original file is preserved until you explicitly save or save-as.
 
