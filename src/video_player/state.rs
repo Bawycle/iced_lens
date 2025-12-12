@@ -284,12 +284,11 @@ impl VideoPlayer {
         // Clear end-of-stream flag since we're resuming playback
         self.at_end_of_stream = false;
 
-        // Start or resume sync clock
-        if position == 0.0 {
-            self.sync_clock.start(0.0);
-        } else {
-            self.sync_clock.resume();
-        }
+        // Start sync clock at the current position.
+        // Always use start() instead of resume() to ensure the sync clock
+        // is at the correct position, especially after frame stepping where
+        // the video position has advanced but audio hasn't.
+        self.sync_clock.start(position);
 
         // Send Play command to decoder via command sender with resume position
         if let Some(sender) = &self.command_sender {
@@ -445,10 +444,10 @@ impl VideoPlayer {
         }
     }
 
-    /// Updates playback position (called during playback).
+    /// Updates playback position (called during playback or stepping).
     ///
     /// Should be called regularly by the playback loop to track progress.
-    /// Updates position for Playing, Buffering, and Seeking states.
+    /// Updates position for Playing, Buffering, Seeking, and Paused (when stepping) states.
     pub fn update_position(&mut self, position_secs: f64) {
         match &self.state {
             PlaybackState::Playing { .. } => {
@@ -463,6 +462,13 @@ impl VideoPlayer {
                 if *resume_playing {
                     self.state = PlaybackState::Playing { position_secs };
                 } else {
+                    self.state = PlaybackState::Paused { position_secs };
+                }
+            }
+            PlaybackState::Paused { .. } => {
+                // Update position during frame stepping so that when we resume,
+                // playback starts from the stepped position, not the original pause position.
+                if self.is_in_stepping_mode() {
                     self.state = PlaybackState::Paused { position_secs };
                 }
             }
