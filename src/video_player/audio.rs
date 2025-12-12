@@ -262,6 +262,10 @@ impl AudioDecoder {
         let mut playback_start_time: Option<std::time::Instant> = None;
         let mut first_pts: Option<f64> = None;
 
+        // Precise seeking: target PTS to reach after keyframe seek
+        // Audio frames with PTS < target will be skipped (not sent to output)
+        let mut seek_target_secs: Option<f64> = None;
+
         // Main loop
         loop {
             // Check for commands (non-blocking)
@@ -270,11 +274,15 @@ impl AudioDecoder {
                     is_playing = true;
                     playback_start_time = Some(std::time::Instant::now());
                     first_pts = None;
+                    // Clear seek target - playback from current position
+                    seek_target_secs = None;
                 }
                 Ok(AudioDecoderCommand::Pause) => {
                     is_playing = false;
                     playback_start_time = None;
                     first_pts = None;
+                    // Clear seek target
+                    seek_target_secs = None;
                 }
                 Ok(AudioDecoderCommand::Seek { target_secs }) => {
                     let timestamp = (target_secs * 1_000_000.0) as i64;
@@ -283,11 +291,14 @@ impl AudioDecoder {
                             "Audio seek failed: {}",
                             e
                         )));
+                        seek_target_secs = None;
                     } else {
                         decoder.flush();
                         // Reset timing after seek
                         playback_start_time = Some(std::time::Instant::now());
                         first_pts = None;
+                        // Set target for precise seeking - will skip frames until we reach it
+                        seek_target_secs = Some(target_secs);
                     }
                 }
                 Ok(AudioDecoderCommand::Stop) => {
@@ -353,6 +364,19 @@ impl AudioDecoder {
                     // Calculate duration
                     let frame_duration =
                         samples.len() as f64 / (sample_rate as f64 * channels as f64);
+
+                    // Precise seeking: skip audio frames before target PTS
+                    // This ensures audio starts at the same position as video after seek
+                    if let Some(target) = seek_target_secs {
+                        let frame_end_pts = pts_secs + frame_duration;
+                        if frame_end_pts < target {
+                            // Entire frame is before target - skip it
+                            continue;
+                        }
+                        // Frame contains or is after target - clear seek state
+                        // and emit from this frame onwards
+                        seek_target_secs = None;
+                    }
 
                     // Frame pacing: wait until the audio should be queued
                     // We use a look-ahead of ~200ms to ensure buffer stays filled
