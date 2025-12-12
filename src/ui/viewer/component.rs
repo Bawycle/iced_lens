@@ -788,6 +788,9 @@ impl State {
                     PlaybackMessage::EndOfStream => {
                         // Handle end of stream
                         if let Some(ref mut player) = self.video_player {
+                            // Mark that we've reached the end (for step forward button)
+                            player.set_at_end_of_stream();
+
                             if player.is_loop_enabled() {
                                 // Restart playback from beginning
                                 // Clear seek preview so step operations use actual position
@@ -948,29 +951,36 @@ impl State {
                 // Build PlaybackState for video controls
                 // Show controls for any video, not just when VideoPlayer exists
                 if let MediaData::Video(ref video_data) = media {
-                    let (is_playing, position_secs, loop_enabled, can_step_backward) =
-                        if let Some(player) = &self.video_player {
-                            let state = player.state();
-                            let can_step_back = player.can_step_backward();
-                            match state {
-                                crate::video_player::PlaybackState::Playing { position_secs } => {
-                                    (true, *position_secs, player.is_loop_enabled(), false)
-                                }
-                                crate::video_player::PlaybackState::Paused { position_secs } => (
-                                    false,
-                                    *position_secs,
-                                    player.is_loop_enabled(),
-                                    can_step_back,
-                                ),
-                                crate::video_player::PlaybackState::Buffering { position_secs } => {
-                                    (true, *position_secs, player.is_loop_enabled(), false)
-                                }
-                                _ => (false, 0.0, player.is_loop_enabled(), false),
+                    let (
+                        is_playing,
+                        position_secs,
+                        loop_enabled,
+                        can_step_backward,
+                        can_step_forward,
+                    ) = if let Some(player) = &self.video_player {
+                        let state = player.state();
+                        let can_step_back = player.can_step_backward();
+                        let can_step_fwd = player.can_step_forward();
+                        match state {
+                            crate::video_player::PlaybackState::Playing { position_secs } => {
+                                (true, *position_secs, player.is_loop_enabled(), false, false)
                             }
-                        } else {
-                            // No player yet - show initial state (paused at 0)
-                            (false, 0.0, false, false)
-                        };
+                            crate::video_player::PlaybackState::Paused { position_secs } => (
+                                false,
+                                *position_secs,
+                                player.is_loop_enabled(),
+                                can_step_back,
+                                can_step_fwd,
+                            ),
+                            crate::video_player::PlaybackState::Buffering { position_secs } => {
+                                (true, *position_secs, player.is_loop_enabled(), false, false)
+                            }
+                            _ => (false, 0.0, player.is_loop_enabled(), false, false),
+                        }
+                    } else {
+                        // No player yet - show initial state (paused at 0)
+                        (false, 0.0, false, false, false)
+                    };
 
                     Some(video_controls::PlaybackState {
                         is_playing,
@@ -982,6 +992,7 @@ impl State {
                         seek_preview_position: self.seek_preview_position,
                         overflow_menu_open: self.overflow_menu_open,
                         can_step_backward,
+                        can_step_forward,
                     })
                 } else {
                     None

@@ -87,6 +87,10 @@ pub struct PlaybackState {
     /// Can step backward (in stepping mode with frame history available)?
     /// When false, the step backward button is disabled.
     pub can_step_backward: bool,
+
+    /// Can step forward (paused and not at end of video)?
+    /// When false, the step forward button is disabled.
+    pub can_step_forward: bool,
 }
 
 impl Default for PlaybackState {
@@ -101,6 +105,7 @@ impl Default for PlaybackState {
             seek_preview_position: None,
             overflow_menu_open: false,
             can_step_backward: false,
+            can_step_forward: false,
         }
     }
 }
@@ -311,8 +316,8 @@ fn build_overflow_menu<'a>(
     )
     .gap(4);
 
-    // Step forward button (only enabled when paused)
-    let step_forward_content: Element<'_, Message> = if !state.is_playing {
+    // Step forward button (only enabled when paused AND not at end of video)
+    let step_forward_content: Element<'_, Message> = if state.can_step_forward {
         button(icons::sized(icons::step_forward(), icon_size))
             .on_press(Message::StepForward)
             .padding(spacing::XS)
@@ -453,6 +458,7 @@ mod tests {
             seek_preview_position: None,
             overflow_menu_open: false,
             can_step_backward: false,
+            can_step_forward: false,
         };
 
         let position = if state.duration_secs > 0.0 {
@@ -476,6 +482,7 @@ mod tests {
             seek_preview_position: None,
             overflow_menu_open: false,
             can_step_backward: false,
+            can_step_forward: false,
         };
 
         let position = if state.duration_secs > 0.0 {
@@ -499,6 +506,7 @@ mod tests {
             seek_preview_position: Some(0.75),
             overflow_menu_open: false,
             can_step_backward: false,
+            can_step_forward: false,
         };
 
         // When seek_preview_position is set, it should be used instead of calculated position

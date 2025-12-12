@@ -150,6 +150,10 @@ pub struct VideoPlayer {
     /// Reset to 0 on play/seek/stop, incremented on step_frame,
     /// decremented on step_backward.
     history_position: usize,
+
+    /// Whether we've reached the end of the video stream.
+    /// Set to true when EndOfStream is received, reset to false on seek/play.
+    at_end_of_stream: bool,
 }
 
 impl VideoPlayer {
@@ -165,6 +169,7 @@ impl VideoPlayer {
             command_sender: None,
             sync_clock: Arc::new(SyncClock::new()),
             history_position: 0,
+            at_end_of_stream: false,
         })
     }
 
@@ -220,6 +225,21 @@ impl VideoPlayer {
         self.history_position >= 1
     }
 
+    /// Returns whether forward stepping is available.
+    ///
+    /// Forward stepping is available when the video is paused and
+    /// we haven't reached the end of the stream (last frame).
+    pub fn can_step_forward(&self) -> bool {
+        self.state.is_effectively_paused() && !self.at_end_of_stream
+    }
+
+    /// Marks that the end of stream has been reached.
+    ///
+    /// Called when EndOfStream event is received from the decoder.
+    pub fn set_at_end_of_stream(&mut self) {
+        self.at_end_of_stream = true;
+    }
+
     /// Starts or resumes playback.
     ///
     /// State transitions:
@@ -260,6 +280,9 @@ impl VideoPlayer {
 
         // Exit stepping mode - reset history position
         self.history_position = 0;
+
+        // Clear end-of-stream flag since we're resuming playback
+        self.at_end_of_stream = false;
 
         // Start or resume sync clock
         if position == 0.0 {
@@ -354,6 +377,9 @@ impl VideoPlayer {
         // Exit stepping mode - seek breaks frame continuity
         self.history_position = 0;
 
+        // Clear end-of-stream flag since we're seeking to a new position
+        self.at_end_of_stream = false;
+
         // Remember if we should resume playing after seek.
         // Use is_playing_or_will_resume() to handle chained seeks correctly:
         // if we're already seeking with resume_playing=true, preserve that intent.
@@ -393,6 +419,9 @@ impl VideoPlayer {
 
         // Exit stepping mode - seek breaks frame continuity
         self.history_position = 0;
+
+        // Clear end-of-stream flag since we're seeking to a new position
+        self.at_end_of_stream = false;
 
         self.state = PlaybackState::Seeking {
             target_secs: clamped_target,
@@ -554,6 +583,9 @@ impl VideoPlayer {
         // Only step backward if we have history to go back to
         if self.history_position >= 1 {
             self.history_position -= 1;
+
+            // Clear end-of-stream flag since we're stepping back from the end
+            self.at_end_of_stream = false;
 
             // Send StepBackward command to decoder
             if let Some(sender) = &self.command_sender {
