@@ -7,6 +7,7 @@
 use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{sizing, spacing};
 use crate::ui::{icons, styles};
+use crate::video_player::time_units::{self, secs_to_micros};
 use iced::widget::{button, column, container, row, slider, text, tooltip, Column, Row, Text};
 use iced::{Element, Length};
 
@@ -17,13 +18,11 @@ pub enum Message {
     TogglePlayback,
 
     /// Seek preview - slider is being dragged (visual feedback only, no actual seek).
-    SeekPreview(f32),
+    /// Position in microseconds for maximum precision.
+    SeekPreview(f64),
 
     /// Commit seek - slider released, perform actual seek to preview position.
     SeekCommit,
-
-    /// Legacy seek (kept for compatibility).
-    Seek(f32),
 
     /// Seek relative to current position (in seconds, can be negative).
     /// Used by keyboard shortcuts (e.g., arrow keys for ±5s).
@@ -65,8 +64,11 @@ pub struct PlaybackState {
     /// Current playback position in seconds.
     pub position_secs: f64,
 
-    /// Total duration in seconds.
+    /// Total duration in seconds (for time display).
     pub duration_secs: f64,
+
+    /// Total duration in microseconds (for slider range).
+    pub duration_micros: f64,
 
     /// Current volume (0.0 to 1.0).
     pub volume: f32,
@@ -77,9 +79,9 @@ pub struct PlaybackState {
     /// Is loop mode enabled?
     pub loop_enabled: bool,
 
-    /// Preview position during seek drag (0.0 to 1.0), if any.
+    /// Preview position during seek drag in microseconds, if any.
     /// When Some, the slider shows this position instead of actual playback position.
-    pub seek_preview_position: Option<f32>,
+    pub seek_preview_position: Option<f64>,
 
     /// Is the overflow menu (advanced controls) open?
     pub overflow_menu_open: bool,
@@ -99,6 +101,7 @@ impl Default for PlaybackState {
             is_playing: false,
             position_secs: 0.0,
             duration_secs: 0.0,
+            duration_micros: 0.0,
             volume: 1.0,
             muted: false,
             loop_enabled: false,
@@ -149,21 +152,22 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     )
     .gap(4);
 
-    // Calculate timeline position (0.0 to 1.0)
-    // Use preview position during drag, otherwise use actual playback position
-    let timeline_position = if let Some(preview) = state.seek_preview_position {
-        preview
-    } else if state.duration_secs > 0.0 {
-        (state.position_secs / state.duration_secs).clamp(0.0, 1.0) as f32
-    } else {
-        0.0
-    };
+    // Calculate timeline position in microseconds
+    // Use preview position during drag, otherwise convert playback position to microseconds
+    let timeline_position_micros = state
+        .seek_preview_position
+        .unwrap_or_else(|| secs_to_micros(state.position_secs));
 
     // Use on_change for visual preview, on_release for actual seek
-    let timeline = slider(0.0..=1.0, timeline_position, Message::SeekPreview)
-        .on_release(Message::SeekCommit)
-        .width(Length::FillPortion(1))
-        .step(0.001);
+    // Dynamic range from 0 to duration in microseconds for maximum precision
+    let timeline = slider(
+        0.0..=state.duration_micros,
+        timeline_position_micros,
+        Message::SeekPreview,
+    )
+    .on_release(Message::SeekCommit)
+    .width(Length::FillPortion(1))
+    .step(time_units::SLIDER_STEP_MICROS);
 
     // Format time display - use monospace-like sizing
     let time_display = text(format!(
@@ -417,6 +421,7 @@ mod tests {
         assert!(!state.is_playing);
         assert_eq!(state.position_secs, 0.0);
         assert_eq!(state.duration_secs, 0.0);
+        assert_eq!(state.duration_micros, 0.0);
         assert_eq!(state.volume, 1.0);
         assert!(!state.muted);
         assert!(!state.loop_enabled);
@@ -432,10 +437,10 @@ mod tests {
 
     #[test]
     fn message_debug_works() {
-        let msg = Message::Seek(0.5);
+        let msg = Message::SeekPreview(500_000.0);
         let debug_str = format!("{:?}", msg);
-        assert!(debug_str.contains("Seek"));
-        assert!(debug_str.contains("0.5"));
+        assert!(debug_str.contains("SeekPreview"));
+        assert!(debug_str.contains("500000"));
     }
 
     #[test]
@@ -447,11 +452,12 @@ mod tests {
     }
 
     #[test]
-    fn timeline_position_calculated_correctly() {
+    fn timeline_position_uses_microseconds() {
         let state = PlaybackState {
             is_playing: true,
             position_secs: 30.0,
             duration_secs: 120.0,
+            duration_micros: secs_to_micros(120.0),
             volume: 0.8,
             muted: false,
             loop_enabled: false,
@@ -461,13 +467,13 @@ mod tests {
             can_step_forward: false,
         };
 
-        let position = if state.duration_secs > 0.0 {
-            (state.position_secs / state.duration_secs).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
+        // Position should be in microseconds
+        let position_micros = state
+            .seek_preview_position
+            .unwrap_or_else(|| secs_to_micros(state.position_secs));
 
-        assert_eq!(position, 0.25);
+        assert_eq!(position_micros, 30_000_000.0);
+        assert_eq!(state.duration_micros, 120_000_000.0);
     }
 
     #[test]
@@ -476,6 +482,7 @@ mod tests {
             is_playing: false,
             position_secs: 10.0,
             duration_secs: 0.0,
+            duration_micros: 0.0,
             volume: 1.0,
             muted: false,
             loop_enabled: false,
@@ -485,39 +492,42 @@ mod tests {
             can_step_forward: false,
         };
 
-        let position = if state.duration_secs > 0.0 {
-            (state.position_secs / state.duration_secs).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
+        // When duration is zero, position in microseconds is still converted
+        let position_micros = state
+            .seek_preview_position
+            .unwrap_or_else(|| secs_to_micros(state.position_secs));
 
-        assert_eq!(position, 0.0);
+        // Position is 10 seconds in microseconds, but slider range is 0..=0
+        // so the slider will clamp to 0
+        assert_eq!(position_micros, 10_000_000.0);
+        assert_eq!(state.duration_micros, 0.0);
     }
 
     #[test]
     fn timeline_uses_preview_position_when_set() {
+        // Preview position at 90 seconds (75% of 120s) in microseconds
+        let preview_micros = secs_to_micros(90.0);
+
         let state = PlaybackState {
             is_playing: true,
             position_secs: 30.0,
             duration_secs: 120.0,
+            duration_micros: secs_to_micros(120.0),
             volume: 1.0,
             muted: false,
             loop_enabled: false,
-            seek_preview_position: Some(0.75),
+            seek_preview_position: Some(preview_micros),
             overflow_menu_open: false,
             can_step_backward: false,
             can_step_forward: false,
         };
 
         // When seek_preview_position is set, it should be used instead of calculated position
-        let position = if let Some(preview) = state.seek_preview_position {
-            preview
-        } else if state.duration_secs > 0.0 {
-            (state.position_secs / state.duration_secs).clamp(0.0, 1.0) as f32
-        } else {
-            0.0
-        };
+        let position_micros = state
+            .seek_preview_position
+            .unwrap_or_else(|| secs_to_micros(state.position_secs));
 
-        assert_eq!(position, 0.75);
+        // Should use preview position (90s in µs) not playback position (30s)
+        assert_eq!(position_micros, 90_000_000.0);
     }
 }

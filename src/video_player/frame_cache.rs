@@ -26,6 +26,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use super::decoder::DecodedFrame;
+use super::time_units::pts_to_micros;
 
 /// Default cache size in bytes (64 MB).
 /// Allows ~8 frames at 1080p or ~64 frames at 480p.
@@ -150,18 +151,6 @@ impl CacheEntry {
             is_keyframe,
         }
     }
-}
-
-/// Converts PTS in seconds to microseconds for precise indexing.
-#[inline]
-pub fn pts_to_micros(pts_secs: f64) -> i64 {
-    (pts_secs * 1_000_000.0) as i64
-}
-
-/// Converts microseconds back to seconds.
-#[inline]
-pub fn micros_to_pts(micros: i64) -> f64 {
-    micros as f64 / 1_000_000.0
 }
 
 /// LRU frame cache for decoded video frames.
@@ -434,6 +423,7 @@ impl std::fmt::Debug for FrameCache {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::video_player::time_units::micros_to_pts;
 
     fn create_test_frame(pts_secs: f64, size: usize) -> DecodedFrame {
         DecodedFrame {

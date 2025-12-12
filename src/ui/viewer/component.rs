@@ -10,7 +10,9 @@ use crate::ui::viewer::{
     self, controls, pane, state as geometry, video_controls, HudIconKind, HudLine,
 };
 use crate::ui::widgets::VideoCanvas;
-use crate::video_player::{subscription::PlaybackMessage, SharedLufsCache, VideoPlayer};
+use crate::video_player::{
+    subscription::PlaybackMessage, time_units, SharedLufsCache, VideoPlayer,
+};
 use iced::widget::scrollable::{self, AbsoluteOffset, Id, RelativeOffset};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
 use std::path::PathBuf;
@@ -143,9 +145,9 @@ pub struct State {
     /// Always defaults to true for videos and is NOT persisted.
     video_fit_to_window: bool,
 
-    /// Preview position for seek slider (0.0 to 1.0).
+    /// Preview position for seek slider in microseconds.
     /// Set during slider drag, cleared on release.
-    seek_preview_position: Option<f32>,
+    seek_preview_position: Option<f64>,
 
     /// Whether videos should auto-play when loaded.
     video_autoplay: bool,
@@ -622,21 +624,10 @@ impl State {
                         // Perform actual seek to preview position
                         // Don't clear seek_preview_position here - it will be cleared
                         // when we receive a frame near the seek target
-                        if let Some(position) = self.seek_preview_position {
+                        if let Some(position_micros) = self.seek_preview_position {
                             if let Some(player) = &mut self.video_player {
-                                if let Some(MediaData::Video(ref video_data)) = self.media {
-                                    let target_secs = position as f64 * video_data.duration_secs;
-                                    player.seek(target_secs);
-                                }
-                            }
-                        }
-                    }
-                    VM::Seek(position) => {
-                        // Legacy seek - direct seek without preview
-                        // Position is 0.0 to 1.0, convert to seconds
-                        if let Some(player) = &mut self.video_player {
-                            if let Some(MediaData::Video(ref video_data)) = self.media {
-                                let target_secs = position as f64 * video_data.duration_secs;
+                                // Convert microseconds to seconds for seek API
+                                let target_secs = time_units::micros_to_secs(position_micros);
                                 player.seek(target_secs);
                             }
                         }
@@ -761,14 +752,12 @@ impl State {
 
                         // Clear seek preview if we received a frame near the seek target
                         // This ensures the slider stays at the new position after seek completes
-                        if let Some(preview_pos) = self.seek_preview_position {
-                            if let Some(MediaData::Video(ref video_data)) = self.media {
-                                let preview_secs = preview_pos as f64 * video_data.duration_secs;
-                                let diff = (pts_secs - preview_secs).abs();
-                                // Clear preview if frame is within 0.5 seconds of target
-                                if diff < 0.5 {
-                                    self.seek_preview_position = None;
-                                }
+                        if let Some(preview_micros) = self.seek_preview_position {
+                            let preview_secs = time_units::micros_to_secs(preview_micros);
+                            let diff = (pts_secs - preview_secs).abs();
+                            // Clear preview if frame is within 0.5 seconds of target
+                            if diff < 0.5 {
+                                self.seek_preview_position = None;
                             }
                         }
                     }
@@ -986,6 +975,7 @@ impl State {
                         is_playing,
                         position_secs,
                         duration_secs: video_data.duration_secs,
+                        duration_micros: time_units::secs_to_micros(video_data.duration_secs),
                         volume: self.video_volume,
                         muted: self.video_muted,
                         loop_enabled,

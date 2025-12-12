@@ -12,6 +12,7 @@ pub mod normalization;
 mod state;
 pub mod subscription;
 pub mod sync;
+pub mod time_units;
 mod webp_decoder;
 
 pub use decoder::{AsyncDecoder, DecodedFrame, DecoderCommand, DecoderEvent};
