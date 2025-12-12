@@ -27,39 +27,19 @@
 //! std::fs::remove_dir_all(&temp_dir).unwrap();
 //! ```
 
+pub mod defaults;
+
+// Re-export all default constants for backward compatibility
+pub use defaults::*;
+
 use crate::error::{Error, Result};
 use crate::ui::theming::ThemeMode;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf}; // Added PathBuf back
+use std::path::{Path, PathBuf};
 
 const CONFIG_FILE: &str = "settings.toml";
 const APP_NAME: &str = "IcedLens";
-
-// Overlay auto-hide timeout constants
-pub const DEFAULT_OVERLAY_TIMEOUT_SECS: u32 = 3;
-pub const MIN_OVERLAY_TIMEOUT_SECS: u32 = 1;
-pub const MAX_OVERLAY_TIMEOUT_SECS: u32 = 30;
-
-// Video volume constants
-pub const DEFAULT_VOLUME: f32 = 0.8;
-pub const MIN_VOLUME: f32 = 0.0;
-pub const MAX_VOLUME: f32 = 1.0;
-pub const VOLUME_STEP: f32 = 0.05; // 5% per key press
-
-// Audio normalization target (EBU R128 standard uses -23 LUFS, but -16 LUFS is common for streaming)
-pub const DEFAULT_NORMALIZATION_TARGET_LUFS: f32 = -16.0;
-
-// Frame cache constants
-pub const DEFAULT_FRAME_CACHE_MB: u32 = 64;
-pub const MIN_FRAME_CACHE_MB: u32 = 16;
-pub const MAX_FRAME_CACHE_MB: u32 = 512;
-
-// Frame history constants (for frame-by-frame backward stepping)
-// This is separate from frame cache - it stores recently decoded frames for stepping backward
-pub const DEFAULT_FRAME_HISTORY_MB: u32 = 128;
-pub const MIN_FRAME_HISTORY_MB: u32 = 32;
-pub const MAX_FRAME_HISTORY_MB: u32 = 512;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -177,16 +157,6 @@ impl Default for Config {
         }
     }
 }
-
-pub const DEFAULT_ZOOM_STEP_PERCENT: f32 = 10.0;
-
-// Compile-time assertions to validate overlay timeout bounds
-const _: () = {
-    assert!(MIN_OVERLAY_TIMEOUT_SECS > 0);
-    assert!(MAX_OVERLAY_TIMEOUT_SECS >= MIN_OVERLAY_TIMEOUT_SECS);
-    assert!(DEFAULT_OVERLAY_TIMEOUT_SECS >= MIN_OVERLAY_TIMEOUT_SECS);
-    assert!(DEFAULT_OVERLAY_TIMEOUT_SECS <= MAX_OVERLAY_TIMEOUT_SECS);
-};
 
 fn get_default_config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|mut path| {
