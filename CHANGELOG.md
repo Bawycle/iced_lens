@@ -7,10 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - In Development
-
-> **Note:** This version is currently under active development on the `feature/video_player` branch.
-> Features listed here are planned or partially implemented but not yet released.
+## [0.2.0] - 2025-12-12
 
 ### Added
 - **Video playback:** full video player with play/pause, seek bar, volume control, mute, and loop toggle for MP4, AVI, MOV, MKV, and WebM files.
@@ -27,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Edit button is disabled when viewing videos (editing not supported for video files).
+- **MSRV**: Minimum Supported Rust Version upgraded from 1.78 to 1.92.0.
 
 ### Fixed
 - Keyboard shortcuts work correctly in fullscreen mode.
@@ -112,5 +110,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MSRV**: Rust 1.78+
 - **License**: Mozilla Public License 2.0 (MPL-2.0)
 
-[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.1.0...HEAD
+[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.2.0...HEAD
+[0.2.0]: https://codeberg.org/Bawycle/iced_lens/releases/tag/v0.2.0
 [0.1.0]: https://codeberg.org/Bawycle/iced_lens/releases/tag/v0.1.0

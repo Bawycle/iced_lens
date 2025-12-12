@@ -154,9 +154,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
 
     // Timeline position in seconds
     // Use preview position during drag, otherwise use actual playback position
-    let timeline_position = state
-        .seek_preview_position
-        .unwrap_or(state.position_secs);
+    let timeline_position = state.seek_preview_position.unwrap_or(state.position_secs);
 
     // Use on_change for visual preview, on_release for actual seek
     let timeline = slider(

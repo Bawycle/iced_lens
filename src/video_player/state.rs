@@ -1197,7 +1197,10 @@ mod tests {
         // Verify seeking state preserves resume intent
         assert!(matches!(
             player.state(),
-            PlaybackState::Seeking { resume_playing: true, .. }
+            PlaybackState::Seeking {
+                resume_playing: true,
+                ..
+            }
         ));
 
         // Frame arrives at seek target
@@ -1245,7 +1248,10 @@ mod tests {
         player.seek(50.0);
         assert!(matches!(
             player.state(),
-            PlaybackState::Seeking { resume_playing: false, .. }
+            PlaybackState::Seeking {
+                resume_playing: false,
+                ..
+            }
         ));
 
         // Frame arrives (completes seek to paused)
