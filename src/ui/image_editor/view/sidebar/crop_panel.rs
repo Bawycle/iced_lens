@@ -3,6 +3,7 @@
 
 use crate::ui::image_editor::state::{CropRatio, CropState};
 use crate::ui::styles;
+use crate::ui::design_tokens::spacing;
 use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length};
 
@@ -14,7 +15,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
     let ratio_label = text(ctx.i18n.tr("image-editor-crop-ratio-label")).size(13);
 
     let ratios_row1 = Row::new()
-        .spacing(4)
+        .spacing(spacing::XXS)
         .push(ratio_button(
             crop,
             ctx.i18n.tr("image-editor-crop-ratio-free"),
@@ -27,7 +28,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
         ));
 
     let ratios_row2 = Row::new()
-        .spacing(4)
+        .spacing(spacing::XXS)
         .push(ratio_button(
             crop,
             ctx.i18n.tr("image-editor-crop-ratio-landscape"),
@@ -40,7 +41,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
         ));
 
     let ratios_row3 = Row::new()
-        .spacing(4)
+        .spacing(spacing::XXS)
         .push(ratio_button(
             crop,
             ctx.i18n.tr("image-editor-crop-ratio-photo"),
@@ -56,7 +57,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
 
     let apply_btn = {
         let btn = button(text(ctx.i18n.tr("image-editor-crop-apply")).size(14))
-            .padding(8)
+            .padding(spacing::XS)
             .width(Length::Fill)
             .style(iced::widget::button::primary);
         if crop.overlay.visible {
@@ -68,7 +69,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
 
     container(
         Column::new()
-            .spacing(8)
+            .spacing(spacing::XS)
             .push(title)
             .push(ratio_label)
             .push(ratios_row1)
@@ -77,7 +78,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
             .push(crop_info)
             .push(apply_btn),
     )
-    .padding(12)
+    .padding(spacing::SM)
     .width(Length::Fill)
     .style(styles::editor::settings_panel)
     .into()

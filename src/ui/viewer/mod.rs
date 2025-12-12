@@ -169,7 +169,7 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
             )
             .map(Message::Controls);
 
-            let mut controls_column = Column::new().spacing(8);
+            let mut controls_column = Column::new().spacing(spacing::XS);
             controls_column = controls_column.push(controls_view);
 
             // Add video controls if video is playing/paused
@@ -182,7 +182,7 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
 
             let overlay_container = Container::new(controls_column)
                 .width(Length::Fill)
-                .padding(10)
+                .padding(spacing::SM)
                 .style(styles::overlay::controls_container);
 
             stack = stack.push(overlay_container);
@@ -193,7 +193,7 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
         // Windowed mode: normal column layout
         // Note: Navigation bar (hamburger menu, edit button) is now handled at app level
         let mut column = Column::new()
-            .spacing(16)
+            .spacing(spacing::MD)
             .width(Length::Fill)
             .height(Length::Fill);
 

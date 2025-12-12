@@ -2,6 +2,7 @@
 //! Top toolbar for the editor surface.
 
 use crate::ui::styles;
+use crate::ui::design_tokens::spacing;
 use iced::widget::{button, container, Row, Text};
 use iced::{Alignment, Element, Length};
 
@@ -34,7 +35,7 @@ pub fn view<'a>(model: &ToolbarModel, ctx: &ViewContext<'a>) -> Element<'a, Mess
         Row::new()
             .push(back_btn)
             .align_y(Alignment::Center)
-            .padding(8),
+            .padding(spacing::XS),
     )
     .width(Length::Fill)
     .style(styles::editor::toolbar)

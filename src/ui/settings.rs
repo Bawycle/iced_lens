@@ -382,7 +382,7 @@ impl State {
         )
         .on_input(Message::ZoomStepInputChanged)
         .on_submit(Message::ZoomStepSubmitted)
-        .padding(6)
+        .padding(spacing::XXS)
         .width(Length::Fixed(100.0));
 
         let zoom_input_row = Row::new()

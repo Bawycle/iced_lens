@@ -2,6 +2,7 @@
 //! Resize tool panel for the editor sidebar.
 
 use crate::ui::styles;
+use crate::ui::design_tokens::spacing;
 use iced::widget::{button, checkbox, container, slider, text, text_input, Column, Row};
 use iced::{Element, Length};
 
@@ -11,7 +12,7 @@ use crate::ui::image_editor::{Message, SidebarMessage};
 
 pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let scale_section = Column::new()
-        .spacing(6)
+        .spacing(spacing::XXS)
         .push(text(ctx.i18n.tr("image-editor-resize-section-title")).size(14))
         .push(text(ctx.i18n.tr("image-editor-resize-scale-label")).size(13))
         .push(
@@ -22,7 +23,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
         )
         .push(text(format!("{:.0}%", resize.scale_percent)).size(13));
 
-    let mut presets = Row::new().spacing(8);
+    let mut presets = Row::new().spacing(spacing::XS);
     for preset in [50.0, 75.0, 150.0, 200.0] {
         let label = format!("{preset:.0}%");
         presets = presets.push(
@@ -34,7 +35,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
     }
 
     let presets_section = Column::new()
-        .spacing(6)
+        .spacing(spacing::XXS)
         .push(text(ctx.i18n.tr("image-editor-resize-presets-label")).size(13))
         .push(presets);
 
@@ -42,7 +43,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
     let width_label = text(width_placeholder.clone()).size(13);
     let width_input = text_input(width_placeholder.as_str(), &resize.width_input)
         .on_input(|value| Message::Sidebar(SidebarMessage::WidthInputChanged(value)))
-        .padding(6)
+        .padding(spacing::XXS)
         .size(14)
         .width(Length::Fill);
 
@@ -50,22 +51,22 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
     let height_label = text(height_placeholder.clone()).size(13);
     let height_input = text_input(height_placeholder.as_str(), &resize.height_input)
         .on_input(|value| Message::Sidebar(SidebarMessage::HeightInputChanged(value)))
-        .padding(6)
+        .padding(spacing::XXS)
         .size(14)
         .width(Length::Fill);
 
     let dimensions_row = Row::new()
-        .spacing(8)
+        .spacing(spacing::XS)
         .push(
             Column::new()
-                .spacing(4)
+                .spacing(spacing::XXS)
                 .width(Length::Fill)
                 .push(width_label)
                 .push(width_input),
         )
         .push(
             Column::new()
-                .spacing(4)
+                .spacing(spacing::XXS)
                 .width(Length::Fill)
                 .push(height_label)
                 .push(height_input),
@@ -78,14 +79,14 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
     .on_toggle(|_| Message::Sidebar(SidebarMessage::ToggleLockAspect));
 
     let apply_btn = button(text(ctx.i18n.tr("image-editor-resize-apply")).size(16))
-        .padding(10)
+        .padding(spacing::SM)
         .width(Length::Fill)
         .style(iced::widget::button::primary)
         .on_press(SidebarMessage::ApplyResize.into());
 
     container(
         Column::new()
-            .spacing(12)
+            .spacing(spacing::SM)
             .push(scale_section)
             .push(presets_section)
             .push(text(ctx.i18n.tr("image-editor-resize-dimensions-label")).size(13))
@@ -93,7 +94,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
             .push(lock_checkbox)
             .push(apply_btn),
     )
-    .padding(12)
+    .padding(spacing::SM)
     .width(Length::Fill)
     .style(styles::editor::settings_panel)
     .into()

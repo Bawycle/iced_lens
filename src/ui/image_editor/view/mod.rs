@@ -19,7 +19,7 @@ pub fn render<'a>(state: &'a State, ctx: ViewContext<'a>) -> Element<'a, Message
     let toolbar_model = ToolbarModel::from_state(state);
     let toolbar = toolbar::view(&toolbar_model, &ctx);
 
-    let mut main_row = Row::new().spacing(0);
+    let mut main_row = Row::new().spacing(0.0);
 
     if state.sidebar_expanded {
         let sidebar_model = SidebarModel::from_state(state);

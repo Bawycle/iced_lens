@@ -158,7 +158,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
                 let loop_icon = icons::sized(icons::loop_icon(), 20.0)
                     .style(styles::overlay::loop_icon(svg_color));
                 Row::new()
-                    .spacing(4)
+                    .spacing(spacing::XXS)
                     .align_y(Vertical::Center)
                     .push(loop_icon)
                     .push(Text::new("◀").size(28))
@@ -168,7 +168,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
             };
             let left_arrow = button(button_content)
                 .on_press(Message::NavigatePrevious)
-                .padding(12)
+                .padding(spacing::SM)
                 .style(styles::button_overlay(
                     arrow_text_color,
                     arrow_bg_alpha_normal,
@@ -179,7 +179,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
                 Container::new(left_arrow)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .padding(16)
+                    .padding(spacing::MD)
                     .align_x(Horizontal::Left)
                     .align_y(Vertical::Center),
             );
@@ -191,7 +191,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
                 let loop_icon = icons::sized(icons::loop_icon(), 20.0)
                     .style(styles::overlay::loop_icon(svg_color));
                 Row::new()
-                    .spacing(4)
+                    .spacing(spacing::XXS)
                     .align_y(Vertical::Center)
                     .push(Text::new("▶").size(28))
                     .push(loop_icon)
@@ -201,7 +201,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
             };
             let right_arrow = button(button_content)
                 .on_press(Message::NavigateNext)
-                .padding(12)
+                .padding(spacing::SM)
                 .style(styles::button_overlay(
                     arrow_text_color,
                     arrow_bg_alpha_normal,
@@ -212,7 +212,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
                 Container::new(right_arrow)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .padding(16)
+                    .padding(spacing::MD)
                     .align_x(Horizontal::Right)
                     .align_y(Vertical::Center),
             );
@@ -360,7 +360,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
     if model.hud_visible && !ctx.hud_lines.is_empty() {
         const HUD_ICON_SIZE: f32 = 14.0;
 
-        let mut hud_column: Column<'_, Message> = Column::new().spacing(4);
+        let mut hud_column: Column<'_, Message> = Column::new().spacing(spacing::XXS);
         for hud_line in &ctx.hud_lines {
             let icon = match hud_line.icon {
                 HudIconKind::Position => icons::crosshair(),
@@ -379,7 +379,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
             ));
 
             let line_row = Row::new()
-                .spacing(4)
+                .spacing(spacing::XXS)
                 .align_y(Vertical::Center)
                 .push(styled_icon)
                 .push(Text::new(hud_line.text.clone()).size(12));
@@ -388,14 +388,14 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
         }
 
         let indicator = Container::new(hud_column)
-            .padding(6)
+            .padding(spacing::XXS)
             .style(styles::overlay::indicator(4.0));
 
         stack = stack.push(
             Container::new(indicator)
                 .width(Length::Fill)
                 .height(Length::Fill)
-                .padding(10)
+                .padding(spacing::SM)
                 .align_x(Horizontal::Right)
                 .align_y(Vertical::Bottom),
         );
@@ -407,10 +407,10 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
             let position_text = format!("{}/{}", current + 1, model.total_count);
             let position_indicator = Container::new(Text::new(position_text).size(14))
                 .padding(Padding {
-                    top: 4.0,
-                    right: 8.0,
-                    bottom: 4.0,
-                    left: 8.0,
+                    top: spacing::XXS,
+                    right: spacing::XS,
+                    bottom: spacing::XXS,
+                    left: spacing::XS,
                 })
                 .style(styles::overlay::indicator(12.0));
 
@@ -418,7 +418,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
                 Container::new(position_indicator)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .padding(10)
+                    .padding(spacing::SM)
                     .align_x(Horizontal::Center)
                     .align_y(Vertical::Bottom),
             );

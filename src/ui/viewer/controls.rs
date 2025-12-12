@@ -43,7 +43,7 @@ pub fn view<'a>(
     let zoom_input = text_input(&zoom_placeholder, &zoom.zoom_input)
         .on_input(Message::ZoomInputChanged)
         .on_submit(Message::ZoomInputSubmitted)
-        .padding(6)
+        .padding(spacing::XXS)
         .size(16)
         .width(Length::Fixed(60.0));
 
@@ -52,7 +52,7 @@ pub fn view<'a>(
     let reset_tooltip = ctx.i18n.tr("viewer-zoom-reset-button");
     let reset_button_content: Element<'_, Message> = button(icons::fill(icons::refresh()))
         .on_press(Message::ResetZoom)
-        .padding(4)
+        .padding(spacing::XXS)
         .width(Length::Fixed(shared_styles::ICON_SIZE))
         .height(Length::Fixed(shared_styles::ICON_SIZE))
         .into();
@@ -61,12 +61,12 @@ pub fn view<'a>(
         Text::new(reset_tooltip),
         tooltip::Position::Bottom,
     )
-    .gap(4);
+    .gap(spacing::XXS);
 
     let zoom_out_tooltip = ctx.i18n.tr("viewer-zoom-out-tooltip");
     let zoom_out_button_content: Element<'_, Message> = button(icons::fill(icons::zoom_out()))
         .on_press(Message::ZoomOut)
-        .padding(4)
+        .padding(spacing::XXS)
         .width(Length::Fixed(shared_styles::ICON_SIZE))
         .height(Length::Fixed(shared_styles::ICON_SIZE))
         .into();
@@ -75,12 +75,12 @@ pub fn view<'a>(
         Text::new(zoom_out_tooltip),
         tooltip::Position::Bottom,
     )
-    .gap(4);
+    .gap(spacing::XXS);
 
     let zoom_in_tooltip = ctx.i18n.tr("viewer-zoom-in-tooltip");
     let zoom_in_button_content: Element<'_, Message> = button(icons::fill(icons::zoom_in()))
         .on_press(Message::ZoomIn)
-        .padding(4)
+        .padding(spacing::XXS)
         .width(Length::Fixed(shared_styles::ICON_SIZE))
         .height(Length::Fixed(shared_styles::ICON_SIZE))
         .into();
@@ -89,7 +89,7 @@ pub fn view<'a>(
         Text::new(zoom_in_tooltip),
         tooltip::Position::Bottom,
     )
-    .gap(4);
+    .gap(spacing::XXS);
 
     let fit_tooltip = ctx.i18n.tr("viewer-fit-to-window-toggle");
     let fit_icon = if effective_fit_to_window {
@@ -99,7 +99,7 @@ pub fn view<'a>(
     };
     let fit_button = button(fit_icon)
         .on_press(Message::SetFitToWindow(!effective_fit_to_window))
-        .padding(4)
+        .padding(spacing::XXS)
         .width(Length::Fixed(shared_styles::ICON_SIZE))
         .height(Length::Fixed(shared_styles::ICON_SIZE));
 
@@ -114,12 +114,12 @@ pub fn view<'a>(
         Text::new(fit_tooltip),
         tooltip::Position::Bottom,
     )
-    .gap(4);
+    .gap(spacing::XXS);
 
     let fullscreen_tooltip = ctx.i18n.tr("viewer-fullscreen-tooltip");
     let fullscreen_button = button(icons::fill(icons::fullscreen()))
         .on_press(Message::ToggleFullscreen)
-        .padding(4)
+        .padding(spacing::XXS)
         .width(Length::Fixed(shared_styles::ICON_SIZE))
         .height(Length::Fixed(shared_styles::ICON_SIZE));
 
@@ -134,12 +134,12 @@ pub fn view<'a>(
         Text::new(fullscreen_tooltip),
         tooltip::Position::Bottom,
     )
-    .gap(4);
+    .gap(spacing::XXS);
 
     let delete_tooltip = ctx.i18n.tr("viewer-delete-tooltip");
     let delete_button_content: Element<'_, Message> = button(icons::fill(icons::trash()))
         .on_press(Message::DeleteCurrentImage)
-        .padding(4)
+        .padding(spacing::XXS)
         .width(Length::Fixed(shared_styles::ICON_SIZE))
         .height(Length::Fixed(shared_styles::ICON_SIZE))
         .into();
