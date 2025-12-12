@@ -11,7 +11,10 @@ use crate::error::Error;
 use crate::i18n::fluent::I18n;
 use crate::image_navigation::ImageNavigator;
 use crate::media::{self, MediaData};
+use crate::ui::about::{self, Event as AboutEvent, ViewContext as AboutViewContext};
+use crate::ui::help::{self, Event as HelpEvent, ViewContext as HelpViewContext};
 use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
+use crate::ui::navbar::{self, Event as NavbarEvent, ViewContext as NavbarViewContext};
 use crate::ui::settings::{
     self, Event as SettingsEvent, State as SettingsState, StateConfig as SettingsConfig,
     ViewContext as SettingsViewContext,
@@ -51,6 +54,10 @@ pub struct App {
     frame_cache_mb: u32,
     /// Frame history size in MB for backward frame stepping.
     frame_history_mb: u32,
+    /// Whether the hamburger menu is open.
+    menu_open: bool,
+    /// Help screen state (tracks expanded sections).
+    help_state: help::State,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +66,8 @@ pub enum Screen {
     Viewer,
     Settings,
     ImageEditor,
+    Help,
+    About,
 }
 
 impl fmt::Debug for App {
@@ -78,6 +87,9 @@ pub enum Message {
     SwitchScreen(Screen),
     Settings(settings::Message),
     ImageEditor(image_editor::Message),
+    Navbar(navbar::Message),
+    Help(help::Message),
+    About(about::Message),
     ImageEditorLoaded(Result<MediaData, Error>),
     SaveAsDialogResult(Option<PathBuf>),
     FrameCaptureDialogResult {
@@ -156,6 +168,8 @@ impl Default for App {
             lufs_cache: create_lufs_cache(),
             frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
             frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
+            menu_open: false,
+            help_state: help::State::new(),
         }
     }
 }
@@ -303,11 +317,11 @@ impl App {
                     }
                 })
             }
-            Screen::Settings => {
-                // In settings screen, only route non-wheel events to viewer
-                // (wheel events are used by settings scrollable)
+            Screen::Settings | Screen::Help | Screen::About => {
+                // In settings/help/about screens, only route non-wheel events to viewer
+                // (wheel events are used by scrollable content)
                 event::listen_with(|event, status, window_id| {
-                    // Don't route wheel scroll to viewer - it's used by settings scroll
+                    // Don't route wheel scroll to viewer - it's used by scrollable content
                     if matches!(
                         event,
                         event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
@@ -355,6 +369,9 @@ impl App {
             Message::SwitchScreen(target) => self.handle_screen_switch(target),
             Message::Settings(settings_message) => self.handle_settings_message(settings_message),
             Message::ImageEditor(editor_message) => self.handle_editor_message(editor_message),
+            Message::Navbar(navbar_message) => self.handle_navbar_message(navbar_message),
+            Message::Help(help_message) => self.handle_help_message(help_message),
+            Message::About(about_message) => self.handle_about_message(about_message),
             Message::ImageEditorLoaded(result) => {
                 match result {
                     Ok(media_data) => {
@@ -748,6 +765,45 @@ impl App {
         }
     }
 
+    fn handle_navbar_message(&mut self, message: navbar::Message) -> Task<Message> {
+        match navbar::update(message, &mut self.menu_open) {
+            NavbarEvent::None => Task::none(),
+            NavbarEvent::OpenSettings => {
+                self.screen = Screen::Settings;
+                Task::none()
+            }
+            NavbarEvent::OpenHelp => {
+                self.screen = Screen::Help;
+                Task::none()
+            }
+            NavbarEvent::OpenAbout => {
+                self.screen = Screen::About;
+                Task::none()
+            }
+            NavbarEvent::EnterEditor => self.handle_screen_switch(Screen::ImageEditor),
+        }
+    }
+
+    fn handle_help_message(&mut self, message: help::Message) -> Task<Message> {
+        match help::update(&mut self.help_state, message) {
+            HelpEvent::None => Task::none(),
+            HelpEvent::BackToViewer => {
+                self.screen = Screen::Viewer;
+                Task::none()
+            }
+        }
+    }
+
+    fn handle_about_message(&mut self, message: about::Message) -> Task<Message> {
+        match about::update(message) {
+            AboutEvent::None => Task::none(),
+            AboutEvent::BackToViewer => {
+                self.screen = Screen::Viewer;
+                Task::none()
+            }
+        }
+    }
+
     fn handle_navigate_next(&mut self) -> Task<Message> {
         // Rescan directory to handle added/removed images
         if let Some(current_path) = self
@@ -940,7 +996,8 @@ impl App {
                     .overlay_timeout_secs
                     .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
 
-                self.viewer
+                let viewer_content = self
+                    .viewer
                     .view(component::ViewEnv {
                         i18n: &self.i18n,
                         background_theme: self.settings.background_theme(),
@@ -949,7 +1006,27 @@ impl App {
                             overlay_timeout_secs as u64,
                         ),
                     })
-                    .map(Message::Viewer)
+                    .map(Message::Viewer);
+
+                // In fullscreen mode, don't show the navbar
+                if self.fullscreen {
+                    viewer_content
+                } else {
+                    // Add navbar above the viewer content
+                    let navbar_view = navbar::view(NavbarViewContext {
+                        i18n: &self.i18n,
+                        menu_open: self.menu_open,
+                        can_edit: !self.viewer.is_video(),
+                    })
+                    .map(Message::Navbar);
+
+                    iced::widget::Column::new()
+                        .push(navbar_view)
+                        .push(viewer_content)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .into()
+                }
             }
             Screen::Settings => self
                 .settings
@@ -971,6 +1048,12 @@ impl App {
                         .into()
                 }
             }
+            Screen::Help => help::view(HelpViewContext {
+                i18n: &self.i18n,
+                state: &self.help_state,
+            })
+            .map(Message::Help),
+            Screen::About => about::view(AboutViewContext { i18n: &self.i18n }).map(Message::About),
         };
 
         let column = iced::widget::Column::new().push(

@@ -169,6 +169,28 @@ pub fn flip_vertical<'a>() -> Svg<'a> {
 }
 
 // =============================================================================
+// Navigation Icons
+// =============================================================================
+
+/// Hamburger menu icon: three horizontal lines.
+pub fn hamburger<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/hamburger.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
+/// Help icon: question mark in circle.
+pub fn help<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/help.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
+/// Info icon: letter "i" in circle.
+pub fn info<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/info.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
+// =============================================================================
 // Settings Section Icons
 // =============================================================================
 
@@ -267,6 +289,9 @@ mod tests {
         let _ = step_forward();
         let _ = step_backward();
         let _ = more();
+        let _ = hamburger();
+        let _ = help();
+        let _ = info();
     }
 
     #[test]

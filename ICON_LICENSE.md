@@ -16,7 +16,10 @@ Files Covered:
   - `flip_vertical.svg`
   - `fullscreen.svg`
   - `globe.svg`
+  - `hamburger.svg`
+  - `help.svg`
   - `image.svg`
+  - `info.svg`
   - `loop.svg`
   - `magnifier.svg`
   - `more.svg`

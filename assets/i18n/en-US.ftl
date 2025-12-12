@@ -133,3 +133,141 @@ error-load-video-io = We couldn't read this file. Check that it still exists and
 error-video-retry = Retry
 video-editor-unavailable = Video editing is not available in this version.
 video-editor-future = Video editing is planned for a future release.
+
+# Navigation bar
+menu-button-tooltip = Menu
+menu-settings = Settings
+menu-help = Help
+menu-about = About
+navbar-edit-button = Edit
+
+# Help screen
+help-title = Help
+help-back-to-viewer-button = Back to Viewer
+
+# Common labels
+help-toc-title = Contents
+help-tools-title = Available Tools
+help-shortcuts-title = Keyboard Shortcuts
+help-usage-title = How to Use
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Viewer Section
+# ─────────────────────────────────────────────────────────────────────────────
+help-section-viewer = Image and Video Viewer
+help-viewer-role = Browse and view your images and videos. Navigate through files in the same folder and adjust the display to your preferences.
+
+help-viewer-tool-navigation = Navigation
+help-viewer-tool-navigation-desc = Use arrow buttons or keyboard to move between files in the folder.
+help-viewer-tool-zoom = Zoom
+help-viewer-tool-zoom-desc = Scroll with mouse wheel, use +/- buttons, or enter a percentage directly.
+help-viewer-tool-pan = Pan
+help-viewer-tool-pan-desc = When zoomed in, click and drag the image to move around.
+help-viewer-tool-fit = Fit to window
+help-viewer-tool-fit-desc = Automatically scales the image to fit entirely within the window.
+help-viewer-tool-fullscreen = Fullscreen
+help-viewer-tool-fullscreen-desc = Immersive view with auto-hiding controls (delay configurable in Settings).
+help-viewer-tool-delete = Delete
+help-viewer-tool-delete-desc = Permanently remove the current file (moves to system trash if available).
+
+help-viewer-key-navigate = Move to previous/next file
+help-viewer-key-edit = Open image in editor
+help-viewer-key-fullscreen = Enter/exit fullscreen
+help-viewer-key-exit-fullscreen = Exit fullscreen mode
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Video Playback Section
+# ─────────────────────────────────────────────────────────────────────────────
+help-section-video = Video Playback
+help-video-role = Play video files with full playback controls. Adjust volume, seek through the timeline, and navigate frame by frame for precise positioning.
+
+help-video-tool-playback = Play/Pause
+help-video-tool-playback-desc = Start or stop video playback with the play button or Space key.
+help-video-tool-timeline = Timeline
+help-video-tool-timeline-desc = Click anywhere on the progress bar to jump to that position.
+help-video-tool-volume = Volume
+help-video-tool-volume-desc = Drag the volume slider or click the speaker icon to mute/unmute.
+help-video-tool-loop = Loop
+help-video-tool-loop-desc = Enable to automatically restart the video when it ends.
+help-video-tool-stepping = Frame stepping
+help-video-tool-stepping-desc = When paused, move forward or backward one frame at a time for precise navigation.
+help-video-tool-capture = Frame capture
+help-video-tool-capture-desc = Save the current video frame as an image file (opens in editor).
+
+help-video-key-playpause = Play or pause the video
+help-video-key-mute = Toggle audio mute
+help-video-key-step-back = Step backward one frame
+help-video-key-step-forward = Step forward one frame
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Image Editor Section
+# ─────────────────────────────────────────────────────────────────────────────
+help-section-editor = Image Editor
+help-editor-role = Make adjustments to your images: rotate, crop to a specific area, or resize to different dimensions.
+help-editor-workflow = All changes are non-destructive until you save. Use "Save" to overwrite the original, or "Save As" to create a new file and preserve the original.
+
+help-editor-rotate-title = Rotation
+help-editor-rotate-desc = Rotate or flip the image to correct orientation or create mirror effects.
+help-editor-rotate-left = Rotate 90° counter-clockwise
+help-editor-rotate-right = Rotate 90° clockwise
+help-editor-flip-h = Flip horizontally (mirror left/right)
+help-editor-flip-v = Flip vertically (mirror top/bottom)
+
+help-editor-crop-title = Crop
+help-editor-crop-desc = Remove unwanted areas by selecting the region you want to keep.
+help-editor-crop-ratios = Choose a preset ratio (1:1 square, 16:9 landscape, 9:16 portrait, 4:3 or 3:4 photo) or crop freely.
+help-editor-crop-usage = Drag the handles to adjust the selection, then click "Apply" to confirm.
+
+help-editor-resize-title = Resize
+help-editor-resize-desc = Change the image dimensions to make it larger or smaller.
+help-editor-resize-scale = Scale by percentage (e.g., 50% to halve the size)
+help-editor-resize-dimensions = Enter exact width and height in pixels
+help-editor-resize-lock = Lock aspect ratio to maintain proportions
+help-editor-resize-presets = Use presets for common sizes (HD, Full HD, 4K...)
+
+help-editor-save-title = Saving
+help-editor-save-overwrite = Save: overwrites the original file
+help-editor-save-as = Save As: creates a new file (choose location and format)
+
+help-editor-key-save = Save current changes
+help-editor-key-undo = Undo last change
+help-editor-key-redo = Redo undone change
+help-editor-key-cancel = Cancel all changes and exit
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Frame Capture Section
+# ─────────────────────────────────────────────────────────────────────────────
+help-section-capture = Video Frame Capture
+help-capture-role = Extract any frame from a video and save it as an image file. Perfect for creating thumbnails or capturing specific moments.
+
+help-capture-step1 = Play or navigate the video to the desired frame
+help-capture-step2 = Pause the video (use frame stepping for precision)
+help-capture-step3 = Click the camera button in the video controls
+help-capture-step4 = The frame opens in the editor — save as PNG, JPEG, or WebP
+
+help-capture-formats = Supported export formats: PNG (lossless), JPEG (smaller file size), WebP (modern format with good compression).
+
+# About screen
+about-title = About
+about-back-to-viewer-button = Back to Viewer
+
+about-section-app = Application
+about-app-name = IcedLens
+about-app-description = Lightweight image and video viewer with basic image editing.
+
+about-section-license = License
+about-license-name = Mozilla Public License 2.0 (MPL-2.0)
+about-license-summary = File-level copyleft: modified files must be shared under the same license. Compatible with proprietary code.
+
+about-section-icon-license = Icon License
+about-icon-license-name = IcedLens Icon License
+about-icon-license-summary = All icons (application logo and UI icons) may only be redistributed unmodified to represent IcedLens.
+
+about-section-credits = Credits
+about-credits-iced = Built with the Iced GUI toolkit
+about-credits-ffmpeg = Video playback powered by FFmpeg
+about-credits-fluent = Internationalization by Project Fluent
+
+about-section-links = Links
+about-link-repository = Source Code
+about-link-issues = Report Issues

@@ -1,7 +1,10 @@
+pub mod about;
 pub mod components;
 pub mod design_tokens;
+pub mod help;
 pub mod icons;
 pub mod image_editor;
+pub mod navbar;
 pub mod settings;
 pub mod state;
 pub mod styles;

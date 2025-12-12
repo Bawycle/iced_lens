@@ -17,7 +17,7 @@ use crate::ui::state::ZoomState;
 use crate::ui::styles;
 use crate::ui::theme;
 use crate::ui::widgets::AnimatedSpinner;
-use iced::widget::{button, Column, Container, Image, Row, Stack, Text};
+use iced::widget::{Column, Container, Image, Stack, Text};
 use iced::{alignment, Element, Length};
 
 /// Kind of icon to display for a HUD line.
@@ -191,34 +191,14 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
         stack.into()
     } else {
         // Windowed mode: normal column layout
+        // Note: Navigation bar (hamburger menu, edit button) is now handled at app level
         let mut column = Column::new()
             .spacing(16)
             .width(Length::Fill)
             .height(Length::Fill);
 
-        // Add top navigation bar with Settings and Edit buttons
+        // Add zoom controls and video controls
         if ctx.controls_visible {
-            let mut top_bar = Row::new().spacing(10).padding(10);
-
-            let settings_button = button(Text::new(ctx.i18n.tr("open-settings-button")))
-                .on_press(Message::OpenSettings);
-            top_bar = top_bar.push(settings_button);
-
-            // Edit button is disabled for videos (editing not supported in v0.2)
-            let edit_button = if ctx.is_video {
-                button(Text::new("✏ Edit")).style(styles::button::disabled())
-            } else {
-                button(Text::new("✏ Edit")).on_press(Message::EnterEditor)
-            };
-            top_bar = top_bar.push(edit_button);
-
-            column = column.push(
-                Container::new(top_bar)
-                    .width(Length::Fill)
-                    .align_x(alignment::Horizontal::Left)
-                    .style(styles::editor::toolbar),
-            );
-
             let controls_view = controls::view(
                 ctx.controls_context,
                 ctx.zoom,
