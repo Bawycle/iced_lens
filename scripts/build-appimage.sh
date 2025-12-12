@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 # Build an AppImage for iced_lens so testers can run a single portable binary with the right assets.
 # Default artifact path: target/release/iced_lens-<version>-<arch>.AppImage (override with --output-dir or APPIMAGE_OUTPUT_DIR).
+#
+# Dependencies bundled automatically by linuxdeploy:
+# - FFmpeg libraries (libavcodec, libavformat, libavutil, libswscale, libswresample)
+# - Audio libraries (libasound/ALSA, libpulse/PulseAudio)
+# - GTK libraries (via linuxdeploy-plugin-gtk, required by rfd file dialogs)
+# - Hardware acceleration libs (libva, libvdpau) when available
+#
+# Note: The binary links dynamically to FFmpeg. linuxdeploy automatically bundles
+# all shared library dependencies found via ldd. For systems without FFmpeg,
+# the AppImage should work as long as the bundled libs are compatible.
 set -euo pipefail
 
 # Keep all intermediate artifacts under target/ to avoid dirtying the repo tree.
@@ -50,6 +60,17 @@ Environment overrides:
   TARGET_TRIPLE Rust target triple to cross-compile
   APPIMAGE_ARCH Architecture label for output filename/AppImage metadata
   APPIMAGE_OUTPUT_DIR Destination directory for final AppImage (default target/release)
+
+Bundled dependencies (via linuxdeploy):
+  - FFmpeg libraries (libavcodec, libavformat, libavutil, libswscale, libswresample)
+  - Audio libraries (libasound/ALSA, libpulse/PulseAudio via cpal)
+  - GTK libraries (required by rfd file dialogs)
+  - Hardware acceleration (libva, libvdpau when available)
+
+Build requirements:
+  - FFmpeg development headers (libavcodec-dev, libavformat-dev, etc.)
+  - ALSA development headers (libasound2-dev)
+  - linuxdeploy with GTK plugin for full functionality
 USAGE
       exit 0
       ;;
@@ -146,10 +167,11 @@ cat >"$DESKTOP_FILE" <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=Iced Lens
-Comment=Minimal image viewer built with Iced
+Comment=Image and video viewer built with Iced
 Exec=iced_lens %F
 Icon=iced_lens
-Categories=Graphics;Viewer;
+Categories=Graphics;Viewer;Video;AudioVideo;
+MimeType=image/jpeg;image/png;image/gif;image/webp;image/bmp;image/svg+xml;video/mp4;video/x-msvideo;video/quicktime;video/x-matroska;video/webm;
 Terminal=false
 EOF
 
@@ -203,3 +225,32 @@ fi
 mkdir -p "$OUTPUT_DIR"
 mv "$NEW_APPIMAGE" "$OUTPUT_PATH"
 echo "AppImage created at $OUTPUT_PATH"
+
+# Verify critical FFmpeg and audio libraries are bundled
+echo "Verifying bundled libraries..."
+MISSING_LIBS=()
+for lib in libavcodec libavformat libavutil libswscale libswresample libasound; do
+  if ! find "$APPDIR" -name "${lib}.so*" -print -quit | grep -q .; then
+    MISSING_LIBS+=("$lib")
+  fi
+done
+
+if [[ ${#MISSING_LIBS[@]} -gt 0 ]]; then
+  echo "Warning: The following libraries may not be bundled: ${MISSING_LIBS[*]}" >&2
+  echo "The AppImage may not work on systems without these libraries installed." >&2
+else
+  echo "All critical libraries (FFmpeg, ALSA) are bundled."
+fi
+
+# Generate SHA256 checksum for integrity verification
+CHECKSUM_FILE="${OUTPUT_PATH}.sha256"
+if command -v sha256sum >/dev/null 2>&1; then
+  (cd "$OUTPUT_DIR" && sha256sum "$(basename "$OUTPUT_PATH")") > "$CHECKSUM_FILE"
+  echo "SHA256 checksum: $CHECKSUM_FILE"
+elif command -v shasum >/dev/null 2>&1; then
+  # macOS fallback
+  (cd "$OUTPUT_DIR" && shasum -a 256 "$(basename "$OUTPUT_PATH")") > "$CHECKSUM_FILE"
+  echo "SHA256 checksum: $CHECKSUM_FILE"
+else
+  echo "Warning: sha256sum not found, checksum file not generated" >&2
+fi
