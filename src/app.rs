@@ -79,7 +79,7 @@ impl fmt::Debug for App {
     }
 }
 
-/// Top-level messages consumed by [`App::update`]. The variants forward
+/// Top-level messages consumed by `App::update`. The variants forward
 /// lower-level component messages while keeping a single update entrypoint.
 #[derive(Debug, Clone)]
 pub enum Message {

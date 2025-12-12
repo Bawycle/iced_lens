@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Derived viewer state helpers used to keep [`App`] lean.
+//! Derived viewer state helpers used to keep `App` lean.
 
 use crate::media::MediaData;
 use crate::ui::state::viewport::ViewportState;

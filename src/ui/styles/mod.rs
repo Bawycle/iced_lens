@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Styles centralisés pour tous les composants UI.
+//! Centralized style definitions for UI components.
+//!
+//! This module provides consistent styling across the application, separating
+//! visual presentation from component logic.
+//!
+//! # Submodules
+//!
+//! - [`button`] - Button styles (primary, overlay, icon buttons)
+//! - [`container`] - Container backgrounds, borders, and shadows
+//! - [`editor`] - Image editor specific styles (crop overlay, resize handles)
+//! - [`overlay`] - Fullscreen overlay and floating UI styles
 
 pub mod button;
 pub mod container;
