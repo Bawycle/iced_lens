@@ -230,7 +230,8 @@ impl AsyncDecoder {
                     // Just like audio, we continue from where we were.
                     is_playing = true;
                     playback_start_time = Some(std::time::Instant::now());
-                    first_pts = None;
+                    // Don't reset first_pts here - preserve seek target if set
+                    // Pause already resets it, and decode loop sets it if None
                     // Exit stepping mode and clear history on play
                     in_stepping_mode = false;
                     frame_history.clear();
@@ -364,7 +365,9 @@ impl AsyncDecoder {
                             last_decoded_for_seek = Some((decoded_frame, pts_secs, is_keyframe));
                             continue;
                         }
-                        // Frame is at or after target - clear seek target and emit this frame
+                        // Frame is at or after target - use seek target as timing reference
+                        // (not the frame's PTS) to ensure A/V sync with audio decoder
+                        first_pts = Some(target);
                         seek_target_secs = None;
                     }
 

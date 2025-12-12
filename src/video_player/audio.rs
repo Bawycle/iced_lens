@@ -273,7 +273,8 @@ impl AudioDecoder {
                 Ok(AudioDecoderCommand::Play) => {
                     is_playing = true;
                     playback_start_time = Some(std::time::Instant::now());
-                    first_pts = None;
+                    // Don't reset first_pts here - preserve seek target if set
+                    // Pause already resets it, and decode loop sets it if None
                     // Clear seek target - playback from current position
                     seek_target_secs = None;
                 }
@@ -373,8 +374,9 @@ impl AudioDecoder {
                             // Entire frame is before target - skip it
                             continue;
                         }
-                        // Frame contains or is after target - clear seek state
-                        // and emit from this frame onwards
+                        // Frame contains or is after target - use seek target as timing
+                        // reference (not the frame's PTS) to ensure A/V sync
+                        first_pts = Some(target);
                         seek_target_secs = None;
                     }
 
