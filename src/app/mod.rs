@@ -6,31 +6,30 @@
 //! loading. This file intentionally keeps policy decisions (minimum window size,
 //! persistence format, localization switching) close to the main update loop so
 //! it is easy to audit user-facing behavior.
+
+mod message;
+mod persistence;
+mod screen;
+mod subscription;
+mod update;
+mod view;
+
+pub use message::{Flags, Message};
+pub use screen::Screen;
+
 use crate::config;
-use crate::error::Error;
 use crate::i18n::fluent::I18n;
 use crate::image_navigation::ImageNavigator;
 use crate::media::{self, MediaData};
-use crate::ui::about::{self, Event as AboutEvent, ViewContext as AboutViewContext};
-use crate::ui::help::{self, Event as HelpEvent, ViewContext as HelpViewContext};
-use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
-use crate::ui::navbar::{self, Event as NavbarEvent, ViewContext as NavbarViewContext};
-use crate::ui::settings::{
-    self, Event as SettingsEvent, State as SettingsState, StateConfig as SettingsConfig,
-    ViewContext as SettingsViewContext,
-};
+use crate::ui::help;
+use crate::ui::image_editor::{self, State as ImageEditorState};
+use crate::ui::settings::{State as SettingsState, StateConfig as SettingsConfig};
 use crate::ui::state::zoom::{MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT};
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
 use crate::video_player::{create_lufs_cache, SharedLufsCache};
-use iced::{
-    event, time,
-    widget::{Container, Text},
-    window, Element, Length, Subscription, Task, Theme,
-};
+use iced::{window, Element, Subscription, Task, Theme};
 use std::fmt;
-use std::path::PathBuf;
-use unic_langid::LanguageIdentifier;
 
 /// Root Iced application state that bridges UI components, localization, and
 /// persisted preferences.
@@ -60,16 +59,6 @@ pub struct App {
     help_state: help::State,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-/// Screens the user can navigate between.
-pub enum Screen {
-    Viewer,
-    Settings,
-    ImageEditor,
-    Help,
-    About,
-}
-
 impl fmt::Debug for App {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("App")
@@ -77,43 +66,6 @@ impl fmt::Debug for App {
             .field("viewer_has_image", &self.viewer.has_media())
             .finish()
     }
-}
-
-/// Top-level messages consumed by `App::update`. The variants forward
-/// lower-level component messages while keeping a single update entrypoint.
-#[derive(Debug, Clone)]
-pub enum Message {
-    Viewer(component::Message),
-    SwitchScreen(Screen),
-    Settings(settings::Message),
-    ImageEditor(image_editor::Message),
-    Navbar(navbar::Message),
-    Help(help::Message),
-    About(about::Message),
-    ImageEditorLoaded(Result<MediaData, Error>),
-    SaveAsDialogResult(Option<PathBuf>),
-    FrameCaptureDialogResult {
-        path: Option<PathBuf>,
-        frame: Option<crate::media::frame_export::ExportableFrame>,
-    },
-    /// Open the image editor with a captured video frame.
-    OpenImageEditorWithFrame {
-        frame: crate::media::frame_export::ExportableFrame,
-        video_path: PathBuf,
-        position_secs: f64,
-    },
-    Tick(std::time::Instant), // Periodic tick for overlay auto-hide
-}
-
-/// Runtime flags passed in from the CLI or launcher to tweak startup behavior.
-#[derive(Debug, Default)]
-pub struct Flags {
-    /// Optional locale override in BCP-47 form (e.g. `fr`, `en-US`).
-    pub lang: Option<String>,
-    /// Optional image path to preload on startup.
-    pub file_path: Option<String>,
-    /// Optional directory containing Fluent `.ftl` files for custom builds.
-    pub i18n_dir: Option<String>,
 }
 
 pub const WINDOW_DEFAULT_HEIGHT: u32 = 650;
@@ -269,143 +221,51 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        let event_subscription = match self.screen {
-            Screen::ImageEditor => event::listen_with(|event, status, window_id| {
-                if let event::Event::Window(window::Event::Resized(_)) = &event {
-                    return Some(Message::Viewer(component::Message::RawEvent {
-                        window: window_id,
-                        event: event.clone(),
-                    }));
-                }
+        let event_sub = subscription::create_event_subscription(self.screen);
+        let tick_sub =
+            subscription::create_tick_subscription(self.fullscreen, self.viewer.is_loading_media());
+        let video_sub = subscription::create_video_subscription(
+            &self.viewer,
+            Some(self.lufs_cache.clone()),
+            self.audio_normalization,
+            self.frame_cache_mb,
+        );
 
-                // In editor screen, route keyboard events to editor
-                if let event::Event::Keyboard(..) = &event {
-                    match status {
-                        event::Status::Ignored => Some(Message::ImageEditor(
-                            crate::ui::image_editor::Message::RawEvent {
-                                window: window_id,
-                                event: event.clone(),
-                            },
-                        )),
-                        event::Status::Captured => None,
-                    }
-                } else {
-                    None
-                }
-            }),
-            Screen::Viewer => {
-                // In viewer screen, route all events including wheel scroll for zoom
-                event::listen_with(|event, status, window_id| {
-                    if matches!(
-                        event,
-                        event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
-                    ) {
-                        return Some(Message::Viewer(component::Message::RawEvent {
-                            window: window_id,
-                            event: event.clone(),
-                        }));
-                    }
-
-                    match status {
-                        event::Status::Ignored => {
-                            Some(Message::Viewer(component::Message::RawEvent {
-                                window: window_id,
-                                event: event.clone(),
-                            }))
-                        }
-                        event::Status::Captured => None,
-                    }
-                })
-            }
-            Screen::Settings | Screen::Help | Screen::About => {
-                // In settings/help/about screens, only route non-wheel events to viewer
-                // (wheel events are used by scrollable content)
-                event::listen_with(|event, status, window_id| {
-                    // Don't route wheel scroll to viewer - it's used by scrollable content
-                    if matches!(
-                        event,
-                        event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
-                    ) {
-                        return None;
-                    }
-
-                    match status {
-                        event::Status::Ignored => {
-                            Some(Message::Viewer(component::Message::RawEvent {
-                                window: window_id,
-                                event: event.clone(),
-                            }))
-                        }
-                        event::Status::Captured => None,
-                    }
-                })
-            }
-        };
-
-        // Add periodic tick when in fullscreen to update overlay auto-hide
-        // or when loading media to check for timeout
-        let tick_subscription = if self.fullscreen || self.viewer.is_loading_media() {
-            time::every(std::time::Duration::from_millis(100)).map(Message::Tick)
-        } else {
-            Subscription::none()
-        };
-
-        // Add video playback subscription with LUFS cache for audio normalization
-        let video_subscription = self
-            .viewer
-            .subscription(
-                Some(self.lufs_cache.clone()),
-                self.audio_normalization,
-                self.frame_cache_mb,
-            )
-            .map(Message::Viewer);
-
-        Subscription::batch([event_subscription, tick_subscription, video_subscription])
+        Subscription::batch([event_sub, tick_sub, video_sub])
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        match message {
-            Message::Viewer(viewer_message) => self.handle_viewer_message(viewer_message),
-            Message::SwitchScreen(target) => self.handle_screen_switch(target),
-            Message::Settings(settings_message) => self.handle_settings_message(settings_message),
-            Message::ImageEditor(editor_message) => self.handle_editor_message(editor_message),
-            Message::Navbar(navbar_message) => self.handle_navbar_message(navbar_message),
-            Message::Help(help_message) => self.handle_help_message(help_message),
-            Message::About(about_message) => self.handle_about_message(about_message),
-            Message::ImageEditorLoaded(result) => {
-                match result {
-                    Ok(media_data) => {
-                        // Editor only supports images in v0.2, not videos
-                        // Extract ImageData from MediaData
-                        let image_data = match media_data {
-                            MediaData::Image(img) => img,
-                            MediaData::Video(_) => {
-                                // Video editing not supported in v0.2
-                                eprintln!("Video editing is not supported in this version");
-                                return Task::none();
-                            }
-                        };
+        let mut ctx = update::UpdateContext {
+            i18n: &mut self.i18n,
+            screen: &mut self.screen,
+            settings: &mut self.settings,
+            viewer: &mut self.viewer,
+            image_editor: &mut self.image_editor,
+            image_navigator: &mut self.image_navigator,
+            fullscreen: &mut self.fullscreen,
+            window_id: &mut self.window_id,
+            theme_mode: &mut self.theme_mode,
+            video_autoplay: &mut self.video_autoplay,
+            audio_normalization: &mut self.audio_normalization,
+            frame_cache_mb: self.frame_cache_mb,
+            frame_history_mb: self.frame_history_mb,
+            menu_open: &mut self.menu_open,
+            help_state: &mut self.help_state,
+        };
 
-                        // Create a new ImageEditorState with the loaded image
-                        if let Some(current_image_path) = self.image_navigator.current_image_path()
-                        {
-                            let path = current_image_path.to_path_buf();
-                            match image_editor::State::new(path, image_data) {
-                                Ok(new_editor_state) => {
-                                    self.image_editor = Some(new_editor_state);
-                                }
-                                Err(err) => {
-                                    eprintln!("Failed to create editor state: {:?}", err);
-                                }
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        eprintln!("Failed to load image for editor: {:?}", err);
-                    }
-                }
-                Task::none()
+        match message {
+            Message::Viewer(viewer_message) => update::handle_viewer_message(&mut ctx, viewer_message),
+            Message::SwitchScreen(target) => update::handle_screen_switch(&mut ctx, target),
+            Message::Settings(settings_message) => {
+                update::handle_settings_message(&mut ctx, settings_message)
             }
+            Message::ImageEditor(editor_message) => {
+                update::handle_editor_message(&mut ctx, editor_message)
+            }
+            Message::Navbar(navbar_message) => update::handle_navbar_message(&mut ctx, navbar_message),
+            Message::Help(help_message) => update::handle_help_message(&mut ctx, help_message),
+            Message::About(about_message) => update::handle_about_message(&mut ctx, about_message),
+            Message::ImageEditorLoaded(result) => self.handle_image_editor_loaded(result),
             Message::Tick(_instant) => {
                 // Periodic tick for overlay auto-hide - just trigger a view refresh
                 // The view() function will check elapsed time and hide controls if needed
@@ -425,7 +285,11 @@ impl App {
                                 // TODO: Show success notification to user
 
                                 // Rescan directory if saved in the same folder as viewer
-                                self.rescan_directory_if_same(&path);
+                                persistence::rescan_directory_if_same(
+                                    &mut self.viewer,
+                                    &mut self.image_navigator,
+                                    &path,
+                                );
                             }
                             Err(err) => {
                                 eprintln!("Failed to save image: {:?}", err);
@@ -474,598 +338,55 @@ impl App {
         }
     }
 
-    fn handle_viewer_message(&mut self, message: component::Message) -> Task<Message> {
-        if let component::Message::RawEvent { window, .. } = &message {
-            self.window_id = Some(*window);
-        }
-
-        let (effect, task) = self.viewer.handle_message(message, &self.i18n);
-        let viewer_task = task.map(Message::Viewer);
-        let side_effect = match effect {
-            component::Effect::PersistPreferences => self.persist_preferences(),
-            component::Effect::ToggleFullscreen => self.toggle_fullscreen_task(),
-            component::Effect::ExitFullscreen => self.update_fullscreen_mode(false),
-            component::Effect::OpenSettings => {
-                self.screen = Screen::Settings;
-                Task::none()
-            }
-            component::Effect::EnterEditor => self.handle_screen_switch(Screen::ImageEditor),
-            component::Effect::NavigateNext => self.handle_navigate_next(),
-            component::Effect::NavigatePrevious => self.handle_navigate_previous(),
-            component::Effect::CaptureFrame {
-                frame,
-                video_path,
-                position_secs,
-            } => self.handle_capture_frame(frame, video_path, position_secs),
-            component::Effect::None => Task::none(),
-        };
-        Task::batch([viewer_task, side_effect])
-    }
-
-    fn handle_screen_switch(&mut self, target: Screen) -> Task<Message> {
-        // Handle Settings → Viewer transition
-        if matches!(target, Screen::Viewer) && matches!(self.screen, Screen::Settings) {
-            match self.settings.ensure_zoom_step_committed() {
-                Ok(Some(value)) => {
-                    self.viewer.set_zoom_step_percent(value);
-                    self.screen = target;
-                    return self.persist_preferences();
-                }
-                Ok(None) => {
-                    self.screen = target;
-                    return Task::none();
-                }
-                Err(_) => {
-                    self.screen = Screen::Settings;
-                    return Task::none();
-                }
-            }
-        }
-
-        // Handle Viewer → Editor transition
-        if matches!(target, Screen::ImageEditor) && matches!(self.screen, Screen::Viewer) {
-            if let (Some(image_path), Some(media_data)) = (
-                self.viewer.current_image_path.clone(),
-                self.viewer.media().cloned(),
-            ) {
+    /// Handles async image loading result for the editor.
+    fn handle_image_editor_loaded(
+        &mut self,
+        result: Result<MediaData, crate::error::Error>,
+    ) -> Task<Message> {
+        match result {
+            Ok(media_data) => {
                 // Editor only supports images in v0.2, not videos
+                // Extract ImageData from MediaData
                 let image_data = match media_data {
                     MediaData::Image(img) => img,
                     MediaData::Video(_) => {
+                        // Video editing not supported in v0.2
                         eprintln!("Video editing is not supported in this version");
                         return Task::none();
                     }
                 };
 
-                // Synchronize image_navigator with viewer state before entering editor
-                let config = config::load().unwrap_or_default();
-                let sort_order = config.sort_order.unwrap_or_default();
-                if let Err(err) = self.image_navigator.scan_directory(&image_path, sort_order) {
-                    eprintln!("Failed to scan directory: {:?}", err);
-                }
-
-                match ImageEditorState::new(image_path, image_data) {
-                    Ok(state) => {
-                        self.image_editor = Some(state);
-                        self.screen = target;
-                    }
-                    Err(err) => {
-                        eprintln!("Failed to enter editor screen: {err:?}");
-                    }
-                }
-                return Task::none();
-            } else {
-                // Can't enter editor screen without an image
-                return Task::none();
-            }
-        }
-
-        // Handle Editor → Viewer transition
-        if matches!(target, Screen::Viewer) && matches!(self.screen, Screen::ImageEditor) {
-            self.image_editor = None;
-            self.screen = target;
-            return Task::none();
-        }
-
-        self.screen = target;
-        Task::none()
-    }
-
-    fn handle_settings_message(&mut self, message: settings::Message) -> Task<Message> {
-        match self.settings.update(message) {
-            SettingsEvent::None => Task::none(),
-            SettingsEvent::BackToViewer => {
-                self.screen = Screen::Viewer;
-                Task::none()
-            }
-            SettingsEvent::BackToViewerWithZoomChange(value) => {
-                self.viewer.set_zoom_step_percent(value);
-                self.screen = Screen::Viewer;
-                self.persist_preferences()
-            }
-            SettingsEvent::LanguageSelected(locale) => self.apply_language_change(locale),
-            SettingsEvent::ZoomStepChanged(value) => {
-                self.viewer.set_zoom_step_percent(value);
-                self.persist_preferences()
-            }
-            SettingsEvent::BackgroundThemeSelected(_) => self.persist_preferences(),
-            SettingsEvent::ThemeModeSelected(mode) => {
-                self.theme_mode = mode;
-                self.persist_preferences()
-            }
-            SettingsEvent::SortOrderSelected(_) => self.persist_preferences(),
-            SettingsEvent::OverlayTimeoutChanged(_) => self.persist_preferences(),
-            SettingsEvent::VideoAutoplayChanged(enabled) => {
-                self.video_autoplay = enabled;
-                self.viewer.set_video_autoplay(enabled);
-                self.persist_preferences()
-            }
-            SettingsEvent::AudioNormalizationChanged(enabled) => {
-                self.audio_normalization = enabled;
-                self.persist_preferences()
-            }
-            SettingsEvent::FrameCacheMbChanged(mb) => {
-                self.frame_cache_mb = mb;
-                self.persist_preferences()
-            }
-            SettingsEvent::FrameHistoryMbChanged(mb) => {
-                self.frame_history_mb = mb;
-                self.persist_preferences()
-            }
-        }
-    }
-
-    fn handle_editor_message(&mut self, message: image_editor::Message) -> Task<Message> {
-        let Some(editor_state) = self.image_editor.as_mut() else {
-            return Task::none();
-        };
-
-        match editor_state.update(message) {
-            ImageEditorEvent::None => Task::none(),
-            ImageEditorEvent::ExitEditor => {
-                // Get the image source before dropping the editor
-                let image_source = editor_state.image_source().clone();
-
-                self.image_editor = None;
-                self.screen = Screen::Viewer;
-
-                // For file mode: reload the image in the viewer to show any saved changes
-                // For captured frame mode: just return to viewer without reloading
-                match image_source {
-                    image_editor::ImageSource::File(current_image_path) => {
-                        // Set loading state directly (before render)
-                        self.viewer.is_loading_media = true;
-                        self.viewer.loading_started_at = Some(std::time::Instant::now());
-
-                        // Reload the image in the viewer to show any saved changes
-                        Task::perform(
-                            async move { crate::media::load_media(&current_image_path) },
-                            |result| Message::Viewer(component::Message::ImageLoaded(result)),
-                        )
-                    }
-                    image_editor::ImageSource::CapturedFrame { .. } => {
-                        // Just return to viewer, no need to reload anything
-                        Task::none()
-                    }
-                }
-            }
-            ImageEditorEvent::NavigateNext => {
-                // Rescan directory to handle added/removed images
-                if let Some(current_path) = self
-                    .image_navigator
-                    .current_image_path()
-                    .map(|p| p.to_path_buf())
-                {
-                    let config = config::load().unwrap_or_default();
-                    let sort_order = config.sort_order.unwrap_or_default();
-                    let _ = self
-                        .image_navigator
-                        .scan_directory(&current_path, sort_order);
-                }
-
-                // Navigate to next image in the list
-                if let Some(next_path) = self.image_navigator.navigate_next() {
-                    // Synchronize viewer state immediately
-                    self.viewer.current_image_path = Some(next_path.clone());
-                    self.viewer.image_list.set_current(&next_path);
-
-                    // Load the next image and create a new ImageEditorState
-                    Task::perform(
-                        async move { crate::media::load_media(&next_path) },
-                        Message::ImageEditorLoaded,
-                    )
-                } else {
-                    Task::none()
-                }
-            }
-            ImageEditorEvent::NavigatePrevious => {
-                // Rescan directory to handle added/removed images
-                if let Some(current_path) = self
-                    .image_navigator
-                    .current_image_path()
-                    .map(|p| p.to_path_buf())
-                {
-                    let config = config::load().unwrap_or_default();
-                    let sort_order = config.sort_order.unwrap_or_default();
-                    let _ = self
-                        .image_navigator
-                        .scan_directory(&current_path, sort_order);
-                }
-
-                // Navigate to previous image in the list
-                if let Some(prev_path) = self.image_navigator.navigate_previous() {
-                    // Synchronize viewer state immediately
-                    self.viewer.current_image_path = Some(prev_path.clone());
-                    self.viewer.image_list.set_current(&prev_path);
-
-                    // Load the previous image and create a new ImageEditorState
-                    Task::perform(
-                        async move { crate::media::load_media(&prev_path) },
-                        Message::ImageEditorLoaded,
-                    )
-                } else {
-                    Task::none()
-                }
-            }
-            ImageEditorEvent::SaveRequested { path, overwrite: _ } => {
-                // Save the edited image
-                if let Some(editor) = self.image_editor.as_mut() {
-                    match editor.save_image(&path) {
-                        Ok(()) => {
-                            eprintln!("Image saved successfully to: {:?}", path);
-                            // TODO: Show success notification to user
+                // Create a new ImageEditorState with the loaded image
+                if let Some(current_image_path) = self.image_navigator.current_image_path() {
+                    let path = current_image_path.to_path_buf();
+                    match image_editor::State::new(path, image_data) {
+                        Ok(new_editor_state) => {
+                            self.image_editor = Some(new_editor_state);
                         }
                         Err(err) => {
-                            eprintln!("Failed to save image: {:?}", err);
-                            // TODO: Show error notification to user
+                            eprintln!("Failed to create editor state: {:?}", err);
                         }
                     }
                 }
-                Task::none()
             }
-            ImageEditorEvent::SaveAsRequested => {
-                // Open file picker dialog for "Save As"
-                use crate::media::frame_export::{generate_default_filename, ExportFormat};
-
-                let image_source = editor_state.image_source().clone();
-                let export_format = editor_state.export_format();
-
-                // Get filter based on selected export format
-                let (filter_name, filter_ext): (&str, Vec<&str>) = match export_format {
-                    ExportFormat::Png => ("PNG Image", vec!["png"]),
-                    ExportFormat::Jpeg => ("JPEG Image", vec!["jpg", "jpeg"]),
-                    ExportFormat::WebP => ("WebP Image", vec!["webp"]),
-                };
-
-                // Generate filename based on image source, with selected format extension
-                let filename = match &image_source {
-                    image_editor::ImageSource::File(path) => {
-                        // Replace extension with selected format
-                        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
-                        format!("{}.{}", stem, export_format.extension())
-                    }
-                    image_editor::ImageSource::CapturedFrame {
-                        video_path,
-                        position_secs,
-                    } => generate_default_filename(video_path, *position_secs, export_format),
-                };
-
-                Task::perform(
-                    async move {
-                        rfd::AsyncFileDialog::new()
-                            .set_file_name(&filename)
-                            .add_filter(filter_name, &filter_ext)
-                            .save_file()
-                            .await
-                            .map(|h| h.path().to_path_buf())
-                    },
-                    Message::SaveAsDialogResult,
-                )
+            Err(err) => {
+                eprintln!("Failed to load image for editor: {:?}", err);
             }
         }
-    }
-
-    fn handle_navbar_message(&mut self, message: navbar::Message) -> Task<Message> {
-        match navbar::update(message, &mut self.menu_open) {
-            NavbarEvent::None => Task::none(),
-            NavbarEvent::OpenSettings => {
-                self.screen = Screen::Settings;
-                Task::none()
-            }
-            NavbarEvent::OpenHelp => {
-                self.screen = Screen::Help;
-                Task::none()
-            }
-            NavbarEvent::OpenAbout => {
-                self.screen = Screen::About;
-                Task::none()
-            }
-            NavbarEvent::EnterEditor => self.handle_screen_switch(Screen::ImageEditor),
-        }
-    }
-
-    fn handle_help_message(&mut self, message: help::Message) -> Task<Message> {
-        match help::update(&mut self.help_state, message) {
-            HelpEvent::None => Task::none(),
-            HelpEvent::BackToViewer => {
-                self.screen = Screen::Viewer;
-                Task::none()
-            }
-        }
-    }
-
-    fn handle_about_message(&mut self, message: about::Message) -> Task<Message> {
-        match about::update(message) {
-            AboutEvent::None => Task::none(),
-            AboutEvent::BackToViewer => {
-                self.screen = Screen::Viewer;
-                Task::none()
-            }
-        }
-    }
-
-    fn handle_navigate_next(&mut self) -> Task<Message> {
-        // Rescan directory to handle added/removed images
-        if let Some(current_path) = self
-            .image_navigator
-            .current_image_path()
-            .map(|p| p.to_path_buf())
-        {
-            let config = config::load().unwrap_or_default();
-            let sort_order = config.sort_order.unwrap_or_default();
-            let _ = self
-                .image_navigator
-                .scan_directory(&current_path, sort_order);
-        }
-
-        // Navigate to next image
-        if let Some(next_path) = self.image_navigator.navigate_next() {
-            // Synchronize viewer state from navigator
-            self.viewer.current_image_path = Some(next_path.clone());
-            // Also sync viewer.image_list from viewer.current_image_path
-            let _ = self.viewer.scan_directory();
-
-            // Set loading state directly (before render)
-            self.viewer.is_loading_media = true;
-            self.viewer.loading_started_at = Some(std::time::Instant::now());
-
-            // Load the next image
-            Task::perform(
-                async move { crate::media::load_media(&next_path) },
-                |result| Message::Viewer(component::Message::ImageLoaded(result)),
-            )
-        } else {
-            Task::none()
-        }
-    }
-
-    fn handle_navigate_previous(&mut self) -> Task<Message> {
-        // Rescan directory to handle added/removed images
-        if let Some(current_path) = self
-            .image_navigator
-            .current_image_path()
-            .map(|p| p.to_path_buf())
-        {
-            let config = config::load().unwrap_or_default();
-            let sort_order = config.sort_order.unwrap_or_default();
-            let _ = self
-                .image_navigator
-                .scan_directory(&current_path, sort_order);
-        }
-
-        // Navigate to previous image
-        if let Some(prev_path) = self.image_navigator.navigate_previous() {
-            // Synchronize viewer state from navigator
-            self.viewer.current_image_path = Some(prev_path.clone());
-            // Also sync viewer.image_list from viewer.current_image_path
-            let _ = self.viewer.scan_directory();
-
-            // Set loading state directly (before render)
-            self.viewer.is_loading_media = true;
-            self.viewer.loading_started_at = Some(std::time::Instant::now());
-
-            // Load the previous image
-            Task::perform(
-                async move { crate::media::load_media(&prev_path) },
-                |result| Message::Viewer(component::Message::ImageLoaded(result)),
-            )
-        } else {
-            Task::none()
-        }
-    }
-
-    /// Handles frame capture: opens the editor with the captured frame.
-    fn handle_capture_frame(
-        &self,
-        frame: crate::media::frame_export::ExportableFrame,
-        video_path: PathBuf,
-        position_secs: f64,
-    ) -> Task<Message> {
-        Task::done(Message::OpenImageEditorWithFrame {
-            frame,
-            video_path,
-            position_secs,
-        })
-    }
-
-    /// Applies the newly selected locale, persists it to config, and refreshes
-    /// any visible error strings that depend on localization.
-    fn apply_language_change(&mut self, locale: LanguageIdentifier) -> Task<Message> {
-        self.i18n.set_locale(locale.clone());
-
-        let mut cfg = config::load().unwrap_or_default();
-        cfg.language = Some(locale.to_string());
-
-        if let Err(error) = config::save(&cfg) {
-            eprintln!("Failed to save config: {:?}", error);
-        }
-
-        self.viewer.refresh_error_translation(&self.i18n);
         Task::none()
-    }
-
-    /// Rescans the viewer's directory if the given path is in the same folder.
-    ///
-    /// This is called after Save As to update the file list when a new image
-    /// is saved in the currently viewed directory. The current media remains
-    /// selected (no auto-switch to the new file).
-    fn rescan_directory_if_same(&mut self, saved_path: &std::path::Path) {
-        let saved_dir = saved_path.parent();
-
-        // Get the viewer's current directory
-        let viewer_dir = self
-            .viewer
-            .current_image_path
-            .as_ref()
-            .and_then(|p| p.parent());
-
-        // Only rescan if both directories exist and match
-        if let (Some(saved), Some(viewer)) = (saved_dir, viewer_dir) {
-            if saved == viewer {
-                // Rescan the viewer's image list
-                let _ = self.viewer.scan_directory();
-
-                // Also rescan the image navigator
-                let config = config::load().unwrap_or_default();
-                let sort_order = config.sort_order.unwrap_or_default();
-                if let Some(current_path) = self.viewer.current_image_path.clone() {
-                    let _ = self
-                        .image_navigator
-                        .scan_directory(&current_path, sort_order);
-                }
-            }
-        }
-    }
-
-    /// Persists the current viewer + settings preferences to disk.
-    ///
-    /// Guarded during tests to keep isolation: unit tests exercise the logic by
-    /// calling the function directly rather than through `Effect`s.
-    fn persist_preferences(&self) -> Task<Message> {
-        if cfg!(test) {
-            return Task::none();
-        }
-
-        let mut cfg = config::load().unwrap_or_default();
-        // Use image_fit_to_window() to only persist the image setting, not video
-        cfg.fit_to_window = Some(self.viewer.image_fit_to_window());
-        cfg.zoom_step = Some(self.viewer.zoom_step_percent());
-        cfg.background_theme = Some(self.settings.background_theme());
-        cfg.sort_order = Some(self.settings.sort_order());
-        cfg.overlay_timeout_secs = Some(self.settings.overlay_timeout_secs());
-        cfg.theme_mode = self.theme_mode;
-        cfg.video_autoplay = Some(self.video_autoplay);
-        cfg.audio_normalization = Some(self.audio_normalization);
-        cfg.frame_cache_mb = Some(self.frame_cache_mb);
-        cfg.frame_history_mb = Some(self.frame_history_mb);
-
-        if let Err(error) = config::save(&cfg) {
-            eprintln!("Failed to save config: {:?}", error);
-        }
-
-        Task::none()
-    }
-
-    fn toggle_fullscreen_task(&mut self) -> Task<Message> {
-        self.update_fullscreen_mode(!self.fullscreen)
-    }
-
-    fn update_fullscreen_mode(&mut self, desired: bool) -> Task<Message> {
-        if self.fullscreen == desired {
-            return Task::none();
-        }
-
-        let Some(window_id) = self.window_id else {
-            return Task::none();
-        };
-
-        self.fullscreen = desired;
-        let mode = if desired {
-            window::Mode::Fullscreen
-        } else {
-            window::Mode::Windowed
-        };
-        window::change_mode::<Message>(window_id, mode)
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let current_view: Element<'_, Message> = match self.screen {
-            Screen::Viewer => {
-                let config = config::load().unwrap_or_default();
-                let overlay_timeout_secs = config
-                    .overlay_timeout_secs
-                    .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
-
-                let viewer_content = self
-                    .viewer
-                    .view(component::ViewEnv {
-                        i18n: &self.i18n,
-                        background_theme: self.settings.background_theme(),
-                        is_fullscreen: self.fullscreen,
-                        overlay_hide_delay: std::time::Duration::from_secs(
-                            overlay_timeout_secs as u64,
-                        ),
-                    })
-                    .map(Message::Viewer);
-
-                // In fullscreen mode, don't show the navbar
-                if self.fullscreen {
-                    viewer_content
-                } else {
-                    // Add navbar above the viewer content
-                    let navbar_view = navbar::view(NavbarViewContext {
-                        i18n: &self.i18n,
-                        menu_open: self.menu_open,
-                        can_edit: !self.viewer.is_video(),
-                    })
-                    .map(Message::Navbar);
-
-                    iced::widget::Column::new()
-                        .push(navbar_view)
-                        .push(viewer_content)
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .into()
-                }
-            }
-            Screen::Settings => self
-                .settings
-                .view(SettingsViewContext { i18n: &self.i18n })
-                .map(Message::Settings),
-            Screen::ImageEditor => {
-                if let Some(editor_state) = &self.image_editor {
-                    editor_state
-                        .view(image_editor::ViewContext {
-                            i18n: &self.i18n,
-                            background_theme: self.settings.background_theme(),
-                        })
-                        .map(Message::ImageEditor)
-                } else {
-                    // Fallback if editor state is missing
-                    Container::new(Text::new("Editor error"))
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .into()
-                }
-            }
-            Screen::Help => help::view(HelpViewContext {
-                i18n: &self.i18n,
-                state: &self.help_state,
-            })
-            .map(Message::Help),
-            Screen::About => about::view(AboutViewContext { i18n: &self.i18n }).map(Message::About),
-        };
-
-        let column = iced::widget::Column::new().push(
-            Container::new(current_view)
-                .width(Length::Fill)
-                .height(Length::Fill),
-        );
-
-        Container::new(column.width(Length::Fill).height(Length::Fill))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        view::view(view::ViewContext {
+            i18n: &self.i18n,
+            screen: self.screen,
+            settings: &self.settings,
+            viewer: &self.viewer,
+            image_editor: self.image_editor.as_ref(),
+            help_state: &self.help_state,
+            fullscreen: self.fullscreen,
+            menu_open: self.menu_open,
+        })
     }
 }
 
@@ -1075,6 +396,7 @@ mod tests {
     use crate::config::DEFAULT_ZOOM_STEP_PERCENT;
     use crate::error::Error;
     use crate::media::ImageData;
+    use crate::ui::settings;
     use crate::ui::state::zoom::{
         format_number, DEFAULT_ZOOM_PERCENT, MAX_ZOOM_PERCENT, ZOOM_STEP_INVALID_KEY,
         ZOOM_STEP_RANGE_KEY,
@@ -1461,7 +783,7 @@ mod tests {
     fn language_selected_updates_config_file() {
         with_temp_config_dir(|config_root| {
             let mut app = App::default();
-            let target_locale: LanguageIdentifier = app
+            let target_locale: unic_langid::LanguageIdentifier = app
                 .i18n
                 .available_locales
                 .iter()
@@ -1483,13 +805,26 @@ mod tests {
     #[test]
     fn persist_preferences_handles_save_errors() {
         with_temp_config_dir(|config_root| {
-            let app = App::default();
+            // Create a directory where the config file should be, causing write to fail
             let settings_dir = config_root.join("IcedLens");
             fs::create_dir_all(&settings_dir).expect("dir");
             fs::create_dir_all(settings_dir.join("settings.toml"))
                 .expect("create conflicting directory");
 
-            let _ = app.persist_preferences();
+            // Call persist_preferences directly with default values
+            // This should not panic even though the save will fail
+            let viewer = component::State::new();
+            let settings_state = SettingsState::default();
+            let _ = persistence::persist_preferences(
+                &viewer,
+                &settings_state,
+                crate::ui::theming::ThemeMode::System,
+                false, // video_autoplay
+                true,  // audio_normalization
+                config::DEFAULT_FRAME_CACHE_MB,
+                config::DEFAULT_FRAME_HISTORY_MB,
+            );
+            // Test passes if we reach here without panicking
         });
     }
 
