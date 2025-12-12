@@ -1051,4 +1051,418 @@ mod tests {
         assert!(player.state().is_playing());
         assert_eq!(player.state().position(), Some(60.0));
     }
+
+    // ========================================================================
+    // A/V Sync Invariant Tests
+    // These tests simulate UI action sequences that could cause A/V drift
+    // and verify that position tracking remains consistent.
+    // ========================================================================
+
+    #[test]
+    fn stepping_updates_paused_position() {
+        // Simulates: pause → step_frame → frame arrives
+        // Bug: position wasn't updated during stepping, causing drift on resume
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        // Play and pause at 10.0s
+        player.play();
+        player.update_position(10.0);
+        player.pause();
+        assert_eq!(player.state().position(), Some(10.0));
+
+        // Step forward (enters stepping mode)
+        player.step_frame();
+        assert!(player.is_in_stepping_mode());
+
+        // Frame arrives at 10.033s (one frame at 30fps)
+        player.update_position(10.033);
+
+        // Position MUST be updated (this was the bug)
+        assert_eq!(player.state().position(), Some(10.033));
+        assert!(player.state().is_paused());
+    }
+
+    #[test]
+    fn stepping_multiple_frames_tracks_position() {
+        // Simulates: pause → step → step → step (multiple frames)
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(20.0);
+        player.pause();
+
+        // Step through 5 frames (at 30fps, ~167ms)
+        let frame_duration = 1.0 / 30.0;
+        for i in 1..=5 {
+            player.step_frame();
+            let new_pos = 20.0 + (i as f64) * frame_duration;
+            player.update_position(new_pos);
+        }
+
+        // Position should reflect all steps
+        let expected = 20.0 + 5.0 * frame_duration;
+        let actual = player.state().position().unwrap();
+        assert!((actual - expected).abs() < 0.001);
+    }
+
+    #[test]
+    fn stepping_then_play_uses_stepped_position() {
+        // Simulates: pause → step → step → play
+        // Verifies sync clock would start at correct position
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(15.0);
+        player.pause();
+
+        // Step forward a few frames
+        player.step_frame();
+        player.update_position(15.1);
+        player.step_frame();
+        player.update_position(15.2);
+
+        // Resume playback
+        player.play();
+
+        // Must resume from stepped position, not original pause position
+        assert!(player.state().is_playing());
+        assert_eq!(player.state().position(), Some(15.2));
+
+        // Verify sync clock is at the stepped position
+        let sync_time = player.sync_time();
+        assert!((sync_time - 15.2).abs() < 0.1);
+    }
+
+    #[test]
+    fn stepping_backward_then_play_uses_correct_position() {
+        // Simulates: pause → step → step → step_back → play
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(30.0);
+        player.pause();
+
+        // Step forward
+        player.step_frame();
+        player.update_position(30.033);
+        player.step_frame();
+        player.update_position(30.066);
+
+        // Step backward (frame from history)
+        player.step_backward();
+        // Note: step_backward sends a command but doesn't directly update position
+        // The decoder would send the previous frame back
+        player.update_position(30.033);
+
+        // Resume
+        player.play();
+        assert_eq!(player.state().position(), Some(30.033));
+    }
+
+    #[test]
+    fn update_position_ignored_when_paused_not_stepping() {
+        // Verifies that spurious frame updates don't change position when paused
+        // (only stepping mode should update paused position)
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(25.0);
+        player.pause();
+
+        // Spurious update (not in stepping mode)
+        assert!(!player.is_in_stepping_mode());
+        player.update_position(99.0);
+
+        // Position should NOT change
+        assert_eq!(player.state().position(), Some(25.0));
+    }
+
+    #[test]
+    fn seek_during_playback_sync_position() {
+        // Simulates: playing → seek (slider drag) → frame arrives
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(10.0);
+
+        // Seek to 45.0s (slider drag and release)
+        player.seek(45.0);
+
+        // Verify seeking state preserves resume intent
+        assert!(matches!(
+            player.state(),
+            PlaybackState::Seeking { resume_playing: true, .. }
+        ));
+
+        // Frame arrives at seek target
+        player.update_position(45.0);
+
+        // Should be playing at new position
+        assert!(player.state().is_playing());
+        assert_eq!(player.state().position(), Some(45.0));
+    }
+
+    #[test]
+    fn multiple_rapid_seeks_use_final_position() {
+        // Simulates: playing → seek → seek → seek (rapid slider movements)
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(5.0);
+
+        // Rapid seeks (user dragging slider)
+        player.seek(20.0);
+        player.seek(40.0);
+        player.seek(60.0);
+
+        // Final seek target
+        assert_eq!(player.state().position(), Some(60.0));
+
+        // Frame arrives
+        player.update_position(60.0);
+        assert!(player.state().is_playing());
+        assert_eq!(player.state().position(), Some(60.0));
+    }
+
+    #[test]
+    fn seek_while_paused_then_play() {
+        // Simulates: pause → seek → play
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(10.0);
+        player.pause();
+
+        // Seek while paused
+        player.seek(50.0);
+        assert!(matches!(
+            player.state(),
+            PlaybackState::Seeking { resume_playing: false, .. }
+        ));
+
+        // Frame arrives (completes seek to paused)
+        player.update_position(50.0);
+        assert!(player.state().is_paused());
+        assert_eq!(player.state().position(), Some(50.0));
+
+        // Now play
+        player.play();
+        assert!(player.state().is_playing());
+        assert_eq!(player.state().position(), Some(50.0));
+
+        // Sync clock should be at 50.0
+        let sync_time = player.sync_time();
+        assert!((sync_time - 50.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn sync_clock_matches_position_after_play() {
+        // Verifies sync clock is initialized to correct position on play()
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        // Test from stopped (position 0)
+        player.play();
+        assert!((player.sync_time() - 0.0).abs() < 0.1);
+
+        // Test from paused
+        player.update_position(35.0);
+        player.pause();
+        player.play();
+        assert!((player.sync_time() - 35.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn sync_clock_matches_position_after_stepping_and_play() {
+        // Critical test: verifies the A/V sync fix for stepping
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(10.0);
+        player.pause();
+
+        // Step forward significantly
+        for i in 1..=30 {
+            player.step_frame();
+            player.update_position(10.0 + (i as f64) * 0.033);
+        }
+
+        let stepped_position = player.state().position().unwrap();
+        assert!((stepped_position - 10.99).abs() < 0.1); // ~11 seconds after 30 frames
+
+        // Resume playback
+        player.play();
+
+        // Sync clock MUST match the stepped position (this was the bug)
+        let sync_time = player.sync_time();
+        assert!(
+            (sync_time - stepped_position).abs() < 0.1,
+            "Sync clock {} doesn't match stepped position {}",
+            sync_time,
+            stepped_position
+        );
+    }
+
+    // ========================================================================
+    // Edge Case Tests - Loop, End-of-Stream, Complex Sequences
+    // ========================================================================
+
+    #[test]
+    fn loop_restart_maintains_sync() {
+        // Simulates: playing → end of stream → loop restart (seek(0) + play)
+        // This is what the UI does when loop is enabled and video ends
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.set_loop(true);
+        player.play();
+        player.update_position(video.duration_secs);
+
+        // Simulate loop restart (what component.rs does on EndOfStream with loop)
+        player.seek(0.0);
+        player.play();
+
+        // After loop restart, should be seeking to 0 with resume_playing=true
+        // (because play() after seek() transitions to Playing when seek completes)
+        assert!(matches!(
+            player.state(),
+            PlaybackState::Seeking { target_secs, resume_playing: true } if *target_secs == 0.0
+        ));
+
+        // Frame arrives at position 0
+        player.update_position(0.0);
+
+        // Should be playing at 0
+        assert!(player.state().is_playing());
+        assert_eq!(player.state().position(), Some(0.0));
+
+        // Sync clock must be at 0
+        let sync_time = player.sync_time();
+        assert!(
+            sync_time.abs() < 0.1,
+            "Sync clock {} should be near 0 after loop restart",
+            sync_time
+        );
+    }
+
+    #[test]
+    fn seek_after_end_of_stream_resyncs() {
+        // Simulates: playing → end of stream (paused at end) → seek back → play
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(video.duration_secs);
+
+        // End of stream without loop - pause at end
+        player.set_at_end_of_stream();
+        player.pause_at(video.duration_secs);
+
+        assert!(player.state().is_paused());
+        assert_eq!(player.state().position(), Some(video.duration_secs));
+
+        // User seeks back to middle
+        player.seek(60.0);
+        player.update_position(60.0);
+
+        assert!(player.state().is_paused());
+        assert_eq!(player.state().position(), Some(60.0));
+
+        // User plays
+        player.play();
+
+        assert!(player.state().is_playing());
+        assert_eq!(player.state().position(), Some(60.0));
+
+        // Sync clock must be at 60.0
+        let sync_time = player.sync_time();
+        assert!(
+            (sync_time - 60.0).abs() < 0.1,
+            "Sync clock {} should be near 60.0 after seek from end",
+            sync_time
+        );
+    }
+
+    #[test]
+    fn complex_sequence_pause_seek_step_play() {
+        // Simulates a complex user interaction sequence:
+        // playing → pause → seek → step → step → play
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        // Start playing at 10s
+        player.play();
+        player.update_position(10.0);
+
+        // Pause
+        player.pause();
+        assert!(player.state().is_paused());
+        assert_eq!(player.state().position(), Some(10.0));
+
+        // Seek to 50s while paused
+        player.seek(50.0);
+        player.update_position(50.0);
+        assert!(player.state().is_paused());
+        assert_eq!(player.state().position(), Some(50.0));
+
+        // Step forward twice
+        player.step_frame();
+        player.update_position(50.033);
+        player.step_frame();
+        player.update_position(50.066);
+
+        assert!(player.state().is_paused());
+        assert_eq!(player.state().position(), Some(50.066));
+
+        // Resume playback
+        player.play();
+
+        // Must be playing at stepped position
+        assert!(player.state().is_playing());
+        assert_eq!(player.state().position(), Some(50.066));
+
+        // Sync clock must match
+        let sync_time = player.sync_time();
+        assert!(
+            (sync_time - 50.066).abs() < 0.1,
+            "Sync clock {} should match stepped position 50.066",
+            sync_time
+        );
+    }
+
+    #[test]
+    fn seek_to_zero_from_middle_resyncs() {
+        // Edge case: seek to exactly 0.0 (beginning)
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        player.play();
+        player.update_position(45.0);
+
+        // Seek to beginning
+        player.seek(0.0);
+
+        // Frame arrives
+        player.update_position(0.0);
+
+        assert!(player.state().is_playing());
+        assert_eq!(player.state().position(), Some(0.0));
+
+        // Sync clock must be at 0
+        let sync_time = player.sync_time();
+        assert!(
+            sync_time.abs() < 0.1,
+            "Sync clock {} should be near 0",
+            sync_time
+        );
+    }
 }
