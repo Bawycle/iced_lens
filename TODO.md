@@ -15,6 +15,12 @@
   - Fixed with debouncing (check Seeking state before new seek)
   - Reduced default keyboard seek step to 2 seconds
 
+- [ ] **[Intermittent]** Image horizontal offset after exiting fullscreen
+  - Observed: vertical image with fit-to-window, enter fullscreen, exit fullscreen → image shifted horizontally
+  - Not reliably reproducible (happened once, couldn't reproduce after restart)
+  - Possible causes: race condition on window resize, stale viewport dimensions, window manager timing
+  - If reproduced: note exact steps, window size, image used, timing between actions
+
 ## Planned Features
 
 ### Framework Upgrade
