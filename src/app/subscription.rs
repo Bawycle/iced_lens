@@ -86,9 +86,14 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
     }
 }
 
-/// Creates a periodic tick subscription for overlay auto-hide and loading timeout.
-pub fn create_tick_subscription(fullscreen: bool, is_loading: bool) -> Subscription<Message> {
-    if fullscreen || is_loading {
+/// Creates a periodic tick subscription for overlay auto-hide, loading timeout,
+/// and notification auto-dismiss.
+pub fn create_tick_subscription(
+    fullscreen: bool,
+    is_loading: bool,
+    has_notifications: bool,
+) -> Subscription<Message> {
+    if fullscreen || is_loading || has_notifications {
         time::every(std::time::Duration::from_millis(100)).map(Message::Tick)
     } else {
         Subscription::none()

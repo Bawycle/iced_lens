@@ -12,10 +12,11 @@ use crate::ui::about::{self, ViewContext as AboutViewContext};
 use crate::ui::help::{self, ViewContext as HelpViewContext};
 use crate::ui::image_editor::{self, State as ImageEditorState};
 use crate::ui::navbar::{self, ViewContext as NavbarViewContext};
+use crate::ui::notifications::{Manager as NotificationManager, Toast};
 use crate::ui::settings::{State as SettingsState, ViewContext as SettingsViewContext};
 use crate::ui::viewer::component;
 use iced::{
-    widget::{Container, Text},
+    widget::{Container, Stack, Text},
     Element, Length,
 };
 
@@ -31,6 +32,8 @@ pub struct ViewContext<'a> {
     pub menu_open: bool,
     /// Navigation info from the central MediaNavigator (single source of truth).
     pub navigation: NavigationInfo,
+    /// Notification manager for rendering toast overlays.
+    pub notifications: &'a NotificationManager,
 }
 
 /// Renders the current application view based on the active screen.
@@ -50,13 +53,17 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
         Screen::About => view_about(ctx.i18n),
     };
 
-    let column = iced::widget::Column::new().push(
-        Container::new(current_view)
-            .width(Length::Fill)
-            .height(Length::Fill),
-    );
+    let main_content = Container::new(current_view)
+        .width(Length::Fill)
+        .height(Length::Fill);
 
-    Container::new(column.width(Length::Fill).height(Length::Fill))
+    // Render toast notifications as an overlay
+    let toast_overlay = Toast::view_overlay(ctx.notifications, ctx.i18n).map(Message::Notification);
+
+    // Stack the main content with the toast overlay
+    Stack::new()
+        .push(main_content)
+        .push(toast_overlay)
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
@@ -70,7 +77,7 @@ fn view_viewer<'a>(
     menu_open: bool,
     navigation: NavigationInfo,
 ) -> Element<'a, Message> {
-    let config = config::load().unwrap_or_default();
+    let (config, _) = config::load();
     let overlay_timeout_secs = config
         .overlay_timeout_secs
         .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);

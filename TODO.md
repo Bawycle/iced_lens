@@ -52,24 +52,24 @@ Unify how the application communicates with the user. Currently:
 
 **Goal:** Replace `eprintln!` with a proper notification system following UX best practices.
 
-#### Phase 1: Toast/Snackbar Component
-- [ ] Create `src/ui/notifications/` module
-  - [ ] `notification.rs` — `Notification` struct with severity (Success, Info, Warning, Error), message, timestamp, optional action
-  - [ ] `toast.rs` — Toast widget component (auto-dismiss, themed by severity)
-  - [ ] `manager.rs` — `NotificationManager` to queue and manage notifications
-- [ ] Add `notifications: NotificationManager` field to `App` struct
-- [ ] Add `Message::Notification(NotificationMessage)` variants (Push, Dismiss, Tick)
-- [ ] Render toast overlay in `app/view.rs` (positioned bottom-center or top-right)
-- [ ] Add i18n keys for common notifications (save success, save error, etc.)
+#### Phase 1: Toast/Snackbar Component ✅
+- [x] Create `src/ui/notifications/` module
+  - [x] `notification.rs` — `Notification` struct with severity (Success, Info, Warning, Error), message, timestamp, optional action
+  - [x] `toast.rs` — Toast widget component (auto-dismiss, themed by severity)
+  - [x] `manager.rs` — `NotificationManager` to queue and manage notifications
+- [x] Add `notifications: NotificationManager` field to `App` struct
+- [x] Add `Message::Notification(NotificationMessage)` variants (Push, Dismiss, Tick)
+- [x] Render toast overlay in `app/view.rs` (positioned bottom-right)
+- [x] Add i18n keys for common notifications (save success, save error, etc.)
 
-#### Phase 2: Replace eprintln! with Notifications
-- [ ] `app/mod.rs` — Save success/error, frame capture, directory scan errors
-- [ ] `app/update.rs` — Editor operations, navigation errors
-- [ ] `app/persistence.rs` — Config save errors
-- [ ] `app/persisted_state.rs` — State load/save errors (silent or log-only?)
-- [ ] `ui/viewer/component.rs` — Video player errors
-- [ ] `ui/image_editor/state/*.rs` — Crop, resize, history errors
-- [ ] `video_player/*.rs` — Audio/video decoding errors (may need special handling)
+#### Phase 2: Replace eprintln! with Notifications (Partial) ✅
+- [x] `app/mod.rs` — Save success/error, frame capture
+- [x] `app/update.rs` — Save success/error, delete error
+- [ ] `app/persistence.rs` — Config save errors (kept as eprintln!, background operation)
+- [ ] `app/persisted_state.rs` — State load/save errors (kept as eprintln!, silent defaults)
+- [ ] `ui/viewer/component.rs` — Video player errors (handled by ErrorDisplay component)
+- [ ] `ui/image_editor/state/*.rs` — Internal errors (kept as eprintln!, developer info)
+- [ ] `video_player/*.rs` — Decoder errors (kept as eprintln!, internal/debug info)
 
 #### Phase 3: Extend ErrorDisplay Usage
 - [ ] Use `ErrorDisplay` for recoverable errors in editor (e.g., invalid crop region)

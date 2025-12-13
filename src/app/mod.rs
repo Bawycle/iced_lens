@@ -24,6 +24,7 @@ use crate::i18n::fluent::I18n;
 use crate::media::{self, MediaData, MediaNavigator};
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
+use crate::ui::notifications;
 use crate::ui::settings::{State as SettingsState, StateConfig as SettingsConfig};
 use crate::ui::state::zoom::{MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT};
 use crate::ui::theming::ThemeMode;
@@ -60,6 +61,8 @@ pub struct App {
     help_state: help::State,
     /// Persisted application state (last save directory, etc.).
     app_state: persisted_state::AppState,
+    /// Toast notification manager for user feedback.
+    notifications: notifications::Manager,
 }
 
 impl fmt::Debug for App {
@@ -140,6 +143,7 @@ impl Default for App {
             menu_open: false,
             help_state: help::State::new(),
             app_state: persisted_state::AppState::default(),
+            notifications: notifications::Manager::new(),
         }
     }
 }
@@ -148,7 +152,7 @@ impl App {
     /// Initializes application state and optionally kicks off asynchronous image
     /// loading based on `Flags` received from the launcher.
     fn new(flags: Flags) -> (Self, Task<Message>) {
-        let config = config::load().unwrap_or_default();
+        let (config, config_warning) = config::load();
         let i18n = I18n::new(flags.lang.clone(), flags.i18n_dir.clone(), &config);
 
         let mut app = App {
@@ -216,16 +220,31 @@ impl App {
         }
 
         // Load application state (last save directory, etc.)
-        app.app_state = persisted_state::AppState::load();
+        let (app_state, state_warning) = persisted_state::AppState::load();
+        app.app_state = app_state;
+
+        // Show warnings for config/state loading issues
+        if let Some(key) = config_warning {
+            app.notifications
+                .push(notifications::Notification::warning(&key));
+        }
+        if let Some(key) = state_warning {
+            app.notifications
+                .push(notifications::Notification::warning(&key));
+        }
 
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
 
-            // Initialize MediaNavigator with the initial media
-            let config = config::load().unwrap_or_default();
-            let sort_order = config.sort_order.unwrap_or_default();
-            if let Err(err) = app.media_navigator.scan_directory(&path, sort_order) {
-                eprintln!("Failed to scan directory: {:?}", err);
+            // Initialize MediaNavigator with the initial media (reuse sort_order from config above)
+            if app
+                .media_navigator
+                .scan_directory(&path, sort_order)
+                .is_err()
+            {
+                app.notifications.push(notifications::Notification::warning(
+                    "notification-scan-dir-error",
+                ));
             }
 
             // Synchronize viewer state
@@ -260,8 +279,11 @@ impl App {
 
     fn subscription(&self) -> Subscription<Message> {
         let event_sub = subscription::create_event_subscription(self.screen);
-        let tick_sub =
-            subscription::create_tick_subscription(self.fullscreen, self.viewer.is_loading_media());
+        let tick_sub = subscription::create_tick_subscription(
+            self.fullscreen,
+            self.viewer.is_loading_media(),
+            self.notifications.has_notifications(),
+        );
         let video_sub = subscription::create_video_subscription(
             &self.viewer,
             Some(self.lufs_cache.clone()),
@@ -290,6 +312,7 @@ impl App {
             menu_open: &mut self.menu_open,
             help_state: &mut self.help_state,
             app_state: &mut self.app_state,
+            notifications: &mut self.notifications,
         };
 
         match message {
@@ -308,6 +331,10 @@ impl App {
             }
             Message::Help(help_message) => update::handle_help_message(&mut ctx, help_message),
             Message::About(about_message) => update::handle_about_message(&mut ctx, about_message),
+            Message::Notification(notification_message) => {
+                self.notifications.handle_message(notification_message);
+                Task::none()
+            }
             Message::ImageEditorLoaded(result) => self.handle_image_editor_loaded(result),
             Message::Tick(_instant) => {
                 // Periodic tick for overlay auto-hide - just trigger a view refresh
@@ -315,6 +342,9 @@ impl App {
 
                 // Also check for loading timeout
                 self.viewer.check_loading_timeout(&self.i18n);
+
+                // Tick notification manager to handle auto-dismiss
+                self.notifications.tick();
 
                 Task::none()
             }
@@ -324,12 +354,17 @@ impl App {
                     if let Some(editor) = self.image_editor.as_mut() {
                         match editor.save_image(&path) {
                             Ok(()) => {
-                                eprintln!("Image saved successfully to: {:?}", path);
-                                // TODO: Show success notification to user
+                                self.notifications
+                                    .push(notifications::Notification::success(
+                                        "notification-save-success",
+                                    ));
 
                                 // Remember the save directory for next time
                                 self.app_state.set_last_save_directory_from_file(&path);
-                                self.app_state.save();
+                                if let Some(key) = self.app_state.save() {
+                                    self.notifications
+                                        .push(notifications::Notification::warning(&key));
+                                }
 
                                 // Rescan directory if saved in the same folder as viewer
                                 persistence::rescan_directory_if_same(
@@ -338,9 +373,10 @@ impl App {
                                     &path,
                                 );
                             }
-                            Err(err) => {
-                                eprintln!("Failed to save image: {:?}", err);
-                                // TODO: Show error notification to user
+                            Err(_err) => {
+                                self.notifications.push(notifications::Notification::error(
+                                    "notification-save-error",
+                                ));
                             }
                         }
                     }
@@ -355,16 +391,22 @@ impl App {
 
                     match frame.save_to_file(&path, format) {
                         Ok(()) => {
-                            eprintln!("Frame captured successfully to: {:?}", path);
-                            // TODO: Show success notification to user
+                            self.notifications
+                                .push(notifications::Notification::success(
+                                    "notification-frame-capture-success",
+                                ));
 
                             // Remember the save directory for next time
                             self.app_state.set_last_save_directory_from_file(&path);
-                            self.app_state.save();
+                            if let Some(key) = self.app_state.save() {
+                                self.notifications
+                                    .push(notifications::Notification::warning(&key));
+                            }
                         }
-                        Err(err) => {
-                            eprintln!("Failed to capture frame: {:?}", err);
-                            // TODO: Show error notification to user
+                        Err(_err) => {
+                            self.notifications.push(notifications::Notification::error(
+                                "notification-frame-capture-error",
+                            ));
                         }
                     }
                 }
@@ -380,8 +422,10 @@ impl App {
                         self.image_editor = Some(state);
                         self.screen = Screen::ImageEditor;
                     }
-                    Err(err) => {
-                        eprintln!("Failed to open editor with captured frame: {err:?}");
+                    Err(_) => {
+                        self.notifications.push(notifications::Notification::error(
+                            "notification-editor-frame-error",
+                        ));
                     }
                 }
                 Task::none()
@@ -402,7 +446,9 @@ impl App {
                     MediaData::Image(img) => img,
                     MediaData::Video(_) => {
                         // Video editing not supported in v0.2
-                        eprintln!("Video editing is not supported in this version");
+                        self.notifications.push(notifications::Notification::warning(
+                            "notification-video-editing-unsupported",
+                        ));
                         return Task::none();
                     }
                 };
@@ -414,14 +460,18 @@ impl App {
                         Ok(new_editor_state) => {
                             self.image_editor = Some(new_editor_state);
                         }
-                        Err(err) => {
-                            eprintln!("Failed to create editor state: {:?}", err);
+                        Err(_) => {
+                            self.notifications.push(notifications::Notification::error(
+                                "notification-editor-create-error",
+                            ));
                         }
                     }
                 }
             }
-            Err(err) => {
-                eprintln!("Failed to load image for editor: {:?}", err);
+            Err(_) => {
+                self.notifications.push(notifications::Notification::error(
+                    "notification-editor-load-error",
+                ));
             }
         }
         Task::none()
@@ -438,6 +488,7 @@ impl App {
             fullscreen: self.fullscreen,
             menu_open: self.menu_open,
             navigation: self.media_navigator.navigation_info(),
+            notifications: &self.notifications,
         })
     }
 }
@@ -867,6 +918,7 @@ mod tests {
             // This should not panic even though the save will fail
             let viewer = component::State::new();
             let settings_state = SettingsState::default();
+            let mut notifs = notifications::Manager::new();
             let _ = persistence::persist_preferences(persistence::PreferencesContext {
                 viewer: &viewer,
                 settings: &settings_state,
@@ -876,6 +928,7 @@ mod tests {
                 frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
                 frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
                 keyboard_seek_step_secs: config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
+                notifications: &mut notifs,
             });
             // Test passes if we reach here without panicking
         });

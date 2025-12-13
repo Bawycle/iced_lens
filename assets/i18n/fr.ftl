@@ -273,3 +273,26 @@ about-credits-fluent = Internationalisation par Project Fluent
 about-section-links = Liens
 about-link-repository = Code source
 about-link-issues = Signaler un problème
+
+# Notifications
+notification-save-success = Image enregistrée avec succès
+notification-save-error = Échec de l'enregistrement de l'image
+notification-frame-capture-success = Image capturée avec succès
+notification-frame-capture-error = Échec de la capture d'image
+notification-delete-success = Fichier supprimé avec succès
+notification-delete-error = Échec de la suppression du fichier
+notification-copy-success = Copié dans le presse-papiers
+notification-copy-error = Échec de la copie dans le presse-papiers
+notification-config-save-error = Échec de l'enregistrement des paramètres
+notification-config-load-error = Échec du chargement des paramètres, valeurs par défaut utilisées
+notification-state-parse-error = Échec de lecture de l'état, valeurs par défaut utilisées
+notification-state-read-error = Impossible d'ouvrir le fichier d'état
+notification-state-path-error = Impossible de déterminer le chemin des données
+notification-state-dir-error = Impossible de créer le dossier de données
+notification-state-write-error = Échec de l'enregistrement de l'état
+notification-state-create-error = Impossible de créer le fichier d'état
+notification-scan-dir-error = Échec de l'analyse du dossier
+notification-editor-frame-error = Impossible d'ouvrir l'éditeur avec l'image capturée
+notification-editor-create-error = Impossible d'ouvrir l'éditeur d'images
+notification-editor-load-error = Impossible de charger l'image pour l'édition
+notification-video-editing-unsupported = L'édition vidéo n'est pas encore supportée

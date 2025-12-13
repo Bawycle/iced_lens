@@ -51,48 +51,41 @@ impl State {
         };
 
         // Reload the working image from disk
-        match image_rs::open(&image_path) {
-            Ok(fresh_image) => {
-                self.working_image = fresh_image;
-                match image_transform::dynamic_to_image_data(&self.working_image) {
-                    Ok(image_data) => {
-                        self.current_image = image_data.clone();
-                        self.sync_resize_state_dimensions();
+        let Ok(fresh_image) = image_rs::open(&image_path) else {
+            return;
+        };
+        self.working_image = fresh_image;
 
-                        // Reset crop state
-                        let crop_width = (self.current_image.width as f32 * 0.75).round() as u32;
-                        let crop_height = (self.current_image.height as f32 * 0.75).round() as u32;
-                        self.crop_state.x = (self.current_image.width - crop_width) / 2;
-                        self.crop_state.y = (self.current_image.height - crop_height) / 2;
-                        self.crop_state.width = crop_width;
-                        self.crop_state.height = crop_height;
-                        self.crop_state.ratio = CropRatio::None;
-                        self.crop_state.overlay.visible = false;
-                        self.crop_state.overlay.drag_state = CropDragState::None;
-                        self.crop_modified = false;
+        let Ok(image_data) = image_transform::dynamic_to_image_data(&self.working_image) else {
+            return;
+        };
 
-                        // Hide resize overlay to avoid stale rectangles after cancel
-                        self.resize_state.overlay.visible = false;
-                        self.resize_state.overlay.set_original_dimensions(
-                            self.current_image.width,
-                            self.current_image.height,
-                        );
+        self.current_image = image_data.clone();
+        self.sync_resize_state_dimensions();
 
-                        // Clear transformation history
-                        self.transformation_history.clear();
-                        self.history_index = 0;
+        // Reset crop state
+        let crop_width = (self.current_image.width as f32 * 0.75).round() as u32;
+        let crop_height = (self.current_image.height as f32 * 0.75).round() as u32;
+        self.crop_state.x = (self.current_image.width - crop_width) / 2;
+        self.crop_state.y = (self.current_image.height - crop_height) / 2;
+        self.crop_state.width = crop_width;
+        self.crop_state.height = crop_height;
+        self.crop_state.ratio = CropRatio::None;
+        self.crop_state.overlay.visible = false;
+        self.crop_state.overlay.drag_state = CropDragState::None;
+        self.crop_modified = false;
 
-                        // Clear preview but keep tool panel open
-                        self.preview_image = None;
-                    }
-                    Err(err) => {
-                        eprintln!("Failed to convert reloaded image: {err:?}");
-                    }
-                }
-            }
-            Err(err) => {
-                eprintln!("Failed to reload original image: {err:?}");
-            }
-        }
+        // Hide resize overlay to avoid stale rectangles after cancel
+        self.resize_state.overlay.visible = false;
+        self.resize_state
+            .overlay
+            .set_original_dimensions(self.current_image.width, self.current_image.height);
+
+        // Clear transformation history
+        self.transformation_history.clear();
+        self.history_index = 0;
+
+        // Clear preview but keep tool panel open
+        self.preview_image = None;
     }
 }

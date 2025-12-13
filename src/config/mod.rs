@@ -8,8 +8,8 @@
 //! use iced_lens::config::{self, Config};
 //! use std::path::PathBuf;
 //!
-//! // Load existing configuration
-//! let mut config = config::load().unwrap_or_default();
+//! // Load existing configuration (returns tuple with optional warning)
+//! let (mut config, _warning) = config::load();
 //!
 //! // Modify a setting
 //! config.language = Some("fr".to_string());
@@ -180,19 +180,25 @@ fn get_default_config_path() -> Option<PathBuf> {
     })
 }
 
-pub fn load() -> Result<Config> {
+/// Loads the configuration from the default path.
+///
+/// Returns a tuple of (config, optional_warning). If loading fails, returns
+/// default config with a warning message explaining what went wrong.
+pub fn load() -> (Config, Option<String>) {
     if let Some(path) = get_default_config_path() {
         if path.exists() {
             match load_from_path(&path) {
-                Ok(config) => return Ok(config),
-                Err(err) => {
-                    eprintln!("Failed to load config from {}: {}", path.display(), err);
-                    return Err(err);
+                Ok(config) => return (config, None),
+                Err(_) => {
+                    return (
+                        Config::default(),
+                        Some("notification-config-load-error".to_string()),
+                    );
                 }
             }
         }
     }
-    Ok(Config::default())
+    (Config::default(), None)
 }
 
 pub fn save(config: &Config) -> Result<()> {

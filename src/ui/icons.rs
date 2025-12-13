@@ -90,6 +90,18 @@ pub fn warning<'a>() -> Svg<'a> {
     Svg::new(Handle::from_memory(DATA))
 }
 
+/// Checkmark icon: check/tick mark for success.
+pub fn checkmark<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/checkmark.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
+/// Close icon: X mark for dismissing/closing.
+pub fn close<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/close.svg");
+    Svg::new(Handle::from_memory(DATA))
+}
+
 // =============================================================================
 // Zoom & View Icons
 // =============================================================================
@@ -292,6 +304,9 @@ mod tests {
         let _ = hamburger();
         let _ = help();
         let _ = info();
+        let _ = warning();
+        let _ = checkmark();
+        let _ = close();
     }
 
     #[test]

@@ -8,6 +8,7 @@ use crate::ui::about;
 use crate::ui::help;
 use crate::ui::image_editor;
 use crate::ui::navbar;
+use crate::ui::notifications;
 use crate::ui::settings;
 use crate::ui::viewer::component;
 use std::path::PathBuf;
@@ -26,6 +27,7 @@ pub enum Message {
     Navbar(navbar::Message),
     Help(help::Message),
     About(about::Message),
+    Notification(notifications::NotificationMessage),
     ImageEditorLoaded(Result<MediaData, Error>),
     SaveAsDialogResult(Option<PathBuf>),
     FrameCaptureDialogResult {

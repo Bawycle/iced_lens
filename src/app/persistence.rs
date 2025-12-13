@@ -8,6 +8,7 @@ use super::Message;
 use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::media::MediaNavigator;
+use crate::ui::notifications;
 use crate::ui::settings::State as SettingsState;
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
@@ -25,6 +26,7 @@ pub struct PreferencesContext<'a> {
     pub frame_cache_mb: u32,
     pub frame_history_mb: u32,
     pub keyboard_seek_step_secs: f64,
+    pub notifications: &'a mut notifications::Manager,
 }
 
 /// Persists the current viewer + settings preferences to disk.
@@ -36,7 +38,12 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
         return Task::none();
     }
 
-    let mut cfg = config::load().unwrap_or_default();
+    let (mut cfg, load_warning) = config::load();
+    if let Some(key) = load_warning {
+        ctx.notifications
+            .push(notifications::Notification::warning(&key));
+    }
+
     // Use image_fit_to_window() to only persist the image setting, not video
     cfg.fit_to_window = Some(ctx.viewer.image_fit_to_window());
     cfg.zoom_step = Some(ctx.viewer.zoom_step_percent());
@@ -55,8 +62,10 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     cfg.video_muted = Some(ctx.viewer.video_muted());
     cfg.video_loop = Some(ctx.viewer.video_loop());
 
-    if let Err(error) = config::save(&cfg) {
-        eprintln!("Failed to save config: {:?}", error);
+    if config::save(&cfg).is_err() {
+        ctx.notifications.push(notifications::Notification::warning(
+            "notification-config-save-error",
+        ));
     }
 
     Task::none()
@@ -68,14 +77,21 @@ pub fn apply_language_change(
     i18n: &mut I18n,
     viewer: &mut component::State,
     locale: LanguageIdentifier,
+    notifications: &mut notifications::Manager,
 ) -> Task<Message> {
     i18n.set_locale(locale.clone());
 
-    let mut cfg = config::load().unwrap_or_default();
+    let (mut cfg, load_warning) = config::load();
+    if let Some(key) = load_warning {
+        notifications.push(notifications::Notification::warning(&key));
+    }
+
     cfg.language = Some(locale.to_string());
 
-    if let Err(error) = config::save(&cfg) {
-        eprintln!("Failed to save config: {:?}", error);
+    if config::save(&cfg).is_err() {
+        notifications.push(notifications::Notification::warning(
+            "notification-config-save-error",
+        ));
     }
 
     viewer.refresh_error_translation(i18n);
@@ -101,7 +117,7 @@ pub fn rescan_directory_if_same(
     if let (Some(saved), Some(viewer_path)) = (saved_dir, viewer_dir) {
         if saved == viewer_path {
             // Rescan the media navigator (single source of truth)
-            let config = config::load().unwrap_or_default();
+            let (config, _) = config::load();
             let sort_order = config.sort_order.unwrap_or_default();
             if let Some(current_path) = viewer.current_image_path.clone() {
                 let _ = media_navigator.scan_directory(&current_path, sort_order);

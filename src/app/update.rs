@@ -4,7 +4,7 @@
 //! This module contains the main `update` function and all specialized
 //! message handlers for different parts of the application.
 
-use super::{persistence, Message, Screen};
+use super::{notifications, persistence, Message, Screen};
 use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::media::{self, frame_export::ExportableFrame, MediaData, MediaNavigator};
@@ -36,11 +36,12 @@ pub struct UpdateContext<'a> {
     pub menu_open: &'a mut bool,
     pub help_state: &'a mut help::State,
     pub app_state: &'a mut super::persisted_state::AppState,
+    pub notifications: &'a mut notifications::Manager,
 }
 
 impl<'a> UpdateContext<'a> {
     /// Creates a PreferencesContext for persisting preferences.
-    pub fn preferences_context(&self) -> persistence::PreferencesContext<'_> {
+    pub fn preferences_context(&mut self) -> persistence::PreferencesContext<'_> {
         persistence::PreferencesContext {
             viewer: self.viewer,
             settings: self.settings,
@@ -50,6 +51,7 @@ impl<'a> UpdateContext<'a> {
             frame_cache_mb: self.frame_cache_mb,
             frame_history_mb: self.frame_history_mb,
             keyboard_seek_step_secs: self.settings.keyboard_seek_step_secs(),
+            notifications: self.notifications,
         }
     }
 }
@@ -122,16 +124,24 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
             let image_data = match media_data {
                 MediaData::Image(img) => img,
                 MediaData::Video(_) => {
-                    eprintln!("Video editing is not supported in this version");
+                    ctx.notifications.push(notifications::Notification::warning(
+                        "notification-video-editing-unsupported",
+                    ));
                     return Task::none();
                 }
             };
 
             // Synchronize media_navigator with viewer state before entering editor
-            let config = config::load().unwrap_or_default();
+            let (config, _) = config::load();
             let sort_order = config.sort_order.unwrap_or_default();
-            if let Err(err) = ctx.media_navigator.scan_directory(&image_path, sort_order) {
-                eprintln!("Failed to scan directory: {:?}", err);
+            if ctx
+                .media_navigator
+                .scan_directory(&image_path, sort_order)
+                .is_err()
+            {
+                ctx.notifications.push(notifications::Notification::warning(
+                    "notification-scan-dir-error",
+                ));
             }
 
             match ImageEditorState::new(image_path, image_data) {
@@ -139,8 +149,10 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                     *ctx.image_editor = Some(state);
                     *ctx.screen = target;
                 }
-                Err(err) => {
-                    eprintln!("Failed to enter editor screen: {err:?}");
+                Err(_) => {
+                    ctx.notifications.push(notifications::Notification::error(
+                        "notification-editor-create-error",
+                    ));
                 }
             }
             return Task::none();
@@ -178,7 +190,7 @@ pub fn handle_settings_message(
             persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::LanguageSelected(locale) => {
-            persistence::apply_language_change(ctx.i18n, ctx.viewer, locale)
+            persistence::apply_language_change(ctx.i18n, ctx.viewer, locale, ctx.notifications)
         }
         SettingsEvent::ZoomStepChanged(value) => {
             ctx.viewer.set_zoom_step_percent(value);
@@ -264,10 +276,14 @@ pub fn handle_editor_message(
             if let Some(editor) = ctx.image_editor.as_mut() {
                 match editor.save_image(&path) {
                     Ok(()) => {
-                        eprintln!("Image saved successfully to: {:?}", path);
+                        ctx.notifications.push(notifications::Notification::success(
+                            "notification-save-success",
+                        ));
                     }
-                    Err(err) => {
-                        eprintln!("Failed to save image: {:?}", err);
+                    Err(_err) => {
+                        ctx.notifications.push(notifications::Notification::error(
+                            "notification-save-error",
+                        ));
                     }
                 }
             }
@@ -338,7 +354,7 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         .current_media_path()
         .map(|p| p.to_path_buf())
     {
-        let config = config::load().unwrap_or_default();
+        let (config, _) = config::load();
         let sort_order = config.sort_order.unwrap_or_default();
         let _ = ctx
             .media_navigator
@@ -368,7 +384,7 @@ fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message>
         .current_media_path()
         .map(|p| p.to_path_buf())
     {
-        let config = config::load().unwrap_or_default();
+        let (config, _) = config::load();
         let sort_order = config.sort_order.unwrap_or_default();
         let _ = ctx
             .media_navigator
@@ -443,7 +459,7 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         .current_media_path()
         .map(|p| p.to_path_buf())
     {
-        let config = config::load().unwrap_or_default();
+        let (config, _) = config::load();
         let sort_order = config.sort_order.unwrap_or_default();
         let _ = ctx
             .media_navigator
@@ -476,7 +492,7 @@ pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         .current_media_path()
         .map(|p| p.to_path_buf())
     {
-        let config = config::load().unwrap_or_default();
+        let (config, _) = config::load();
         let sort_order = config.sort_order.unwrap_or_default();
         let _ = ctx
             .media_navigator
@@ -526,13 +542,17 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
     // Attempt to delete the file
     match std::fs::remove_file(&current_path) {
         Ok(()) => {
+            ctx.notifications.push(notifications::Notification::success(
+                "notification-delete-success",
+            ));
+
             // Rescan directory after deletion
             let scan_seed = next_candidate
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| current_path.clone());
 
-            let config = config::load().unwrap_or_default();
+            let (config, _) = config::load();
             let sort_order = config.sort_order.unwrap_or_default();
             let _ = ctx.media_navigator.scan_directory(&scan_seed, sort_order);
 
@@ -555,9 +575,10 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
                 Task::none()
             }
         }
-        Err(err) => {
-            eprintln!("Failed to delete file: {}", err);
-            // TODO: Once notification system is in place, show error notification
+        Err(_err) => {
+            ctx.notifications.push(notifications::Notification::error(
+                "notification-delete-error",
+            ));
             Task::none()
         }
     }

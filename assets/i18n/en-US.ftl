@@ -273,3 +273,26 @@ about-credits-fluent = Internationalization by Project Fluent
 about-section-links = Links
 about-link-repository = Source Code
 about-link-issues = Report Issues
+
+# Notifications
+notification-save-success = Image saved successfully
+notification-save-error = Failed to save image
+notification-frame-capture-success = Frame captured successfully
+notification-frame-capture-error = Failed to capture frame
+notification-delete-success = File deleted successfully
+notification-delete-error = Failed to delete file
+notification-copy-success = Copied to clipboard
+notification-copy-error = Failed to copy to clipboard
+notification-config-save-error = Failed to save settings
+notification-config-load-error = Failed to load settings, using defaults
+notification-state-parse-error = Failed to read app state, using defaults
+notification-state-read-error = Failed to open app state file
+notification-state-path-error = Cannot determine app data path
+notification-state-dir-error = Failed to create app data directory
+notification-state-write-error = Failed to save app state
+notification-state-create-error = Failed to create app state file
+notification-scan-dir-error = Failed to scan directory
+notification-editor-frame-error = Failed to open editor with captured frame
+notification-editor-create-error = Failed to open image editor
+notification-editor-load-error = Failed to load image for editing
+notification-video-editing-unsupported = Video editing is not supported yet

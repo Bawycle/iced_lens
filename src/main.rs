@@ -29,7 +29,7 @@ fn main() -> iced::Result {
     let args = pico_args::Arguments::from_env();
     match parse_run_mode(args).expect("failed to parse CLI arguments") {
         RunMode::Help(lang, i18n_dir) => {
-            let config = iced_lens::config::load().unwrap_or_default();
+            let (config, _) = iced_lens::config::load();
             let i18n = iced_lens::i18n::fluent::I18n::new(lang, i18n_dir, &config);
             println!("{}", help_text(&i18n));
             Ok(())
@@ -116,7 +116,7 @@ mod tests {
         let mode = parse_run_mode(pico_args::Arguments::from_vec(args)).expect("parse should work");
         match mode {
             RunMode::Help(lang, dir) => {
-                let config = iced_lens::config::load().unwrap_or_default();
+                let (config, _) = iced_lens::config::load();
                 let i18n = iced_lens::i18n::fluent::I18n::new(lang, dir, &config);
                 let text = help_text(&i18n);
                 assert!(text.contains("UTILISATION"));

@@ -23,6 +23,7 @@
 //! - [`theming`] - Light/Dark/System theme mode management
 //! - [`icons`] - SVG icon loading and rendering
 //! - [`navbar`] - Navigation bar with hamburger menu
+//! - [`notifications`] - Toast notification system for user feedback
 
 pub mod about;
 pub mod components;
@@ -31,6 +32,7 @@ pub mod help;
 pub mod icons;
 pub mod image_editor;
 pub mod navbar;
+pub mod notifications;
 pub mod settings;
 pub mod state;
 pub mod styles;

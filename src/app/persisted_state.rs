@@ -33,63 +33,61 @@ pub struct AppState {
 impl AppState {
     /// Loads application state from disk.
     ///
-    /// Returns default state if the file doesn't exist or cannot be read.
-    /// Errors are logged but not propagated to avoid blocking app startup.
-    pub fn load() -> Self {
+    /// Returns a tuple of (state, optional_warning). If loading fails, returns
+    /// default state with a warning message explaining what went wrong.
+    /// The warning can be displayed to the user via notifications.
+    pub fn load() -> (Self, Option<String>) {
         let Some(path) = Self::state_file_path() else {
-            return Self::default();
+            return (Self::default(), None);
         };
 
         if !path.exists() {
-            return Self::default();
+            return (Self::default(), None);
         }
 
         match fs::File::open(&path) {
             Ok(file) => {
                 let reader = BufReader::new(file);
                 match ciborium::from_reader(reader) {
-                    Ok(state) => state,
-                    Err(err) => {
-                        eprintln!("Failed to parse app state, using defaults: {err}");
-                        Self::default()
-                    }
+                    Ok(state) => (state, None),
+                    Err(_) => (
+                        Self::default(),
+                        Some("notification-state-parse-error".to_string()),
+                    ),
                 }
             }
-            Err(err) => {
-                eprintln!("Failed to open app state file: {err}");
-                Self::default()
-            }
+            Err(_) => (
+                Self::default(),
+                Some("notification-state-read-error".to_string()),
+            ),
         }
     }
 
     /// Saves application state to disk.
     ///
     /// Creates the parent directory if it doesn't exist.
-    /// Errors are logged but not propagated to avoid disrupting user workflow.
-    pub fn save(&self) {
+    /// Returns an optional warning message if save failed.
+    pub fn save(&self) -> Option<String> {
         let Some(path) = Self::state_file_path() else {
-            eprintln!("Cannot determine app state path");
-            return;
+            return Some("notification-state-path-error".to_string());
         };
 
         // Create parent directory if needed
         if let Some(parent) = path.parent() {
-            if let Err(err) = fs::create_dir_all(parent) {
-                eprintln!("Failed to create app state directory: {err}");
-                return;
+            if fs::create_dir_all(parent).is_err() {
+                return Some("notification-state-dir-error".to_string());
             }
         }
 
         match fs::File::create(&path) {
             Ok(file) => {
                 let writer = BufWriter::new(file);
-                if let Err(err) = ciborium::into_writer(self, writer) {
-                    eprintln!("Failed to write app state: {err}");
+                if ciborium::into_writer(self, writer).is_err() {
+                    return Some("notification-state-write-error".to_string());
                 }
+                None
             }
-            Err(err) => {
-                eprintln!("Failed to create app state file: {err}");
-            }
+            Err(_) => Some("notification-state-create-error".to_string()),
         }
     }
 
