@@ -6,7 +6,7 @@
 //! and usage instructions.
 
 use crate::i18n::fluent::I18n;
-use crate::ui::design_tokens::{radius, sizing, spacing};
+use crate::ui::design_tokens::{radius, sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::styles;
 use iced::{
@@ -105,10 +105,10 @@ pub fn update(state: &mut State, message: Message) -> Event {
 /// Render the help screen.
 pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     let back_button =
-        button(text(format!("← {}", ctx.i18n.tr("help-back-to-viewer-button"))).size(14))
+        button(text(format!("← {}", ctx.i18n.tr("help-back-to-viewer-button"))).size(typography::BODY))
             .on_press(Message::BackToViewer);
 
-    let title = Text::new(ctx.i18n.tr("help-title")).size(30);
+    let title = Text::new(ctx.i18n.tr("help-title")).size(typography::TITLE_LG);
 
     // Build collapsible sections
     let viewer_section = build_collapsible_section(
@@ -170,14 +170,14 @@ fn build_collapsible_section<'a>(
     let icon_sized = icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
 
     // Expand/collapse indicator
-    let indicator = Text::new(if is_expanded { "▼" } else { "▶" }).size(14);
+    let indicator = Text::new(if is_expanded { "▼" } else { "▶" }).size(typography::BODY);
 
     let header_content = Row::new()
         .spacing(spacing::SM)
         .align_y(Vertical::Center)
         .push(indicator)
         .push(icon_sized)
-        .push(Text::new(title).size(18));
+        .push(Text::new(title).size(typography::TITLE_SM));
 
     let header = button(header_content)
         .width(Length::Fill)
@@ -456,13 +456,13 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 
 /// Build a paragraph of text.
 fn build_paragraph<'a>(content: String) -> Element<'a, Message> {
-    Text::new(content).size(14).into()
+    Text::new(content).size(typography::BODY).into()
 }
 
 /// Build a subsection title (e.g., "Available Tools", "Keyboard Shortcuts").
 fn build_subsection_title<'a>(title: String) -> Element<'a, Message> {
     Text::new(title)
-        .size(15)
+        .size(typography::BODY)
         .style(|theme: &Theme| text::Style {
             color: Some(theme.extended_palette().background.strong.text),
         })
@@ -472,7 +472,7 @@ fn build_subsection_title<'a>(title: String) -> Element<'a, Message> {
 /// Build a tool title (e.g., "Rotation", "Crop").
 fn build_tool_title<'a>(title: String) -> Element<'a, Message> {
     Text::new(title)
-        .size(15)
+        .size(typography::BODY)
         .style(|theme: &Theme| text::Style {
             color: Some(theme.extended_palette().primary.strong.color),
         })
@@ -483,22 +483,22 @@ fn build_tool_title<'a>(title: String) -> Element<'a, Message> {
 fn build_tool_item<'a>(name: String, description: String) -> Element<'a, Message> {
     Row::new()
         .spacing(spacing::SM)
-        .push(Text::new(format!("• {}:", name)).size(14).font(Font {
+        .push(Text::new(format!("• {}:", name)).size(typography::BODY).font(Font {
             weight: Weight::Bold,
             ..Font::default()
         }))
-        .push(Text::new(description).size(14))
+        .push(Text::new(description).size(typography::BODY))
         .into()
 }
 
 /// Build a bullet point.
 fn build_bullet<'a>(content: String) -> Element<'a, Message> {
-    Text::new(format!("  • {}", content)).size(14).into()
+    Text::new(format!("  • {}", content)).size(typography::BODY).into()
 }
 
 /// Build a numbered step (for instructions).
 fn build_numbered_step<'a>(number: &'a str, content: String) -> Element<'a, Message> {
-    let badge = Container::new(Text::new(number).size(12))
+    let badge = Container::new(Text::new(number).size(typography::CAPTION))
         .padding([spacing::XXS, spacing::XS])
         .style(|theme: &Theme| container::Style {
             background: Some(theme.extended_palette().primary.base.color.into()),
@@ -514,13 +514,13 @@ fn build_numbered_step<'a>(number: &'a str, content: String) -> Element<'a, Mess
         .spacing(spacing::SM)
         .align_y(Vertical::Center)
         .push(badge)
-        .push(Text::new(content).size(14))
+        .push(Text::new(content).size(typography::BODY))
         .into()
 }
 
 /// Build a single shortcut row with key badge and description.
 fn build_shortcut_row<'a>(key: &'a str, description: String) -> Element<'a, Message> {
-    let key_badge = Container::new(Text::new(key).size(12))
+    let key_badge = Container::new(Text::new(key).size(typography::CAPTION))
         .padding([spacing::XXS, spacing::XS])
         .style(|theme: &Theme| container::Style {
             background: Some(theme.extended_palette().background.strong.color.into()),
@@ -535,7 +535,7 @@ fn build_shortcut_row<'a>(key: &'a str, description: String) -> Element<'a, Mess
         .spacing(spacing::SM)
         .align_y(Vertical::Center)
         .push(Container::new(key_badge).width(Length::Fixed(70.0)))
-        .push(Text::new(description).size(14))
+        .push(Text::new(description).size(typography::BODY))
         .into()
 }
 

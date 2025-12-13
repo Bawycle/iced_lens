@@ -205,6 +205,41 @@ pub fn video_play_overlay() -> impl Fn(&Theme, button::Status) -> button::Style 
     }
 }
 
+/// Style for active toggle controls in dark control bars.
+///
+/// Uses a subtle highlight that fits with dark overlays while clearly
+/// indicating the active state. Suitable for mute, loop, fit-to-window toggles.
+pub fn control_active(_theme: &Theme, status: button::Status) -> button::Style {
+    match status {
+        button::Status::Active | button::Status::Pressed => button::Style {
+            background: Some(Background::Color(Color {
+                a: opacity::OVERLAY_STRONG,
+                ..palette::PRIMARY_600
+            })),
+            text_color: WHITE,
+            border: Border {
+                color: palette::PRIMARY_500,
+                width: 1.0,
+                radius: radius::SM.into(),
+            },
+            shadow: shadow::SM,
+            snap: true,
+        },
+        button::Status::Hovered => button::Style {
+            background: Some(Background::Color(palette::PRIMARY_500)),
+            text_color: WHITE,
+            border: Border {
+                color: palette::PRIMARY_400,
+                width: 1.0,
+                radius: radius::SM.into(),
+            },
+            shadow: shadow::MD,
+            snap: true,
+        },
+        _ => button::Style::default(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

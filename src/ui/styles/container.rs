@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Container styles.
 
-use crate::ui::design_tokens::radius;
+use crate::ui::design_tokens::{opacity, radius};
 use iced::widget::container;
 use iced::{Background, Border, Color, Theme};
 
@@ -16,7 +16,10 @@ pub fn panel(theme: &Theme) -> container::Style {
 
     container::Style {
         background: Some(Background::Color(Color::from_rgba(
-            base.r, base.g, base.b, 0.95,
+            base.r,
+            base.g,
+            base.b,
+            opacity::SURFACE,
         ))),
         border: Border {
             radius: radius::LG.into(),

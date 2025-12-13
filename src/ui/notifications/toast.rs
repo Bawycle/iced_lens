@@ -7,7 +7,7 @@
 use super::manager::{Manager, Message};
 use super::notification::{Notification, Severity};
 use crate::i18n::fluent::I18n;
-use crate::ui::design_tokens::{opacity, palette, radius, shadow, spacing};
+use crate::ui::design_tokens::{border, opacity, palette, radius, shadow, sizing, spacing, typography};
 use crate::ui::icons;
 use iced::widget::{button, container, svg, text, Column, Container, Row, Text};
 use iced::{alignment, Color, Element, Length, Theme};
@@ -29,20 +29,20 @@ impl Toast {
         // Severity icon
         let icon = Self::severity_icon(severity);
         let icon_widget =
-            icons::sized(icon, 20.0).style(move |_theme: &Theme, _status| svg::Style {
+            icons::sized(icon, sizing::ICON_MD).style(move |_theme: &Theme, _status| svg::Style {
                 color: Some(accent_color),
             });
 
         // Message text
         let message_widget = Text::new(message_text)
-            .size(14)
+            .size(typography::BODY)
             .style(|theme: &Theme| text::Style {
                 color: Some(theme.palette().text),
             });
 
         // Dismiss button (always visible, uses main text color for good contrast)
         let notification_id = notification.id();
-        let dismiss_button = button(icons::sized(icons::close(), 16.0).style(
+        let dismiss_button = button(icons::sized(icons::close(), sizing::ICON_SM).style(
             |theme: &Theme, _status| svg::Style {
                 color: Some(theme.palette().text),
             },
@@ -65,7 +65,7 @@ impl Toast {
 
         // Toast container with accent border
         Container::new(content)
-            .width(Length::Fixed(320.0))
+            .width(Length::Fixed(sizing::TOAST_WIDTH))
             .padding(spacing::SM)
             .style(move |theme: &Theme| toast_container_style(theme, accent_color))
             .into()
@@ -121,7 +121,7 @@ fn toast_container_style(theme: &Theme, accent_color: Color) -> container::Style
         background: Some(iced::Background::Color(bg_color)),
         border: iced::Border {
             color: accent_color,
-            width: 2.0,
+            width: border::WIDTH_MD,
             radius: radius::MD.into(),
         },
         shadow: shadow::MD,

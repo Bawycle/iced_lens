@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Centralized styles for editor surfaces and panels.
 
-use crate::ui::design_tokens::radius;
+use crate::ui::design_tokens::{opacity, radius};
 use iced::widget::container;
 use iced::{Background, Border, Color, Theme};
+
+/// Brightness adjustment for panel backgrounds.
+/// Dark themes get slightly lighter, light themes get slightly darker
+/// to create visual separation from the main background.
+const BRIGHTNESS_ADJUST_DARK: f32 = 0.10;
+const BRIGHTNESS_ADJUST_LIGHT: f32 = 0.06;
+const LUMINANCE_THRESHOLD: f32 = 1.5;
 
 /// Style for the main editor toolbar.
 ///
@@ -15,7 +22,10 @@ pub fn toolbar(theme: &Theme) -> container::Style {
 
     container::Style {
         background: Some(Background::Color(Color::from_rgba(
-            base.r, base.g, base.b, 0.95,
+            base.r,
+            base.g,
+            base.b,
+            opacity::SURFACE,
         ))),
         border: Border {
             width: 0.0,
@@ -31,22 +41,29 @@ pub fn settings_panel(theme: &Theme) -> container::Style {
     let palette = theme.extended_palette();
     let base = palette.background.base.color;
     let luminance = base.r + base.g + base.b;
-    let (r, g, b) = if luminance < 1.5 {
+    let (r, g, b) = if luminance < LUMINANCE_THRESHOLD {
+        // Dark theme: brighten slightly
         (
-            (base.r + 0.10).min(1.0),
-            (base.g + 0.10).min(1.0),
-            (base.b + 0.10).min(1.0),
+            (base.r + BRIGHTNESS_ADJUST_DARK).min(1.0),
+            (base.g + BRIGHTNESS_ADJUST_DARK).min(1.0),
+            (base.b + BRIGHTNESS_ADJUST_DARK).min(1.0),
         )
     } else {
+        // Light theme: darken slightly
         (
-            (base.r - 0.06).max(0.0),
-            (base.g - 0.06).max(0.0),
-            (base.b - 0.06).max(0.0),
+            (base.r - BRIGHTNESS_ADJUST_LIGHT).max(0.0),
+            (base.g - BRIGHTNESS_ADJUST_LIGHT).max(0.0),
+            (base.b - BRIGHTNESS_ADJUST_LIGHT).max(0.0),
         )
     };
 
     container::Style {
-        background: Some(Background::Color(Color::from_rgba(r, g, b, 0.95))),
+        background: Some(Background::Color(Color::from_rgba(
+            r,
+            g,
+            b,
+            opacity::SURFACE,
+        ))),
         border: Border {
             radius: radius::LG.into(),
             width: 0.0,

@@ -17,7 +17,7 @@ pub mod editor;
 pub mod overlay;
 
 // Re-exports pour backward compatibility
-pub use button::{overlay as button_overlay, primary as button_primary};
+pub use button::{control_active as button_control_active, overlay as button_overlay, primary as button_primary};
 
 use iced::widget::svg;
 use iced::Theme;
