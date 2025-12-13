@@ -62,32 +62,41 @@ Unify how the application communicates with the user. Currently:
 - [x] Render toast overlay in `app/view.rs` (positioned bottom-right)
 - [x] Add i18n keys for common notifications (save success, save error, etc.)
 
-#### Phase 2: Replace eprintln! with Notifications (Partial) ✅
-- [x] `app/mod.rs` — Save success/error, frame capture
-- [x] `app/update.rs` — Save success/error, delete error
-- [ ] `app/persistence.rs` — Config save errors (kept as eprintln!, background operation)
-- [ ] `app/persisted_state.rs` — State load/save errors (kept as eprintln!, silent defaults)
-- [ ] `ui/viewer/component.rs` — Video player errors (handled by ErrorDisplay component)
-- [ ] `ui/image_editor/state/*.rs` — Internal errors (kept as eprintln!, developer info)
-- [ ] `video_player/*.rs` — Decoder errors (kept as eprintln!, internal/debug info)
+#### Phase 2: Replace eprintln! with Notifications ✅
+- [x] `app/mod.rs` — Save success/error, frame capture, editor errors
+- [x] `app/update.rs` — Save success/error, delete success/error, editor errors
+- [x] `app/persistence.rs` — Config save/load errors → warning notifications
+- [x] `app/persisted_state.rs` — State save/load errors → warning notifications
+- [x] `ui/image_editor/state/*.rs` — Removed debug eprintln! (silent early returns)
+- [x] `ui/viewer/component.rs` — Video player errors (handled by ErrorDisplay, intentional)
+- [x] `video_player/*.rs` — Decoder errors (handled by ErrorDisplay, intentional)
+- [x] `i18n/fluent.rs` — FTL parsing errors (kept as eprintln!, developer/translator info)
 
-#### Phase 3: Extend ErrorDisplay Usage
-- [ ] Use `ErrorDisplay` for recoverable errors in editor (e.g., invalid crop region)
-- [ ] Add i18n keys for generic `Error` variants (Io, Svg, Config) — currently only `VideoError` has them
-- [ ] Consider inline error states vs modal errors vs toasts based on severity
+#### Phase 3: Extend ErrorDisplay Usage ✅
+- [x] Add i18n keys for generic `Error` variants (Io, Svg) — already exist in `error-load-image-*` keys
+- [x] Document error handling strategy (see below)
 
-#### Phase 4: Documentation
-- [ ] Update `CONTRIBUTING.md` with notification system guidelines
-  - When to use toasts vs ErrorDisplay vs silent logging
-  - How to push notifications from message handlers
-  - i18n requirements for notification messages
-  - Code examples for common use cases
+#### Phase 4: Documentation ✅
+- [x] Update `CONTRIBUTING.md` with notification system guidelines
+  - Error handling strategy table
+  - Code examples for adding notifications
+  - Severity guidelines and best practices
 
-#### Design Considerations
-- Toast duration: ~3s for success/info, ~5s for warnings, manual dismiss for errors
-- Max visible toasts: 3 (queue others)
-- Animation: fade in/out (if Iced supports, else instant)
-- Accessibility: ensure sufficient contrast, screen reader support
+#### Error Handling Strategy
+
+| Type | Method | When to use |
+|------|--------|-------------|
+| **Toast Notification** | `notifications.push(Notification::*)` | User-initiated actions: save, delete, copy, config changes. Non-blocking feedback. |
+| **ErrorDisplay** | `ErrorDisplay::new()` in view | Content loading failures (image, video). Contextual, shown where content would appear. Requires user acknowledgment. |
+| **Silent (no output)** | Early return / `let else` | Recoverable internal errors where fallback behavior is acceptable. |
+| **eprintln!** | `eprintln!()` | Developer/translator info only (FTL parsing errors). Never for user-facing issues. |
+
+**Toast Duration:**
+- Success/Info: 3 seconds (auto-dismiss)
+- Warning: 5 seconds (auto-dismiss)
+- Error: Manual dismiss only
+
+**Max visible toasts:** 3 (others queued)
 
 ### Media Metadata
 - [ ] Retrieve metadata from media files (EXIF, video info, etc.)

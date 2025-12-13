@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Toast notification system:** visual feedback for user actions replaces silent console output.
+  - Success notifications for save, delete, copy, and frame capture operations.
+  - Warning notifications for configuration issues (corrupted settings, permission errors).
+  - Error notifications for failed operations requiring user acknowledgment.
+  - Auto-dismiss for success/info (3s) and warnings (5s); errors require manual dismiss.
 - **Keyboard seek step setting:** configurable time skip for arrow keys during video playback (0.5–30 seconds), accessible from the Settings screen (Video section).
 - **Video playback preferences persistence:** volume, mute state, and loop toggle are now saved to `settings.toml` and restored on startup.
 - **Remember last Save As directory:** the file dialog now opens in the last used save location, persisted across sessions.
@@ -15,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Iced 0.14.0 upgrade:** migrated to the latest Iced framework version with VideoShader for persistent GPU textures.
 - Default keyboard seek step reduced from 5 seconds to 2 seconds.
+- Configuration and state loading now provides user feedback when falling back to defaults.
 
 ### Fixed
 - Fit-to-window now correctly updates when the hamburger menu collapses/expands.

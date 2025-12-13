@@ -14,6 +14,7 @@ Thank you for your interest in contributing to IcedLens! We welcome contribution
 8. [Pull Request Process](#pull-request-process)
 9. [Project Structure](#project-structure)
 10. [Style Architecture](#style-architecture)
+11. [Notification System](#notification-system)
 
 ## Code of Conduct
 
@@ -494,6 +495,62 @@ Run style tests:
 ```bash
 cargo test style_integration
 ```
+
+## Notification System
+
+IcedLens uses a toast notification system for user feedback. Understanding when to use notifications vs other error handling methods is important.
+
+### Error Handling Strategy
+
+| Type | Method | When to use |
+|------|--------|-------------|
+| **Toast Notification** | `notifications.push(...)` | User-initiated actions (save, delete, copy). Non-blocking feedback. |
+| **ErrorDisplay** | `ErrorDisplay::new()` | Content loading failures (image, video). Contextual, shown in viewer area. |
+| **Silent** | Early return / `let else` | Recoverable internal errors with acceptable fallback. |
+| **eprintln!** | `eprintln!()` | Developer info only (FTL parsing). Never for user-facing issues. |
+
+### Adding a Toast Notification
+
+**1. Add i18n key** in `assets/i18n/en-US.ftl` (and other language files):
+```fluent
+notification-my-action-success = Action completed successfully
+notification-my-action-error = Action failed
+```
+
+**2. Push notification from a message handler** in `app/mod.rs` or `app/update.rs`:
+```rust
+use crate::ui::notifications::{self, Notification};
+
+// Success notification (auto-dismisses after 3s)
+self.notifications.push(Notification::success("notification-my-action-success"));
+
+// Warning notification (auto-dismisses after 5s)
+self.notifications.push(Notification::warning("notification-my-action-warning"));
+
+// Error notification (requires manual dismiss)
+self.notifications.push(Notification::error("notification-my-action-error"));
+```
+
+**3. From UpdateContext** (in `app/update.rs` handlers):
+```rust
+ctx.notifications.push(notifications::Notification::success("notification-save-success"));
+```
+
+### Notification Severities
+
+| Severity | Auto-dismiss | Use case |
+|----------|--------------|----------|
+| `Success` | 3 seconds | Completed actions (save, delete, copy) |
+| `Info` | 3 seconds | Informational messages |
+| `Warning` | 5 seconds | Non-critical issues (config fallback) |
+| `Error` | Manual | Critical failures requiring acknowledgment |
+
+### Guidelines
+
+- **Always use i18n keys**, never hardcoded strings
+- **Keep messages concise** (notifications have limited space)
+- **Choose appropriate severity** based on user impact
+- **Maximum 3 visible** notifications (others are queued)
 
 ## Getting Help
 
