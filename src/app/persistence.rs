@@ -7,7 +7,7 @@
 use super::Message;
 use crate::config;
 use crate::i18n::fluent::I18n;
-use crate::image_navigation::ImageNavigator;
+use crate::media::MediaNavigator;
 use crate::ui::settings::State as SettingsState;
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
@@ -27,6 +27,7 @@ pub fn persist_preferences(
     audio_normalization: bool,
     frame_cache_mb: u32,
     frame_history_mb: u32,
+    keyboard_seek_step_secs: f64,
 ) -> Task<Message> {
     if cfg!(test) {
         return Task::none();
@@ -44,6 +45,7 @@ pub fn persist_preferences(
     cfg.audio_normalization = Some(audio_normalization);
     cfg.frame_cache_mb = Some(frame_cache_mb);
     cfg.frame_history_mb = Some(frame_history_mb);
+    cfg.keyboard_seek_step_secs = Some(keyboard_seek_step_secs);
 
     if let Err(error) = config::save(&cfg) {
         eprintln!("Failed to save config: {:?}", error);
@@ -79,7 +81,7 @@ pub fn apply_language_change(
 /// selected (no auto-switch to the new file).
 pub fn rescan_directory_if_same(
     viewer: &mut component::State,
-    image_navigator: &mut ImageNavigator,
+    media_navigator: &mut MediaNavigator,
     saved_path: &Path,
 ) {
     let saved_dir = saved_path.parent();
@@ -93,11 +95,11 @@ pub fn rescan_directory_if_same(
             // Rescan the viewer's image list
             let _ = viewer.scan_directory();
 
-            // Also rescan the image navigator
+            // Also rescan the media navigator
             let config = config::load().unwrap_or_default();
             let sort_order = config.sort_order.unwrap_or_default();
             if let Some(current_path) = viewer.current_image_path.clone() {
-                let _ = image_navigator.scan_directory(&current_path, sort_order);
+                let _ = media_navigator.scan_directory(&current_path, sort_order);
             }
         }
     }

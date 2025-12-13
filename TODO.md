@@ -4,23 +4,16 @@
 
 ## Bugs to Fix
 
-- [ ] Fit-to-window doesn't expand media when hamburger menu collapses
-  - When the menu opens, images/videos correctly shrink to fit the reduced space
-  - When the menu closes, media doesn't expand to fill the newly available space
-  - Workaround: resize the window to trigger recalculation
+- [x] ~~Fit-to-window doesn't expand media when hamburger menu collapses~~ ✅
+  - Fixed with responsive widget for automatic layout detection
+  - No more manual LayoutChanged events needed
 
-- [ ] Navigation index not updated after media deletion
-  - After deleting a media via toolbar button, the position counter stays correct
-  - But navigating to next media jumps to media #1
-  - And navigating to previous media jumps to the last media
-  - Likely the navigation index is not properly synced after the directory rescan
+- [x] ~~Navigation index not updated after media deletion~~ ✅
+  - Fixed with MediaDeleted effect to sync media_navigator after deletion
 
-- [ ] Video seeking with keyboard arrows broken when held down
-  - Tapping left/right arrows works but seek step is too large
-  - Holding down arrows continuously causes erratic behavior
-  - Fix: ignore new seek events until current seek completes (debouncing)
-  - Consider: reduce default keyboard seek step, add setting in Settings
-    - Note: this is the keyboard shortcut seek step, not the slider step
+- [x] ~~Video seeking with keyboard arrows broken when held down~~ ✅
+  - Fixed with debouncing (check Seeking state before new seek)
+  - Reduced default keyboard seek step to 2 seconds
 
 ## Planned Features
 
@@ -40,6 +33,7 @@
   - [ ] `volume` level
   - [ ] `loop` toggle
   - Similar to how `fit_to_window` is handled for images
+- [x] `keyboard_seek_step_secs` (added to Settings screen + persisted) ✅
 
 ### Image Editor Enhancements
 - [ ] Add brightness adjustment tool
@@ -82,6 +76,9 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
   - Study current UI/UX best practices (Material Design, Human Interface Guidelines, etc.)
 
 ### Project Structure Reorganization
+- [x] ~~Move navigation logic to `src/media/navigator.rs`~~ ✅
+  - Now `MediaNavigator` (renamed from `ImageNavigator`) is in `media/` module
+  - Single source of truth for media navigation
 - [ ] Move `src/config/` into `src/app/config/`
   - Config is app infrastructure, not business logic like `media/` or `video_player/`
 - [ ] Move `src/i18n/` into `src/app/i18n/`

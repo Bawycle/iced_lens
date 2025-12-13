@@ -105,6 +105,10 @@ pub struct Config {
     /// Defaults to 128 MB.
     #[serde(default = "default_frame_history_mb")]
     pub frame_history_mb: Option<u32>,
+    /// Keyboard seek step in seconds (arrow keys during video playback).
+    /// Defaults to 2.0 seconds.
+    #[serde(default = "default_keyboard_seek_step_secs")]
+    pub keyboard_seek_step_secs: Option<f64>,
 }
 
 fn default_frame_cache_mb() -> Option<u32> {
@@ -113,6 +117,10 @@ fn default_frame_cache_mb() -> Option<u32> {
 
 fn default_frame_history_mb() -> Option<u32> {
     Some(DEFAULT_FRAME_HISTORY_MB)
+}
+
+fn default_keyboard_seek_step_secs() -> Option<f64> {
+    Some(DEFAULT_KEYBOARD_SEEK_STEP_SECS)
 }
 
 fn default_audio_normalization() -> Option<bool> {
@@ -154,6 +162,7 @@ impl Default for Config {
             audio_normalization: default_audio_normalization(),
             frame_cache_mb: default_frame_cache_mb(),
             frame_history_mb: default_frame_history_mb(),
+            keyboard_seek_step_secs: default_keyboard_seek_step_secs(),
         }
     }
 }
@@ -225,6 +234,7 @@ mod tests {
             audio_normalization: Some(true),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
+            keyboard_seek_step_secs: Some(DEFAULT_KEYBOARD_SEEK_STEP_SECS),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("nested").join("settings.toml");
@@ -269,6 +279,7 @@ mod tests {
             audio_normalization: Some(false),
             frame_cache_mb: Some(128),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
+            keyboard_seek_step_secs: Some(DEFAULT_KEYBOARD_SEEK_STEP_SECS),
         };
 
         save_to_path(&config, &config_path).expect("save should create directories");
@@ -306,6 +317,7 @@ mod tests {
             audio_normalization: Some(true),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
+            keyboard_seek_step_secs: Some(DEFAULT_KEYBOARD_SEEK_STEP_SECS),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("settings.toml");
@@ -347,6 +359,7 @@ mod tests {
             audio_normalization: Some(true),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
+            keyboard_seek_step_secs: Some(DEFAULT_KEYBOARD_SEEK_STEP_SECS),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("settings.toml");
@@ -381,6 +394,7 @@ mod tests {
             audio_normalization: Some(false),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
+            keyboard_seek_step_secs: Some(DEFAULT_KEYBOARD_SEEK_STEP_SECS),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("settings.toml");
