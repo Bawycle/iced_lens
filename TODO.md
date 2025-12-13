@@ -43,6 +43,52 @@
   - Persist the path in CBOR format in the app data directory (use `app::paths::get_app_data_dir()`)
   - Applies to both image saves and video frame captures
 
+### User Feedback & Notifications
+
+Unify how the application communicates with the user. Currently:
+- `eprintln!` is used throughout (~54 occurrences) — invisible to GUI users
+- `ErrorDisplay` component exists but only for media loading errors in viewer
+- No feedback for save operations, frame captures, config errors, etc.
+
+**Goal:** Replace `eprintln!` with a proper notification system following UX best practices.
+
+#### Phase 1: Toast/Snackbar Component
+- [ ] Create `src/ui/notifications/` module
+  - [ ] `notification.rs` — `Notification` struct with severity (Success, Info, Warning, Error), message, timestamp, optional action
+  - [ ] `toast.rs` — Toast widget component (auto-dismiss, themed by severity)
+  - [ ] `manager.rs` — `NotificationManager` to queue and manage notifications
+- [ ] Add `notifications: NotificationManager` field to `App` struct
+- [ ] Add `Message::Notification(NotificationMessage)` variants (Push, Dismiss, Tick)
+- [ ] Render toast overlay in `app/view.rs` (positioned bottom-center or top-right)
+- [ ] Add i18n keys for common notifications (save success, save error, etc.)
+
+#### Phase 2: Replace eprintln! with Notifications
+- [ ] `app/mod.rs` — Save success/error, frame capture, directory scan errors
+- [ ] `app/update.rs` — Editor operations, navigation errors
+- [ ] `app/persistence.rs` — Config save errors
+- [ ] `app/persisted_state.rs` — State load/save errors (silent or log-only?)
+- [ ] `ui/viewer/component.rs` — Video player errors
+- [ ] `ui/image_editor/state/*.rs` — Crop, resize, history errors
+- [ ] `video_player/*.rs` — Audio/video decoding errors (may need special handling)
+
+#### Phase 3: Extend ErrorDisplay Usage
+- [ ] Use `ErrorDisplay` for recoverable errors in editor (e.g., invalid crop region)
+- [ ] Add i18n keys for generic `Error` variants (Io, Svg, Config) — currently only `VideoError` has them
+- [ ] Consider inline error states vs modal errors vs toasts based on severity
+
+#### Phase 4: Documentation
+- [ ] Update `CONTRIBUTING.md` with notification system guidelines
+  - When to use toasts vs ErrorDisplay vs silent logging
+  - How to push notifications from message handlers
+  - i18n requirements for notification messages
+  - Code examples for common use cases
+
+#### Design Considerations
+- Toast duration: ~3s for success/info, ~5s for warnings, manual dismiss for errors
+- Max visible toasts: 3 (queue others)
+- Animation: fade in/out (if Iced supports, else instant)
+- Accessibility: ensure sufficient contrast, screen reader support
+
 ### Media Metadata
 - [ ] Retrieve metadata from media files (EXIF, video info, etc.)
 - [ ] Design UX/UI for displaying metadata (TBD - needs exploration)
@@ -97,10 +143,11 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
   - Config is app infrastructure, not business logic like `media/` or `video_player/`
 - [ ] Move `src/i18n/` into `src/app/i18n/`
   - Translations are app-specific infrastructure
-- [ ] Create `src/app/paths.rs` with `get_app_data_dir()`
+- [x] ~~Create `src/app/paths.rs` with `get_app_data_dir()`~~ ✅
   - Single source of truth for app data directory
-  - Uses `dirs::config_dir()` (cross-platform: Linux, macOS, Windows)
-  - Refactor `config/mod.rs` to use this module
+  - Uses `dirs::data_dir()` (cross-platform: Linux, macOS, Windows)
+- [ ] Refactor `config/mod.rs` to use `app::paths` module
+  - Currently config has its own `get_default_config_path()` function
 - [ ] Update `CONTRIBUTING.md` project structure section after refactoring
 
 ## Benchmarks
