@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Warning notifications for configuration issues (corrupted settings, permission errors).
   - Error notifications for failed operations requiring user acknowledgment.
   - Auto-dismiss for success/info (3s) and warnings (5s); errors require manual dismiss.
+- **Path override CLI arguments:** `--data-dir` and `--config-dir` allow overriding default directories for portable installations or testing.
+- **Environment variable overrides:** `ICED_LENS_DATA_DIR` and `ICED_LENS_CONFIG_DIR` for CI/CD and portable deployments.
 - **Keyboard seek step setting:** configurable time skip for arrow keys during video playback (0.5–30 seconds), accessible from the Settings screen (Video section).
 - **Video playback preferences persistence:** volume, mute state, and loop toggle are now saved to `settings.toml` and restored on startup.
 - **Remember last Save As directory:** the file dialog now opens in the last used save location, persisted across sessions.

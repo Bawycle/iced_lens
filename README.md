@@ -94,13 +94,17 @@ USAGE:
 	iced_lens [OPTIONS] [IMAGE_PATH]
 
 OPTIONS:
-	-h, --help        Show help text
-			--lang <id>   Set locale (en-US, fr)
-			--i18n-dir <path> Override translation directory (defaults to assets/i18n/)
+	-h, --help              Show help text
+	    --lang <id>         Set locale (en-US, fr)
+	    --i18n-dir <path>   Override translation directory (defaults to assets/i18n/)
+	    --data-dir <path>   Override data directory (state files)
+	    --config-dir <path> Override config directory (settings.toml)
 
 ARGS:
 	<IMAGE_PATH>     Path to image file to open
 ```
+
+Path overrides can also be set via environment variables: `ICED_LENS_DATA_DIR` and `ICED_LENS_CONFIG_DIR`.
 
 ### Navigation Controls
 **Image Navigation:**

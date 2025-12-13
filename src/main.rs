@@ -10,6 +10,8 @@ pub enum RunMode {
 fn parse_run_mode(mut args: pico_args::Arguments) -> Result<RunMode, pico_args::Error> {
     let lang = args.opt_value_from_str("--lang")?;
     let i18n_dir = args.opt_value_from_str("--i18n-dir")?;
+    let data_dir = args.opt_value_from_str("--data-dir")?;
+    let config_dir = args.opt_value_from_str("--config-dir")?;
     if args.contains("--help") || args.contains("-h") {
         return Ok(RunMode::Help(lang, i18n_dir));
     }
@@ -22,6 +24,8 @@ fn parse_run_mode(mut args: pico_args::Arguments) -> Result<RunMode, pico_args::
         lang,
         file_path,
         i18n_dir,
+        data_dir,
+        config_dir,
     }))
 }
 
@@ -34,18 +38,27 @@ fn main() -> iced::Result {
             println!("{}", help_text(&i18n));
             Ok(())
         }
-        RunMode::Normal(flags) => app::run(flags),
+        RunMode::Normal(flags) => {
+            // Initialize CLI path overrides before any config/state loading
+            iced_lens::app::paths::init_cli_overrides(
+                flags.data_dir.clone(),
+                flags.config_dir.clone(),
+            );
+            app::run(flags)
+        }
     }
 }
 fn help_text(i18n: &iced_lens::i18n::fluent::I18n) -> String {
     format!(
-        "{desc}\n\n{usage}\n  iced_lens [OPTIONS] [IMAGE_PATH]\n\n{opts}\n  {line_help}\n  {line_lang}\n  {line_i18n_dir}\n\n{args}\n  {arg_path}\n\n{examples}\n  {ex1}\n  {ex2}\n  {ex3}\n",
+        "{desc}\n\n{usage}\n  iced_lens [OPTIONS] [IMAGE_PATH]\n\n{opts}\n  {line_help}\n  {line_lang}\n  {line_i18n_dir}\n  {line_data_dir}\n  {line_config_dir}\n\n{args}\n  {arg_path}\n\n{examples}\n  {ex1}\n  {ex2}\n  {ex3}\n",
         desc = i18n.tr("help-description"),
         usage = i18n.tr("help-usage-heading"),
         opts = i18n.tr("help-options-heading"),
         line_help = i18n.tr("help-line-option-help"),
         line_lang = i18n.tr("help-line-option-lang"),
         line_i18n_dir = i18n.tr("help-line-option-i18n-dir"),
+        line_data_dir = i18n.tr("help-line-option-data-dir"),
+        line_config_dir = i18n.tr("help-line-option-config-dir"),
         args = i18n.tr("help-args-heading"),
         arg_path = i18n.tr("help-arg-image-path"),
         examples = i18n.tr("help-examples-heading"),
@@ -89,6 +102,26 @@ mod tests {
                 assert!(flags.lang.is_none());
                 assert!(flags.file_path.is_none());
                 assert!(flags.i18n_dir.is_none());
+                assert!(flags.data_dir.is_none());
+                assert!(flags.config_dir.is_none());
+            }
+            _ => panic!("expected Normal mode"),
+        }
+    }
+
+    #[test]
+    fn parse_run_mode_accepts_data_and_config_dir() {
+        let args = vec![
+            OsString::from("--data-dir"),
+            OsString::from("/custom/data"),
+            OsString::from("--config-dir"),
+            OsString::from("/custom/config"),
+        ];
+        let mode = parse_run_mode(pico_args::Arguments::from_vec(args)).expect("parse should work");
+        match mode {
+            RunMode::Normal(flags) => {
+                assert_eq!(flags.data_dir.as_deref(), Some("/custom/data"));
+                assert_eq!(flags.config_dir.as_deref(), Some("/custom/config"));
             }
             _ => panic!("expected Normal mode"),
         }

@@ -147,17 +147,17 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
   - Removed `image_list` field from `viewer::component::State`
   - Moved deletion logic to App (handles file deletion via `media_navigator`)
 
-### Path Injection for Testability
-- [ ] Refactor `AppState` to support path injection
-  - Add `load_from(path: Option<PathBuf>)` method for custom paths
-  - Keep `load()` as convenience method using default path
+### Path Injection for Testability ✅
+- [x] ~~Refactor `AppState` to support path injection~~ ✅
+  - Added `load_from(base_dir: Option<PathBuf>)` and `save_to(base_dir: Option<PathBuf>)` methods
+  - `load()` and `save()` remain as convenience methods using default path
   - Support `ICED_LENS_DATA_DIR` environment variable override
   - Benefits:
     - Isolated tests (each test uses temp directory)
     - Portable mode (store data on USB drive)
     - CI/CD friendly (no interference between parallel tests)
-- [ ] Apply same pattern to `config` module
-  - `Config::load_from(path)` + `Config::load()` convenience method
+- [x] ~~Apply same pattern to `config` module~~ ✅
+  - Added `load_with_override(base_dir)` and `save_with_override(config, base_dir)` functions
   - Support `ICED_LENS_CONFIG_DIR` environment variable
 
 ### Project Structure Reorganization
@@ -167,9 +167,12 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
   - Translations are app-specific infrastructure
 - [x] ~~Create `src/app/paths.rs` with `get_app_data_dir()`~~ ✅
   - Single source of truth for app data directory
-  - Uses `dirs::data_dir()` (cross-platform: Linux, macOS, Windows)
-- [ ] Refactor `config/mod.rs` to use `app::paths` module
-  - Currently config has its own `get_default_config_path()` function
+  - Added `get_app_config_dir()` for config directory
+  - Environment variable overrides: `ICED_LENS_DATA_DIR`, `ICED_LENS_CONFIG_DIR`
+  - Uses `dirs::data_dir()` / `dirs::config_dir()` (cross-platform: Linux, macOS, Windows)
+- [x] ~~Refactor `config/mod.rs` to use `app::paths` module~~ ✅
+  - Removed duplicated `get_default_config_path()` function
+  - Now uses centralized path resolution from `app::paths`
 - [ ] Update `CONTRIBUTING.md` project structure section after refactoring
 
 ## Benchmarks

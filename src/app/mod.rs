@@ -446,9 +446,10 @@ impl App {
                     MediaData::Image(img) => img,
                     MediaData::Video(_) => {
                         // Video editing not supported in v0.2
-                        self.notifications.push(notifications::Notification::warning(
-                            "notification-video-editing-unsupported",
-                        ));
+                        self.notifications
+                            .push(notifications::Notification::warning(
+                                "notification-video-editing-unsupported",
+                            ));
                         return Task::none();
                     }
                 };
@@ -566,11 +567,7 @@ mod tests {
     #[test]
     fn new_starts_in_viewer_mode_without_image() {
         with_temp_config_dir(|_| {
-            let (app, _command) = App::new(Flags {
-                lang: None,
-                file_path: None,
-                i18n_dir: None,
-            });
+            let (app, _command) = App::new(Flags::default());
             assert_eq!(app.screen, Screen::Viewer);
             assert!(!app.viewer.has_media());
         });

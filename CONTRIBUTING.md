@@ -356,6 +356,63 @@ User preferences and application settings:
 - **`defaults.rs`**: Centralized default values for all constants (zoom, volume, cache sizes, etc.). **Always add new defaults here** rather than scattering them across the codebase. Includes compile-time validation to ensure constraints are valid.
 - **`mod.rs`**: User settings persistence (`settings.toml`)
 
+### Path Injection for Testing
+
+IcedLens supports path injection to enable isolated, CI-friendly tests. This allows tests to run in parallel without interfering with each other or with real user data.
+
+#### Environment Variables
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `ICED_LENS_DATA_DIR` | Application state directory | `~/.local/share/IcedLens/` (Linux) |
+| `ICED_LENS_CONFIG_DIR` | Configuration directory | `~/.config/IcedLens/` (Linux) |
+
+#### Path Resolution Order
+
+Both `AppState` and `Config` follow the same resolution order:
+
+1. **Explicit override** (parameter to `load_from()`/`save_to()`)
+2. **Environment variable** (if set and non-empty)
+3. **Platform default** (via `dirs` crate)
+
+#### Writing Isolated Tests
+
+```rust
+use tempfile::tempdir;
+use iced_lens::app::persisted_state::AppState;
+use iced_lens::config;
+
+#[test]
+fn test_with_isolated_directories() {
+    // Create isolated temp directories
+    let state_dir = tempdir().expect("create temp dir");
+    let config_dir = tempdir().expect("create temp dir");
+
+    // Save state to isolated directory
+    let state = AppState { /* ... */ };
+    state.save_to(Some(state_dir.path().to_path_buf()));
+
+    // Save config to isolated directory
+    let config = config::Config::default();
+    config::save_with_override(&config, Some(config_dir.path().to_path_buf()))
+        .expect("save config");
+
+    // Load back from isolated directories
+    let (loaded_state, _) = AppState::load_from(Some(state_dir.path().to_path_buf()));
+    let (loaded_config, _) = config::load_with_override(Some(config_dir.path().to_path_buf()));
+
+    // Tests are completely isolated - no interference with real user data
+    // or other parallel tests
+}
+```
+
+#### Benefits
+
+- **Test isolation**: Each test uses its own temp directory
+- **CI/CD friendly**: Parallel test execution without conflicts
+- **Portable mode**: Store data on USB drive by setting env vars
+- **No cleanup needed**: `tempdir()` auto-cleans on drop
+
 ## Style Architecture
 
 IcedLens uses a layered design system to ensure visual consistency. Understanding this architecture is essential before modifying colors, spacing, or component styles.

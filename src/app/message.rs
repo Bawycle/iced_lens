@@ -52,4 +52,10 @@ pub struct Flags {
     pub file_path: Option<String>,
     /// Optional directory containing Fluent `.ftl` files for custom builds.
     pub i18n_dir: Option<String>,
+    /// Optional data directory override (for state files).
+    /// Takes precedence over `ICED_LENS_DATA_DIR` environment variable.
+    pub data_dir: Option<String>,
+    /// Optional config directory override (for settings.toml).
+    /// Takes precedence over `ICED_LENS_CONFIG_DIR` environment variable.
+    pub config_dir: Option<String>,
 }
