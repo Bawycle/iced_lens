@@ -32,6 +32,7 @@ iced_widget = "0.14.0"
 tokio = { version = "1.48", features = ["macros", "rt-multi-thread", "sync"] }
 dark-light = "2.0.0"
 bytemuck = { version = "1.16", features = ["derive"] }
+ciborium = "0.2"
 wgpu = "27.0"
 cpal = "0.16.0"
 lru = "0.16"

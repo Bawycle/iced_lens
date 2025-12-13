@@ -282,9 +282,10 @@ Key files and directories:
 iced_lens/
 ├── src/
 │   ├── main.rs                 # Entry point
-│   ├── app/                    # Main application logic and state machine
+│   ├── app/                    # Main application logic and orchestration
 │   │   ├── mod.rs              # App struct and Message enum
-│   │   ├── state.rs            # AppState machine (Browsing, Viewing, Editing)
+│   │   ├── paths.rs            # Application directory paths (data dir, config dir)
+│   │   ├── persisted_state.rs  # Persisted application state (CBOR format)
 │   │   ├── update.rs           # Message handling
 │   │   └── view.rs             # UI rendering dispatch
 │   ├── config/                 # Configuration persistence

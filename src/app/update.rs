@@ -35,6 +35,7 @@ pub struct UpdateContext<'a> {
     pub frame_history_mb: u32,
     pub menu_open: &'a mut bool,
     pub help_state: &'a mut help::State,
+    pub app_state: &'a mut super::persisted_state::AppState,
 }
 
 /// Handles viewer component messages.
@@ -371,13 +372,17 @@ pub fn handle_editor_message(
         }
         ImageEditorEvent::SaveAsRequested => {
             let editor_state = ctx.image_editor.as_ref().expect("editor state exists");
-            handle_save_as_dialog(editor_state)
+            let last_dir = ctx.app_state.last_save_directory.clone();
+            handle_save_as_dialog(editor_state, last_dir)
         }
     }
 }
 
 /// Handles Save As dialog request.
-fn handle_save_as_dialog(editor_state: &ImageEditorState) -> Task<Message> {
+fn handle_save_as_dialog(
+    editor_state: &ImageEditorState,
+    last_save_directory: Option<PathBuf>,
+) -> Task<Message> {
     use crate::media::frame_export::{generate_default_filename, ExportFormat};
 
     let image_source = editor_state.image_source().clone();
@@ -405,12 +410,18 @@ fn handle_save_as_dialog(editor_state: &ImageEditorState) -> Task<Message> {
 
     Task::perform(
         async move {
-            rfd::AsyncFileDialog::new()
+            let mut dialog = rfd::AsyncFileDialog::new()
                 .set_file_name(&filename)
-                .add_filter(filter_name, &filter_ext)
-                .save_file()
-                .await
-                .map(|h| h.path().to_path_buf())
+                .add_filter(filter_name, &filter_ext);
+
+            // Use last save directory if available
+            if let Some(dir) = last_save_directory {
+                if dir.exists() {
+                    dialog = dialog.set_directory(&dir);
+                }
+            }
+
+            dialog.save_file().await.map(|h| h.path().to_path_buf())
         },
         Message::SaveAsDialogResult,
     )

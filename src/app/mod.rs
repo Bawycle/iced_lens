@@ -8,6 +8,8 @@
 //! it is easy to audit user-facing behavior.
 
 mod message;
+pub mod paths;
+pub mod persisted_state;
 mod persistence;
 mod screen;
 mod subscription;
@@ -56,6 +58,8 @@ pub struct App {
     menu_open: bool,
     /// Help screen state (tracks expanded sections).
     help_state: help::State,
+    /// Persisted application state (last save directory, etc.).
+    app_state: persisted_state::AppState,
 }
 
 impl fmt::Debug for App {
@@ -135,6 +139,7 @@ impl Default for App {
             frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
             menu_open: false,
             help_state: help::State::new(),
+            app_state: persisted_state::AppState::default(),
         }
     }
 }
@@ -210,6 +215,9 @@ impl App {
             app.viewer.set_video_loop(loop_enabled);
         }
 
+        // Load application state (last save directory, etc.)
+        app.app_state = persisted_state::AppState::load();
+
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
 
@@ -281,6 +289,7 @@ impl App {
             frame_history_mb: self.frame_history_mb,
             menu_open: &mut self.menu_open,
             help_state: &mut self.help_state,
+            app_state: &mut self.app_state,
         };
 
         match message {
@@ -318,6 +327,10 @@ impl App {
                                 eprintln!("Image saved successfully to: {:?}", path);
                                 // TODO: Show success notification to user
 
+                                // Remember the save directory for next time
+                                self.app_state.set_last_save_directory_from_file(&path);
+                                self.app_state.save();
+
                                 // Rescan directory if saved in the same folder as viewer
                                 persistence::rescan_directory_if_same(
                                     &mut self.viewer,
@@ -344,6 +357,10 @@ impl App {
                         Ok(()) => {
                             eprintln!("Frame captured successfully to: {:?}", path);
                             // TODO: Show success notification to user
+
+                            // Remember the save directory for next time
+                            self.app_state.set_last_save_directory_from_file(&path);
+                            self.app_state.save();
                         }
                         Err(err) => {
                             eprintln!("Failed to capture frame: {:?}", err);
