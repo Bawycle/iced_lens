@@ -86,7 +86,7 @@ impl ErrorState {
         let friendly_key = match error {
             Error::Io(_) => "error-load-image-io",
             Error::Svg(_) => "error-load-image-svg",
-            #[allow(unreachable_patterns)]
+            // Config and Video errors use the general message
             _ => "error-load-image-general",
         };
 
@@ -175,6 +175,8 @@ pub struct State {
     keyboard_seek_step_secs: f64,
 }
 
+// Manual Default impl required: video_fit_to_window defaults to true (not false),
+// and video_volume/keyboard_seek_step_secs use config constants instead of 0.0.
 #[allow(clippy::derivable_impls)]
 impl Default for State {
     fn default() -> Self {

@@ -38,6 +38,22 @@ pub struct UpdateContext<'a> {
     pub app_state: &'a mut super::persisted_state::AppState,
 }
 
+impl<'a> UpdateContext<'a> {
+    /// Creates a PreferencesContext for persisting preferences.
+    pub fn preferences_context(&self) -> persistence::PreferencesContext<'_> {
+        persistence::PreferencesContext {
+            viewer: self.viewer,
+            settings: self.settings,
+            theme_mode: *self.theme_mode,
+            video_autoplay: *self.video_autoplay,
+            audio_normalization: *self.audio_normalization,
+            frame_cache_mb: self.frame_cache_mb,
+            frame_history_mb: self.frame_history_mb,
+            keyboard_seek_step_secs: self.settings.keyboard_seek_step_secs(),
+        }
+    }
+}
+
 /// Handles viewer component messages.
 pub fn handle_viewer_message(
     ctx: &mut UpdateContext<'_>,
@@ -50,16 +66,9 @@ pub fn handle_viewer_message(
     let (effect, task) = ctx.viewer.handle_message(message, ctx.i18n);
     let viewer_task = task.map(Message::Viewer);
     let side_effect = match effect {
-        component::Effect::PersistPreferences => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-            ctx.settings.keyboard_seek_step_secs(),
-        ),
+        component::Effect::PersistPreferences => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
         component::Effect::ToggleFullscreen => toggle_fullscreen(ctx.fullscreen, ctx.window_id),
         component::Effect::ExitFullscreen => {
             update_fullscreen_mode(ctx.fullscreen, ctx.window_id, false)
@@ -90,16 +99,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
             Ok(Some(value)) => {
                 ctx.viewer.set_zoom_step_percent(value);
                 *ctx.screen = target;
-                return persistence::persist_preferences(
-                    ctx.viewer,
-                    ctx.settings,
-                    *ctx.theme_mode,
-                    *ctx.video_autoplay,
-                    *ctx.audio_normalization,
-                    ctx.frame_cache_mb,
-                    ctx.frame_history_mb,
-                    ctx.settings.keyboard_seek_step_secs(),
-                );
+                return persistence::persist_preferences(ctx.preferences_context());
             }
             Ok(None) => {
                 *ctx.screen = target;
@@ -175,135 +175,46 @@ pub fn handle_settings_message(
         SettingsEvent::BackToViewerWithZoomChange(value) => {
             ctx.viewer.set_zoom_step_percent(value);
             *ctx.screen = Screen::Viewer;
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-                ctx.settings.keyboard_seek_step_secs(),
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::LanguageSelected(locale) => {
             persistence::apply_language_change(ctx.i18n, ctx.viewer, locale)
         }
         SettingsEvent::ZoomStepChanged(value) => {
             ctx.viewer.set_zoom_step_percent(value);
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-                ctx.settings.keyboard_seek_step_secs(),
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
-        SettingsEvent::BackgroundThemeSelected(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-            ctx.settings.keyboard_seek_step_secs(),
-        ),
+        SettingsEvent::BackgroundThemeSelected(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
         SettingsEvent::ThemeModeSelected(mode) => {
             *ctx.theme_mode = mode;
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-                ctx.settings.keyboard_seek_step_secs(),
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
-        SettingsEvent::SortOrderSelected(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-            ctx.settings.keyboard_seek_step_secs(),
-        ),
-        SettingsEvent::OverlayTimeoutChanged(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-            ctx.settings.keyboard_seek_step_secs(),
-        ),
+        SettingsEvent::SortOrderSelected(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
+        SettingsEvent::OverlayTimeoutChanged(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
         SettingsEvent::VideoAutoplayChanged(enabled) => {
             *ctx.video_autoplay = enabled;
             ctx.viewer.set_video_autoplay(enabled);
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-                ctx.settings.keyboard_seek_step_secs(),
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::AudioNormalizationChanged(enabled) => {
             *ctx.audio_normalization = enabled;
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-                ctx.settings.keyboard_seek_step_secs(),
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
-        SettingsEvent::FrameCacheMbChanged(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-            ctx.settings.keyboard_seek_step_secs(),
-        ),
-        SettingsEvent::FrameHistoryMbChanged(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-            ctx.settings.keyboard_seek_step_secs(),
-        ),
+        SettingsEvent::FrameCacheMbChanged(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
+        SettingsEvent::FrameHistoryMbChanged(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
         SettingsEvent::KeyboardSeekStepChanged(step) => {
             ctx.viewer.set_keyboard_seek_step_secs(step);
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-                ctx.settings.keyboard_seek_step_secs(),
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
     }
 }

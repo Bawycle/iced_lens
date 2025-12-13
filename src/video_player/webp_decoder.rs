@@ -68,12 +68,6 @@ impl WebpAnimDecoder {
             .map_err(|_| Error::Io("WebP decoder task is not running".into()))
     }
 
-    /// Receives the next event from the decoder (non-blocking).
-    #[allow(dead_code)]
-    pub fn try_recv_event(&mut self) -> Option<DecoderEvent> {
-        self.event_rx.try_recv().ok()
-    }
-
     /// Receives the next event from the decoder (blocking).
     pub async fn recv_event(&mut self) -> Option<DecoderEvent> {
         self.event_rx.recv().await

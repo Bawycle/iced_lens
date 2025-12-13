@@ -15,43 +15,45 @@ use iced::Task;
 use std::path::Path;
 use unic_langid::LanguageIdentifier;
 
+/// Context for persisting preferences, bundling all required state references.
+pub struct PreferencesContext<'a> {
+    pub viewer: &'a component::State,
+    pub settings: &'a SettingsState,
+    pub theme_mode: ThemeMode,
+    pub video_autoplay: bool,
+    pub audio_normalization: bool,
+    pub frame_cache_mb: u32,
+    pub frame_history_mb: u32,
+    pub keyboard_seek_step_secs: f64,
+}
+
 /// Persists the current viewer + settings preferences to disk.
 ///
 /// Guarded during tests to keep isolation: unit tests exercise the logic by
 /// calling the function directly rather than through `Effect`s.
-#[allow(clippy::too_many_arguments)]
-pub fn persist_preferences(
-    viewer: &component::State,
-    settings: &SettingsState,
-    theme_mode: ThemeMode,
-    video_autoplay: bool,
-    audio_normalization: bool,
-    frame_cache_mb: u32,
-    frame_history_mb: u32,
-    keyboard_seek_step_secs: f64,
-) -> Task<Message> {
+pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     if cfg!(test) {
         return Task::none();
     }
 
     let mut cfg = config::load().unwrap_or_default();
     // Use image_fit_to_window() to only persist the image setting, not video
-    cfg.fit_to_window = Some(viewer.image_fit_to_window());
-    cfg.zoom_step = Some(viewer.zoom_step_percent());
-    cfg.background_theme = Some(settings.background_theme());
-    cfg.sort_order = Some(settings.sort_order());
-    cfg.overlay_timeout_secs = Some(settings.overlay_timeout_secs());
-    cfg.theme_mode = theme_mode;
-    cfg.video_autoplay = Some(video_autoplay);
-    cfg.audio_normalization = Some(audio_normalization);
-    cfg.frame_cache_mb = Some(frame_cache_mb);
-    cfg.frame_history_mb = Some(frame_history_mb);
-    cfg.keyboard_seek_step_secs = Some(keyboard_seek_step_secs);
+    cfg.fit_to_window = Some(ctx.viewer.image_fit_to_window());
+    cfg.zoom_step = Some(ctx.viewer.zoom_step_percent());
+    cfg.background_theme = Some(ctx.settings.background_theme());
+    cfg.sort_order = Some(ctx.settings.sort_order());
+    cfg.overlay_timeout_secs = Some(ctx.settings.overlay_timeout_secs());
+    cfg.theme_mode = ctx.theme_mode;
+    cfg.video_autoplay = Some(ctx.video_autoplay);
+    cfg.audio_normalization = Some(ctx.audio_normalization);
+    cfg.frame_cache_mb = Some(ctx.frame_cache_mb);
+    cfg.frame_history_mb = Some(ctx.frame_history_mb);
+    cfg.keyboard_seek_step_secs = Some(ctx.keyboard_seek_step_secs);
 
     // Video playback preferences (persisted but not in Settings UI)
-    cfg.video_volume = Some(viewer.video_volume());
-    cfg.video_muted = Some(viewer.video_muted());
-    cfg.video_loop = Some(viewer.video_loop());
+    cfg.video_volume = Some(ctx.viewer.video_volume());
+    cfg.video_muted = Some(ctx.viewer.video_muted());
+    cfg.video_loop = Some(ctx.viewer.video_loop());
 
     if let Err(error) = config::save(&cfg) {
         eprintln!("Failed to save config: {:?}", error);

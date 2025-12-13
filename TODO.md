@@ -138,6 +138,19 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
   - Removed `image_list` field from `viewer::component::State`
   - Moved deletion logic to App (handles file deletion via `media_navigator`)
 
+### Path Injection for Testability
+- [ ] Refactor `AppState` to support path injection
+  - Add `load_from(path: Option<PathBuf>)` method for custom paths
+  - Keep `load()` as convenience method using default path
+  - Support `ICED_LENS_DATA_DIR` environment variable override
+  - Benefits:
+    - Isolated tests (each test uses temp directory)
+    - Portable mode (store data on USB drive)
+    - CI/CD friendly (no interference between parallel tests)
+- [ ] Apply same pattern to `config` module
+  - `Config::load_from(path)` + `Config::load()` convenience method
+  - Support `ICED_LENS_CONFIG_DIR` environment variable
+
 ### Project Structure Reorganization
 - [ ] Move `src/config/` into `src/app/config/`
   - Config is app infrastructure, not business logic like `media/` or `video_player/`

@@ -867,16 +867,16 @@ mod tests {
             // This should not panic even though the save will fail
             let viewer = component::State::new();
             let settings_state = SettingsState::default();
-            let _ = persistence::persist_preferences(
-                &viewer,
-                &settings_state,
-                crate::ui::theming::ThemeMode::System,
-                false, // video_autoplay
-                true,  // audio_normalization
-                config::DEFAULT_FRAME_CACHE_MB,
-                config::DEFAULT_FRAME_HISTORY_MB,
-                config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
-            );
+            let _ = persistence::persist_preferences(persistence::PreferencesContext {
+                viewer: &viewer,
+                settings: &settings_state,
+                theme_mode: crate::ui::theming::ThemeMode::System,
+                video_autoplay: false,
+                audio_normalization: true,
+                frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
+                frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
+                keyboard_seek_step_secs: config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
+            });
             // Test passes if we reach here without panicking
         });
     }
