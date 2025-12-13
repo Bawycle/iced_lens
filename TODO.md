@@ -124,11 +124,13 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
 
 ## Refactoring
 
-### UI Style Harmonization
-- [ ] Review and harmonize styles across all screens (viewer, editor, settings)
-  - Ensure consistent button styles, spacing, and colors
-  - Improve overall UX and aesthetics
-  - Study current UI/UX best practices (Material Design, Human Interface Guidelines, etc.)
+### UI Style Harmonization ✅
+- [x] ~~Review and harmonize styles across all screens (viewer, editor, settings)~~ ✅
+  - Added typography tokens (TITLE_LG/MD/SM, BODY_LG/BODY/BODY_SM, CAPTION)
+  - Added border width tokens (WIDTH_SM, WIDTH_MD) and opacity::SURFACE
+  - Replaced hardcoded button padding with spacing tokens
+  - Aligned semantic colors with palette tokens in theming.rs
+  - Created button::control_active style for toggle controls
 
 ### Configuration Improvements
 - [ ] Add sections to `settings.toml` for better organization
