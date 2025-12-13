@@ -12,12 +12,14 @@ use crate::ui::theme;
 use crate::ui::viewer::{component::Message, HudIconKind, HudLine};
 use crate::ui::widgets::{wheel_blocking_scrollable::wheel_blocking_scrollable, AnimatedSpinner};
 use iced::mouse;
-use iced::widget::{button, mouse_area, Column, Container, Row, Scrollable, Stack, Text};
+use iced::widget::{
+    button, mouse_area, responsive, Column, Container, Row, Scrollable, Stack, Text,
+};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::scrollable::{Direction, Scrollbar, Viewport},
     widget::Id,
-    Background, Element, Length, Padding, Theme,
+    Background, Element, Length, Padding, Size, Theme,
 };
 
 pub struct ViewContext<'a> {
@@ -30,7 +32,10 @@ pub struct ViewContext<'a> {
 pub struct ViewModel<'a> {
     pub media: &'a MediaData,
     pub zoom_percent: f32,
-    pub padding: Padding,
+    /// Manual zoom percentage (used when fit_to_window is disabled).
+    pub manual_zoom_percent: f32,
+    /// Whether fit-to-window mode is enabled.
+    pub fit_to_window: bool,
     pub is_dragging: bool,
     pub cursor_over_media: bool,
     pub arrows_visible: bool,
@@ -51,6 +56,62 @@ pub struct ViewModel<'a> {
 }
 
 pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Message> {
+    // Use responsive widget to get the available size and calculate fit-to-window zoom
+    responsive(move |available_size: Size| view_inner(&ctx, &model, available_size)).into()
+}
+
+/// Calculate the zoom percentage needed to fit media within available space.
+fn calculate_fit_zoom(media_width: u32, media_height: u32, available: Size) -> f32 {
+    if media_width == 0 || media_height == 0 || available.width <= 0.0 || available.height <= 0.0 {
+        return crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT;
+    }
+
+    let scale_x = available.width / media_width as f32;
+    let scale_y = available.height / media_height as f32;
+    let scale = scale_x.min(scale_y);
+
+    if !scale.is_finite() || scale <= 0.0 {
+        return crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT;
+    }
+
+    crate::ui::state::zoom::clamp_zoom(scale * 100.0)
+}
+
+/// Calculate padding to center media within available space.
+fn calculate_centering_padding(media_size: Size, available: Size) -> Padding {
+    let horizontal = ((available.width - media_size.width) / 2.0).max(0.0);
+    let vertical = ((available.height - media_size.height) / 2.0).max(0.0);
+
+    Padding {
+        top: vertical,
+        right: horizontal,
+        bottom: vertical,
+        left: horizontal,
+    }
+}
+
+fn view_inner<'a>(
+    ctx: &ViewContext<'a>,
+    model: &ViewModel<'a>,
+    available_size: Size,
+) -> Element<'a, Message> {
+    // Calculate effective zoom: use fit-to-window calculation or manual zoom
+    let effective_zoom = if model.fit_to_window {
+        calculate_fit_zoom(model.media.width(), model.media.height(), available_size)
+    } else {
+        model.manual_zoom_percent
+    };
+
+    // Calculate scaled media size
+    let scale = effective_zoom / 100.0;
+    let scaled_width = model.media.width() as f32 * scale;
+    let scaled_height = model.media.height() as f32 * scale;
+    let scaled_size = Size::new(scaled_width, scaled_height);
+
+    // Calculate padding based on current available size (from responsive widget)
+    // This ensures proper centering even when layout changes
+    let effective_padding = calculate_centering_padding(scaled_size, available_size);
+
     // Determine arrow colors based on background theme for optimal visibility
     // Following UX best practices: semi-transparent backgrounds with strong shadows
     let (arrow_text_color, arrow_bg_alpha_normal, arrow_bg_alpha_hover, svg_color) =
@@ -83,14 +144,14 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
             shader.view()
         } else {
             // No frame yet, show thumbnail
-            super::view_media(model.media, model.zoom_percent)
+            super::view_media(model.media, effective_zoom)
         }
     } else {
         // Not a video or no shader, show static media
-        super::view_media(model.media, model.zoom_percent)
+        super::view_media(model.media, effective_zoom)
     };
 
-    let media_container = Container::new(media_viewer).padding(model.padding);
+    let media_container = Container::new(media_viewer).padding(effective_padding);
 
     let scrollable = Scrollable::new(media_container)
         .id(Id::new(ctx.scrollable_id))

@@ -17,6 +17,9 @@ pub struct ViewportState {
 
     /// Current viewport bounds
     pub bounds: Option<Rectangle>,
+
+    /// Previous viewport bounds (for layout change detection)
+    pub previous_bounds: Option<Rectangle>,
 }
 
 impl Default for ViewportState {
@@ -25,16 +28,37 @@ impl Default for ViewportState {
             offset: AbsoluteOffset { x: 0.0, y: 0.0 },
             previous_offset: AbsoluteOffset { x: 0.0, y: 0.0 },
             bounds: None,
+            previous_bounds: None,
         }
     }
 }
 
 impl ViewportState {
-    /// Updates the viewport state with new bounds and offset
-    pub fn update(&mut self, bounds: Rectangle, offset: AbsoluteOffset) {
+    /// Updates the viewport state with new bounds and offset.
+    /// Returns true if the bounds size changed (layout change detected).
+    pub fn update(&mut self, bounds: Rectangle, offset: AbsoluteOffset) -> bool {
         self.previous_offset = self.offset;
         self.offset = offset;
+        self.previous_bounds = self.bounds;
+
+        let bounds_changed = match self.previous_bounds {
+            Some(prev) => {
+                // Check if size changed (not just position)
+                (prev.width - bounds.width).abs() > 0.1 || (prev.height - bounds.height).abs() > 0.1
+            }
+            None => false, // First update, no change
+        };
+
         self.bounds = Some(bounds);
+        bounds_changed
+    }
+
+    /// Checks if content of given size fits within current viewport bounds.
+    pub fn content_fits(&self, content_width: f32, content_height: f32) -> bool {
+        match self.bounds {
+            Some(bounds) => content_width <= bounds.width && content_height <= bounds.height,
+            None => false,
+        }
     }
 
     /// Calculates the scroll position as percentage (0-100%)

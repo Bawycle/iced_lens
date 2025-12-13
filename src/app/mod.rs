@@ -19,8 +19,7 @@ pub use screen::Screen;
 
 use crate::config;
 use crate::i18n::fluent::I18n;
-use crate::image_navigation::ImageNavigator;
-use crate::media::{self, MediaData};
+use crate::media::{self, MediaData, MediaNavigator};
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
 use crate::ui::settings::{State as SettingsState, StateConfig as SettingsConfig};
@@ -39,7 +38,7 @@ pub struct App {
     settings: SettingsState,
     viewer: component::State,
     image_editor: Option<ImageEditorState>,
-    image_navigator: ImageNavigator,
+    media_navigator: MediaNavigator,
     fullscreen: bool,
     window_id: Option<window::Id>,
     theme_mode: ThemeMode,
@@ -125,7 +124,7 @@ impl Default for App {
             settings: SettingsState::default(),
             viewer: component::State::new(),
             image_editor: None,
-            image_navigator: ImageNavigator::new(),
+            media_navigator: MediaNavigator::new(),
             fullscreen: false,
             window_id: None,
             theme_mode: ThemeMode::System,
@@ -171,6 +170,9 @@ impl App {
             .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
         let video_autoplay = config.video_autoplay.unwrap_or(false);
         let audio_normalization = config.audio_normalization.unwrap_or(true);
+        let keyboard_seek_step_secs = config
+            .keyboard_seek_step_secs
+            .unwrap_or(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS);
         let frame_cache_mb = config
             .frame_cache_mb
             .unwrap_or(config::DEFAULT_FRAME_CACHE_MB);
@@ -189,18 +191,21 @@ impl App {
             audio_normalization,
             frame_cache_mb,
             frame_history_mb,
+            keyboard_seek_step_secs,
         });
         app.video_autoplay = video_autoplay;
         app.audio_normalization = audio_normalization;
         app.viewer.set_video_autoplay(video_autoplay);
+        app.viewer
+            .set_keyboard_seek_step_secs(keyboard_seek_step_secs);
 
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
 
-            // Initialize ImageNavigator with the initial image
+            // Initialize MediaNavigator with the initial media
             let config = config::load().unwrap_or_default();
             let sort_order = config.sort_order.unwrap_or_default();
-            if let Err(err) = app.image_navigator.scan_directory(&path, sort_order) {
+            if let Err(err) = app.media_navigator.scan_directory(&path, sort_order) {
                 eprintln!("Failed to scan directory: {:?}", err);
             }
 
@@ -255,7 +260,7 @@ impl App {
             settings: &mut self.settings,
             viewer: &mut self.viewer,
             image_editor: &mut self.image_editor,
-            image_navigator: &mut self.image_navigator,
+            media_navigator: &mut self.media_navigator,
             fullscreen: &mut self.fullscreen,
             window_id: &mut self.window_id,
             theme_mode: &mut self.theme_mode,
@@ -305,7 +310,7 @@ impl App {
                                 // Rescan directory if saved in the same folder as viewer
                                 persistence::rescan_directory_if_same(
                                     &mut self.viewer,
-                                    &mut self.image_navigator,
+                                    &mut self.media_navigator,
                                     &path,
                                 );
                             }
@@ -375,7 +380,7 @@ impl App {
                 };
 
                 // Create a new ImageEditorState with the loaded image
-                if let Some(current_image_path) = self.image_navigator.current_image_path() {
+                if let Some(current_image_path) = self.media_navigator.current_media_path() {
                     let path = current_image_path.to_path_buf();
                     match image_editor::State::new(path, image_data) {
                         Ok(new_editor_state) => {
@@ -841,6 +846,7 @@ mod tests {
                 true,  // audio_normalization
                 config::DEFAULT_FRAME_CACHE_MB,
                 config::DEFAULT_FRAME_HISTORY_MB,
+                config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
             );
             // Test passes if we reach here without panicking
         });
@@ -873,9 +879,9 @@ mod tests {
             .scan_directory()
             .expect("failed to scan directory");
 
-        // Also initialize image_navigator
+        // Also initialize media_navigator
         let _ = app
-            .image_navigator
+            .media_navigator
             .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
 
         let _ = app.update(Message::Viewer(component::Message::NavigateNext));
@@ -915,9 +921,9 @@ mod tests {
             .scan_directory()
             .expect("failed to scan directory");
 
-        // Also initialize image_navigator
+        // Also initialize media_navigator
         let _ = app
-            .image_navigator
+            .media_navigator
             .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
 
         let _ = app.update(Message::Viewer(component::Message::NavigatePrevious));
@@ -957,9 +963,9 @@ mod tests {
             .scan_directory()
             .expect("failed to scan directory");
 
-        // Also initialize image_navigator
+        // Also initialize media_navigator
         let _ = app
-            .image_navigator
+            .media_navigator
             .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
 
         let _ = app.update(Message::Viewer(component::Message::NavigateNext));
@@ -1000,9 +1006,9 @@ mod tests {
                 .scan_directory()
                 .expect("failed to scan directory");
 
-            // Also initialize image_navigator
+            // Also initialize media_navigator
             let _ = app
-                .image_navigator
+                .media_navigator
                 .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
 
             let _ = app.update(Message::Viewer(component::Message::RawEvent {

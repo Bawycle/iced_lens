@@ -8,9 +8,10 @@
 
 use crate::config::{
     BackgroundTheme, SortOrder, DEFAULT_FRAME_CACHE_MB, DEFAULT_FRAME_HISTORY_MB,
-    DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT, MAX_FRAME_CACHE_MB,
-    MAX_FRAME_HISTORY_MB, MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB, MIN_FRAME_HISTORY_MB,
-    MIN_OVERLAY_TIMEOUT_SECS,
+    DEFAULT_KEYBOARD_SEEK_STEP_SECS, DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT,
+    MAX_FRAME_CACHE_MB, MAX_FRAME_HISTORY_MB, MAX_KEYBOARD_SEEK_STEP_SECS,
+    MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB, MIN_FRAME_HISTORY_MB,
+    MIN_KEYBOARD_SEEK_STEP_SECS, MIN_OVERLAY_TIMEOUT_SECS,
 };
 use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{radius, sizing, spacing};
@@ -53,6 +54,7 @@ pub struct StateConfig {
     pub audio_normalization: bool,
     pub frame_cache_mb: u32,
     pub frame_history_mb: u32,
+    pub keyboard_seek_step_secs: f64,
 }
 
 impl Default for StateConfig {
@@ -67,6 +69,7 @@ impl Default for StateConfig {
             audio_normalization: true,
             frame_cache_mb: DEFAULT_FRAME_CACHE_MB,
             frame_history_mb: DEFAULT_FRAME_HISTORY_MB,
+            keyboard_seek_step_secs: DEFAULT_KEYBOARD_SEEK_STEP_SECS,
         }
     }
 }
@@ -86,6 +89,7 @@ pub struct State {
     audio_normalization: bool,
     frame_cache_mb: u32,
     frame_history_mb: u32,
+    keyboard_seek_step_secs: f64,
 }
 
 /// Messages emitted directly by the settings widgets.
@@ -103,6 +107,7 @@ pub enum Message {
     AudioNormalizationChanged(bool),
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
+    KeyboardSeekStepChanged(f64),
 }
 
 /// Events propagated to the parent application for side effects.
@@ -121,6 +126,7 @@ pub enum Event {
     AudioNormalizationChanged(bool),
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
+    KeyboardSeekStepChanged(f64),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -169,6 +175,9 @@ impl State {
         let clamped_history = config
             .frame_history_mb
             .clamp(MIN_FRAME_HISTORY_MB, MAX_FRAME_HISTORY_MB);
+        let clamped_seek_step = config
+            .keyboard_seek_step_secs
+            .clamp(MIN_KEYBOARD_SEEK_STEP_SECS, MAX_KEYBOARD_SEEK_STEP_SECS);
         Self {
             background_theme: config.background_theme,
             sort_order: config.sort_order,
@@ -182,6 +191,7 @@ impl State {
             audio_normalization: config.audio_normalization,
             frame_cache_mb: clamped_cache,
             frame_history_mb: clamped_history,
+            keyboard_seek_step_secs: clamped_seek_step,
         }
     }
 
@@ -219,6 +229,10 @@ impl State {
 
     pub fn frame_history_mb(&self) -> u32 {
         self.frame_history_mb
+    }
+
+    pub fn keyboard_seek_step_secs(&self) -> f64 {
+        self.keyboard_seek_step_secs
     }
 
     pub(crate) fn zoom_step_input_value(&self) -> &str {
@@ -563,12 +577,44 @@ impl State {
             history_control.into(),
         );
 
+        // Keyboard seek step slider
+        let seek_step_slider = Slider::new(
+            MIN_KEYBOARD_SEEK_STEP_SECS..=MAX_KEYBOARD_SEEK_STEP_SECS,
+            self.keyboard_seek_step_secs,
+            Message::KeyboardSeekStepChanged,
+        )
+        .step(0.5)
+        .width(Length::Fixed(200.0));
+
+        let seek_step_value = Text::new(format!(
+            "{} {}",
+            self.keyboard_seek_step_secs,
+            ctx.i18n.tr("seconds")
+        ));
+
+        let seek_step_control = Row::new()
+            .spacing(spacing::SM)
+            .align_y(Vertical::Center)
+            .push(seek_step_slider)
+            .push(seek_step_value);
+
+        let seek_step_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-keyboard-seek-step-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-keyboard-seek-step-hint"))
+                    .size(13)
+                    .into(),
+            ),
+            seek_step_control.into(),
+        );
+
         let content = Column::new()
             .spacing(spacing::MD)
             .push(autoplay_setting)
             .push(normalization_setting)
             .push(cache_setting)
-            .push(history_setting);
+            .push(history_setting)
+            .push(seek_step_setting);
 
         build_section(
             icons::video_camera(),
@@ -698,6 +744,11 @@ impl State {
             Message::FrameHistoryMbChanged(mb) => {
                 update_if_changed(&mut self.frame_history_mb, mb, Event::FrameHistoryMbChanged)
             }
+            Message::KeyboardSeekStepChanged(step) => update_if_changed(
+                &mut self.keyboard_seek_step_secs,
+                step,
+                Event::KeyboardSeekStepChanged,
+            ),
         }
     }
 

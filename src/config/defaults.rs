@@ -67,6 +67,19 @@ pub const VOLUME_STEP: f32 = 0.05;
 pub const DEFAULT_NORMALIZATION_TARGET_LUFS: f32 = -16.0;
 
 // ==========================================================================
+// Video Seek Defaults
+// ==========================================================================
+
+/// Default keyboard seek step in seconds (arrow keys).
+pub const DEFAULT_KEYBOARD_SEEK_STEP_SECS: f64 = 2.0;
+
+/// Minimum keyboard seek step in seconds.
+pub const MIN_KEYBOARD_SEEK_STEP_SECS: f64 = 0.5;
+
+/// Maximum keyboard seek step in seconds.
+pub const MAX_KEYBOARD_SEEK_STEP_SECS: f64 = 30.0;
+
+// ==========================================================================
 // Frame Cache Defaults
 // ==========================================================================
 
@@ -119,4 +132,10 @@ const _: () = {
     assert!(MAX_FRAME_HISTORY_MB >= MIN_FRAME_HISTORY_MB);
     assert!(DEFAULT_FRAME_HISTORY_MB >= MIN_FRAME_HISTORY_MB);
     assert!(DEFAULT_FRAME_HISTORY_MB <= MAX_FRAME_HISTORY_MB);
+
+    // Keyboard seek step validation
+    assert!(MIN_KEYBOARD_SEEK_STEP_SECS > 0.0);
+    assert!(MAX_KEYBOARD_SEEK_STEP_SECS >= MIN_KEYBOARD_SEEK_STEP_SECS);
+    assert!(DEFAULT_KEYBOARD_SEEK_STEP_SECS >= MIN_KEYBOARD_SEEK_STEP_SECS);
+    assert!(DEFAULT_KEYBOARD_SEEK_STEP_SECS <= MAX_KEYBOARD_SEEK_STEP_SECS);
 };

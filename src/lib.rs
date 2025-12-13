@@ -12,7 +12,6 @@ pub mod directory_scanner;
 pub mod error;
 pub mod i18n;
 pub mod icon;
-pub mod image_navigation;
 pub mod media;
 pub mod ui;
 pub mod video_player;

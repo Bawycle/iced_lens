@@ -35,6 +35,7 @@ fn test_language_change_via_config() {
         audio_normalization: Some(true),
         frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
         frame_history_mb: Some(config::DEFAULT_FRAME_HISTORY_MB),
+        keyboard_seek_step_secs: Some(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS),
     };
     config::save_to_path(&initial_config, &temp_config_file_path)
         .expect("Failed to write initial config file");
@@ -60,6 +61,7 @@ fn test_language_change_via_config() {
         audio_normalization: Some(true),
         frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
         frame_history_mb: Some(config::DEFAULT_FRAME_HISTORY_MB),
+        keyboard_seek_step_secs: Some(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS),
     };
     config::save_to_path(&french_config, &temp_config_file_path)
         .expect("Failed to write french config file");

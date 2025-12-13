@@ -68,6 +68,10 @@ pub enum Effect {
         video_path: PathBuf,
         position_secs: f64,
     },
+    /// Media was deleted, app should sync media_navigator with the new current path.
+    MediaDeleted {
+        next_path: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +163,12 @@ pub struct State {
 
     /// Whether the overflow menu (advanced video controls) is open.
     overflow_menu_open: bool,
+
+    /// Last time a keyboard seek was triggered (for debouncing).
+    last_keyboard_seek: Option<Instant>,
+
+    /// Keyboard seek step in seconds (arrow keys during video playback).
+    keyboard_seek_step_secs: f64,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -192,6 +202,8 @@ impl Default for State {
             video_volume: crate::config::DEFAULT_VOLUME,
             video_muted: false,
             overflow_menu_open: false,
+            last_keyboard_seek: None,
+            keyboard_seek_step_secs: crate::config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
         }
     }
 }
@@ -323,6 +335,11 @@ impl State {
         self.video_autoplay = enabled;
     }
 
+    /// Sets the keyboard seek step in seconds.
+    pub fn set_keyboard_seek_step_secs(&mut self, step: f64) {
+        self.keyboard_seek_step_secs = step;
+    }
+
     pub fn scan_directory(&mut self) -> crate::error::Result<()> {
         if let Some(path) = &self.current_image_path {
             let config = crate::config::load().unwrap_or_default();
@@ -437,6 +454,7 @@ impl State {
                     self.current_video_path = None;
                     self.video_shader.clear(); // Clear frame to release memory
                     self.seek_preview_position = None;
+                    self.last_keyboard_seek = None;
                     self.playback_session_id += 1; // Ensure old subscription is dropped
                 }
                 // Reset video fit-to-window to default for new media
@@ -500,7 +518,7 @@ impl State {
             }
             Message::ViewportChanged { bounds, offset } => {
                 self.viewport.update(bounds, offset);
-                self.refresh_fit_zoom();
+                // Note: centering is now calculated in view via responsive widget
                 (Effect::None, Task::none())
             }
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
@@ -631,11 +649,41 @@ impl State {
                     }
                     VM::SeekRelative(delta_secs) => {
                         // Seek relative to current position
-                        // Used by keyboard shortcuts (e.g., arrow keys for ±5s)
-                        if let Some(player) = &mut self.video_player {
-                            if let Some(current_pos) = player.state().position() {
-                                let target_secs = current_pos + delta_secs;
-                                player.seek(target_secs);
+                        // Used by keyboard shortcuts (e.g., arrow keys)
+                        //
+                        // Important: We use seek_preview_position as our "intended position"
+                        // because player.state().position() may return keyframe positions
+                        // which can differ from our target. This prevents "snap back" behavior.
+                        //
+                        // Time-based debounce: ignore events within 200ms of last seek
+                        const SEEK_DEBOUNCE_MS: u64 = 200;
+
+                        let now = Instant::now();
+                        let should_seek = match self.last_keyboard_seek {
+                            Some(last) => {
+                                now.duration_since(last).as_millis() >= SEEK_DEBOUNCE_MS as u128
+                            }
+                            None => true,
+                        };
+
+                        if should_seek {
+                            if let Some(player) = &mut self.video_player {
+                                // Use seek_preview_position if set (from previous keyboard seek),
+                                // otherwise fall back to player's reported position
+                                let base_position = self
+                                    .seek_preview_position
+                                    .or_else(|| player.state().position());
+
+                                if let Some(current_pos) = base_position {
+                                    let duration = player.video_data().duration_secs;
+                                    let target_secs =
+                                        (current_pos + delta_secs).max(0.0).min(duration);
+
+                                    // Store our intended position for subsequent seeks
+                                    self.seek_preview_position = Some(target_secs);
+                                    player.seek(target_secs);
+                                    self.last_keyboard_seek = Some(now);
+                                }
                             }
                         }
                     }
@@ -867,11 +915,12 @@ impl State {
             true
         };
 
+        let effective_fit_to_window = self.fit_to_window();
         let image = self.media.as_ref().map(|image_data| viewer::ImageContext {
             i18n: env.i18n,
             controls_context: controls::ViewContext { i18n: env.i18n },
             zoom: &self.zoom,
-            effective_fit_to_window: self.fit_to_window(),
+            effective_fit_to_window,
             pane_context: pane::ViewContext {
                 background_theme: env.background_theme,
                 hud_lines,
@@ -881,7 +930,8 @@ impl State {
             pane_model: pane::ViewModel {
                 media: image_data,
                 zoom_percent: self.zoom.zoom_percent,
-                padding: geometry_state.media_padding(),
+                manual_zoom_percent: self.zoom.zoom_percent,
+                fit_to_window: effective_fit_to_window,
                 is_dragging: self.drag.is_dragging,
                 cursor_over_media: geometry_state.is_cursor_over_media(),
                 arrows_visible: if env.is_fullscreen {
@@ -1200,11 +1250,12 @@ impl State {
                     key: keyboard::Key::Named(keyboard::key::Named::ArrowRight),
                     ..
                 } => {
-                    // ArrowRight: Seek +5s if video is playing, otherwise navigate to next media
+                    // ArrowRight: Seek forward if video is playing, otherwise navigate to next media
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
+                        let step = self.keyboard_seek_step_secs;
                         self.handle_message(
-                            Message::VideoControls(video_controls::Message::SeekRelative(5.0)),
+                            Message::VideoControls(video_controls::Message::SeekRelative(step)),
                             &I18n::default(),
                         )
                     } else {
@@ -1215,11 +1266,12 @@ impl State {
                     key: keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
                     ..
                 } => {
-                    // ArrowLeft: Seek -5s if video is playing, otherwise navigate to previous media
+                    // ArrowLeft: Seek backward if video is playing, otherwise navigate to previous media
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
+                        let step = self.keyboard_seek_step_secs;
                         self.handle_message(
-                            Message::VideoControls(video_controls::Message::SeekRelative(-5.0)),
+                            Message::VideoControls(video_controls::Message::SeekRelative(-step)),
                             &I18n::default(),
                         )
                     } else {
@@ -1562,10 +1614,15 @@ impl State {
                 if let Some(next_path) = next_candidate {
                     self.current_image_path = Some(next_path.clone());
                     self.image_list.set_current(&next_path);
-                    (Effect::None, Self::load_image_task(next_path))
+                    (
+                        Effect::MediaDeleted {
+                            next_path: Some(next_path.clone()),
+                        },
+                        Self::load_image_task(next_path),
+                    )
                 } else {
                     self.current_image_path = None;
-                    (Effect::None, Task::none())
+                    (Effect::MediaDeleted { next_path: None }, Task::none())
                 }
             }
             Err(err) => {
