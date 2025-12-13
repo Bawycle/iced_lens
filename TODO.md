@@ -161,9 +161,9 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
   - Support `ICED_LENS_CONFIG_DIR` environment variable
 
 ### Project Structure Reorganization
-- [ ] Move `src/config/` into `src/app/config/`
+- [x] ~~Move `src/config/` into `src/app/config/`~~ ✅
   - Config is app infrastructure, not business logic like `media/` or `video_player/`
-- [ ] Move `src/i18n/` into `src/app/i18n/`
+- [x] ~~Move `src/i18n/` into `src/app/i18n/`~~ ✅
   - Translations are app-specific infrastructure
 - [x] ~~Create `src/app/paths.rs` with `get_app_data_dir()`~~ ✅
   - Single source of truth for app data directory

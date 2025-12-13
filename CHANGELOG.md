@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Iced 0.14.0 upgrade:** migrated to the latest Iced framework version with VideoShader for persistent GPU textures.
 - Default keyboard seek step reduced from 5 seconds to 2 seconds.
 - Configuration and state loading now provides user feedback when falling back to defaults.
+- **Project structure reorganization:** moved `config/` and `i18n/` modules into `app/` as they are application infrastructure rather than independent business logic. Public API unchanged via re-exports.
 
 ### Fixed
 - Fit-to-window now correctly updates when the hamburger menu collapses/expands.

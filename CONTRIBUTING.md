@@ -285,12 +285,12 @@ iced_lens/
 │   ├── main.rs                 # Entry point
 │   ├── app/                    # Main application logic and orchestration
 │   │   ├── mod.rs              # App struct and Message enum
+│   │   ├── config/             # Configuration persistence (settings.toml)
+│   │   ├── i18n/               # Internationalization system (Fluent)
 │   │   ├── paths.rs            # Application directory paths (data dir, config dir)
 │   │   ├── persisted_state.rs  # Persisted application state (CBOR format)
 │   │   ├── update.rs           # Message handling
 │   │   └── view.rs             # UI rendering dispatch
-│   ├── config/                 # Configuration persistence
-│   ├── i18n/                   # Internationalization system (Fluent)
 │   ├── media/                  # Media loading and transforms
 │   │   ├── image/              # Image loading, decoding, caching
 │   │   ├── video/              # Video file detection and metadata

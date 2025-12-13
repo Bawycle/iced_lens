@@ -7,6 +7,8 @@
 //! persistence format, localization switching) close to the main update loop so
 //! it is easy to audit user-facing behavior.
 
+pub mod config;
+pub mod i18n;
 mod message;
 pub mod paths;
 pub mod persisted_state;
@@ -19,8 +21,7 @@ mod view;
 pub use message::{Flags, Message};
 pub use screen::Screen;
 
-use crate::config;
-use crate::i18n::fluent::I18n;
+use i18n::fluent::I18n;
 use crate::media::{self, MediaData, MediaNavigator};
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};

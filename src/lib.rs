@@ -7,14 +7,16 @@
 #![doc(html_root_url = "https://docs.rs/iced_lens/0.1.0")]
 
 pub mod app;
-pub mod config;
 pub mod directory_scanner;
 pub mod error;
-pub mod i18n;
 pub mod icon;
 pub mod media;
 pub mod ui;
 pub mod video_player;
+
+// Re-export config and i18n from app for backwards compatibility
+pub use app::config;
+pub use app::i18n;
 
 #[cfg(test)]
 mod tests {
