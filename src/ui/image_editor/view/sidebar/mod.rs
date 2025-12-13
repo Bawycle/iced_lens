@@ -1,27 +1,29 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Sidebar layout composition.
 
+pub mod adjustments_panel;
 pub mod crop_panel;
 pub mod resize_panel;
 
 use crate::media::frame_export::ExportFormat;
 use crate::ui::design_tokens::{sizing, spacing, typography};
 use crate::ui::icons;
-use crate::ui::image_editor::state::{CropState, ResizeState};
+use crate::ui::image_editor::state::{AdjustmentState, CropState, ResizeState};
 use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, container, rule, text, tooltip, Column, Row, Scrollable};
-use iced::{alignment::Vertical, Element, Length};
+use iced::{alignment::Vertical, Element, Length, Padding};
 
 use super::super::{EditorTool, Message, SidebarMessage, State, ViewContext};
 
-const SIDEBAR_WIDTH: f32 = 290.0;
+const SIDEBAR_WIDTH: f32 = 310.0;
 
 pub struct SidebarModel<'a> {
     pub active_tool: Option<EditorTool>,
     pub crop_state: &'a CropState,
     pub resize_state: &'a ResizeState,
+    pub adjustment_state: &'a AdjustmentState,
     pub can_undo: bool,
     pub can_redo: bool,
     pub has_unsaved_changes: bool,
@@ -37,6 +39,7 @@ impl<'a> SidebarModel<'a> {
             active_tool: state.active_tool,
             crop_state: &state.crop_state,
             resize_state: &state.resize_state,
+            adjustment_state: &state.adjustment_state,
             can_undo: state.can_undo(),
             can_redo: state.can_redo(),
             has_unsaved_changes: state.has_unsaved_changes(),
@@ -47,7 +50,10 @@ impl<'a> SidebarModel<'a> {
 }
 
 pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let mut scrollable_section = Column::new().spacing(spacing::SM);
+    // Right padding provides space for the scrollbar
+    let mut scrollable_section = Column::new()
+        .spacing(spacing::SM)
+        .padding(Padding::ZERO.right(spacing::MD));
 
     scrollable_section =
         scrollable_section.push(undo_redo_section(model.can_undo, model.can_redo, ctx));
@@ -77,8 +83,19 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
         scrollable_section = scrollable_section.push(resize_panel::panel(model.resize_state, ctx));
     }
 
+    let light_button = tool_button(
+        ctx.i18n.tr("image-editor-tool-light"),
+        SidebarMessage::SelectTool(EditorTool::Adjust),
+        model.active_tool == Some(EditorTool::Adjust),
+    );
+    scrollable_section = scrollable_section.push(light_button);
+    if model.active_tool == Some(EditorTool::Adjust) {
+        scrollable_section =
+            scrollable_section.push(adjustments_panel::panel(model.adjustment_state, ctx));
+    }
+
     let scrollable = Scrollable::new(scrollable_section)
-        .direction(Direction::Vertical(Scrollbar::new()))
+        .direction(Direction::Vertical(Scrollbar::new().margin(spacing::XXS)))
         .height(Length::Fill)
         .width(Length::Fill);
 

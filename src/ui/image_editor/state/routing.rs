@@ -27,6 +27,7 @@ impl State {
                     match tool {
                         EditorTool::Crop => self.teardown_crop_tool(),
                         EditorTool::Resize => self.hide_resize_overlay(),
+                        EditorTool::Adjust => self.teardown_adjustment_tool(),
                         EditorTool::Rotate => {}
                     }
                 } else {
@@ -37,6 +38,9 @@ impl State {
                     if self.active_tool == Some(EditorTool::Resize) {
                         self.hide_resize_overlay();
                     }
+                    if self.active_tool == Some(EditorTool::Adjust) {
+                        self.teardown_adjustment_tool();
+                    }
                     self.active_tool = Some(tool);
                     self.preview_image = None;
 
@@ -45,6 +49,7 @@ impl State {
                         EditorTool::Resize => {
                             // Option A2: No overlay - preview shows directly on canvas
                         }
+                        EditorTool::Adjust => self.prepare_adjustment_tool(),
                         EditorTool::Rotate => {}
                     }
                 }
@@ -100,6 +105,22 @@ impl State {
             }
             SidebarMessage::ApplyResize => {
                 self.sidebar_apply_resize();
+                Event::None
+            }
+            SidebarMessage::BrightnessChanged(value) => {
+                self.sidebar_brightness_changed(value);
+                Event::None
+            }
+            SidebarMessage::ContrastChanged(value) => {
+                self.sidebar_contrast_changed(value);
+                Event::None
+            }
+            SidebarMessage::ApplyAdjustments => {
+                self.sidebar_apply_adjustments();
+                Event::None
+            }
+            SidebarMessage::ResetAdjustments => {
+                self.sidebar_reset_adjustments();
                 Event::None
             }
             SidebarMessage::Undo => {

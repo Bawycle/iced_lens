@@ -205,7 +205,7 @@ impl Default for FullscreenConfig {
 // =============================================================================
 
 /// Application configuration with logical sections.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct Config {
     /// General application settings.
     #[serde(default)]
@@ -222,17 +222,6 @@ pub struct Config {
     /// Fullscreen overlay settings.
     #[serde(default)]
     pub fullscreen: FullscreenConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            general: GeneralConfig::default(),
-            display: DisplayConfig::default(),
-            video: VideoConfig::default(),
-            fullscreen: FullscreenConfig::default(),
-        }
-    }
 }
 
 // =============================================================================

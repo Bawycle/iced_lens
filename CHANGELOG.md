@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Light adjustment tool:** brightness and contrast sliders in the image editor with live preview and full undo/redo support.
 - **Toast notification system:** visual feedback for user actions replaces silent console output.
   - Success notifications for save, delete, copy, and frame capture operations.
   - Warning notifications for configuration issues (corrupted settings, permission errors).

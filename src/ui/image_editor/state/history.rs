@@ -68,6 +68,12 @@ impl State {
                 Transformation::Resize { width, height } => {
                     image_transform::resize(&working_image, *width, *height)
                 }
+                Transformation::AdjustBrightness { value } => {
+                    image_transform::adjust_brightness(&working_image, *value)
+                }
+                Transformation::AdjustContrast { value } => {
+                    image_transform::adjust_contrast(&working_image, *value)
+                }
             };
         }
 
