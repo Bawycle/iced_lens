@@ -79,6 +79,7 @@ fn view_viewer<'a>(
 ) -> Element<'a, Message> {
     let (config, _) = config::load();
     let overlay_timeout_secs = config
+        .fullscreen
         .overlay_timeout_secs
         .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
 

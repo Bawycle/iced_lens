@@ -14,7 +14,7 @@
 //!
 //! // Initialize I18n
 //! let mut config = Config::default();
-//! config.language = Some("fr".to_string());
+//! config.general.language = Some("fr".to_string());
 //! let mut i18n = I18n::new(None, None, &config);
 //!
 //! // Get a translated string
@@ -180,7 +180,7 @@ fn resolve_locale(
     }
 
     // 2. Check config file
-    if let Some(lang_str) = &config.language {
+    if let Some(lang_str) = &config.general.language {
         if let Ok(lang) = lang_str.parse::<LanguageIdentifier>() {
             if available.contains(&lang) {
                 return Some(lang);
@@ -219,10 +219,8 @@ mod tests {
 
     #[test]
     fn test_resolve_locale_config() {
-        let config = Config {
-            language: Some("fr".to_string()),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.general.language = Some("fr".to_string());
         let available: Vec<LanguageIdentifier> =
             vec!["en-US".parse().unwrap(), "fr".parse().unwrap()];
         let lang = resolve_locale(None, &config, &available);

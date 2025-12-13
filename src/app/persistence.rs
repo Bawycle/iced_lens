@@ -45,22 +45,22 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     }
 
     // Use image_fit_to_window() to only persist the image setting, not video
-    cfg.fit_to_window = Some(ctx.viewer.image_fit_to_window());
-    cfg.zoom_step = Some(ctx.viewer.zoom_step_percent());
-    cfg.background_theme = Some(ctx.settings.background_theme());
-    cfg.sort_order = Some(ctx.settings.sort_order());
-    cfg.overlay_timeout_secs = Some(ctx.settings.overlay_timeout_secs());
-    cfg.theme_mode = ctx.theme_mode;
-    cfg.video_autoplay = Some(ctx.video_autoplay);
-    cfg.audio_normalization = Some(ctx.audio_normalization);
-    cfg.frame_cache_mb = Some(ctx.frame_cache_mb);
-    cfg.frame_history_mb = Some(ctx.frame_history_mb);
-    cfg.keyboard_seek_step_secs = Some(ctx.keyboard_seek_step_secs);
+    cfg.display.fit_to_window = Some(ctx.viewer.image_fit_to_window());
+    cfg.display.zoom_step = Some(ctx.viewer.zoom_step_percent());
+    cfg.display.background_theme = Some(ctx.settings.background_theme());
+    cfg.display.sort_order = Some(ctx.settings.sort_order());
+    cfg.fullscreen.overlay_timeout_secs = Some(ctx.settings.overlay_timeout_secs());
+    cfg.general.theme_mode = ctx.theme_mode;
+    cfg.video.autoplay = Some(ctx.video_autoplay);
+    cfg.video.audio_normalization = Some(ctx.audio_normalization);
+    cfg.video.frame_cache_mb = Some(ctx.frame_cache_mb);
+    cfg.video.frame_history_mb = Some(ctx.frame_history_mb);
+    cfg.video.keyboard_seek_step_secs = Some(ctx.keyboard_seek_step_secs);
 
     // Video playback preferences (persisted but not in Settings UI)
-    cfg.video_volume = Some(ctx.viewer.video_volume());
-    cfg.video_muted = Some(ctx.viewer.video_muted());
-    cfg.video_loop = Some(ctx.viewer.video_loop());
+    cfg.video.volume = Some(ctx.viewer.video_volume());
+    cfg.video.muted = Some(ctx.viewer.video_muted());
+    cfg.video.loop_enabled = Some(ctx.viewer.video_loop());
 
     if config::save(&cfg).is_err() {
         ctx.notifications.push(notifications::Notification::warning(
@@ -86,7 +86,7 @@ pub fn apply_language_change(
         notifications.push(notifications::Notification::warning(&key));
     }
 
-    cfg.language = Some(locale.to_string());
+    cfg.general.language = Some(locale.to_string());
 
     if config::save(&cfg).is_err() {
         notifications.push(notifications::Notification::warning(
@@ -118,7 +118,7 @@ pub fn rescan_directory_if_same(
         if saved == viewer_path {
             // Rescan the media navigator (single source of truth)
             let (config, _) = config::load();
-            let sort_order = config.sort_order.unwrap_or_default();
+            let sort_order = config.display.sort_order.unwrap_or_default();
             if let Some(current_path) = viewer.current_image_path.clone() {
                 let _ = media_navigator.scan_directory(&current_path, sort_order);
             }

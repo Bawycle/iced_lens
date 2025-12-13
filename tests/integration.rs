@@ -2,7 +2,8 @@
 use iced_lens::app::paths;
 use iced_lens::app::persisted_state::AppState;
 use iced_lens::config::{
-    self, Config, DEFAULT_FRAME_CACHE_MB, DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT,
+    self, Config, DisplayConfig, FullscreenConfig, GeneralConfig, VideoConfig,
+    DEFAULT_FRAME_CACHE_MB, DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT,
 };
 use iced_lens::i18n::fluent::I18n;
 use iced_lens::ui::theming::ThemeMode;
@@ -29,21 +30,29 @@ fn test_language_change_via_config() {
 
     // 1. Initial config: en-US
     let initial_config = Config {
-        language: Some("en-US".to_string()),
-        fit_to_window: Some(true),
-        zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
-        background_theme: Some(config::BackgroundTheme::Dark),
-        sort_order: Some(config::SortOrder::Alphabetical),
-        overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
-        theme_mode: ThemeMode::System,
-        video_autoplay: Some(false),
-        video_volume: Some(config::DEFAULT_VOLUME),
-        video_muted: Some(false),
-        video_loop: Some(false),
-        audio_normalization: Some(true),
-        frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
-        frame_history_mb: Some(config::DEFAULT_FRAME_HISTORY_MB),
-        keyboard_seek_step_secs: Some(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS),
+        general: GeneralConfig {
+            language: Some("en-US".to_string()),
+            theme_mode: ThemeMode::System,
+        },
+        display: DisplayConfig {
+            fit_to_window: Some(true),
+            zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
+            background_theme: Some(config::BackgroundTheme::Dark),
+            sort_order: Some(config::SortOrder::Alphabetical),
+        },
+        video: VideoConfig {
+            autoplay: Some(false),
+            volume: Some(config::DEFAULT_VOLUME),
+            muted: Some(false),
+            loop_enabled: Some(false),
+            audio_normalization: Some(true),
+            frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
+            frame_history_mb: Some(config::DEFAULT_FRAME_HISTORY_MB),
+            keyboard_seek_step_secs: Some(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS),
+        },
+        fullscreen: FullscreenConfig {
+            overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
+        },
     };
     config::save_to_path(&initial_config, &temp_config_file_path)
         .expect("Failed to write initial config file");
@@ -56,21 +65,29 @@ fn test_language_change_via_config() {
 
     // 2. Change config to fr
     let french_config = Config {
-        language: Some("fr".to_string()),
-        fit_to_window: Some(true),
-        zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
-        background_theme: Some(config::BackgroundTheme::Dark),
-        sort_order: Some(config::SortOrder::Alphabetical),
-        overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
-        theme_mode: ThemeMode::System,
-        video_autoplay: Some(false),
-        video_volume: Some(config::DEFAULT_VOLUME),
-        video_muted: Some(false),
-        video_loop: Some(false),
-        audio_normalization: Some(true),
-        frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
-        frame_history_mb: Some(config::DEFAULT_FRAME_HISTORY_MB),
-        keyboard_seek_step_secs: Some(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS),
+        general: GeneralConfig {
+            language: Some("fr".to_string()),
+            theme_mode: ThemeMode::System,
+        },
+        display: DisplayConfig {
+            fit_to_window: Some(true),
+            zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
+            background_theme: Some(config::BackgroundTheme::Dark),
+            sort_order: Some(config::SortOrder::Alphabetical),
+        },
+        video: VideoConfig {
+            autoplay: Some(false),
+            volume: Some(config::DEFAULT_VOLUME),
+            muted: Some(false),
+            loop_enabled: Some(false),
+            audio_normalization: Some(true),
+            frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
+            frame_history_mb: Some(config::DEFAULT_FRAME_HISTORY_MB),
+            keyboard_seek_step_secs: Some(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS),
+        },
+        fullscreen: FullscreenConfig {
+            overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
+        },
     };
     config::save_to_path(&french_config, &temp_config_file_path)
         .expect("Failed to write french config file");
@@ -103,10 +120,8 @@ fn test_isolated_directories_for_state_and_config() {
     assert!(state_result.is_none(), "state save should succeed");
 
     // Save config to config_dir
-    let config = Config {
-        language: Some("ja".to_string()),
-        ..Config::default()
-    };
+    let mut config = Config::default();
+    config.general.language = Some("ja".to_string());
     config::save_with_override(&config, Some(config_dir.path().to_path_buf()))
         .expect("config save should succeed");
 
@@ -122,7 +137,7 @@ fn test_isolated_directories_for_state_and_config() {
         loaded_state.last_save_directory,
         Some(PathBuf::from("/test/isolated/state"))
     );
-    assert_eq!(loaded_config.language, Some("ja".to_string()));
+    assert_eq!(loaded_config.general.language, Some("ja".to_string()));
 }
 
 /// Tests that environment variables override default paths.
@@ -156,11 +171,9 @@ fn test_parallel_test_isolation() {
     let dir_a = tempdir().expect("create temp dir A");
     let base_a = dir_a.path().to_path_buf();
 
-    let config_a = Config {
-        language: Some("de".to_string()),
-        zoom_step: Some(25.0),
-        ..Config::default()
-    };
+    let mut config_a = Config::default();
+    config_a.general.language = Some("de".to_string());
+    config_a.display.zoom_step = Some(25.0);
     config::save_with_override(&config_a, Some(base_a.clone())).expect("save A");
 
     let state_a = AppState {
@@ -172,11 +185,9 @@ fn test_parallel_test_isolation() {
     let dir_b = tempdir().expect("create temp dir B");
     let base_b = dir_b.path().to_path_buf();
 
-    let config_b = Config {
-        language: Some("es".to_string()),
-        zoom_step: Some(50.0),
-        ..Config::default()
-    };
+    let mut config_b = Config::default();
+    config_b.general.language = Some("es".to_string());
+    config_b.display.zoom_step = Some(50.0);
     config::save_with_override(&config_b, Some(base_b.clone())).expect("save B");
 
     let state_b = AppState {
@@ -190,10 +201,10 @@ fn test_parallel_test_isolation() {
     let (loaded_state_a, _) = AppState::load_from(Some(base_a));
     let (loaded_state_b, _) = AppState::load_from(Some(base_b));
 
-    assert_eq!(loaded_config_a.language, Some("de".to_string()));
-    assert_eq!(loaded_config_a.zoom_step, Some(25.0));
-    assert_eq!(loaded_config_b.language, Some("es".to_string()));
-    assert_eq!(loaded_config_b.zoom_step, Some(50.0));
+    assert_eq!(loaded_config_a.general.language, Some("de".to_string()));
+    assert_eq!(loaded_config_a.display.zoom_step, Some(25.0));
+    assert_eq!(loaded_config_b.general.language, Some("es".to_string()));
+    assert_eq!(loaded_config_b.display.zoom_step, Some(50.0));
 
     assert_eq!(
         loaded_state_a.last_save_directory,
@@ -248,10 +259,8 @@ fn test_ci_friendly_isolated_tests() {
             let dir = tempdir().expect("create temp dir");
             let base = dir.path().to_path_buf();
 
-            let config = Config {
-                language: Some(format!("lang-{}", i)),
-                ..Config::default()
-            };
+            let mut config = Config::default();
+            config.general.language = Some(format!("lang-{}", i));
             config::save_with_override(&config, Some(base.clone())).expect("save");
 
             let state = AppState {
@@ -268,7 +277,7 @@ fn test_ci_friendly_isolated_tests() {
         let (loaded_config, _) = config::load_with_override(Some(base.clone()));
         let (loaded_state, _) = AppState::load_from(Some(base));
 
-        assert_eq!(loaded_config.language, Some(format!("lang-{}", i)));
+        assert_eq!(loaded_config.general.language, Some(format!("lang-{}", i)));
         assert_eq!(
             loaded_state.last_save_directory,
             Some(PathBuf::from(format!("/run/{}/save", i)))

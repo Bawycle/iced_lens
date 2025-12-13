@@ -161,32 +161,36 @@ impl App {
             ..Self::default()
         };
 
-        app.theme_mode = config.theme_mode;
+        app.theme_mode = config.general.theme_mode;
 
-        if let Some(step) = config.zoom_step {
+        if let Some(step) = config.display.zoom_step {
             let clamped = clamp_zoom_step(step);
             app.viewer.set_zoom_step_percent(clamped);
         }
 
-        match config.fit_to_window {
+        match config.display.fit_to_window {
             Some(true) | None => app.viewer.enable_fit_to_window(),
             Some(false) => app.viewer.disable_fit_to_window(),
         }
 
-        let theme = config.background_theme.unwrap_or_default();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let theme = config.display.background_theme.unwrap_or_default();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let overlay_timeout_secs = config
+            .fullscreen
             .overlay_timeout_secs
             .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
-        let video_autoplay = config.video_autoplay.unwrap_or(false);
-        let audio_normalization = config.audio_normalization.unwrap_or(true);
+        let video_autoplay = config.video.autoplay.unwrap_or(false);
+        let audio_normalization = config.video.audio_normalization.unwrap_or(true);
         let keyboard_seek_step_secs = config
+            .video
             .keyboard_seek_step_secs
             .unwrap_or(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS);
         let frame_cache_mb = config
+            .video
             .frame_cache_mb
             .unwrap_or(config::DEFAULT_FRAME_CACHE_MB);
         let frame_history_mb = config
+            .video
             .frame_history_mb
             .unwrap_or(config::DEFAULT_FRAME_HISTORY_MB);
         app.frame_cache_mb = frame_cache_mb;
@@ -196,7 +200,7 @@ impl App {
             background_theme: theme,
             sort_order,
             overlay_timeout_secs,
-            theme_mode: config.theme_mode,
+            theme_mode: config.general.theme_mode,
             video_autoplay,
             audio_normalization,
             frame_cache_mb,
@@ -210,13 +214,13 @@ impl App {
             .set_keyboard_seek_step_secs(keyboard_seek_step_secs);
 
         // Apply video playback preferences from config
-        if let Some(volume) = config.video_volume {
+        if let Some(volume) = config.video.volume {
             app.viewer.set_video_volume(volume);
         }
-        if let Some(muted) = config.video_muted {
+        if let Some(muted) = config.video.muted {
             app.viewer.set_video_muted(muted);
         }
-        if let Some(loop_enabled) = config.video_loop {
+        if let Some(loop_enabled) = config.video.loop_enabled {
             app.viewer.set_video_loop(loop_enabled);
         }
 
