@@ -132,13 +132,13 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
   - Aligned semantic colors with palette tokens in theming.rs
   - Created button::control_active style for toggle controls
 
-### Configuration Improvements
-- [ ] Add sections to `settings.toml` for better organization
-  - `[general]` for language, theme
-  - `[display]` for background, zoom, sort order
-  - `[video]` for autoplay, volume, muted, seek step, cache settings
-  - `[fullscreen]` for overlay timeout
-  - Requires migration logic for existing config files
+### Configuration Improvements ✅
+- [x] ~~Add sections to `settings.toml` for better organization~~ ✅
+  - `[general]` for language and theme mode
+  - `[display]` for fit_to_window, zoom_step, background_theme, sort_order
+  - `[video]` for autoplay, volume, muted, loop, audio_normalization, caching settings
+  - `[fullscreen]` for overlay_timeout_secs
+  - Migration logic auto-converts old flat configs to new sectioned format on load
 
 ### Media Navigation Single Source of Truth
 - [x] ~~Move navigation logic to `src/media/navigator.rs`~~ ✅

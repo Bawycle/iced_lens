@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Iced 0.14.0 upgrade:** migrated to the latest Iced framework version with VideoShader for persistent GPU textures.
 - **UI style harmonization:** centralized design tokens for typography, spacing, borders, and opacity. All hardcoded values replaced with semantic tokens for consistent styling across screens.
+- **Sectioned configuration file:** `settings.toml` now uses TOML sections (`[general]`, `[display]`, `[video]`, `[fullscreen]`) for better organization. Existing flat config files are automatically migrated on load.
 - Default keyboard seek step reduced from 5 seconds to 2 seconds.
 - Configuration and state loading now provides user feedback when falling back to defaults.
 - **Project structure reorganization:** moved `config/` and `i18n/` modules into `app/` as they are application infrastructure rather than independent business logic. Public API unchanged via re-exports.

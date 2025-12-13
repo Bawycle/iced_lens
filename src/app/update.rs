@@ -133,7 +133,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
 
             // Synchronize media_navigator with viewer state before entering editor
             let (config, _) = config::load();
-            let sort_order = config.sort_order.unwrap_or_default();
+            let sort_order = config.display.sort_order.unwrap_or_default();
             if ctx
                 .media_navigator
                 .scan_directory(&image_path, sort_order)
@@ -355,7 +355,7 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         .map(|p| p.to_path_buf())
     {
         let (config, _) = config::load();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let _ = ctx
             .media_navigator
             .scan_directory(&current_path, sort_order);
@@ -385,7 +385,7 @@ fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message>
         .map(|p| p.to_path_buf())
     {
         let (config, _) = config::load();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let _ = ctx
             .media_navigator
             .scan_directory(&current_path, sort_order);
@@ -460,7 +460,7 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         .map(|p| p.to_path_buf())
     {
         let (config, _) = config::load();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let _ = ctx
             .media_navigator
             .scan_directory(&current_path, sort_order);
@@ -493,7 +493,7 @@ pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         .map(|p| p.to_path_buf())
     {
         let (config, _) = config::load();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let _ = ctx
             .media_navigator
             .scan_directory(&current_path, sort_order);
@@ -553,7 +553,7 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
                 .unwrap_or_else(|| current_path.clone());
 
             let (config, _) = config::load();
-            let sort_order = config.sort_order.unwrap_or_default();
+            let sort_order = config.display.sort_order.unwrap_or_default();
             let _ = ctx.media_navigator.scan_directory(&scan_seed, sort_order);
 
             if let Some(next_path) = next_candidate {
