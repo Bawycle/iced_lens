@@ -76,15 +76,7 @@ pub fn handle_viewer_message(
             video_path,
             position_secs,
         } => handle_capture_frame(frame, video_path, position_secs),
-        component::Effect::MediaDeleted { next_path } => {
-            // Sync media_navigator with the new current path after deletion
-            if let Some(path) = next_path {
-                let config = config::load().unwrap_or_default();
-                let sort_order = config.sort_order.unwrap_or_default();
-                let _ = ctx.media_navigator.scan_directory(&path, sort_order);
-            }
-            Task::none()
-        }
+        component::Effect::RequestDelete => handle_delete_current_media(ctx),
         component::Effect::None => Task::none(),
     };
     Task::batch([viewer_task, side_effect])
@@ -446,7 +438,6 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     if let Some(next_path) = ctx.media_navigator.navigate_next() {
         // Synchronize viewer state immediately
         ctx.viewer.current_image_path = Some(next_path.clone());
-        ctx.viewer.image_list.set_current(&next_path);
 
         // Load the next image and create a new ImageEditorState
         Task::perform(
@@ -477,7 +468,6 @@ fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message>
     if let Some(prev_path) = ctx.media_navigator.navigate_previous() {
         // Synchronize viewer state immediately
         ctx.viewer.current_image_path = Some(prev_path.clone());
-        ctx.viewer.image_list.set_current(&prev_path);
 
         // Load the previous image and create a new ImageEditorState
         Task::perform(
@@ -553,8 +543,6 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     if let Some(next_path) = ctx.media_navigator.navigate_next() {
         // Synchronize viewer state from navigator
         ctx.viewer.current_image_path = Some(next_path.clone());
-        // Also sync viewer.image_list from viewer.current_image_path
-        let _ = ctx.viewer.scan_directory();
 
         // Set loading state directly (before render)
         ctx.viewer.is_loading_media = true;
@@ -588,8 +576,6 @@ pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     if let Some(prev_path) = ctx.media_navigator.navigate_previous() {
         // Synchronize viewer state from navigator
         ctx.viewer.current_image_path = Some(prev_path.clone());
-        // Also sync viewer.image_list from viewer.current_image_path
-        let _ = ctx.viewer.scan_directory();
 
         // Set loading state directly (before render)
         ctx.viewer.is_loading_media = true;
@@ -601,6 +587,68 @@ pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         })
     } else {
         Task::none()
+    }
+}
+
+/// Handles deletion of the current media file.
+///
+/// Uses media_navigator to find the next media to display after deletion.
+pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let Some(current_path) = ctx
+        .media_navigator
+        .current_media_path()
+        .map(|p| p.to_path_buf())
+    else {
+        return Task::none();
+    };
+
+    // Get the next candidate before deletion
+    let has_multiple = ctx.media_navigator.len() > 1;
+    let next_candidate = if has_multiple {
+        ctx.media_navigator
+            .navigate_next()
+            .filter(|next| *next != current_path)
+    } else {
+        None
+    };
+
+    // Attempt to delete the file
+    match std::fs::remove_file(&current_path) {
+        Ok(()) => {
+            // Rescan directory after deletion
+            let scan_seed = next_candidate
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| current_path.clone());
+
+            let config = config::load().unwrap_or_default();
+            let sort_order = config.sort_order.unwrap_or_default();
+            let _ = ctx.media_navigator.scan_directory(&scan_seed, sort_order);
+
+            if let Some(next_path) = next_candidate {
+                // Navigate to the next media
+                ctx.media_navigator
+                    .set_current_media_path(next_path.clone());
+                ctx.viewer.current_image_path = Some(next_path.clone());
+
+                // Set loading state
+                ctx.viewer.is_loading_media = true;
+                ctx.viewer.loading_started_at = Some(std::time::Instant::now());
+
+                Task::perform(async move { media::load_media(&next_path) }, |result| {
+                    Message::Viewer(component::Message::ImageLoaded(result))
+                })
+            } else {
+                // No more media in directory
+                ctx.viewer.current_image_path = None;
+                Task::none()
+            }
+        }
+        Err(err) => {
+            eprintln!("Failed to delete file: {}", err);
+            // TODO: Once notification system is in place, show error notification
+            Task::none()
+        }
     }
 }
 

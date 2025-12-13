@@ -7,6 +7,7 @@
 use super::{Message, Screen};
 use crate::config;
 use crate::i18n::fluent::I18n;
+use crate::media::navigator::NavigationInfo;
 use crate::ui::about::{self, ViewContext as AboutViewContext};
 use crate::ui::help::{self, ViewContext as HelpViewContext};
 use crate::ui::image_editor::{self, State as ImageEditorState};
@@ -28,6 +29,8 @@ pub struct ViewContext<'a> {
     pub help_state: &'a crate::ui::help::State,
     pub fullscreen: bool,
     pub menu_open: bool,
+    /// Navigation info from the central MediaNavigator (single source of truth).
+    pub navigation: NavigationInfo,
 }
 
 /// Renders the current application view based on the active screen.
@@ -39,6 +42,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
             ctx.settings,
             ctx.fullscreen,
             ctx.menu_open,
+            ctx.navigation,
         ),
         Screen::Settings => view_settings(ctx.settings, ctx.i18n),
         Screen::ImageEditor => view_image_editor(ctx.image_editor, ctx.i18n, ctx.settings),
@@ -64,6 +68,7 @@ fn view_viewer<'a>(
     settings: &'a SettingsState,
     fullscreen: bool,
     menu_open: bool,
+    navigation: NavigationInfo,
 ) -> Element<'a, Message> {
     let config = config::load().unwrap_or_default();
     let overlay_timeout_secs = config
@@ -76,6 +81,7 @@ fn view_viewer<'a>(
             background_theme: settings.background_theme(),
             is_fullscreen: fullscreen,
             overlay_hide_delay: std::time::Duration::from_secs(overlay_timeout_secs as u64),
+            navigation,
         })
         .map(Message::Viewer);
 
