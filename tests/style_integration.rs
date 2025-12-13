@@ -10,7 +10,7 @@ mod tests {
 
     #[test]
     fn all_button_styles_compile() {
-        let theme = Theme::default();
+        let theme = Theme::Dark;
 
         // Smoke-test all button styles compile and are callable
         let _ = button::primary(&theme, iced::widget::button::Status::Active);

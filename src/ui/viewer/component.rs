@@ -9,9 +9,10 @@ use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer::{
     self, controls, pane, state as geometry, video_controls, HudIconKind, HudLine,
 };
-use crate::ui::widgets::VideoCanvas;
+use crate::ui::widgets::VideoShader;
 use crate::video_player::{subscription::PlaybackMessage, SharedLufsCache, VideoPlayer};
-use iced::widget::scrollable::{self, AbsoluteOffset, Id, RelativeOffset};
+use iced::widget::scrollable::{AbsoluteOffset, RelativeOffset};
+use iced::widget::{operation, Id};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -135,7 +136,7 @@ pub struct State {
 
     // Video playback state
     video_player: Option<VideoPlayer>,
-    video_canvas: VideoCanvas<Message>,
+    video_shader: VideoShader<Message>,
     current_video_path: Option<PathBuf>,
     playback_session_id: u64, // Incremented each time playback starts, ensures unique subscription ID
 
@@ -182,7 +183,7 @@ impl Default for State {
             loading_started_at: None,
             spinner_rotation: 0.0,
             video_player: None,
-            video_canvas: VideoCanvas::new(),
+            video_shader: VideoShader::new(),
             current_video_path: None,
             playback_session_id: 0,
             video_fit_to_window: true, // Videos always fit-to-window by default
@@ -333,7 +334,7 @@ impl State {
 
     /// Returns an exportable frame from the video canvas, if available.
     pub fn exportable_frame(&self) -> Option<crate::media::frame_export::ExportableFrame> {
-        self.video_canvas.exportable_frame()
+        self.video_shader.exportable_frame()
     }
 
     /// Returns true if media is currently being loaded.
@@ -434,7 +435,7 @@ impl State {
                     }
                     self.video_player = None;
                     self.current_video_path = None;
-                    self.video_canvas.clear(); // Clear frame to release memory
+                    self.video_shader.clear(); // Clear frame to release memory
                     self.seek_preview_position = None;
                     self.playback_session_id += 1; // Ensure old subscription is dropped
                 }
@@ -492,7 +493,7 @@ impl State {
                 // Sync video canvas scale with zoom changes
                 if self.video_player.is_some() {
                     let zoom_scale = self.zoom.zoom_percent / 100.0;
-                    self.video_canvas.set_scale(zoom_scale);
+                    self.video_shader.set_scale(zoom_scale);
                 }
 
                 result
@@ -553,7 +554,7 @@ impl State {
 
                             // Update canvas scale to match current zoom
                             let zoom_scale = self.zoom.zoom_percent / 100.0;
-                            self.video_canvas.set_scale(zoom_scale);
+                            self.video_shader.set_scale(zoom_scale);
                         }
                         Err(e) => {
                             eprintln!("Failed to create video player: {}", e);
@@ -605,7 +606,7 @@ impl State {
 
                                     // Update canvas scale to match current zoom
                                     let zoom_scale = self.zoom.zoom_percent / 100.0;
-                                    self.video_canvas.set_scale(zoom_scale);
+                                    self.video_shader.set_scale(zoom_scale);
                                 }
                                 Err(e) => {
                                     eprintln!("Failed to create video player: {}", e);
@@ -739,7 +740,7 @@ impl State {
                         pts_secs,
                     } => {
                         // Update canvas with new frame
-                        self.video_canvas.set_frame(rgba_data, width, height);
+                        self.video_shader.set_frame(rgba_data, width, height);
 
                         // Update player position
                         if let Some(ref mut player) = self.video_player {
@@ -911,7 +912,7 @@ impl State {
                     // In windowed mode, always visible
                     true
                 },
-                video_canvas: Some(&self.video_canvas),
+                video_shader: Some(&self.video_shader),
                 // Use is_playing_or_will_resume() to include Seeking state
                 // This prevents the play button from flashing during seek operations
                 is_video_playing: self.is_video_playing_or_will_resume(),
@@ -1422,7 +1423,7 @@ impl State {
                 0.0
             };
 
-            scrollable::snap_to(
+            operation::snap_to(
                 Id::new(SCROLLABLE_ID),
                 RelativeOffset {
                     x: relative_x,
@@ -1455,6 +1456,12 @@ impl State {
             self.video_fit_to_window = false;
         }
 
+        // Sync video shader scale with zoom changes
+        if self.video_player.is_some() {
+            let zoom_scale = self.zoom.zoom_percent / 100.0;
+            self.video_shader.set_scale(zoom_scale);
+        }
+
         true
     }
 
@@ -1472,7 +1479,7 @@ impl State {
                 // Sync video canvas scale when fit-to-window zoom changes
                 if self.video_player.is_some() {
                     let zoom_scale = fit_zoom / 100.0;
-                    self.video_canvas.set_scale(zoom_scale);
+                    self.video_shader.set_scale(zoom_scale);
                 }
             }
         }

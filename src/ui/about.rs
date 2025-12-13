@@ -11,7 +11,7 @@ use crate::ui::icons;
 use crate::ui::styles;
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{button, container, horizontal_rule, scrollable, text, Column, Container, Row, Text},
+    widget::{button, container, rule, scrollable, text, Column, Container, Row, Text},
     Border, Element, Length, Theme,
 };
 
@@ -201,7 +201,7 @@ fn build_section<'a>(
     let inner = Column::new()
         .spacing(spacing::SM)
         .push(header)
-        .push(horizontal_rule(1))
+        .push(rule::horizontal(1))
         .push(content);
 
     Container::new(inner)

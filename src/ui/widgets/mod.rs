@@ -7,13 +7,13 @@
 //! # Widgets
 //!
 //! - [`AnimatedSpinner`] - Loading indicator with smooth rotation animation
-//! - [`VideoCanvas`] - GPU-accelerated video frame rendering with scaling
+//! - [`VideoShader`] - GPU-accelerated video frame rendering using custom wgpu shader
 //! - [`wheel_blocking_scrollable`] - Scrollable that captures mouse wheel events
 //!   to prevent them from propagating (useful for zoom controls)
 
 pub mod animated_spinner;
-pub mod video_canvas;
+pub mod video_shader;
 pub mod wheel_blocking_scrollable;
 
 pub use animated_spinner::AnimatedSpinner;
-pub use video_canvas::VideoCanvas;
+pub use video_shader::VideoShader;

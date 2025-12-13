@@ -4,6 +4,7 @@
 use crate::ui::design_tokens::spacing;
 use crate::ui::image_editor::state::{CropRatio, CropState};
 use crate::ui::styles;
+use crate::ui::styles::button as button_styles;
 use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length};
 
@@ -59,7 +60,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
         let btn = button(text(ctx.i18n.tr("image-editor-crop-apply")).size(14))
             .padding(spacing::XS)
             .width(Length::Fill)
-            .style(iced::widget::button::primary);
+            .style(button_styles::selected);
         if crop.overlay.visible {
             btn.on_press(SidebarMessage::ApplyCrop.into())
         } else {
@@ -85,15 +86,15 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
 }
 
 fn ratio_button<'a>(crop: &'a CropState, label: String, ratio: CropRatio) -> Element<'a, Message> {
-    let selected = crop.ratio == ratio;
+    let is_selected = crop.ratio == ratio;
     button(text(label).size(11))
         .on_press(SidebarMessage::SetCropRatio(ratio).into())
         .padding([4, 6])
         .width(Length::Fill)
-        .style(if selected {
-            iced::widget::button::primary
+        .style(if is_selected {
+            button_styles::selected
         } else {
-            iced::widget::button::secondary
+            button_styles::unselected
         })
         .into()
 }

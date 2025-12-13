@@ -20,13 +20,14 @@ use crate::ui::state::zoom::{
     ZOOM_STEP_RANGE_KEY,
 };
 use crate::ui::styles;
+use crate::ui::styles::button as button_styles;
 use crate::ui::theme;
 use crate::ui::theming::ThemeMode;
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
-        button, container, horizontal_rule, scrollable, svg::Svg, text, text_input, Button, Column,
-        Container, Row, Slider, Text,
+        button, container, rule, scrollable, svg::Svg, text, text_input, Button, Column, Container,
+        Row, Slider, Text,
     },
     Border, Element, Length, Theme,
 };
@@ -299,9 +300,9 @@ impl State {
             let btn = Button::new(Text::new(button_text))
                 .on_press(Message::LanguageSelected(locale.clone()))
                 .style(if is_current {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             language_row = language_row.push(btn);
         }
@@ -322,9 +323,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::ThemeModeSelected(mode))
                 .style(if self.theme_mode == mode {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             theme_row = theme_row.push(btn);
         }
@@ -362,9 +363,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::BackgroundThemeSelected(theme))
                 .style(if self.background_theme == theme {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             background_row = background_row.push(btn);
         }
@@ -420,9 +421,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::SortOrderSelected(order))
                 .style(if self.sort_order == order {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             sort_row = sort_row.push(btn);
         }
@@ -457,9 +458,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::VideoAutoplayChanged(enabled))
                 .style(if self.video_autoplay == enabled {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             autoplay_row = autoplay_row.push(btn);
         }
@@ -483,9 +484,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::AudioNormalizationChanged(enabled))
                 .style(if self.audio_normalization == enabled {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             normalization_row = normalization_row.push(btn);
         }
@@ -747,7 +748,7 @@ fn build_section<'a>(
     let inner = Column::new()
         .spacing(spacing::SM)
         .push(header)
-        .push(horizontal_rule(1))
+        .push(rule::horizontal(1))
         .push(content);
 
     Container::new(inner)

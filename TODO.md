@@ -5,10 +5,11 @@
 ## Planned Features
 
 ### Framework Upgrade
-- [ ] Upgrade to Iced 0.14.0
-  - Review breaking changes
-  - Update deprecated APIs
-  - Test all UI components after migration
+- [x] Upgrade to Iced 0.14.0 ✅
+  - [x] Review breaking changes
+  - [x] Update deprecated APIs
+  - [x] Test all UI components after migration
+  - [x] Fix video flickering (implemented VideoShader with persistent GPU texture)
   - Evaluate if Iced 0.14.0 facilitates:
     - [ ] Temporary rotation in viewer (90° increments, session-only) — currently complex to implement
     - [ ] Image centering in editor canvas — currently complex to implement

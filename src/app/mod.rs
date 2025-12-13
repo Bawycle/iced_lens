@@ -96,11 +96,25 @@ pub fn window_settings_with_locale() -> window::Settings {
 
 /// Entry point used by `main.rs` to launch the Iced application loop.
 pub fn run(flags: Flags) -> iced::Result {
-    iced::application(|state: &App| state.title(), App::update, App::view)
+    use std::cell::RefCell;
+
+    // Wrap flags in RefCell<Option<_>> to satisfy Fn trait requirement
+    // while only consuming flags once (iced 0.14 requires Fn, not FnOnce)
+    let boot_state = RefCell::new(Some(flags));
+    let boot = move || {
+        let flags = boot_state
+            .borrow_mut()
+            .take()
+            .expect("Boot function called more than once");
+        App::new(flags)
+    };
+
+    iced::application(boot, App::update, App::view)
+        .title(App::title)
         .theme(App::theme)
         .window(window_settings_with_locale())
         .subscription(App::subscription)
-        .run_with(move || App::new(flags))
+        .run()
 }
 
 impl Default for App {
@@ -1000,6 +1014,7 @@ mod tests {
                     location: keyboard::Location::Standard,
                     modifiers: keyboard::Modifiers::default(),
                     text: None,
+                    repeat: false,
                 }),
             }));
 

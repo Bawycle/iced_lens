@@ -598,5 +598,5 @@ fn update_fullscreen_mode(
     } else {
         window::Mode::Windowed
     };
-    window::change_mode::<Message>(window_id, mode)
+    window::set_mode(window_id, mode)
 }

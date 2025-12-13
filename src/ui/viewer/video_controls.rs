@@ -7,7 +7,9 @@
 use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{sizing, spacing};
 use crate::ui::{icons, styles};
-use iced::widget::{button, column, container, row, slider, text, tooltip, Column, Row, Text};
+use iced::widget::{
+    button, column, container, row, slider, text, tooltip, Column, Row, Space, Text,
+};
 use iced::{Element, Length};
 
 /// Slider step in seconds (1ms precision).
@@ -356,7 +358,7 @@ fn build_overflow_menu<'a>(
 
     // Overflow menu container - align to the right
     let menu_content: Row<'a, Message> = row![
-        iced::widget::horizontal_space(),
+        Space::new().width(Length::Fill),
         step_back_button,
         step_forward_button,
         capture_button,

@@ -15,7 +15,8 @@ use iced::mouse;
 use iced::widget::{button, mouse_area, Column, Container, Row, Scrollable, Stack, Text};
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::scrollable::{Direction, Id, Scrollbar, Viewport},
+    widget::scrollable::{Direction, Scrollbar, Viewport},
+    widget::Id,
     Background, Element, Length, Padding, Theme,
 };
 
@@ -42,7 +43,7 @@ pub struct ViewModel<'a> {
     pub total_count: usize,
     pub position_counter_visible: bool,
     pub hud_visible: bool,
-    pub video_canvas: Option<&'a crate::ui::widgets::VideoCanvas<super::component::Message>>,
+    pub video_shader: Option<&'a crate::ui::widgets::VideoShader<super::component::Message>>,
     pub is_video_playing: bool,
     pub is_loading_media: bool,
     pub spinner_rotation: f32,
@@ -74,18 +75,18 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
             }
         };
 
-    // Use video canvas if it has a frame (playing OR paused with frame),
+    // Use video shader if it has a frame (playing OR paused with frame),
     // otherwise show static media (image or video thumbnail before playback starts)
-    let media_viewer = if let Some(canvas) = model.video_canvas {
-        if canvas.has_frame() {
-            // Show the canvas frame (whether playing or paused)
-            canvas.view()
+    let media_viewer = if let Some(shader) = model.video_shader {
+        if shader.has_frame() {
+            // Show the shader frame (whether playing or paused)
+            shader.view()
         } else {
             // No frame yet, show thumbnail
             super::view_media(model.media, model.zoom_percent)
         }
     } else {
-        // Not a video or no canvas, show static media
+        // Not a video or no shader, show static media
         super::view_media(model.media, model.zoom_percent)
     };
 
@@ -96,8 +97,8 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
         .width(Length::Fill)
         .height(Length::Fill)
         .direction(Direction::Both {
-            vertical: Scrollbar::new().width(0).scroller_width(0),
-            horizontal: Scrollbar::new().width(0).scroller_width(0),
+            vertical: Scrollbar::hidden(),
+            horizontal: Scrollbar::hidden(),
         })
         .on_scroll(|viewport: Viewport| {
             let bounds = viewport.bounds();

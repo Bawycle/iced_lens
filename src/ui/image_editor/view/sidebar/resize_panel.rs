@@ -3,6 +3,7 @@
 
 use crate::ui::design_tokens::spacing;
 use crate::ui::styles;
+use crate::ui::styles::button as button_styles;
 use iced::widget::{button, checkbox, container, slider, text, text_input, Column, Row};
 use iced::{Element, Length};
 
@@ -30,7 +31,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
             button(text(label))
                 .on_press(SidebarMessage::ApplyResizePreset(preset).into())
                 .padding([6, 8])
-                .style(iced::widget::button::secondary),
+                .style(button_styles::unselected),
         );
     }
 
@@ -72,16 +73,14 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
                 .push(height_input),
         );
 
-    let lock_checkbox = checkbox(
-        ctx.i18n.tr("image-editor-resize-lock-aspect"),
-        resize.lock_aspect,
-    )
-    .on_toggle(|_| Message::Sidebar(SidebarMessage::ToggleLockAspect));
+    let lock_checkbox = checkbox(resize.lock_aspect)
+        .label(ctx.i18n.tr("image-editor-resize-lock-aspect"))
+        .on_toggle(|_| Message::Sidebar(SidebarMessage::ToggleLockAspect));
 
     let apply_btn = button(text(ctx.i18n.tr("image-editor-resize-apply")).size(16))
         .padding(spacing::SM)
         .width(Length::Fill)
-        .style(iced::widget::button::primary)
+        .style(button_styles::selected)
         .on_press(SidebarMessage::ApplyResize.into());
 
     container(

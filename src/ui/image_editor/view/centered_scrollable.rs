@@ -9,8 +9,8 @@
 //! Small images will be visible but positioned at top-left instead of centered.
 
 use crate::ui::image_editor::Message;
-use iced::widget::scrollable::{Direction, Id, Scrollbar, Viewport};
-use iced::widget::Scrollable;
+use iced::widget::scrollable::{Direction, Scrollbar, Viewport};
+use iced::widget::{Id, Scrollable};
 use iced::{Element, Length};
 
 /// Creates a simple scrollable widget.

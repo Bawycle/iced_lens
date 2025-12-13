@@ -23,7 +23,8 @@
 
 use crate::ui::design_tokens::{palette, radius, sizing, spacing};
 use crate::ui::icons;
-use iced::widget::{button, container, horizontal_rule, svg, text, Column, Container, Row, Text};
+use crate::ui::styles::button as button_styles;
+use iced::widget::{button, container, rule, svg, text, Column, Container, Row, Text};
 use iced::{alignment, Color, Element, Length, Theme};
 
 /// Severity level determines the color scheme and default icon.
@@ -194,7 +195,7 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
         if let (Some(label), Some(msg)) = (self.action_label, self.action_message) {
             let action_btn = button(Text::new(label))
                 .on_press(msg)
-                .style(button::primary);
+                .style(button_styles::selected);
             content = content.push(
                 Container::new(action_btn)
                     .padding(spacing::SM)
@@ -239,7 +240,7 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
                     let details_column = Column::new()
                         .spacing(spacing::XS)
                         .width(Length::Fill)
-                        .push(horizontal_rule(1))
+                        .push(rule::horizontal(1))
                         .push(details_heading)
                         .push(details_body);
 

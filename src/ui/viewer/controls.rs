@@ -160,15 +160,9 @@ pub fn view<'a>(
         .push(zoom_out_button)
         .push(zoom_in_button)
         .push(reset_button)
-        .push(Space::new(
-            Length::Fixed(shared_styles::CONTROL_PADDING),
-            Length::Shrink,
-        ))
+        .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
         .push(fit_toggle)
-        .push(Space::new(
-            Length::Fixed(shared_styles::CONTROL_PADDING),
-            Length::Shrink,
-        ))
+        .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
         .push(delete_button)
         .push(fullscreen_toggle);
 
