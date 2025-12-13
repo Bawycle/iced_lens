@@ -75,10 +75,24 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
   - Improve overall UX and aesthetics
   - Study current UI/UX best practices (Material Design, Human Interface Guidelines, etc.)
 
-### Project Structure Reorganization
+### Configuration Improvements
+- [ ] Add sections to `settings.toml` for better organization
+  - `[general]` for language, theme
+  - `[display]` for background, zoom, sort order
+  - `[video]` for autoplay, volume, muted, seek step, cache settings
+  - `[fullscreen]` for overlay timeout
+  - Requires migration logic for existing config files
+
+### Media Navigation Single Source of Truth
 - [x] ~~Move navigation logic to `src/media/navigator.rs`~~ ✅
-  - Now `MediaNavigator` (renamed from `ImageNavigator`) is in `media/` module
-  - Single source of truth for media navigation
+  - `MediaNavigator` (renamed from `ImageNavigator`) is now in `media/` module
+- [ ] Remove dual source of truth between `viewer.image_list` and `app.media_navigator`
+  - Currently both maintain their own copy of the media list
+  - Goal: `MediaNavigator` in App is the ONLY source of truth
+  - Viewer should receive navigation info via props/context, not maintain its own list
+  - Remove `image_list` field from `viewer::component::State`
+
+### Project Structure Reorganization
 - [ ] Move `src/config/` into `src/app/config/`
   - Config is app infrastructure, not business logic like `media/` or `video_player/`
 - [ ] Move `src/i18n/` into `src/app/i18n/`

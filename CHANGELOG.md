@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Keyboard seek step setting:** configurable time skip for arrow keys during video playback (0.5–30 seconds), accessible from the Settings screen (Video section).
+
+### Changed
+- **Iced 0.14.0 upgrade:** migrated to the latest Iced framework version with VideoShader for persistent GPU textures.
+- Default keyboard seek step reduced from 5 seconds to 2 seconds.
+
+### Fixed
+- Fit-to-window now correctly updates when the hamburger menu collapses/expands.
+- Video seeking with arrow keys no longer "snaps back" when held down.
+- Image centering recalculates correctly on layout changes.
+- Navigation index now updates correctly after deleting a media file.
+
 ## [0.2.0] - 2025-12-12
 
 ### Added

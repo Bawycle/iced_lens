@@ -291,7 +291,8 @@ iced_lens/
 │   ├── i18n/                   # Internationalization system (Fluent)
 │   ├── media/                  # Media loading and transforms
 │   │   ├── image/              # Image loading, decoding, caching
-│   │   └── video/              # Video file detection and metadata
+│   │   ├── video/              # Video file detection and metadata
+│   │   └── navigator.rs        # Media list navigation (single source of truth)
 │   ├── video_player/           # Video playback engine
 │   │   ├── mod.rs              # VideoPlayer public API
 │   │   ├── state.rs            # Playback state machine
@@ -315,7 +316,6 @@ iced_lens/
 │   │   ├── help.rs             # Help/keyboard shortcuts panel
 │   │   └── navbar.rs           # Navigation bar
 │   ├── directory_scanner.rs    # Async directory scanning
-│   ├── image_navigation.rs     # Image list navigation logic
 │   └── error.rs                # Error types
 ├── assets/
 │   ├── i18n/                   # Translation files (.ftl)
