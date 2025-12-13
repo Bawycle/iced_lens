@@ -98,10 +98,7 @@ pub fn rescan_directory_if_same(
     // Only rescan if both directories exist and match
     if let (Some(saved), Some(viewer_path)) = (saved_dir, viewer_dir) {
         if saved == viewer_path {
-            // Rescan the viewer's image list
-            let _ = viewer.scan_directory();
-
-            // Also rescan the media navigator
+            // Rescan the media navigator (single source of truth)
             let config = config::load().unwrap_or_default();
             let sort_order = config.sort_order.unwrap_or_default();
             if let Some(current_path) = viewer.current_image_path.clone() {

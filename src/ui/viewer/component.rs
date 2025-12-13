@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Viewer component encapsulating state and update logic.
 
-use crate::directory_scanner::ImageList;
 use crate::error::Error;
 use crate::i18n::fluent::I18n;
+use crate::media::navigator::NavigationInfo;
 use crate::media::MediaData;
 use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer::{
@@ -68,10 +68,9 @@ pub enum Effect {
         video_path: PathBuf,
         position_secs: f64,
     },
-    /// Media was deleted, app should sync media_navigator with the new current path.
-    MediaDeleted {
-        next_path: Option<PathBuf>,
-    },
+    /// Request to delete the current media file.
+    /// App will handle the actual deletion using media_navigator.
+    RequestDelete,
 }
 
 #[derive(Debug, Clone)]
@@ -114,6 +113,9 @@ pub struct ViewEnv<'a> {
     pub background_theme: crate::config::BackgroundTheme,
     pub is_fullscreen: bool,
     pub overlay_hide_delay: std::time::Duration,
+    /// Navigation state from the central MediaNavigator.
+    /// This is the single source of truth for navigation info.
+    pub navigation: NavigationInfo,
 }
 
 /// Complete viewer component state.
@@ -126,7 +128,6 @@ pub struct State {
     cursor_position: Option<Point>,
     last_click: Option<Instant>,
     pub current_image_path: Option<PathBuf>,
-    pub image_list: ImageList,
     arrows_visible: bool,
     last_mouse_move: Option<Instant>,
     last_overlay_interaction: Option<Instant>,
@@ -186,7 +187,6 @@ impl Default for State {
             cursor_position: None,
             last_click: None,
             current_image_path: None,
-            image_list: ImageList::default(),
             arrows_visible: false,
             last_mouse_move: None,
             last_overlay_interaction: None,
@@ -374,15 +374,6 @@ impl State {
         self.keyboard_seek_step_secs = step;
     }
 
-    pub fn scan_directory(&mut self) -> crate::error::Result<()> {
-        if let Some(path) = &self.current_image_path {
-            let config = crate::config::load().unwrap_or_default();
-            let sort_order = config.sort_order.unwrap_or_default();
-            self.image_list = ImageList::scan_directory(path, sort_order)?;
-        }
-        Ok(())
-    }
-
     /// Returns an exportable frame from the video canvas, if available.
     pub fn exportable_frame(&self) -> Option<crate::media::frame_export::ExportableFrame> {
         self.video_shader.exportable_frame()
@@ -519,8 +510,6 @@ impl State {
                         }
 
                         self.refresh_fit_zoom();
-                        // Scan directory on successful image load
-                        let _ = self.scan_directory();
                         (Effect::None, Task::none())
                     }
                     Err(error) => {
@@ -538,7 +527,7 @@ impl State {
             }
             Message::Controls(control) => {
                 if matches!(control, controls::Message::DeleteCurrentImage) {
-                    return self.delete_current_image(i18n);
+                    return (Effect::RequestDelete, Task::none());
                 }
                 let result = self.handle_controls(control);
 
@@ -568,7 +557,7 @@ impl State {
                 // Emit effect to let App handle navigation with ImageNavigator
                 (Effect::NavigatePrevious, Task::none())
             }
-            Message::DeleteCurrentImage => self.delete_current_image(i18n),
+            Message::DeleteCurrentImage => (Effect::RequestDelete, Task::none()),
             Message::OpenSettings => (Effect::OpenSettings, Task::none()),
             Message::EnterEditor => (Effect::EnterEditor, Task::none()),
             Message::InitiatePlayback => {
@@ -974,21 +963,23 @@ impl State {
                 cursor_over_media: geometry_state.is_cursor_over_media(),
                 arrows_visible: if env.is_fullscreen {
                     // In fullscreen, arrows use same auto-hide logic as controls
-                    self.arrows_visible && !self.image_list.is_empty() && overlay_should_be_visible
+                    self.arrows_visible
+                        && env.navigation.total_count > 0
+                        && overlay_should_be_visible
                 } else {
                     // In windowed mode, arrows visible on hover (current behavior)
-                    self.arrows_visible && !self.image_list.is_empty()
+                    self.arrows_visible && env.navigation.total_count > 0
                 },
                 overlay_visible: center_overlay_visible,
-                has_next: self.image_list.next().is_some(),
-                has_previous: self.image_list.previous().is_some(),
-                at_first: self.image_list.is_at_first(),
-                at_last: self.image_list.is_at_last(),
-                current_index: self.image_list.current_index(),
-                total_count: self.image_list.len(),
+                has_next: env.navigation.has_next,
+                has_previous: env.navigation.has_previous,
+                at_first: env.navigation.at_first,
+                at_last: env.navigation.at_last,
+                current_index: env.navigation.current_index,
+                total_count: env.navigation.total_count,
                 position_counter_visible: if env.is_fullscreen {
                     // In fullscreen, use same auto-hide logic as arrows and controls
-                    !self.image_list.is_empty() && overlay_should_be_visible
+                    env.navigation.total_count > 0 && overlay_should_be_visible
                 } else {
                     // In windowed mode, always visible
                     true
@@ -1613,66 +1604,6 @@ impl State {
             self.zoom.zoom_percent,
             self.cursor_position,
         )
-    }
-
-    fn load_image_task(path: PathBuf) -> Task<Message> {
-        Task::perform(
-            async move { crate::media::load_media(&path) },
-            Message::ImageLoaded,
-        )
-    }
-
-    fn delete_current_image(&mut self, i18n: &I18n) -> (Effect, Task<Message>) {
-        let Some(current_path) = self.current_image_path.clone() else {
-            return (Effect::None, Task::none());
-        };
-
-        let has_multiple = self.image_list.len() > 1;
-        let next_candidate = if has_multiple {
-            self.image_list
-                .next()
-                .map(|path| path.to_path_buf())
-                .filter(|next| next != &current_path)
-        } else {
-            None
-        };
-
-        match std::fs::remove_file(&current_path) {
-            Ok(()) => {
-                self.media = None;
-                self.error = None;
-
-                let scan_seed = next_candidate
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_else(|| current_path.clone());
-                self.current_image_path = Some(scan_seed);
-                let _ = self.scan_directory();
-
-                if let Some(next_path) = next_candidate {
-                    self.current_image_path = Some(next_path.clone());
-                    self.image_list.set_current(&next_path);
-                    (
-                        Effect::MediaDeleted {
-                            next_path: Some(next_path.clone()),
-                        },
-                        Self::load_image_task(next_path),
-                    )
-                } else {
-                    self.current_image_path = None;
-                    (Effect::MediaDeleted { next_path: None }, Task::none())
-                }
-            }
-            Err(err) => {
-                self.error = Some(ErrorState {
-                    friendly_key: "error-delete-image-io",
-                    friendly_text: i18n.tr("error-delete-image-io"),
-                    details: err.to_string(),
-                    show_details: false,
-                });
-                (Effect::None, Task::none())
-            }
-        }
     }
 }
 

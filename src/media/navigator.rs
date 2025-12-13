@@ -10,6 +10,27 @@ use crate::directory_scanner::ImageList;
 use crate::error::Result;
 use std::path::{Path, PathBuf};
 
+/// Navigation state information for UI rendering.
+///
+/// This struct contains all the information needed by the viewer to render
+/// navigation controls without needing direct access to the media list.
+/// It acts as a snapshot of the current navigation state.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NavigationInfo {
+    /// Whether there is a next media to navigate to.
+    pub has_next: bool,
+    /// Whether there is a previous media to navigate to.
+    pub has_previous: bool,
+    /// Whether the current media is the first in the list.
+    pub at_first: bool,
+    /// Whether the current media is the last in the list.
+    pub at_last: bool,
+    /// Current position in the list (0-indexed), if set.
+    pub current_index: Option<usize>,
+    /// Total number of media items in the list.
+    pub total_count: usize,
+}
+
 /// Manages navigation through a list of media files in a directory.
 ///
 /// This component encapsulates both the media list and the current media path,
@@ -107,6 +128,21 @@ impl MediaNavigator {
     /// Returns the current index in the media list, if set.
     pub fn current_index(&self) -> Option<usize> {
         self.media_list.current_index()
+    }
+
+    /// Returns a snapshot of the current navigation state for UI rendering.
+    ///
+    /// This method provides all the information needed by the viewer to render
+    /// navigation controls without needing direct access to the media list.
+    pub fn navigation_info(&self) -> NavigationInfo {
+        NavigationInfo {
+            has_next: self.has_next(),
+            has_previous: self.has_previous(),
+            at_first: self.is_at_first(),
+            at_last: self.is_at_last(),
+            current_index: self.current_index(),
+            total_count: self.len(),
+        }
     }
 }
 

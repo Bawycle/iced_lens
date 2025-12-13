@@ -437,6 +437,7 @@ impl App {
             help_state: &self.help_state,
             fullscreen: self.fullscreen,
             menu_open: self.menu_open,
+            navigation: self.media_navigator.navigation_info(),
         })
     }
 }
@@ -903,11 +904,8 @@ mod tests {
             sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img1_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
 
-        // Also initialize media_navigator
+        // Initialize media_navigator (single source of truth)
         let _ = app
             .media_navigator
             .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
@@ -945,11 +943,8 @@ mod tests {
             sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
 
-        // Also initialize media_navigator
+        // Initialize media_navigator (single source of truth)
         let _ = app
             .media_navigator
             .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
@@ -987,11 +982,8 @@ mod tests {
             sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
 
-        // Also initialize media_navigator
+        // Initialize media_navigator (single source of truth)
         let _ = app
             .media_navigator
             .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
@@ -1030,11 +1022,8 @@ mod tests {
                 sample_media_data(),
             ))));
             app.viewer.current_image_path = Some(img1_path.clone());
-            app.viewer
-                .scan_directory()
-                .expect("failed to scan directory");
 
-            // Also initialize media_navigator
+            // Initialize media_navigator (single source of truth)
             let _ = app
                 .media_navigator
                 .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
@@ -1089,9 +1078,11 @@ mod tests {
             img1_data.clone(),
         ))));
         app.viewer.current_image_path = Some(img1_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
+
+        // Initialize media_navigator (single source of truth)
+        let _ = app
+            .media_navigator
+            .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
 
         // Switch to editor screen
         let _ = app.update(Message::SwitchScreen(Screen::ImageEditor));
@@ -1144,9 +1135,11 @@ mod tests {
             img2_data.clone(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
+
+        // Initialize media_navigator (single source of truth)
+        let _ = app
+            .media_navigator
+            .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
 
         // Switch to editor screen
         let _ = app.update(Message::SwitchScreen(Screen::ImageEditor));

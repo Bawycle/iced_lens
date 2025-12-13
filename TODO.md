@@ -132,11 +132,11 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
 ### Media Navigation Single Source of Truth
 - [x] ~~Move navigation logic to `src/media/navigator.rs`~~ ✅
   - `MediaNavigator` (renamed from `ImageNavigator`) is now in `media/` module
-- [ ] Remove dual source of truth between `viewer.image_list` and `app.media_navigator`
-  - Currently both maintain their own copy of the media list
-  - Goal: `MediaNavigator` in App is the ONLY source of truth
-  - Viewer should receive navigation info via props/context, not maintain its own list
-  - Remove `image_list` field from `viewer::component::State`
+- [x] ~~Remove dual source of truth between `viewer.image_list` and `app.media_navigator`~~ ✅
+  - Added `NavigationInfo` struct to provide navigation state snapshot
+  - `ViewEnv` now passes `NavigationInfo` from `MediaNavigator` to viewer
+  - Removed `image_list` field from `viewer::component::State`
+  - Moved deletion logic to App (handles file deletion via `media_navigator`)
 
 ### Project Structure Reorganization
 - [ ] Move `src/config/` into `src/app/config/`
