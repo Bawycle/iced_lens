@@ -206,8 +206,10 @@ help-video-tool-capture-desc = Save the current video frame as an image file (op
 
 help-video-key-playpause = Play or pause the video
 help-video-key-mute = Toggle audio mute
-help-video-key-step-back = Step backward one frame
-help-video-key-step-forward = Step forward one frame
+help-video-key-seek = Seek backward/forward (during playback)
+help-video-key-volume = Increase/decrease volume
+help-video-key-step-back = Step backward one frame (when paused)
+help-video-key-step-forward = Step forward one frame (when paused)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Image Editor Section

@@ -432,6 +432,14 @@ IcedLens uses a layered design system to ensure visual consistency. Understandin
 │     theming.rs (ColorScheme, AppTheme, ThemeMode)          │
 │     theme.rs (viewer/editor color helpers)                 │
 ├─────────────────────────────────────────────────────────────┤
+│                    Action Icons                             │
+│              (src/ui/action_icons.rs)                      │
+│     Semantic mapping: action → visual icon                 │
+├─────────────────────────────────────────────────────────────┤
+│                    Icons (Visual Primitives)               │
+│              (src/ui/icons.rs)                             │
+│     Raw SVG assets named by visual appearance              │
+├─────────────────────────────────────────────────────────────┤
 │                    Design Tokens                            │
 │              (src/ui/design_tokens.rs)                     │
 │     palette, opacity, spacing, sizing, radius, shadow      │
@@ -464,7 +472,50 @@ let overlay_bg = Color { a: opacity::OVERLAY_STRONG, ..palette::BLACK };
 let padding = spacing::MD; // 16px
 ```
 
-#### 2. Theme System (`src/ui/theming.rs`)
+#### 2. Icons (`src/ui/icons.rs`)
+
+Raw SVG assets named by their **visual appearance**, not their function:
+
+| Icon | Visual Description |
+|------|-------------------|
+| `play()` | Triangle pointing right |
+| `cross()` | X mark |
+| `triangle_bar_right()` | Triangle with vertical bar (▶\|) |
+| `ellipsis_horizontal()` | Three horizontal dots (⋯) |
+
+**Naming rule:** Describe what you see, not what it does.
+
+#### 3. Action Icons (`src/ui/action_icons.rs`)
+
+Semantic layer mapping **actions to visual icons**. Allows changing an icon in one place:
+
+| Module | Purpose | Example |
+|--------|---------|---------|
+| `video` | Video playback | `video::step_forward()` → `icons::triangle_bar_right()` |
+| `editor` | Image editing | `editor::rotate_left()` → `icons::rotate_left()` |
+| `viewer` | Viewer controls | `viewer::delete()` → `icons::trash()` |
+| `navigation` | App navigation | `navigation::close()` → `icons::cross()` |
+| `notification` | Toast severities | `notification::success()` → `icons::checkmark()` |
+| `sections` | Help screen sections | `sections::video()` → `icons::video_camera()` |
+
+**Usage:**
+```rust
+use crate::ui::action_icons;
+
+// In UI components - use semantic names
+let btn = button(action_icons::video::capture_frame());
+
+// In help screen
+let icon = action_icons::sections::editor();
+```
+
+**Why this separation?**
+- `icons.rs`: Visual primitives (what it looks like)
+- `action_icons.rs`: Semantic meaning (what action it represents)
+
+If you change an icon for an action, update only `action_icons.rs`.
+
+#### 4. Theme System (`src/ui/theming.rs`)
 
 Manages light/dark mode with semantic color mappings:
 
@@ -481,7 +532,7 @@ let bg_color = theme.colors.surface_primary;
 let text_color = theme.colors.text_primary;
 ```
 
-#### 3. Color Helpers (`src/ui/theme.rs`)
+#### 5. Color Helpers (`src/ui/theme.rs`)
 
 Utility functions for viewer/editor-specific colors:
 
@@ -490,7 +541,7 @@ Utility functions for viewer/editor-specific colors:
 - `error_text_color()` - Error text styling
 - `crop_overlay_*()` - Crop tool colors
 
-#### 4. Component Styles (`src/ui/styles/`)
+#### 6. Component Styles (`src/ui/styles/`)
 
 Ready-to-use style functions for Iced widgets:
 

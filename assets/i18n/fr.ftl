@@ -206,8 +206,10 @@ help-video-tool-capture-desc = Enregistrez l'image vidéo actuelle comme fichier
 
 help-video-key-playpause = Lire ou mettre en pause la vidéo
 help-video-key-mute = Activer/désactiver le son
-help-video-key-step-back = Reculer d'une image
-help-video-key-step-forward = Avancer d'une image
+help-video-key-seek = Avancer/reculer dans la vidéo (pendant la lecture)
+help-video-key-volume = Augmenter/diminuer le volume
+help-video-key-step-back = Reculer d'une image (en pause)
+help-video-key-step-forward = Avancer d'une image (en pause)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Section Éditeur d'images

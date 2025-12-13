@@ -6,8 +6,8 @@
 //! and usage instructions.
 
 use crate::i18n::fluent::I18n;
+use crate::ui::action_icons;
 use crate::ui::design_tokens::{radius, sizing, spacing, typography};
-use crate::ui::icons;
 use crate::ui::styles;
 use iced::{
     alignment::{Horizontal, Vertical},
@@ -115,7 +115,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     let viewer_section = build_collapsible_section(
         &ctx,
         HelpSection::Viewer,
-        icons::image(),
+        action_icons::sections::viewer(),
         ctx.i18n.tr("help-section-viewer"),
         build_viewer_content(&ctx),
     );
@@ -123,7 +123,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     let video_section = build_collapsible_section(
         &ctx,
         HelpSection::Video,
-        icons::video_camera(),
+        action_icons::sections::video(),
         ctx.i18n.tr("help-section-video"),
         build_video_content(&ctx),
     );
@@ -131,7 +131,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     let capture_section = build_collapsible_section(
         &ctx,
         HelpSection::Capture,
-        icons::camera(),
+        action_icons::sections::capture(),
         ctx.i18n.tr("help-section-capture"),
         build_capture_content(&ctx),
     );
@@ -139,7 +139,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     let editor_section = build_collapsible_section(
         &ctx,
         HelpSection::Editor,
-        icons::rotate_right(),
+        action_icons::sections::editor(),
         ctx.i18n.tr("help-section-editor"),
         build_editor_content(&ctx),
     );
@@ -168,7 +168,7 @@ fn build_collapsible_section<'a>(
     content: Element<'a, Message>,
 ) -> Element<'a, Message> {
     let is_expanded = ctx.state.is_expanded(section);
-    let icon_sized = icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
+    let icon_sized = action_icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
 
     // Expand/collapse indicator
     let indicator = Text::new(if is_expanded { "▼" } else { "▶" }).size(typography::BODY);
@@ -332,6 +332,14 @@ fn build_video_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         ))
         .push(build_shortcut_row("M", ctx.i18n.tr("help-video-key-mute")))
         .push(build_shortcut_row(
+            "← / →",
+            ctx.i18n.tr("help-video-key-seek"),
+        ))
+        .push(build_shortcut_row(
+            "↑ / ↓",
+            ctx.i18n.tr("help-video-key-volume"),
+        ))
+        .push(build_shortcut_row(
             ",",
             ctx.i18n.tr("help-video-key-step-back"),
         ))
@@ -406,6 +414,15 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(build_bullet(ctx.i18n.tr("help-editor-resize-lock")))
         .push(build_bullet(ctx.i18n.tr("help-editor-resize-presets")));
 
+    // Light tool (brightness/contrast)
+    let light_title = build_tool_title(ctx.i18n.tr("help-editor-light-title"));
+    let light_content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_paragraph(ctx.i18n.tr("help-editor-light-desc")))
+        .push(build_bullet(ctx.i18n.tr("help-editor-light-brightness")))
+        .push(build_bullet(ctx.i18n.tr("help-editor-light-contrast")))
+        .push(build_bullet(ctx.i18n.tr("help-editor-light-preview")));
+
     // Save options
     let save_title = build_tool_title(ctx.i18n.tr("help-editor-save-title"));
     let save_content = Column::new()
@@ -444,6 +461,8 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(crop_content)
         .push(resize_title)
         .push(resize_content)
+        .push(light_title)
+        .push(light_content)
         .push(save_title)
         .push(save_content)
         .push(shortcuts_title)

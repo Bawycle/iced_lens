@@ -21,11 +21,13 @@
 //! - [`design_tokens`] - Design system constants (colors, spacing, sizing)
 //! - [`theme`] - Theme colors and styling helpers
 //! - [`theming`] - Light/Dark/System theme mode management
-//! - [`icons`] - SVG icon loading and rendering
+//! - [`icons`] - SVG icon loading and rendering (visual primitives)
+//! - [`action_icons`] - Semantic action-to-icon mapping
 //! - [`navbar`] - Navigation bar with hamburger menu
 //! - [`notifications`] - Toast notification system for user feedback
 
 pub mod about;
+pub mod action_icons;
 pub mod components;
 pub mod design_tokens;
 pub mod help;
