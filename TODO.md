@@ -38,7 +38,7 @@
 ### Image Editor Enhancements
 - [ ] Add brightness adjustment tool
 - [ ] Add contrast adjustment tool
-- [ ] Remember last "Save As" directory
+- [x] ~~Remember last "Save As" directory~~ ✅
   - When opening the rfd save dialog, start in the last used save directory
   - Persist the path in CBOR format in the app data directory (use `app::paths::get_app_data_dir()`)
   - Applies to both image saves and video frame captures
