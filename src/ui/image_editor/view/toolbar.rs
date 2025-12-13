@@ -24,7 +24,8 @@ pub fn view<'a>(model: &ToolbarModel, ctx: &ViewContext<'a>) -> Element<'a, Mess
     let has_changes = model.has_unsaved_changes;
     let back_label = format!("← {}", ctx.i18n.tr("image-editor-back-to-viewer"));
 
-    let back_btn = button(Text::new(back_label).size(typography::BODY)).padding([spacing::XS, spacing::SM]);
+    let back_btn =
+        button(Text::new(back_label).size(typography::BODY)).padding([spacing::XS, spacing::SM]);
     let back_btn = if has_changes {
         back_btn
     } else {

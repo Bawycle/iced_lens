@@ -77,18 +77,21 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
         .label(ctx.i18n.tr("image-editor-resize-lock-aspect"))
         .on_toggle(|_| Message::Sidebar(SidebarMessage::ToggleLockAspect));
 
-    let apply_btn = button(text(ctx.i18n.tr("image-editor-resize-apply")).size(typography::BODY_LG))
-        .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(button_styles::selected)
-        .on_press(SidebarMessage::ApplyResize.into());
+    let apply_btn =
+        button(text(ctx.i18n.tr("image-editor-resize-apply")).size(typography::BODY_LG))
+            .padding(spacing::SM)
+            .width(Length::Fill)
+            .style(button_styles::selected)
+            .on_press(SidebarMessage::ApplyResize.into());
 
     container(
         Column::new()
             .spacing(spacing::SM)
             .push(scale_section)
             .push(presets_section)
-            .push(text(ctx.i18n.tr("image-editor-resize-dimensions-label")).size(typography::BODY_SM))
+            .push(
+                text(ctx.i18n.tr("image-editor-resize-dimensions-label")).size(typography::BODY_SM),
+            )
             .push(dimensions_row)
             .push(lock_checkbox)
             .push(apply_btn),

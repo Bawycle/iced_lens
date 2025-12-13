@@ -7,7 +7,9 @@
 use super::manager::{Manager, Message};
 use super::notification::{Notification, Severity};
 use crate::i18n::fluent::I18n;
-use crate::ui::design_tokens::{border, opacity, palette, radius, shadow, sizing, spacing, typography};
+use crate::ui::design_tokens::{
+    border, opacity, palette, radius, shadow, sizing, spacing, typography,
+};
 use crate::ui::icons;
 use iced::widget::{button, container, svg, text, Column, Container, Row, Text};
 use iced::{alignment, Color, Element, Length, Theme};
@@ -34,15 +36,16 @@ impl Toast {
             });
 
         // Message text
-        let message_widget = Text::new(message_text)
-            .size(typography::BODY)
-            .style(|theme: &Theme| text::Style {
-                color: Some(theme.palette().text),
-            });
+        let message_widget =
+            Text::new(message_text)
+                .size(typography::BODY)
+                .style(|theme: &Theme| text::Style {
+                    color: Some(theme.palette().text),
+                });
 
         // Dismiss button (always visible, uses main text color for good contrast)
         let notification_id = notification.id();
-        let dismiss_button = button(icons::sized(icons::close(), sizing::ICON_SM).style(
+        let dismiss_button = button(icons::sized(icons::cross(), sizing::ICON_SM).style(
             |theme: &Theme, _status| svg::Style {
                 color: Some(theme.palette().text),
             },

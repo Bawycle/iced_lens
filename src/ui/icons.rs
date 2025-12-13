@@ -62,21 +62,21 @@ pub fn camera<'a>() -> Svg<'a> {
     Svg::new(Handle::from_memory(DATA))
 }
 
-/// Step forward icon: advance one frame.
-pub fn step_forward<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/step_forward.svg");
+/// Triangle with bar on right: play/skip next shape (▶|).
+pub fn triangle_bar_right<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/triangle_bar_right.svg");
     Svg::new(Handle::from_memory(DATA))
 }
 
-/// Step backward icon: go back one frame.
-pub fn step_backward<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/step_backward.svg");
+/// Triangle with bar on left: skip previous shape (|◀).
+pub fn triangle_bar_left<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/triangle_bar_left.svg");
     Svg::new(Handle::from_memory(DATA))
 }
 
-/// More options icon: horizontal ellipsis (three dots).
-pub fn more<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/more.svg");
+/// Horizontal ellipsis: three dots in a row (⋯).
+pub fn ellipsis_horizontal<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/ellipsis_horizontal.svg");
     Svg::new(Handle::from_memory(DATA))
 }
 
@@ -96,9 +96,9 @@ pub fn checkmark<'a>() -> Svg<'a> {
     Svg::new(Handle::from_memory(DATA))
 }
 
-/// Close icon: X mark for dismissing/closing.
-pub fn close<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/close.svg");
+/// Cross icon: X mark shape (✕).
+pub fn cross<'a>() -> Svg<'a> {
+    static DATA: &[u8] = include_bytes!("../../assets/icons/cross.svg");
     Svg::new(Handle::from_memory(DATA))
 }
 
@@ -298,15 +298,15 @@ mod tests {
         let _ = image();
         let _ = cog();
         let _ = camera();
-        let _ = step_forward();
-        let _ = step_backward();
-        let _ = more();
+        let _ = triangle_bar_right();
+        let _ = triangle_bar_left();
+        let _ = ellipsis_horizontal();
         let _ = hamburger();
         let _ = help();
         let _ = info();
         let _ = warning();
         let _ = checkmark();
-        let _ = close();
+        let _ = cross();
     }
 
     #[test]

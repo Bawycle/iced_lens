@@ -213,7 +213,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         .step(0.01);
 
     // More button (overflow menu toggle)
-    let more_button_base = button(icons::sized(icons::more(), icon_size))
+    let more_button_base = button(icons::sized(icons::ellipsis_horizontal(), icon_size))
         .on_press(Message::ToggleOverflowMenu)
         .padding(spacing::XS)
         .width(Length::Shrink)
@@ -298,14 +298,14 @@ fn build_overflow_menu<'a>(
 ) -> Element<'a, Message> {
     // Step backward button (only enabled when paused AND in stepping mode)
     let step_back_content: Element<'_, Message> = if !state.is_playing && state.can_step_backward {
-        button(icons::sized(icons::step_backward(), icon_size))
+        button(icons::sized(icons::triangle_bar_left(), icon_size))
             .on_press(Message::StepBackward)
             .padding(spacing::XS)
             .width(Length::Shrink)
             .height(Length::Fixed(button_height))
             .into()
     } else {
-        button(icons::sized(icons::step_backward(), icon_size))
+        button(icons::sized(icons::triangle_bar_left(), icon_size))
             .padding(spacing::XS)
             .width(Length::Shrink)
             .height(Length::Fixed(button_height))
@@ -321,14 +321,14 @@ fn build_overflow_menu<'a>(
 
     // Step forward button (only enabled when paused AND not at end of video)
     let step_forward_content: Element<'_, Message> = if state.can_step_forward {
-        button(icons::sized(icons::step_forward(), icon_size))
+        button(icons::sized(icons::triangle_bar_right(), icon_size))
             .on_press(Message::StepForward)
             .padding(spacing::XS)
             .width(Length::Shrink)
             .height(Length::Fixed(button_height))
             .into()
     } else {
-        button(icons::sized(icons::step_forward(), icon_size))
+        button(icons::sized(icons::triangle_bar_right(), icon_size))
             .padding(spacing::XS)
             .width(Length::Shrink)
             .height(Length::Fixed(button_height))

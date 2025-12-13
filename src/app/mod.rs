@@ -21,7 +21,6 @@ mod view;
 pub use message::{Flags, Message};
 pub use screen::Screen;
 
-use i18n::fluent::I18n;
 use crate::media::{self, MediaData, MediaNavigator};
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
@@ -31,6 +30,7 @@ use crate::ui::state::zoom::{MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT};
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
 use crate::video_player::{create_lufs_cache, SharedLufsCache};
+use i18n::fluent::I18n;
 use iced::{window, Element, Subscription, Task, Theme};
 use std::fmt;
 

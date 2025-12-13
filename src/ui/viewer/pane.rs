@@ -467,14 +467,15 @@ fn view_inner<'a>(
     if model.position_counter_visible && model.total_count > 1 {
         if let Some(current) = model.current_index {
             let position_text = format!("{}/{}", current + 1, model.total_count);
-            let position_indicator = Container::new(Text::new(position_text).size(typography::BODY))
-                .padding(Padding {
-                    top: spacing::XXS,
-                    right: spacing::XS,
-                    bottom: spacing::XXS,
-                    left: spacing::XS,
-                })
-                .style(styles::overlay::indicator(12.0));
+            let position_indicator =
+                Container::new(Text::new(position_text).size(typography::BODY))
+                    .padding(Padding {
+                        top: spacing::XXS,
+                        right: spacing::XS,
+                        bottom: spacing::XXS,
+                        left: spacing::XS,
+                    })
+                    .style(styles::overlay::indicator(12.0));
 
             stack = stack.push(
                 Container::new(position_indicator)

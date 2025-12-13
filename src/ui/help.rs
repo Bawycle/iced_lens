@@ -104,9 +104,10 @@ pub fn update(state: &mut State, message: Message) -> Event {
 
 /// Render the help screen.
 pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
-    let back_button =
-        button(text(format!("← {}", ctx.i18n.tr("help-back-to-viewer-button"))).size(typography::BODY))
-            .on_press(Message::BackToViewer);
+    let back_button = button(
+        text(format!("← {}", ctx.i18n.tr("help-back-to-viewer-button"))).size(typography::BODY),
+    )
+    .on_press(Message::BackToViewer);
 
     let title = Text::new(ctx.i18n.tr("help-title")).size(typography::TITLE_LG);
 
@@ -483,17 +484,23 @@ fn build_tool_title<'a>(title: String) -> Element<'a, Message> {
 fn build_tool_item<'a>(name: String, description: String) -> Element<'a, Message> {
     Row::new()
         .spacing(spacing::SM)
-        .push(Text::new(format!("• {}:", name)).size(typography::BODY).font(Font {
-            weight: Weight::Bold,
-            ..Font::default()
-        }))
+        .push(
+            Text::new(format!("• {}:", name))
+                .size(typography::BODY)
+                .font(Font {
+                    weight: Weight::Bold,
+                    ..Font::default()
+                }),
+        )
         .push(Text::new(description).size(typography::BODY))
         .into()
 }
 
 /// Build a bullet point.
 fn build_bullet<'a>(content: String) -> Element<'a, Message> {
-    Text::new(format!("  • {}", content)).size(typography::BODY).into()
+    Text::new(format!("  • {}", content))
+        .size(typography::BODY)
+        .into()
 }
 
 /// Build a numbered step (for instructions).

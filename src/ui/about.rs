@@ -51,9 +51,10 @@ pub fn update(message: Message) -> Event {
 
 /// Render the about screen.
 pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
-    let back_button =
-        button(text(format!("← {}", ctx.i18n.tr("about-back-to-viewer-button"))).size(typography::BODY))
-            .on_press(Message::BackToViewer);
+    let back_button = button(
+        text(format!("← {}", ctx.i18n.tr("about-back-to-viewer-button"))).size(typography::BODY),
+    )
+    .on_press(Message::BackToViewer);
 
     let title = Text::new(ctx.i18n.tr("about-title")).size(typography::TITLE_LG);
 
@@ -124,7 +125,8 @@ fn build_license_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 /// Build the icon license section.
 fn build_icon_license_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let license_name = Text::new(ctx.i18n.tr("about-icon-license-name")).size(typography::BODY_LG);
-    let license_summary = Text::new(ctx.i18n.tr("about-icon-license-summary")).size(typography::BODY);
+    let license_summary =
+        Text::new(ctx.i18n.tr("about-icon-license-summary")).size(typography::BODY);
 
     let content = Column::new()
         .spacing(spacing::SM)
@@ -155,7 +157,9 @@ fn build_credits_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 
 /// Build a single credit item.
 fn build_credit_item<'a>(description: String) -> Element<'a, Message> {
-    Text::new(format!("• {}", description)).size(typography::BODY).into()
+    Text::new(format!("• {}", description))
+        .size(typography::BODY)
+        .into()
 }
 
 /// Build the links section.

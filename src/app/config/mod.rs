@@ -106,7 +106,10 @@ impl Default for GeneralConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DisplayConfig {
     /// Whether to fit images to window by default.
-    #[serde(default = "default_fit_to_window", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "default_fit_to_window",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub fit_to_window: Option<bool>,
 
     /// Zoom step percentage for zoom in/out.
@@ -153,19 +156,31 @@ pub struct VideoConfig {
     pub loop_enabled: Option<bool>,
 
     /// Normalize audio volume across different media files.
-    #[serde(default = "default_audio_normalization", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "default_audio_normalization",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub audio_normalization: Option<bool>,
 
     /// Frame cache size in megabytes for seek performance.
-    #[serde(default = "default_frame_cache_mb", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "default_frame_cache_mb",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub frame_cache_mb: Option<u32>,
 
     /// Frame history size in megabytes for backward stepping.
-    #[serde(default = "default_frame_history_mb", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "default_frame_history_mb",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub frame_history_mb: Option<u32>,
 
     /// Keyboard seek step in seconds (arrow keys).
-    #[serde(default = "default_keyboard_seek_step_secs", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "default_keyboard_seek_step_secs",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub keyboard_seek_step_secs: Option<f64>,
 }
 
@@ -188,7 +203,10 @@ impl Default for VideoConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FullscreenConfig {
     /// Auto-hide timeout for fullscreen controls (seconds).
-    #[serde(default = "default_overlay_timeout_secs", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "default_overlay_timeout_secs",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub overlay_timeout_secs: Option<u32>,
 }
 
@@ -550,7 +568,10 @@ mod tests {
         let config = Config::default();
         assert_eq!(config.display.fit_to_window, Some(true));
         assert_eq!(config.display.zoom_step, Some(DEFAULT_ZOOM_STEP_PERCENT));
-        assert_eq!(config.display.background_theme, Some(BackgroundTheme::default()));
+        assert_eq!(
+            config.display.background_theme,
+            Some(BackgroundTheme::default())
+        );
         assert_eq!(config.display.sort_order, Some(SortOrder::default()));
         assert_eq!(config.general.theme_mode, ThemeMode::System);
         assert_eq!(config.video.autoplay, Some(false));
@@ -812,7 +833,10 @@ keyboard_seek_step_secs = 5.0
         assert_eq!(loaded.general.theme_mode, ThemeMode::Dark);
         assert_eq!(loaded.display.fit_to_window, Some(true));
         assert_eq!(loaded.display.zoom_step, Some(15.0));
-        assert_eq!(loaded.display.background_theme, Some(BackgroundTheme::Light));
+        assert_eq!(
+            loaded.display.background_theme,
+            Some(BackgroundTheme::Light)
+        );
         assert_eq!(loaded.display.sort_order, Some(SortOrder::ModifiedDate));
         assert_eq!(loaded.video.autoplay, Some(true));
         assert_eq!(loaded.video.volume, Some(0.7));
@@ -863,7 +887,10 @@ overlay_timeout_secs = 10
         assert_eq!(loaded.general.theme_mode, ThemeMode::Light);
         assert_eq!(loaded.display.fit_to_window, Some(false));
         assert_eq!(loaded.display.zoom_step, Some(20.0));
-        assert_eq!(loaded.display.background_theme, Some(BackgroundTheme::Checkerboard));
+        assert_eq!(
+            loaded.display.background_theme,
+            Some(BackgroundTheme::Checkerboard)
+        );
         assert_eq!(loaded.display.sort_order, Some(SortOrder::CreatedDate));
         assert_eq!(loaded.video.autoplay, Some(true));
         assert_eq!(loaded.video.volume, Some(0.9));
@@ -882,10 +909,19 @@ overlay_timeout_secs = 10
         let content = fs::read_to_string(&config_path).expect("read config");
 
         // Verify sectioned format is used
-        assert!(content.contains("[general]"), "should have [general] section");
-        assert!(content.contains("[display]"), "should have [display] section");
+        assert!(
+            content.contains("[general]"),
+            "should have [general] section"
+        );
+        assert!(
+            content.contains("[display]"),
+            "should have [display] section"
+        );
         assert!(content.contains("[video]"), "should have [video] section");
-        assert!(content.contains("[fullscreen]"), "should have [fullscreen] section");
+        assert!(
+            content.contains("[fullscreen]"),
+            "should have [fullscreen] section"
+        );
     }
 
     #[test]
@@ -910,7 +946,13 @@ zoom_step = 25.0
 
         // Verify new format is written
         let content = fs::read_to_string(&config_path).expect("read config");
-        assert!(content.contains("[general]"), "should have [general] section");
-        assert!(content.contains("language = \"ja\""), "should have language in general section");
+        assert!(
+            content.contains("[general]"),
+            "should have [general] section"
+        );
+        assert!(
+            content.contains("language = \"ja\""),
+            "should have language in general section"
+        );
     }
 }

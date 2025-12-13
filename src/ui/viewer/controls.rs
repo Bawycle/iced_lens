@@ -125,7 +125,9 @@ pub fn view<'a>(
 
     // Apply different style when fullscreen is active (highlighted)
     let fullscreen_button_content: Element<'_, Message> = if is_fullscreen {
-        fullscreen_button.style(styles::button_control_active).into()
+        fullscreen_button
+            .style(styles::button_control_active)
+            .into()
     } else {
         fullscreen_button.into()
     };
