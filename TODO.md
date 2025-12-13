@@ -28,10 +28,10 @@
     - [ ] Image centering in editor canvas — currently complex to implement
 
 ### Settings Persistence
-- [ ] Persist video playback preferences in `settings.toml` (without adding to Settings screen)
-  - [ ] `muted` state
-  - [ ] `volume` level
-  - [ ] `loop` toggle
+- [x] ~~Persist video playback preferences in `settings.toml` (without adding to Settings screen)~~ ✅
+  - [x] ~~`muted` state~~
+  - [x] ~~`volume` level~~
+  - [x] ~~`loop` toggle~~
   - Similar to how `fit_to_window` is handled for images
 - [x] `keyboard_seek_step_secs` (added to Settings screen + persisted) ✅
 

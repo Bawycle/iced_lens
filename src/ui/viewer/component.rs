@@ -161,6 +161,9 @@ pub struct State {
     /// Whether video audio is muted.
     video_muted: bool,
 
+    /// Whether video playback should loop.
+    video_loop: bool,
+
     /// Whether the overflow menu (advanced video controls) is open.
     overflow_menu_open: bool,
 
@@ -201,6 +204,7 @@ impl Default for State {
             video_autoplay: false, // Default to no autoplay
             video_volume: crate::config::DEFAULT_VOLUME,
             video_muted: false,
+            video_loop: false,
             overflow_menu_open: false,
             last_keyboard_seek: None,
             keyboard_seek_step_secs: crate::config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
@@ -333,6 +337,36 @@ impl State {
     /// Sets whether videos should auto-play when loaded.
     pub fn set_video_autoplay(&mut self, enabled: bool) {
         self.video_autoplay = enabled;
+    }
+
+    /// Sets the video volume level (0.0 to 1.0).
+    pub fn set_video_volume(&mut self, volume: f32) {
+        self.video_volume = volume.clamp(crate::config::MIN_VOLUME, crate::config::MAX_VOLUME);
+    }
+
+    /// Returns the current video volume level.
+    pub fn video_volume(&self) -> f32 {
+        self.video_volume
+    }
+
+    /// Sets whether video audio is muted.
+    pub fn set_video_muted(&mut self, muted: bool) {
+        self.video_muted = muted;
+    }
+
+    /// Returns whether video audio is muted.
+    pub fn video_muted(&self) -> bool {
+        self.video_muted
+    }
+
+    /// Sets whether video playback should loop.
+    pub fn set_video_loop(&mut self, enabled: bool) {
+        self.video_loop = enabled;
+    }
+
+    /// Returns whether video playback loops.
+    pub fn video_loop(&self) -> bool {
+        self.video_loop
     }
 
     /// Sets the keyboard seek step in seconds.
@@ -695,6 +729,7 @@ impl State {
                         if let Some(player) = &self.video_player {
                             player.set_volume(self.video_volume);
                         }
+                        return (Effect::PersistPreferences, Task::none());
                     }
                     VM::ToggleMute => {
                         self.video_muted = !self.video_muted;
@@ -702,12 +737,14 @@ impl State {
                         if let Some(player) = &self.video_player {
                             player.set_muted(self.video_muted);
                         }
+                        return (Effect::PersistPreferences, Task::none());
                     }
                     VM::ToggleLoop => {
+                        self.video_loop = !self.video_loop;
                         if let Some(player) = &mut self.video_player {
-                            let current = player.is_loop_enabled();
-                            player.set_loop(!current);
+                            player.set_loop(self.video_loop);
                         }
+                        return (Effect::PersistPreferences, Task::none());
                     }
                     VM::CaptureFrame => {
                         // Pause the video if playing
@@ -771,9 +808,10 @@ impl State {
                         if let Some(ref mut player) = self.video_player {
                             player.set_command_sender(command_sender);
 
-                            // Apply current volume and mute state
+                            // Apply current volume, mute, and loop state
                             player.set_volume(self.video_volume);
                             player.set_muted(self.video_muted);
+                            player.set_loop(self.video_loop);
 
                             // Auto-play if enabled
                             if self.video_autoplay {
@@ -824,7 +862,7 @@ impl State {
                             // Mark that we've reached the end (for step forward button)
                             player.set_at_end_of_stream();
 
-                            if player.is_loop_enabled() {
+                            if self.video_loop {
                                 // Restart playback from beginning
                                 // Clear seek preview so step operations use actual position
                                 self.seek_preview_position = None;
@@ -998,19 +1036,19 @@ impl State {
                         let can_step_fwd = player.can_step_forward();
                         match state {
                             crate::video_player::PlaybackState::Playing { position_secs } => {
-                                (true, *position_secs, player.is_loop_enabled(), false, false)
+                                (true, *position_secs, self.video_loop, false, false)
                             }
                             crate::video_player::PlaybackState::Paused { position_secs } => (
                                 false,
                                 *position_secs,
-                                player.is_loop_enabled(),
+                                self.video_loop,
                                 can_step_back,
                                 can_step_fwd,
                             ),
                             crate::video_player::PlaybackState::Buffering { position_secs } => {
-                                (true, *position_secs, player.is_loop_enabled(), false, false)
+                                (true, *position_secs, self.video_loop, false, false)
                             }
-                            _ => (false, 0.0, player.is_loop_enabled(), false, false),
+                            _ => (false, 0.0, self.video_loop, false, false),
                         }
                     } else {
                         // No player yet - show initial state (paused at 0)

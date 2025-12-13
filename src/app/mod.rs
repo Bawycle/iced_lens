@@ -199,6 +199,17 @@ impl App {
         app.viewer
             .set_keyboard_seek_step_secs(keyboard_seek_step_secs);
 
+        // Apply video playback preferences from config
+        if let Some(volume) = config.video_volume {
+            app.viewer.set_video_volume(volume);
+        }
+        if let Some(muted) = config.video_muted {
+            app.viewer.set_video_muted(muted);
+        }
+        if let Some(loop_enabled) = config.video_loop {
+            app.viewer.set_video_loop(loop_enabled);
+        }
+
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
 

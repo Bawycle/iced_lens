@@ -89,6 +89,10 @@ pub struct Config {
     /// Defaults to false.
     #[serde(default)]
     pub video_muted: Option<bool>,
+    /// Whether video playback should loop.
+    /// Defaults to false.
+    #[serde(default)]
+    pub video_loop: Option<bool>,
     /// Whether to normalize audio volume across different media files.
     /// Uses loudness normalization to prevent sudden volume changes when navigating.
     /// Defaults to true.
@@ -159,6 +163,7 @@ impl Default for Config {
             video_autoplay: Some(false),
             video_volume: Some(DEFAULT_VOLUME),
             video_muted: Some(false),
+            video_loop: Some(false),
             audio_normalization: default_audio_normalization(),
             frame_cache_mb: default_frame_cache_mb(),
             frame_history_mb: default_frame_history_mb(),
@@ -231,6 +236,7 @@ mod tests {
             video_autoplay: Some(false),
             video_volume: Some(DEFAULT_VOLUME),
             video_muted: Some(false),
+            video_loop: Some(false),
             audio_normalization: Some(true),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
@@ -276,6 +282,7 @@ mod tests {
             video_autoplay: Some(true),
             video_volume: Some(0.5),
             video_muted: Some(true),
+            video_loop: Some(true),
             audio_normalization: Some(false),
             frame_cache_mb: Some(128),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
@@ -314,6 +321,7 @@ mod tests {
             video_autoplay: Some(false),
             video_volume: Some(DEFAULT_VOLUME),
             video_muted: Some(false),
+            video_loop: Some(false),
             audio_normalization: Some(true),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
@@ -356,6 +364,7 @@ mod tests {
             video_autoplay: Some(false),
             video_volume: Some(DEFAULT_VOLUME),
             video_muted: Some(false),
+            video_loop: Some(false),
             audio_normalization: Some(true),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
@@ -391,6 +400,7 @@ mod tests {
             video_autoplay: Some(true),
             video_volume: Some(0.65),
             video_muted: Some(true),
+            video_loop: Some(true),
             audio_normalization: Some(false),
             frame_cache_mb: Some(DEFAULT_FRAME_CACHE_MB),
             frame_history_mb: Some(DEFAULT_FRAME_HISTORY_MB),
@@ -404,6 +414,7 @@ mod tests {
 
         assert_eq!(loaded.video_volume, Some(0.65));
         assert_eq!(loaded.video_muted, Some(true));
+        assert_eq!(loaded.video_loop, Some(true));
         assert_eq!(loaded.audio_normalization, Some(false));
     }
 

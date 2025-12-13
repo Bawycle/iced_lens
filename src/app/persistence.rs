@@ -19,6 +19,7 @@ use unic_langid::LanguageIdentifier;
 ///
 /// Guarded during tests to keep isolation: unit tests exercise the logic by
 /// calling the function directly rather than through `Effect`s.
+#[allow(clippy::too_many_arguments)]
 pub fn persist_preferences(
     viewer: &component::State,
     settings: &SettingsState,
@@ -46,6 +47,11 @@ pub fn persist_preferences(
     cfg.frame_cache_mb = Some(frame_cache_mb);
     cfg.frame_history_mb = Some(frame_history_mb);
     cfg.keyboard_seek_step_secs = Some(keyboard_seek_step_secs);
+
+    // Video playback preferences (persisted but not in Settings UI)
+    cfg.video_volume = Some(viewer.video_volume());
+    cfg.video_muted = Some(viewer.video_muted());
+    cfg.video_loop = Some(viewer.video_loop());
 
     if let Err(error) = config::save(&cfg) {
         eprintln!("Failed to save config: {:?}", error);
