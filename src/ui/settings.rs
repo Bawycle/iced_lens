@@ -14,7 +14,7 @@ use crate::config::{
     MIN_KEYBOARD_SEEK_STEP_SECS, MIN_OVERLAY_TIMEOUT_SECS,
 };
 use crate::i18n::fluent::I18n;
-use crate::ui::design_tokens::{radius, sizing, spacing};
+use crate::ui::design_tokens::{radius, sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::state::zoom::{
     format_number, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT, ZOOM_STEP_INVALID_KEY,
@@ -255,11 +255,11 @@ impl State {
                 "← {}",
                 ctx.i18n.tr("settings-back-to-viewer-button")
             ))
-            .size(14),
+            .size(typography::BODY),
         )
         .on_press(Message::BackToViewer);
 
-        let title = Text::new(ctx.i18n.tr("settings-title")).size(30);
+        let title = Text::new(ctx.i18n.tr("settings-title")).size(typography::TITLE_LG);
 
         // =========================================================================
         // SECTION: General (Language, Theme)
@@ -408,14 +408,14 @@ impl State {
 
         let zoom_hint: Element<'_, Message> = if let Some(error_key) = self.zoom_step_error_key() {
             Text::new(ctx.i18n.tr(error_key))
-                .size(13)
+                .size(typography::BODY_SM)
                 .style(move |_theme: &Theme| text::Style {
                     color: Some(theme::error_text_color()),
                 })
                 .into()
         } else {
             Text::new(ctx.i18n.tr("settings-zoom-step-hint"))
-                .size(13)
+                .size(typography::BODY_SM)
                 .into()
         };
 
@@ -483,7 +483,7 @@ impl State {
             ctx.i18n.tr("settings-video-autoplay-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-video-autoplay-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             autoplay_row.into(),
@@ -509,7 +509,7 @@ impl State {
             ctx.i18n.tr("settings-audio-normalization-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-audio-normalization-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             normalization_row.into(),
@@ -540,7 +540,7 @@ impl State {
             ctx.i18n.tr("settings-frame-cache-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-frame-cache-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             cache_control.into(),
@@ -571,7 +571,7 @@ impl State {
             ctx.i18n.tr("settings-frame-history-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-frame-history-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             history_control.into(),
@@ -602,7 +602,7 @@ impl State {
             ctx.i18n.tr("settings-keyboard-seek-step-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-keyboard-seek-step-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             seek_step_control.into(),
@@ -649,7 +649,7 @@ impl State {
             ctx.i18n.tr("settings-overlay-timeout-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-overlay-timeout-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             timeout_control.into(),
@@ -672,7 +672,7 @@ impl State {
         control: Element<'a, Message>,
     ) -> Element<'a, Message> {
         let mut col = Column::new().spacing(spacing::XS);
-        col = col.push(Text::new(label).size(14));
+        col = col.push(Text::new(label).size(typography::BODY));
         col = col.push(control);
         if let Some(hint_element) = hint {
             col = col.push(hint_element);
@@ -794,7 +794,7 @@ fn build_section<'a>(
         .spacing(spacing::SM)
         .align_y(Vertical::Center)
         .push(icon_sized)
-        .push(Text::new(title).size(18));
+        .push(Text::new(title).size(typography::TITLE_SM));
 
     let inner = Column::new()
         .spacing(spacing::SM)

@@ -195,7 +195,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
 
     // Apply active style when muted (highlighted like fit-to-window button)
     let volume_button_content: Element<'_, Message> = if state.muted {
-        volume_button.style(styles::button_primary).into()
+        volume_button.style(styles::button_control_active).into()
     } else {
         volume_button.into()
     };
@@ -220,7 +220,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         .height(Length::Fixed(button_height));
 
     let more_button_content: Element<'_, Message> = if state.overflow_menu_open {
-        more_button_base.style(styles::button_primary).into()
+        more_button_base.style(styles::button_control_active).into()
     } else {
         more_button_base.into()
     };
@@ -242,7 +242,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
 
     // Apply active style when loop is enabled (highlighted like mute button)
     let loop_button_content: Element<'_, Message> = if state.loop_enabled {
-        loop_button_base.style(styles::button_primary).into()
+        loop_button_base.style(styles::button_control_active).into()
     } else {
         loop_button_base.into()
     };

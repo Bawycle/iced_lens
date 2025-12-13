@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Crop tool panel for the editor sidebar.
 
-use crate::ui::design_tokens::spacing;
+use crate::ui::design_tokens::{spacing, typography};
 use crate::ui::image_editor::state::{CropRatio, CropState};
 use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
@@ -12,8 +12,8 @@ use super::super::ViewContext;
 use crate::ui::image_editor::{Message, SidebarMessage};
 
 pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let title = text(ctx.i18n.tr("image-editor-crop-section-title")).size(14);
-    let ratio_label = text(ctx.i18n.tr("image-editor-crop-ratio-label")).size(13);
+    let title = text(ctx.i18n.tr("image-editor-crop-section-title")).size(typography::BODY);
+    let ratio_label = text(ctx.i18n.tr("image-editor-crop-ratio-label")).size(typography::BODY_SM);
 
     let ratios_row1 = Row::new()
         .spacing(spacing::XXS)
@@ -54,10 +54,10 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
             CropRatio::PhotoPortrait,
         ));
 
-    let crop_info = text(format!("{}×{} px", crop.width, crop.height)).size(12);
+    let crop_info = text(format!("{}×{} px", crop.width, crop.height)).size(typography::CAPTION);
 
     let apply_btn = {
-        let btn = button(text(ctx.i18n.tr("image-editor-crop-apply")).size(14))
+        let btn = button(text(ctx.i18n.tr("image-editor-crop-apply")).size(typography::BODY))
             .padding(spacing::XS)
             .width(Length::Fill)
             .style(button_styles::selected);
@@ -87,9 +87,9 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
 
 fn ratio_button<'a>(crop: &'a CropState, label: String, ratio: CropRatio) -> Element<'a, Message> {
     let is_selected = crop.ratio == ratio;
-    button(text(label).size(11))
+    button(text(label).size(typography::CAPTION))
         .on_press(SidebarMessage::SetCropRatio(ratio).into())
-        .padding([4, 6])
+        .padding([spacing::XXS, spacing::XS])
         .width(Length::Fill)
         .style(if is_selected {
             button_styles::selected

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize tool panel for the editor sidebar.
 
-use crate::ui::design_tokens::spacing;
+use crate::ui::design_tokens::{spacing, typography};
 use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
 use iced::widget::{button, checkbox, container, slider, text, text_input, Column, Row};
@@ -14,15 +14,15 @@ use crate::ui::image_editor::{Message, SidebarMessage};
 pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let scale_section = Column::new()
         .spacing(spacing::XXS)
-        .push(text(ctx.i18n.tr("image-editor-resize-section-title")).size(14))
-        .push(text(ctx.i18n.tr("image-editor-resize-scale-label")).size(13))
+        .push(text(ctx.i18n.tr("image-editor-resize-section-title")).size(typography::BODY))
+        .push(text(ctx.i18n.tr("image-editor-resize-scale-label")).size(typography::BODY_SM))
         .push(
             slider(10.0..=200.0, resize.scale_percent, |percent| {
                 Message::Sidebar(SidebarMessage::ScaleChanged(percent))
             })
             .step(1.0),
         )
-        .push(text(format!("{:.0}%", resize.scale_percent)).size(13));
+        .push(text(format!("{:.0}%", resize.scale_percent)).size(typography::BODY_SM));
 
     let mut presets = Row::new().spacing(spacing::XS);
     for preset in [50.0, 75.0, 150.0, 200.0] {
@@ -30,30 +30,30 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
         presets = presets.push(
             button(text(label))
                 .on_press(SidebarMessage::ApplyResizePreset(preset).into())
-                .padding([6, 8])
+                .padding([spacing::XXS, spacing::XS])
                 .style(button_styles::unselected),
         );
     }
 
     let presets_section = Column::new()
         .spacing(spacing::XXS)
-        .push(text(ctx.i18n.tr("image-editor-resize-presets-label")).size(13))
+        .push(text(ctx.i18n.tr("image-editor-resize-presets-label")).size(typography::BODY_SM))
         .push(presets);
 
     let width_placeholder = ctx.i18n.tr("image-editor-resize-width-label");
-    let width_label = text(width_placeholder.clone()).size(13);
+    let width_label = text(width_placeholder.clone()).size(typography::BODY_SM);
     let width_input = text_input(width_placeholder.as_str(), &resize.width_input)
         .on_input(|value| Message::Sidebar(SidebarMessage::WidthInputChanged(value)))
         .padding(spacing::XXS)
-        .size(14)
+        .size(typography::BODY)
         .width(Length::Fill);
 
     let height_placeholder = ctx.i18n.tr("image-editor-resize-height-label");
-    let height_label = text(height_placeholder.clone()).size(13);
+    let height_label = text(height_placeholder.clone()).size(typography::BODY_SM);
     let height_input = text_input(height_placeholder.as_str(), &resize.height_input)
         .on_input(|value| Message::Sidebar(SidebarMessage::HeightInputChanged(value)))
         .padding(spacing::XXS)
-        .size(14)
+        .size(typography::BODY)
         .width(Length::Fill);
 
     let dimensions_row = Row::new()
@@ -77,7 +77,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
         .label(ctx.i18n.tr("image-editor-resize-lock-aspect"))
         .on_toggle(|_| Message::Sidebar(SidebarMessage::ToggleLockAspect));
 
-    let apply_btn = button(text(ctx.i18n.tr("image-editor-resize-apply")).size(16))
+    let apply_btn = button(text(ctx.i18n.tr("image-editor-resize-apply")).size(typography::BODY_LG))
         .padding(spacing::SM)
         .width(Length::Fill)
         .style(button_styles::selected)
@@ -88,7 +88,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
             .spacing(spacing::SM)
             .push(scale_section)
             .push(presets_section)
-            .push(text(ctx.i18n.tr("image-editor-resize-dimensions-label")).size(13))
+            .push(text(ctx.i18n.tr("image-editor-resize-dimensions-label")).size(typography::BODY_SM))
             .push(dimensions_row)
             .push(lock_checkbox)
             .push(apply_btn),

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Extensible theming system.
 
-use crate::ui::design_tokens::palette;
+use crate::ui::design_tokens::{opacity, palette};
 use dark_light;
 use iced::Color;
 use serde::{Deserialize, Serialize};
@@ -50,11 +50,14 @@ impl ColorScheme {
             brand_secondary: palette::PRIMARY_600,
 
             error: palette::ERROR_500,
-            warning: Color::from_rgb8(255, 152, 0),
-            success: Color::from_rgb8(76, 175, 80),
+            warning: palette::WARNING_500,
+            success: palette::SUCCESS_500,
             info: palette::INFO_500,
 
-            overlay_background: Color::from_rgba(0.0, 0.0, 0.0, 0.7),
+            overlay_background: Color {
+                a: opacity::OVERLAY_STRONG,
+                ..palette::BLACK
+            },
             overlay_text: palette::WHITE,
         }
     }
@@ -73,12 +76,15 @@ impl ColorScheme {
             brand_primary: palette::PRIMARY_400,
             brand_secondary: palette::PRIMARY_500,
 
-            error: Color::from_rgb8(244, 67, 54),
-            warning: Color::from_rgb8(255, 167, 38),
-            success: Color::from_rgb8(102, 187, 106),
+            error: palette::ERROR_500,
+            warning: palette::WARNING_500,
+            success: palette::SUCCESS_500,
             info: palette::INFO_500,
 
-            overlay_background: Color::from_rgba(0.0, 0.0, 0.0, 0.8),
+            overlay_background: Color {
+                a: opacity::OVERLAY_HOVER,
+                ..palette::BLACK
+            },
             overlay_text: palette::WHITE,
         }
     }

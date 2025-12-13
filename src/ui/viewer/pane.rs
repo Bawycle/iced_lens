@@ -5,7 +5,7 @@
 use crate::config::BackgroundTheme;
 use crate::media::MediaData;
 use crate::ui::components::checkerboard;
-use crate::ui::design_tokens::{opacity, radius, sizing, spacing};
+use crate::ui::design_tokens::{opacity, radius, sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::styles;
 use crate::ui::theme;
@@ -223,10 +223,10 @@ fn view_inner<'a>(
                     .spacing(spacing::XXS)
                     .align_y(Vertical::Center)
                     .push(loop_icon)
-                    .push(Text::new("◀").size(28))
+                    .push(Text::new("◀").size(typography::TITLE_LG))
                     .into()
             } else {
-                Text::new("◀").size(28).into()
+                Text::new("◀").size(typography::TITLE_LG).into()
             };
             let left_arrow = button(button_content)
                 .on_press(Message::NavigatePrevious)
@@ -255,11 +255,11 @@ fn view_inner<'a>(
                 Row::new()
                     .spacing(spacing::XXS)
                     .align_y(Vertical::Center)
-                    .push(Text::new("▶").size(28))
+                    .push(Text::new("▶").size(typography::TITLE_LG))
                     .push(loop_icon)
                     .into()
             } else {
-                Text::new("▶").size(28).into()
+                Text::new("▶").size(typography::TITLE_LG).into()
             };
             let right_arrow = button(button_content)
                 .on_press(Message::NavigateNext)
@@ -444,7 +444,7 @@ fn view_inner<'a>(
                 .spacing(spacing::XXS)
                 .align_y(Vertical::Center)
                 .push(styled_icon)
-                .push(Text::new(hud_line.text.clone()).size(12));
+                .push(Text::new(hud_line.text.clone()).size(typography::CAPTION));
 
             hud_column = hud_column.push(line_row);
         }
@@ -467,7 +467,7 @@ fn view_inner<'a>(
     if model.position_counter_visible && model.total_count > 1 {
         if let Some(current) = model.current_index {
             let position_text = format!("{}/{}", current + 1, model.total_count);
-            let position_indicator = Container::new(Text::new(position_text).size(14))
+            let position_indicator = Container::new(Text::new(position_text).size(typography::BODY))
                 .padding(Padding {
                     top: spacing::XXS,
                     right: spacing::XS,

@@ -5,7 +5,7 @@ pub mod crop_panel;
 pub mod resize_panel;
 
 use crate::media::frame_export::ExportFormat;
-use crate::ui::design_tokens::spacing;
+use crate::ui::design_tokens::{sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::image_editor::state::{CropState, ResizeState};
 use crate::ui::styles;
@@ -103,7 +103,7 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
 }
 
 pub fn collapsed<'a>() -> Element<'a, Message> {
-    let toggle_button = button(text("☰").size(24))
+    let toggle_button = button(text("☰").size(sizing::ICON_MD))
         .on_press(SidebarMessage::ToggleSidebar.into())
         .padding(spacing::SM);
 
@@ -116,7 +116,7 @@ pub fn collapsed<'a>() -> Element<'a, Message> {
 }
 
 fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
-    let toggle_button = button(text("☰").size(20))
+    let toggle_button = button(text("☰").size(typography::TITLE_MD))
         .on_press(SidebarMessage::ToggleSidebar.into())
         .padding(spacing::XS)
         .style(button_styles::unselected);
@@ -128,13 +128,13 @@ fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
                 .spacing(spacing::XS)
                 .align_y(Vertical::Center)
                 .push(toggle_button)
-                .push(text(ctx.i18n.tr("image-editor-title")).size(18)),
+                .push(text(ctx.i18n.tr("image-editor-title")).size(typography::TITLE_SM)),
         )
         .push(rule::horizontal(1))
 }
 
 fn tool_button<'a>(label: String, message: SidebarMessage, active: bool) -> Element<'a, Message> {
-    button(text(label).size(16))
+    button(text(label).size(typography::BODY_LG))
         .on_press(message.into())
         .padding(spacing::SM)
         .width(Length::Fill)
@@ -151,7 +151,7 @@ fn undo_redo_section<'a>(
     can_redo: bool,
     ctx: &ViewContext<'a>,
 ) -> Element<'a, Message> {
-    let undo_btn = button(text(ctx.i18n.tr("image-editor-undo")).size(16))
+    let undo_btn = button(text(ctx.i18n.tr("image-editor-undo")).size(typography::BODY_LG))
         .padding(spacing::XS)
         .width(Length::Fill)
         .style(button_styles::unselected);
@@ -161,7 +161,7 @@ fn undo_redo_section<'a>(
         undo_btn
     };
 
-    let redo_btn = button(text(ctx.i18n.tr("image-editor-redo")).size(16))
+    let redo_btn = button(text(ctx.i18n.tr("image-editor-redo")).size(typography::BODY_LG))
         .padding(spacing::XS)
         .width(Length::Fill)
         .style(button_styles::unselected);
@@ -175,7 +175,7 @@ fn undo_redo_section<'a>(
         .spacing(spacing::XS)
         .push(undo_btn)
         .push(redo_btn);
-    let title = text(ctx.i18n.tr("image-editor-undo-redo-section-title")).size(14);
+    let title = text(ctx.i18n.tr("image-editor-undo-redo-section-title")).size(typography::BODY);
 
     container(
         Column::new()
@@ -220,7 +220,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .spacing(spacing::XS)
         .push(rotate_left_btn)
         .push(rotate_right_btn);
-    let title = text(ctx.i18n.tr("image-editor-rotate-section-title")).size(14);
+    let title = text(ctx.i18n.tr("image-editor-rotate-section-title")).size(typography::BODY);
 
     container(
         Column::new()
@@ -265,7 +265,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .spacing(spacing::XS)
         .push(flip_horizontal_btn)
         .push(flip_vertical_btn);
-    let title = text(ctx.i18n.tr("image-editor-flip-section-title")).size(14);
+    let title = text(ctx.i18n.tr("image-editor-flip-section-title")).size(typography::BODY);
 
     container(
         Column::new()
@@ -290,11 +290,11 @@ fn footer_section<'a>(
     // Navigation buttons - only for file mode, not captured frames
     if !is_captured_frame {
         let prev_btn = button(
-            container(text("◀").size(20))
+            container(text("◀").size(typography::TITLE_MD))
                 .center_x(Length::Fill)
                 .center_y(Length::Shrink),
         )
-        .padding([8, 16])
+        .padding([spacing::XS, spacing::MD])
         .width(Length::Fill)
         .height(Length::Shrink);
         let prev_btn = if has_changes {
@@ -304,11 +304,11 @@ fn footer_section<'a>(
         };
 
         let next_btn = button(
-            container(text("▶").size(20))
+            container(text("▶").size(typography::TITLE_MD))
                 .center_x(Length::Fill)
                 .center_y(Length::Shrink),
         )
-        .padding([8, 16])
+        .padding([spacing::XS, spacing::MD])
         .width(Length::Fill)
         .height(Length::Shrink);
         let next_btn = if has_changes {
@@ -325,7 +325,7 @@ fn footer_section<'a>(
     }
 
     // Cancel button - always available when there are changes
-    let cancel_btn = button(text(ctx.i18n.tr("image-editor-cancel")).size(16))
+    let cancel_btn = button(text(ctx.i18n.tr("image-editor-cancel")).size(typography::BODY_LG))
         .padding(spacing::SM)
         .width(Length::Fill)
         .style(button_styles::unselected);
@@ -338,7 +338,7 @@ fn footer_section<'a>(
 
     // Save button - only for file mode, not captured frames
     if !is_captured_frame {
-        let save_btn = button(text(ctx.i18n.tr("image-editor-save")).size(16))
+        let save_btn = button(text(ctx.i18n.tr("image-editor-save")).size(typography::BODY_LG))
             .padding(spacing::SM)
             .width(Length::Fill)
             .style(button_styles::selected);
@@ -354,7 +354,7 @@ fn footer_section<'a>(
     footer = footer.push(export_format_section(export_format, ctx));
 
     // Save As button - always available
-    let save_as_btn = button(text(ctx.i18n.tr("image-editor-save-as")).size(16))
+    let save_as_btn = button(text(ctx.i18n.tr("image-editor-save-as")).size(typography::BODY_LG))
         .padding(spacing::SM)
         .width(Length::Fill)
         .style(button_styles::selected);
@@ -374,7 +374,7 @@ fn export_format_section<'a>(
     current_format: ExportFormat,
     ctx: &ViewContext<'a>,
 ) -> Element<'a, Message> {
-    let format_label = text(ctx.i18n.tr("image-editor-export-format-label")).size(14);
+    let format_label = text(ctx.i18n.tr("image-editor-export-format-label")).size(typography::BODY);
 
     let format_buttons: Vec<Element<'a, Message>> = ExportFormat::all()
         .iter()
@@ -386,8 +386,8 @@ fn export_format_section<'a>(
                 ExportFormat::WebP => "WebP",
             };
 
-            button(text(label).size(14))
-                .padding([8, 12])
+            button(text(label).size(typography::BODY))
+                .padding([spacing::XS, spacing::SM])
                 .width(Length::FillPortion(1))
                 .style(if is_selected {
                     button_styles::selected
