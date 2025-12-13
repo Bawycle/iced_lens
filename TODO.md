@@ -101,6 +101,12 @@ Unify how the application communicates with the user. Currently:
 
 **Max visible toasts:** 3 (others queued)
 
+### Help Screen Enhancements
+- [ ] Display icons alongside button references in help text
+  - When describing a button (e.g., "click the camera button"), show the actual icon next to the text
+  - Use `action_icons` module to ensure consistency with UI
+  - Makes help more visual and easier to understand
+
 ### Media Metadata
 - [ ] Retrieve metadata from media files (EXIF, video info, etc.)
 - [ ] Design UX/UI for displaying metadata (TBD - needs exploration)
