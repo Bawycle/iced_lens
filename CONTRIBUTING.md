@@ -309,9 +309,12 @@ iced_lens/
 │   │   │   ├── video_controls.rs # Playback controls toolbar
 │   │   │   └── overlays.rs     # Loading, error, info overlays
 │   │   ├── image_editor/       # Image editing (crop, resize, rotate)
-│   │   ├── widgets/            # Custom reusable widgets
+│   │   ├── notifications/      # Toast notification system
+│   │   ├── components/         # Reusable components (ErrorDisplay, Checkerboard)
+│   │   ├── widgets/            # Custom Iced widgets
 │   │   ├── styles/             # Component-specific styles
-│   │   ├── design_tokens.rs    # Base design tokens (colors, spacing)
+│   │   ├── state/              # Shared UI state (zoom, drag, viewport)
+│   │   ├── design_tokens.rs    # Base design tokens (colors, spacing, typography)
 │   │   ├── theming.rs          # Theme system (light/dark modes)
 │   │   ├── theme.rs            # Color helpers for viewer/editor
 │   │   ├── settings.rs         # Settings panel

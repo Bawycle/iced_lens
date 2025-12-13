@@ -175,7 +175,7 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
 - [x] ~~Refactor `config/mod.rs` to use `app::paths` module~~ ✅
   - Removed duplicated `get_default_config_path()` function
   - Now uses centralized path resolution from `app::paths`
-- [ ] Update `CONTRIBUTING.md` project structure section after refactoring
+- [x] ~~Update `CONTRIBUTING.md` project structure section after refactoring~~ ✅
 
 ## Benchmarks
 
