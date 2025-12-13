@@ -2,6 +2,26 @@
 
 > This file tracks planned work for the next release. It lives only in the `dev` branch and is not included in releases.
 
+## Bugs to Fix
+
+- [ ] Fit-to-window doesn't expand media when hamburger menu collapses
+  - When the menu opens, images/videos correctly shrink to fit the reduced space
+  - When the menu closes, media doesn't expand to fill the newly available space
+  - Workaround: resize the window to trigger recalculation
+
+- [ ] Navigation index not updated after media deletion
+  - After deleting a media via toolbar button, the position counter stays correct
+  - But navigating to next media jumps to media #1
+  - And navigating to previous media jumps to the last media
+  - Likely the navigation index is not properly synced after the directory rescan
+
+- [ ] Video seeking with keyboard arrows broken when held down
+  - Tapping left/right arrows works but seek step is too large
+  - Holding down arrows continuously causes erratic behavior
+  - Fix: ignore new seek events until current seek completes (debouncing)
+  - Consider: reduce default keyboard seek step, add setting in Settings
+    - Note: this is the keyboard shortcut seek step, not the slider step
+
 ## Planned Features
 
 ### Framework Upgrade
@@ -24,6 +44,10 @@
 ### Image Editor Enhancements
 - [ ] Add brightness adjustment tool
 - [ ] Add contrast adjustment tool
+- [ ] Remember last "Save As" directory
+  - When opening the rfd save dialog, start in the last used save directory
+  - Persist the path in CBOR format in the app data directory (use `app::paths::get_app_data_dir()`)
+  - Applies to both image saves and video frame captures
 
 ### Media Metadata
 - [ ] Retrieve metadata from media files (EXIF, video info, etc.)
@@ -48,6 +72,25 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
 **Phase 2: Integration (if Phase 1 successful)**
 - [ ] Add model selection setting + model download / remove
 - [ ] Add a way for the user to choose whether they want to capture the frame with or without AI enhancement.
+
+## Refactoring
+
+### UI Style Harmonization
+- [ ] Review and harmonize styles across all screens (viewer, editor, settings)
+  - Ensure consistent button styles, spacing, and colors
+  - Improve overall UX and aesthetics
+  - Study current UI/UX best practices (Material Design, Human Interface Guidelines, etc.)
+
+### Project Structure Reorganization
+- [ ] Move `src/config/` into `src/app/config/`
+  - Config is app infrastructure, not business logic like `media/` or `video_player/`
+- [ ] Move `src/i18n/` into `src/app/i18n/`
+  - Translations are app-specific infrastructure
+- [ ] Create `src/app/paths.rs` with `get_app_data_dir()`
+  - Single source of truth for app data directory
+  - Uses `dirs::config_dir()` (cross-platform: Linux, macOS, Windows)
+  - Refactor `config/mod.rs` to use this module
+- [ ] Update `CONTRIBUTING.md` project structure section after refactoring
 
 ## Benchmarks
 
