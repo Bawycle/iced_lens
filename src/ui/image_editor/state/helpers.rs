@@ -75,5 +75,8 @@ impl State {
         {
             self.finalize_crop_overlay();
         }
+        if matches!(self.active_tool, Some(EditorTool::Adjust)) {
+            self.commit_adjustment_changes();
+        }
     }
 }

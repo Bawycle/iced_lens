@@ -36,8 +36,11 @@
 - [x] `keyboard_seek_step_secs` (added to Settings screen + persisted) ✅
 
 ### Image Editor Enhancements
-- [ ] Add brightness adjustment tool
-- [ ] Add contrast adjustment tool
+- [x] ~~Add brightness adjustment tool~~ ✅
+- [x] ~~Add contrast adjustment tool~~ ✅
+  - Added `adjust_brightness` and `adjust_contrast` functions in `image_transform.rs`
+  - Added "Light" tool in sidebar with sliders for brightness and contrast
+  - Live preview during adjustment, full undo/redo support
 - [x] ~~Remember last "Save As" directory~~ ✅
   - When opening the rfd save dialog, start in the last used save directory
   - Persist the path in CBOR format in the app data directory (use `app::paths::get_app_data_dir()`)

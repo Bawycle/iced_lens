@@ -35,6 +35,7 @@ impl State {
             crop_state: state::CropState::from_image(&image),
             crop_modified: false,
             resize_state: state::ResizeState::from_image(&image),
+            adjustment_state: state::AdjustmentState::default(),
             crop_base_image: None,
             crop_base_width: image.width,
             crop_base_height: image.height,
@@ -70,6 +71,7 @@ impl State {
             crop_state: state::CropState::from_image(&image),
             crop_modified: false,
             resize_state: state::ResizeState::from_image(&image),
+            adjustment_state: state::AdjustmentState::default(),
             crop_base_image: None,
             crop_base_width: image.width,
             crop_base_height: image.height,
@@ -95,6 +97,7 @@ pub enum EditorTool {
     Rotate,
     Crop,
     Resize,
+    Adjust,
 }
 
 /// Image transformations that can be applied and undone.
@@ -106,4 +109,6 @@ pub enum Transformation {
     FlipVertical,
     Crop { rect: Rectangle },
     Resize { width: u32, height: u32 },
+    AdjustBrightness { value: i32 },
+    AdjustContrast { value: i32 },
 }

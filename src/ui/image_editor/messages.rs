@@ -31,6 +31,14 @@ pub enum SidebarMessage {
     ToggleLockAspect,
     ApplyResizePreset(f32),
     ApplyResize,
+    /// Brightness slider changed (live preview)
+    BrightnessChanged(i32),
+    /// Contrast slider changed (live preview)
+    ContrastChanged(i32),
+    /// Apply current adjustments to image
+    ApplyAdjustments,
+    /// Reset adjustments to default
+    ResetAdjustments,
     Undo,
     Redo,
     NavigateNext,

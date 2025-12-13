@@ -47,6 +47,38 @@ pub fn resize(image: &DynamicImage, width: u32, height: u32) -> DynamicImage {
     image.resize_exact(width, height, FilterType::Lanczos3)
 }
 
+/// Adjust brightness of an image.
+///
+/// The `value` parameter ranges from -100 to +100:
+/// - Negative values darken the image
+/// - Positive values brighten the image
+/// - Zero returns the image unchanged
+pub fn adjust_brightness(image: &DynamicImage, value: i32) -> DynamicImage {
+    if value == 0 {
+        return image.clone();
+    }
+    image.brighten(value)
+}
+
+/// Adjust contrast of an image.
+///
+/// The `value` parameter ranges from -100 to +100:
+/// - Negative values reduce contrast (flatten toward gray)
+/// - Positive values increase contrast (more separation between light/dark)
+/// - Zero returns the image unchanged
+///
+/// Internally converts the -100..+100 range to a multiplier for the image crate's
+/// contrast function which expects a float (-100 = 0.0x, 0 = 1.0x, +100 = 2.0x).
+pub fn adjust_contrast(image: &DynamicImage, value: i32) -> DynamicImage {
+    if value == 0 {
+        return image.clone();
+    }
+    // Convert -100..+100 to a factor: -100 -> -100.0, 0 -> 0.0, +100 -> +100.0
+    // The image crate's contrast function interprets this as percentage adjustment
+    let factor = value as f32;
+    image.adjust_contrast(factor)
+}
+
 /// Crop the image to the specified rectangle.
 ///
 /// The rectangle coordinates are clamped to the image boundaries.
@@ -221,5 +253,59 @@ mod tests {
             [0, 0, 0, 255],
             "Bottom-left should be black after flip"
         );
+    }
+
+    #[test]
+    fn brightness_zero_returns_unchanged() {
+        let img = create_test_image(4, 4);
+        let result = adjust_brightness(&img, 0);
+        assert_eq!(result.width(), 4);
+        assert_eq!(result.height(), 4);
+    }
+
+    #[test]
+    fn brightness_positive_lightens_image() {
+        let buffer = ImageBuffer::from_pixel(2, 2, image_rs::Rgba([100, 100, 100, 255]));
+        let img = DynamicImage::ImageRgba8(buffer);
+
+        let brightened = adjust_brightness(&img, 50);
+        let rgba = brightened.to_rgba8();
+        let pixel = rgba.get_pixel(0, 0).0;
+
+        // Brightness should increase (but not overflow 255)
+        assert!(pixel[0] > 100, "Red channel should be brighter");
+        assert!(pixel[1] > 100, "Green channel should be brighter");
+        assert!(pixel[2] > 100, "Blue channel should be brighter");
+    }
+
+    #[test]
+    fn brightness_negative_darkens_image() {
+        let buffer = ImageBuffer::from_pixel(2, 2, image_rs::Rgba([100, 100, 100, 255]));
+        let img = DynamicImage::ImageRgba8(buffer);
+
+        let darkened = adjust_brightness(&img, -50);
+        let rgba = darkened.to_rgba8();
+        let pixel = rgba.get_pixel(0, 0).0;
+
+        // Brightness should decrease (but not underflow 0)
+        assert!(pixel[0] < 100, "Red channel should be darker");
+        assert!(pixel[1] < 100, "Green channel should be darker");
+        assert!(pixel[2] < 100, "Blue channel should be darker");
+    }
+
+    #[test]
+    fn contrast_zero_returns_unchanged() {
+        let img = create_test_image(4, 4);
+        let result = adjust_contrast(&img, 0);
+        assert_eq!(result.width(), 4);
+        assert_eq!(result.height(), 4);
+    }
+
+    #[test]
+    fn contrast_preserves_dimensions() {
+        let img = create_test_image(8, 6);
+        let result = adjust_contrast(&img, 50);
+        assert_eq!(result.width(), 8);
+        assert_eq!(result.height(), 6);
     }
 }

@@ -44,10 +44,11 @@ IcedLens aims to provide a simple, privacy‑friendly image viewer and editor fo
 
 ### Editing
 - **Non-destructive pipeline** with undo/redo history and Save / Save As flows
-- **Rotate, Crop, Resize** tools share a live preview canvas
+- **Rotate, Crop, Resize, Light** tools share a live preview canvas
   - Rotate: 90° increments, instant apply
   - Crop: overlay with drag handles and preset ratios (Free, Square, 16:9, 9:16, 4:3, 3:4)
-  - Resize: slider (10–200%), width/height inputs, aspect lock, and live preview (auto-commit when leaving the tool)
+  - Resize: slider (10–200%), width/height inputs, aspect lock, and live preview
+  - Light: brightness and contrast sliders with real-time preview
 - **Keyboard shortcuts** keep the workflow fast (E to edit, Ctrl+S, Ctrl+Z/Y, Esc)
 
 ## 3. Screenshots
@@ -200,7 +201,7 @@ This project does not process untrusted remote input; images are opened from loc
 Future items (subject to change based on community feedback):
 - Basic image/video metadata panel (EXIF, codec info)
 - Temporary rotation in viewer (90° increments, session-only)
-- Additional edit tools: flip (horizontal/vertical), brightness/contrast adjustments
+- Additional edit tools: flip (horizontal/vertical)
 - Filters: grayscale, sepia, blur, sharpen
 - Video editing: trim, basic cuts
 - Batch operations
