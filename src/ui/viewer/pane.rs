@@ -328,7 +328,9 @@ fn view_inner<'a>(
 
         // Parse error message to get appropriate i18n key and user-friendly message
         let video_error = VideoError::from_message(error_msg);
-        let error_text = ctx.i18n.tr(video_error.i18n_key());
+        let args = video_error.i18n_args();
+        let args_refs: Vec<(&str, &str)> = args.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let error_text = ctx.i18n.tr_with_args(video_error.i18n_key(), &args_refs);
         let heading = ctx.i18n.tr("error-load-video-heading");
 
         let error_icon = icons::sized(icons::warning(), 32.0)

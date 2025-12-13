@@ -243,7 +243,8 @@ fn build_viewer_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             ctx.i18n.tr("help-viewer-tool-navigation"),
             ctx.i18n.tr("help-viewer-tool-navigation-desc"),
         ))
-        .push(build_tool_item(
+        .push(build_tool_item_with_icon(
+            action_icons::viewer::zoom_in(),
             ctx.i18n.tr("help-viewer-tool-zoom"),
             ctx.i18n.tr("help-viewer-tool-zoom-desc"),
         ))
@@ -251,15 +252,18 @@ fn build_viewer_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             ctx.i18n.tr("help-viewer-tool-pan"),
             ctx.i18n.tr("help-viewer-tool-pan-desc"),
         ))
-        .push(build_tool_item(
+        .push(build_tool_item_with_icon(
+            action_icons::viewer::fit_to_window(),
             ctx.i18n.tr("help-viewer-tool-fit"),
             ctx.i18n.tr("help-viewer-tool-fit-desc"),
         ))
-        .push(build_tool_item(
+        .push(build_tool_item_with_icon(
+            action_icons::viewer::fullscreen(),
             ctx.i18n.tr("help-viewer-tool-fullscreen"),
             ctx.i18n.tr("help-viewer-tool-fullscreen-desc"),
         ))
-        .push(build_tool_item(
+        .push(build_tool_item_with_icon(
+            action_icons::viewer::delete(),
             ctx.i18n.tr("help-viewer-tool-delete"),
             ctx.i18n.tr("help-viewer-tool-delete-desc"),
         ));
@@ -281,6 +285,22 @@ fn build_viewer_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             ctx.i18n.tr("help-viewer-key-exit-fullscreen"),
         ));
 
+    let mouse_title = build_subsection_title(ctx.i18n.tr("help-mouse-title"));
+    let mouse_content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_mouse_row(
+            ctx.i18n.tr("viewer-double-click"),
+            ctx.i18n.tr("help-viewer-mouse-doubleclick"),
+        ))
+        .push(build_mouse_row(
+            ctx.i18n.tr("viewer-scroll-wheel"),
+            ctx.i18n.tr("help-viewer-mouse-wheel"),
+        ))
+        .push(build_mouse_row(
+            ctx.i18n.tr("viewer-click-drag"),
+            ctx.i18n.tr("help-viewer-mouse-drag"),
+        ));
+
     Column::new()
         .spacing(spacing::SM)
         .push(role)
@@ -288,6 +308,8 @@ fn build_viewer_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(tools_content)
         .push(shortcuts_title)
         .push(shortcuts_content)
+        .push(mouse_title)
+        .push(mouse_content)
         .into()
 }
 
@@ -298,7 +320,8 @@ fn build_video_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let tools_title = build_subsection_title(ctx.i18n.tr("help-tools-title"));
     let tools_content = Column::new()
         .spacing(spacing::XS)
-        .push(build_tool_item(
+        .push(build_tool_item_with_icon(
+            action_icons::video::play(),
             ctx.i18n.tr("help-video-tool-playback"),
             ctx.i18n.tr("help-video-tool-playback-desc"),
         ))
@@ -306,19 +329,23 @@ fn build_video_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             ctx.i18n.tr("help-video-tool-timeline"),
             ctx.i18n.tr("help-video-tool-timeline-desc"),
         ))
-        .push(build_tool_item(
+        .push(build_tool_item_with_icon(
+            action_icons::video::volume(),
             ctx.i18n.tr("help-video-tool-volume"),
             ctx.i18n.tr("help-video-tool-volume-desc"),
         ))
-        .push(build_tool_item(
+        .push(build_tool_item_with_icon(
+            action_icons::video::toggle_loop(),
             ctx.i18n.tr("help-video-tool-loop"),
             ctx.i18n.tr("help-video-tool-loop-desc"),
         ))
-        .push(build_tool_item(
+        .push(build_tool_item_with_icon(
+            action_icons::video::step_forward(),
             ctx.i18n.tr("help-video-tool-stepping"),
             ctx.i18n.tr("help-video-tool-stepping-desc"),
         ))
-        .push(build_tool_item(
+        .push(build_tool_item_with_icon(
+            action_icons::video::capture_frame(),
             ctx.i18n.tr("help-video-tool-capture"),
             ctx.i18n.tr("help-video-tool-capture-desc"),
         ));
@@ -391,10 +418,22 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let rotate_content = Column::new()
         .spacing(spacing::XXS)
         .push(build_paragraph(ctx.i18n.tr("help-editor-rotate-desc")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-rotate-left")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-rotate-right")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-flip-h")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-flip-v")));
+        .push(build_bullet_with_icon(
+            action_icons::editor::rotate_left(),
+            ctx.i18n.tr("help-editor-rotate-left"),
+        ))
+        .push(build_bullet_with_icon(
+            action_icons::editor::rotate_right(),
+            ctx.i18n.tr("help-editor-rotate-right"),
+        ))
+        .push(build_bullet_with_icon(
+            action_icons::editor::flip_horizontal(),
+            ctx.i18n.tr("help-editor-flip-h"),
+        ))
+        .push(build_bullet_with_icon(
+            action_icons::editor::flip_vertical(),
+            ctx.i18n.tr("help-editor-flip-v"),
+        ));
 
     // Crop tool
     let crop_title = build_tool_title(ctx.i18n.tr("help-editor-crop-title"));
@@ -515,6 +554,50 @@ fn build_tool_item<'a>(name: String, description: String) -> Element<'a, Message
         .into()
 }
 
+/// Size for inline icons in help text.
+const HELP_ICON_SIZE: f32 = 18.0;
+
+/// Build a tool item with an icon, name, and description.
+fn build_tool_item_with_icon<'a>(
+    icon: iced::widget::Svg<'a>,
+    name: String,
+    description: String,
+) -> Element<'a, Message> {
+    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE).style(styles::tinted_svg);
+
+    Row::new()
+        .spacing(spacing::SM)
+        .align_y(Vertical::Center)
+        .push(Text::new("•").size(typography::BODY))
+        .push(icon_widget)
+        .push(
+            Text::new(format!("{}:", name))
+                .size(typography::BODY)
+                .font(Font {
+                    weight: Weight::Bold,
+                    ..Font::default()
+                }),
+        )
+        .push(Text::new(description).size(typography::BODY))
+        .into()
+}
+
+/// Build a bullet point with an icon.
+fn build_bullet_with_icon<'a>(
+    icon: iced::widget::Svg<'a>,
+    content: String,
+) -> Element<'a, Message> {
+    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE).style(styles::tinted_svg);
+
+    Row::new()
+        .spacing(spacing::SM)
+        .align_y(Vertical::Center)
+        .push(Text::new("  •").size(typography::BODY))
+        .push(icon_widget)
+        .push(Text::new(content).size(typography::BODY))
+        .into()
+}
+
 /// Build a bullet point.
 fn build_bullet<'a>(content: String) -> Element<'a, Message> {
     Text::new(format!("  • {}", content))
@@ -561,6 +644,27 @@ fn build_shortcut_row<'a>(key: &'a str, description: String) -> Element<'a, Mess
         .spacing(spacing::SM)
         .align_y(Vertical::Center)
         .push(Container::new(key_badge).width(Length::Fixed(70.0)))
+        .push(Text::new(description).size(typography::BODY))
+        .into()
+}
+
+/// Build a single mouse interaction row with action badge and description.
+fn build_mouse_row<'a>(action: String, description: String) -> Element<'a, Message> {
+    let action_badge = Container::new(Text::new(action).size(typography::CAPTION))
+        .padding([spacing::XXS, spacing::XS])
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.extended_palette().background.strong.color.into()),
+            border: Border {
+                radius: radius::SM.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+    Row::new()
+        .spacing(spacing::SM)
+        .align_y(Vertical::Center)
+        .push(Container::new(action_badge).width(Length::Fixed(120.0)))
         .push(Text::new(description).size(typography::BODY))
         .into()
 }

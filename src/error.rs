@@ -49,6 +49,18 @@ impl VideoError {
         }
     }
 
+    /// Returns the i18n variable arguments for this error type.
+    ///
+    /// Some error messages contain placeholders like `{ $codec }` or `{ $message }`
+    /// that need to be filled with runtime values.
+    pub fn i18n_args(&self) -> Vec<(&'static str, String)> {
+        match self {
+            VideoError::UnsupportedCodec(codec) => vec![("codec", codec.clone())],
+            VideoError::DecodingFailed(msg) => vec![("message", msg.clone())],
+            _ => vec![],
+        }
+    }
+
     /// Attempts to parse a raw error message into a specific VideoError type.
     /// This is used to categorize errors from FFmpeg/decoder.
     pub fn from_message(msg: &str) -> Self {
@@ -255,5 +267,25 @@ mod tests {
     fn video_error_display() {
         let err = VideoError::UnsupportedCodec("H264".to_string());
         assert!(format!("{}", err).contains("H264"));
+    }
+
+    #[test]
+    fn video_error_i18n_args() {
+        // UnsupportedCodec returns codec arg
+        let codec_err = VideoError::UnsupportedCodec("H264".to_string());
+        let args = codec_err.i18n_args();
+        assert_eq!(args.len(), 1);
+        assert_eq!(args[0], ("codec", "H264".to_string()));
+
+        // DecodingFailed returns message arg
+        let decode_err = VideoError::DecodingFailed("packet error".to_string());
+        let args = decode_err.i18n_args();
+        assert_eq!(args.len(), 1);
+        assert_eq!(args[0], ("message", "packet error".to_string()));
+
+        // Other variants return empty args
+        assert!(VideoError::UnsupportedFormat.i18n_args().is_empty());
+        assert!(VideoError::CorruptedFile.i18n_args().is_empty());
+        assert!(VideoError::NoVideoStream.i18n_args().is_empty());
     }
 }

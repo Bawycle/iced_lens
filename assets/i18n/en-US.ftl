@@ -1,4 +1,7 @@
-window-title = IcedLens
+# Application name term - single source of truth for branding
+-app-name = IcedLens
+
+window-title = { -app-name }
 hello-message = Hello, world!
 open-settings-button = Settings
 settings-back-to-viewer-button = Back to Viewer
@@ -31,6 +34,9 @@ viewer-delete-tooltip = Delete the current image
 viewer-zoom-in-tooltip = Zoom in
 viewer-zoom-out-tooltip = Zoom out
 viewer-fullscreen-tooltip = Toggle fullscreen
+viewer-double-click = Double-click
+viewer-scroll-wheel = Scroll wheel
+viewer-click-drag = Click + drag
 settings-zoom-step-label = Zoom step
 settings-zoom-step-placeholder = 10
 settings-zoom-step-hint = Choose how much the zoom changes when using the controls (1% to 200%).
@@ -52,7 +58,7 @@ help-arg-image-path = <IMAGE_PATH>      Path to an image file to open
 help-example-1 = iced_lens ./photo.png
 help-example-2 = iced_lens --lang fr ./image.jpg
 help-example-3 = iced_lens --help
-help-description = IcedLens – Image Viewer
+help-description = { -app-name } – Image Viewer
 help-line-option-i18n-dir =     --i18n-dir <path>  Load translations from directory
 help-line-option-data-dir =     --data-dir <path>  Override data directory (state files)
 help-line-option-config-dir =     --config-dir <path>  Override config directory (settings.toml)
@@ -185,6 +191,11 @@ help-viewer-key-edit = Open image in editor
 help-viewer-key-fullscreen = Enter/exit fullscreen
 help-viewer-key-exit-fullscreen = Exit fullscreen mode
 
+help-mouse-title = Mouse Interactions
+help-viewer-mouse-doubleclick = Double-click on image/video to toggle fullscreen
+help-viewer-mouse-wheel = Zoom in/out
+help-viewer-mouse-drag = Pan image when zoomed in
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Video Playback Section
 # ─────────────────────────────────────────────────────────────────────────────
@@ -270,7 +281,7 @@ about-title = About
 about-back-to-viewer-button = Back to Viewer
 
 about-section-app = Application
-about-app-name = IcedLens
+about-app-name = { -app-name }
 about-app-description = Lightweight image and video viewer with basic image editing.
 
 about-section-license = License
@@ -278,8 +289,8 @@ about-license-name = Mozilla Public License 2.0 (MPL-2.0)
 about-license-summary = File-level copyleft: modified files must be shared under the same license. Compatible with proprietary code.
 
 about-section-icon-license = Icon License
-about-icon-license-name = IcedLens Icon License
-about-icon-license-summary = All icons (application logo and UI icons) may only be redistributed unmodified to represent IcedLens.
+about-icon-license-name = { -app-name } Icon License
+about-icon-license-summary = All icons (application logo and UI icons) may only be redistributed unmodified to represent { -app-name }.
 
 about-section-credits = Credits
 about-credits-iced = Built with the Iced GUI toolkit

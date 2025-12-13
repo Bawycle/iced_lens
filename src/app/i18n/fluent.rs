@@ -28,7 +28,7 @@
 //! ```
 
 use crate::config::Config;
-use fluent_bundle::{FluentBundle, FluentResource};
+use fluent_bundle::{FluentArgs, FluentBundle, FluentResource, FluentValue};
 use std::collections::HashMap;
 use std::fs;
 use unic_langid::LanguageIdentifier;
@@ -146,11 +146,43 @@ impl I18n {
     }
 
     pub fn tr(&self, key: &str) -> String {
+        self.tr_with_args(key, &[])
+    }
+
+    /// Translate a message key with variable substitution.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The message key to look up
+    /// * `args` - Slice of (name, value) pairs for variable substitution
+    ///
+    /// # Example
+    ///
+    /// ```fluent
+    /// error-codec = The codec '{ $codec }' is not supported.
+    /// ```
+    ///
+    /// ```ignore
+    /// i18n.tr_with_args("error-codec", &[("codec", "H264")]);
+    /// // Returns: "The codec 'H264' is not supported."
+    /// ```
+    pub fn tr_with_args(&self, key: &str, args: &[(&str, &str)]) -> String {
         if let Some(bundle) = self.bundles.get(&self.current_locale) {
             if let Some(msg) = bundle.get_message(key) {
                 if let Some(pattern) = msg.value() {
                     let mut errors = vec![];
-                    let value = bundle.format_pattern(pattern, None, &mut errors);
+
+                    let fluent_args = if args.is_empty() {
+                        None
+                    } else {
+                        let mut fa = FluentArgs::new();
+                        for (name, value) in args {
+                            fa.set(*name, FluentValue::from(*value));
+                        }
+                        Some(fa)
+                    };
+
+                    let value = bundle.format_pattern(pattern, fluent_args.as_ref(), &mut errors);
                     if errors.is_empty() {
                         return value.to_string();
                     }
@@ -246,6 +278,42 @@ mod tests {
         let i18n = I18n::new(None, None, &config);
         let missing = i18n.tr("non-existent-key");
         assert!(missing.starts_with("MISSING:"));
+    }
+
+    #[test]
+    fn test_tr_with_args_substitutes_variables() {
+        let dir = tempdir().expect("temp dir");
+        let ftl_path = dir.path().join("en-US.ftl");
+        let mut ftl_file = std::fs::File::create(&ftl_path).expect("ftl file");
+        writeln!(ftl_file, "greeting = Hello, {{ $name }}!").expect("write ftl");
+        writeln!(
+            ftl_file,
+            "error-codec = Codec '{{ $codec }}' not supported."
+        )
+        .expect("write ftl");
+
+        let i18n = I18n::new(
+            None,
+            Some(dir.path().display().to_string()),
+            &Config::default(),
+        );
+
+        // Test single variable
+        // Note: Fluent adds Unicode directional isolation characters around interpolated values
+        // for bidirectional text support, so we use contains() instead of exact equality
+        let greeting = i18n.tr_with_args("greeting", &[("name", "Alice")]);
+        assert!(greeting.contains("Hello,"));
+        assert!(greeting.contains("Alice"));
+
+        // Test different variable
+        let error = i18n.tr_with_args("error-codec", &[("codec", "H264")]);
+        assert!(error.contains("H264"));
+        assert!(error.contains("not supported"));
+
+        // Test that calling tr() on a message with variables (without providing them)
+        // returns MISSING since Fluent reports resolver errors for missing variables
+        let no_args = i18n.tr("greeting");
+        assert!(no_args.starts_with("MISSING:")); // Expected: missing variables cause error
     }
 
     #[test]

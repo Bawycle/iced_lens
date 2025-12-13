@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Light adjustment tool:** brightness and contrast sliders in the image editor with live preview and full undo/redo support.
+- **Help screen enhancements:** tool descriptions now display their corresponding icons, and a new "Mouse Interactions" section documents double-click fullscreen, scroll wheel zoom, and drag to pan.
 - **Toast notification system:** visual feedback for user actions replaces silent console output.
   - Success notifications for save, delete, copy, and frame capture operations.
   - Warning notifications for configuration issues (corrupted settings, permission errors).
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Video seeking with arrow keys no longer "snaps back" when held down.
 - Image centering recalculates correctly on layout changes.
 - Navigation index now updates correctly after deleting a media file.
+- Video error messages now correctly display the codec name (e.g., "H264 not supported") instead of showing a placeholder.
 
 ## [0.2.0] - 2025-12-12
 

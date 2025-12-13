@@ -1,4 +1,7 @@
-window-title = IcedLens
+# Terme pour le nom de l'application - source unique pour la marque
+-app-name = IcedLens
+
+window-title = { -app-name }
 hello-message = Bonjour, le monde !
 open-settings-button = Paramètres
 settings-back-to-viewer-button = Retour
@@ -31,6 +34,9 @@ viewer-delete-tooltip = Supprimer l'image affichée
 viewer-zoom-in-tooltip = Zoom avant
 viewer-zoom-out-tooltip = Zoom arrière
 viewer-fullscreen-tooltip = Basculer en plein écran
+viewer-double-click = Double-clic
+viewer-scroll-wheel = Molette
+viewer-click-drag = Clic + glisser
 settings-zoom-step-label = Incrément de zoom
 settings-zoom-step-placeholder = 10
 settings-zoom-step-hint = Définissez la variation appliquée lors des contrôles de zoom (de 1 % à 200 %).
@@ -52,7 +58,7 @@ help-arg-image-path = <CHEMIN_IMAGE>      Chemin vers un fichier image à ouvrir
 help-example-1 = iced_lens ./photo.png
 help-example-2 = iced_lens --lang fr ./image.jpg
 help-example-3 = iced_lens --help
-help-description = IcedLens – Visionneuse d'images
+help-description = { -app-name } – Visionneuse d'images
 help-line-option-i18n-dir =     --i18n-dir <chemin>  Charger les traductions depuis un dossier
 help-line-option-data-dir =     --data-dir <chemin>  Remplacer le répertoire de données (fichiers d'état)
 help-line-option-config-dir =     --config-dir <chemin>  Remplacer le répertoire de config (settings.toml)
@@ -185,6 +191,11 @@ help-viewer-key-edit = Ouvrir l'image dans l'éditeur
 help-viewer-key-fullscreen = Entrer/quitter le plein écran
 help-viewer-key-exit-fullscreen = Quitter le mode plein écran
 
+help-mouse-title = Interactions souris
+help-viewer-mouse-doubleclick = Double-clic sur l'image/vidéo pour basculer en plein écran
+help-viewer-mouse-wheel = Zoomer/dézoomer
+help-viewer-mouse-drag = Déplacer l'image lorsqu'elle est zoomée
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Section Lecture vidéo
 # ─────────────────────────────────────────────────────────────────────────────
@@ -270,7 +281,7 @@ about-title = À propos
 about-back-to-viewer-button = Retour
 
 about-section-app = Application
-about-app-name = IcedLens
+about-app-name = { -app-name }
 about-app-description = Visionneuse d'images et de vidéos légère avec édition basique d'images.
 
 about-section-license = Licence
@@ -278,8 +289,8 @@ about-license-name = Mozilla Public License 2.0 (MPL-2.0)
 about-license-summary = Copyleft au niveau des fichiers : les fichiers modifiés doivent être partagés sous la même licence. Compatible avec le code propriétaire.
 
 about-section-icon-license = Licence des icônes
-about-icon-license-name = Licence des icônes IcedLens
-about-icon-license-summary = Toutes les icônes (logo et icônes d'interface) ne peuvent être redistribuées que sans modification pour représenter IcedLens.
+about-icon-license-name = Licence des icônes { -app-name }
+about-icon-license-summary = Toutes les icônes (logo et icônes d'interface) ne peuvent être redistribuées que sans modification pour représenter { -app-name }.
 
 about-section-credits = Crédits
 about-credits-iced = Développé avec la bibliothèque Iced

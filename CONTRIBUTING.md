@@ -148,6 +148,55 @@ If you have any questions about translating, feel free to:
 - Check the existing translation files for examples
 - Ask in your Pull Request—we're here to help!
 
+### Advanced Fluent Features (for Developers)
+
+When adding new translatable strings to the codebase, you may need these Fluent features:
+
+#### Terms (Single Source of Truth)
+
+Use **terms** (prefixed with `-`) for values that should be consistent across all messages:
+
+```fluent
+# Definition (at top of .ftl file)
+-app-name = IcedLens
+
+# Usage in messages
+window-title = { -app-name }
+about-description = { -app-name } is an image viewer.
+```
+
+**When to use:** App name, product terms, or any value repeated across multiple messages.
+
+#### Variables (Dynamic Content)
+
+Use **variables** for runtime values like file names, error details, or counts:
+
+```fluent
+# In .ftl file
+error-codec = The codec '{ $codec }' is not supported.
+error-file = Cannot open { $filename }.
+```
+
+```rust
+// In Rust code - use tr_with_args()
+let msg = i18n.tr_with_args("error-codec", &[("codec", "H264")]);
+// Returns: "The codec 'H264' is not supported."
+```
+
+**API:**
+- `i18n.tr(key)` - Simple translation (no variables)
+- `i18n.tr_with_args(key, &[("var", "value")])` - Translation with variable substitution
+
+**Important:** If a message contains variables but `tr()` is called without them, Fluent reports an error and the translation returns `"MISSING: key"`. Always use `tr_with_args()` for messages with placeholders.
+
+#### Guidelines
+
+| Feature | Use Case | Example |
+|---------|----------|---------|
+| Term (`-name`) | Consistent branding, repeated values | `-app-name = IcedLens` |
+| Variable (`$var`) | Runtime values (errors, file names) | `{ $codec }`, `{ $count }` |
+| Simple message | Static UI text | `button-save = Save` |
+
 ## Code Contributions
 
 Code contributions should follow the project's development practices and quality standards.

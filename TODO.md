@@ -107,11 +107,13 @@ Unify how the application communicates with the user. Currently:
 
 **Max visible toasts:** 3 (others queued)
 
-### Help Screen Enhancements
-- [ ] Display icons alongside button references in help text
-  - When describing a button (e.g., "click the camera button"), show the actual icon next to the text
-  - Use `action_icons` module to ensure consistency with UI
-  - Makes help more visual and easier to understand
+### Help Screen Enhancements ✅
+- [x] ~~Display icons alongside button references in help text~~ ✅
+  - Added `build_tool_item_with_icon()` and `build_bullet_with_icon()` helpers
+  - Viewer: zoom, fit-to-window, fullscreen, delete icons
+  - Video: play, volume, loop, step, capture icons
+  - Editor: rotate left/right, flip horizontal/vertical icons
+  - Uses `action_icons` module for consistency with UI
 
 ### Media Metadata
 - [ ] Retrieve metadata from media files (EXIF, video info, etc.)
