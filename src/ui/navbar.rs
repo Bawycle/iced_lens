@@ -20,6 +20,7 @@ pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
     pub menu_open: bool,
     pub can_edit: bool,
+    pub info_panel_open: bool,
 }
 
 /// Messages emitted by the navbar.
@@ -31,6 +32,7 @@ pub enum Message {
     OpenHelp,
     OpenAbout,
     EnterEditor,
+    ToggleInfoPanel,
 }
 
 /// Events propagated to the parent application.
@@ -41,6 +43,7 @@ pub enum Event {
     OpenHelp,
     OpenAbout,
     EnterEditor,
+    ToggleInfoPanel,
 }
 
 /// Process a navbar message and return the corresponding event.
@@ -70,6 +73,10 @@ pub fn update(message: Message, menu_open: &mut bool) -> Event {
             *menu_open = false;
             Event::EnterEditor
         }
+        Message::ToggleInfoPanel => {
+            *menu_open = false;
+            Event::ToggleInfoPanel
+        }
     }
 }
 
@@ -90,7 +97,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     content.into()
 }
 
-/// Build the top bar with hamburger menu button and edit button.
+/// Build the top bar with hamburger menu button, edit button, and info button.
 fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let menu_button = button(icons::sized(icons::hamburger(), sizing::ICON_MD))
         .on_press(Message::ToggleMenu)
@@ -103,12 +110,22 @@ fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(Text::new(edit_label)).style(styles::button::disabled())
     };
 
+    // Info button with toggle styling (highlighted when panel is open)
+    let info_label = ctx.i18n.tr("navbar-info-button");
+    let info_button_base = button(Text::new(info_label)).on_press(Message::ToggleInfoPanel);
+    let info_button = if ctx.info_panel_open {
+        info_button_base.style(styles::button::selected)
+    } else {
+        info_button_base // Default style when inactive, like Edit button
+    };
+
     let row = Row::new()
         .spacing(spacing::SM)
         .padding(spacing::SM)
         .align_y(Vertical::Center)
         .push(menu_button)
-        .push(edit_button);
+        .push(edit_button)
+        .push(info_button);
 
     Container::new(row)
         .width(Length::Fill)
@@ -221,6 +238,7 @@ mod tests {
             i18n: &i18n,
             menu_open: false,
             can_edit: true,
+            info_panel_open: false,
         };
         let _element = view(ctx);
     }
@@ -232,8 +250,29 @@ mod tests {
             i18n: &i18n,
             menu_open: true,
             can_edit: true,
+            info_panel_open: false,
         };
         let _element = view(ctx);
+    }
+
+    #[test]
+    fn navbar_view_renders_with_info_panel_open() {
+        let i18n = I18n::default();
+        let ctx = ViewContext {
+            i18n: &i18n,
+            menu_open: false,
+            can_edit: true,
+            info_panel_open: true,
+        };
+        let _element = view(ctx);
+    }
+
+    #[test]
+    fn toggle_info_panel_emits_event() {
+        let mut menu_open = true;
+        let event = update(Message::ToggleInfoPanel, &mut menu_open);
+        assert!(!menu_open); // Menu closes
+        assert!(matches!(event, Event::ToggleInfoPanel));
     }
 
     #[test]

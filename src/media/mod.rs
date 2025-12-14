@@ -7,6 +7,7 @@
 pub mod frame_export;
 pub mod image;
 pub mod image_transform;
+pub mod metadata;
 pub mod navigator;
 pub mod video;
 

@@ -21,6 +21,7 @@ mod view;
 pub use message::{Flags, Message};
 pub use screen::Screen;
 
+use crate::media::metadata::MediaMetadata;
 use crate::media::{self, MediaData, MediaNavigator};
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
@@ -58,6 +59,10 @@ pub struct App {
     frame_history_mb: u32,
     /// Whether the hamburger menu is open.
     menu_open: bool,
+    /// Whether the info panel is open.
+    info_panel_open: bool,
+    /// Current media metadata for the info panel.
+    current_metadata: Option<MediaMetadata>,
     /// Help screen state (tracks expanded sections).
     help_state: help::State,
     /// Persisted application state (last save directory, etc.).
@@ -142,6 +147,8 @@ impl Default for App {
             frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
             frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
             menu_open: false,
+            info_panel_open: false,
+            current_metadata: None,
             help_state: help::State::new(),
             app_state: persisted_state::AppState::default(),
             notifications: notifications::Manager::new(),
@@ -315,6 +322,8 @@ impl App {
             frame_cache_mb: self.frame_cache_mb,
             frame_history_mb: self.frame_history_mb,
             menu_open: &mut self.menu_open,
+            info_panel_open: &mut self.info_panel_open,
+            current_metadata: &mut self.current_metadata,
             help_state: &mut self.help_state,
             app_state: &mut self.app_state,
             notifications: &mut self.notifications,
@@ -336,6 +345,9 @@ impl App {
             }
             Message::Help(help_message) => update::handle_help_message(&mut ctx, help_message),
             Message::About(about_message) => update::handle_about_message(&mut ctx, about_message),
+            Message::MetadataPanel(panel_message) => {
+                update::handle_metadata_panel_message(&mut ctx, panel_message)
+            }
             Message::Notification(notification_message) => {
                 self.notifications.handle_message(notification_message);
                 Task::none()
@@ -493,7 +505,9 @@ impl App {
             help_state: &self.help_state,
             fullscreen: self.fullscreen,
             menu_open: self.menu_open,
+            info_panel_open: self.info_panel_open,
             navigation: self.media_navigator.navigation_info(),
+            current_metadata: self.current_metadata.as_ref(),
             notifications: &self.notifications,
         })
     }
