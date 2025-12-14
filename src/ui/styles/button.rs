@@ -62,23 +62,46 @@ pub fn overlay(
 }
 
 /// Style pour bouton désactivé (grayed out, non-interactif).
+///
+/// Very faded appearance with low contrast to clearly indicate non-interactivity.
+/// Adapts to Light/Dark theme.
 pub fn disabled() -> impl Fn(&Theme, button::Status) -> button::Style {
-    move |_theme: &Theme, _status: button::Status| button::Style {
-        background: Some(Background::Color(palette::GRAY_200)),
-        text_color: palette::GRAY_400,
-        border: Border {
-            color: palette::GRAY_400,
-            width: 1.0,
-            radius: radius::SM.into(),
-        },
-        shadow: shadow::NONE,
-        snap: true,
+    move |theme: &Theme, _status: button::Status| {
+        let is_light = matches!(theme, Theme::Light);
+
+        // Low contrast appearance, clearly non-interactive
+        let (bg_color, text_color, border_color) = if is_light {
+            (
+                Color::from_rgba(0.9, 0.9, 0.9, 0.5), // Semi-transparent light gray
+                palette::GRAY_400,                    // Faded text
+                Color::from_rgba(0.7, 0.7, 0.7, 0.3), // Very subtle border
+            )
+        } else {
+            (
+                Color::from_rgba(0.25, 0.25, 0.25, 0.7), // More visible dark gray
+                palette::GRAY_400,                       // Faded but readable text
+                Color::from_rgba(0.35, 0.35, 0.35, 0.5), // Subtle but visible border
+            )
+        };
+
+        button::Style {
+            background: Some(Background::Color(bg_color)),
+            text_color,
+            border: Border {
+                color: border_color,
+                width: 1.0,
+                radius: radius::SM.into(),
+            },
+            shadow: shadow::NONE,
+            snap: true,
+        }
     }
 }
 
-/// Style for selected/active button state.
-/// Uses app's brand colors for consistent appearance across light/dark themes.
-/// Use this for primary actions and selected states in toggle groups.
+/// Style for selected state in button groups (radio buttons, segmented controls).
+///
+/// Use this when one option is selected among multiple mutually exclusive choices.
+/// For on/off toggle buttons, use `toggle_active` instead.
 pub fn selected(theme: &Theme, status: button::Status) -> button::Style {
     let is_light = matches!(theme, Theme::Light);
 
@@ -123,16 +146,27 @@ pub fn selected(theme: &Theme, status: button::Status) -> button::Style {
     }
 }
 
-/// Style for unselected/secondary button state.
-/// Adapts to light/dark theme while maintaining consistency.
-/// Use this for secondary actions and unselected states in toggle groups.
+/// Style for unselected state in button groups (radio buttons, segmented controls).
+///
+/// Use this for non-selected options in mutually exclusive choice groups.
+/// Has clear visual distinction from disabled buttons: solid border, full contrast text.
+/// For on/off toggle buttons in inactive state, use the default button style.
 pub fn unselected(theme: &Theme, status: button::Status) -> button::Style {
     let is_light = matches!(theme, Theme::Light);
 
+    // Clear, interactive appearance with solid border (distinct from faded disabled style)
     let (bg_color, text_color, border_color) = if is_light {
-        (palette::GRAY_100, palette::GRAY_900, palette::GRAY_400)
+        (
+            palette::GRAY_100,
+            palette::GRAY_900, // Full contrast text
+            palette::GRAY_400, // Solid visible border
+        )
     } else {
-        (palette::GRAY_700, WHITE, palette::GRAY_400)
+        (
+            palette::GRAY_700,
+            WHITE, // Full contrast text
+            palette::GRAY_400,
+        )
     };
 
     match status {
@@ -202,41 +236,6 @@ pub fn video_play_overlay() -> impl Fn(&Theme, button::Status) -> button::Style 
             shadow: shadow::LG,
             snap: true,
         }
-    }
-}
-
-/// Style for active toggle controls in dark control bars.
-///
-/// Uses a subtle highlight that fits with dark overlays while clearly
-/// indicating the active state. Suitable for mute, loop, fit-to-window toggles.
-pub fn control_active(_theme: &Theme, status: button::Status) -> button::Style {
-    match status {
-        button::Status::Active | button::Status::Pressed => button::Style {
-            background: Some(Background::Color(Color {
-                a: opacity::OVERLAY_STRONG,
-                ..palette::PRIMARY_600
-            })),
-            text_color: WHITE,
-            border: Border {
-                color: palette::PRIMARY_500,
-                width: 1.0,
-                radius: radius::SM.into(),
-            },
-            shadow: shadow::SM,
-            snap: true,
-        },
-        button::Status::Hovered => button::Style {
-            background: Some(Background::Color(palette::PRIMARY_500)),
-            text_color: WHITE,
-            border: Border {
-                color: palette::PRIMARY_400,
-                width: 1.0,
-                radius: radius::SM.into(),
-            },
-            shadow: shadow::MD,
-            snap: true,
-        },
-        _ => button::Style::default(),
     }
 }
 

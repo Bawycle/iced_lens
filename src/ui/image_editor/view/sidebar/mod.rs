@@ -133,10 +133,11 @@ pub fn collapsed<'a>() -> Element<'a, Message> {
 }
 
 fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
+    // Hamburger is a toggle: selected when sidebar is expanded (which is the case here)
     let toggle_button = button(text("☰").size(typography::TITLE_MD))
         .on_press(SidebarMessage::ToggleSidebar.into())
         .padding(spacing::XS)
-        .style(button_styles::unselected);
+        .style(button_styles::selected);
 
     Column::new()
         .spacing(spacing::XS)
@@ -170,22 +171,20 @@ fn undo_redo_section<'a>(
 ) -> Element<'a, Message> {
     let undo_btn = button(text(ctx.i18n.tr("image-editor-undo")).size(typography::BODY_LG))
         .padding(spacing::XS)
-        .width(Length::Fill)
-        .style(button_styles::unselected);
+        .width(Length::Fill);
     let undo_btn = if can_undo {
         undo_btn.on_press(SidebarMessage::Undo.into())
     } else {
-        undo_btn
+        undo_btn.style(button_styles::disabled())
     };
 
     let redo_btn = button(text(ctx.i18n.tr("image-editor-redo")).size(typography::BODY_LG))
         .padding(spacing::XS)
-        .width(Length::Fill)
-        .style(button_styles::unselected);
+        .width(Length::Fill);
     let redo_btn = if can_redo {
         redo_btn.on_press(SidebarMessage::Redo.into())
     } else {
-        redo_btn
+        redo_btn.style(button_styles::disabled())
     };
 
     let controls = Row::new()
@@ -213,8 +212,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(icons::sized(icons::rotate_left(), icon_size))
             .on_press(SidebarMessage::RotateLeft.into())
             .padding(spacing::XS)
-            .width(Length::Fill)
-            .style(button_styles::unselected),
+            .width(Length::Fill),
         text(ctx.i18n.tr("image-editor-rotate-left-tooltip")),
         tooltip::Position::FollowCursor,
     )
@@ -225,8 +223,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(icons::sized(icons::rotate_right(), icon_size))
             .on_press(SidebarMessage::RotateRight.into())
             .padding(spacing::XS)
-            .width(Length::Fill)
-            .style(button_styles::unselected),
+            .width(Length::Fill),
         text(ctx.i18n.tr("image-editor-rotate-right-tooltip")),
         tooltip::Position::FollowCursor,
     )
@@ -258,8 +255,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(icons::sized(icons::flip_horizontal(), icon_size))
             .on_press(SidebarMessage::FlipHorizontal.into())
             .padding(spacing::XS)
-            .width(Length::Fill)
-            .style(button_styles::unselected),
+            .width(Length::Fill),
         text(ctx.i18n.tr("image-editor-flip-horizontal-tooltip")),
         tooltip::Position::FollowCursor,
     )
@@ -270,8 +266,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(icons::sized(icons::flip_vertical(), icon_size))
             .on_press(SidebarMessage::FlipVertical.into())
             .padding(spacing::XS)
-            .width(Length::Fill)
-            .style(button_styles::unselected),
+            .width(Length::Fill),
         text(ctx.i18n.tr("image-editor-flip-vertical-tooltip")),
         tooltip::Position::FollowCursor,
     )
@@ -315,7 +310,7 @@ fn footer_section<'a>(
         .width(Length::Fill)
         .height(Length::Shrink);
         let prev_btn = if has_changes {
-            prev_btn
+            prev_btn.style(button_styles::disabled())
         } else {
             prev_btn.on_press(SidebarMessage::NavigatePrevious.into())
         };
@@ -329,7 +324,7 @@ fn footer_section<'a>(
         .width(Length::Fill)
         .height(Length::Shrink);
         let next_btn = if has_changes {
-            next_btn
+            next_btn.style(button_styles::disabled())
         } else {
             next_btn.on_press(SidebarMessage::NavigateNext.into())
         };
@@ -341,15 +336,14 @@ fn footer_section<'a>(
         footer = footer.push(nav_row).push(rule::horizontal(1));
     }
 
-    // Cancel button - always available when there are changes
+    // Cancel button - available when there are changes
     let cancel_btn = button(text(ctx.i18n.tr("image-editor-cancel")).size(typography::BODY_LG))
         .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(button_styles::unselected);
+        .width(Length::Fill);
     let cancel_btn = if has_changes {
         cancel_btn.on_press(SidebarMessage::Cancel.into())
     } else {
-        cancel_btn
+        cancel_btn.style(button_styles::disabled())
     };
     footer = footer.push(cancel_btn);
 
@@ -357,12 +351,11 @@ fn footer_section<'a>(
     if !is_captured_frame {
         let save_btn = button(text(ctx.i18n.tr("image-editor-save")).size(typography::BODY_LG))
             .padding(spacing::SM)
-            .width(Length::Fill)
-            .style(button_styles::selected);
+            .width(Length::Fill);
         let save_btn = if has_changes {
             save_btn.on_press(SidebarMessage::Save.into())
         } else {
-            save_btn
+            save_btn.style(button_styles::disabled())
         };
         footer = footer.push(save_btn);
     }
@@ -370,16 +363,15 @@ fn footer_section<'a>(
     // Export format selector - shown before Save As button
     footer = footer.push(export_format_section(export_format, ctx));
 
-    // Save As button - always available
+    // Save As button
     let save_as_btn = button(text(ctx.i18n.tr("image-editor-save-as")).size(typography::BODY_LG))
         .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(button_styles::selected);
+        .width(Length::Fill);
     // For captured frames, Save As is always enabled (it's the only way to save)
     let save_as_btn = if is_captured_frame || has_changes {
         save_as_btn.on_press(SidebarMessage::SaveAs.into())
     } else {
-        save_as_btn
+        save_as_btn.style(button_styles::disabled())
     };
     footer = footer.push(save_as_btn);
 

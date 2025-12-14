@@ -44,22 +44,20 @@ pub fn panel<'a>(adjustment: &'a AdjustmentState, ctx: &ViewContext<'a>) -> Elem
     // Action buttons row
     let reset_btn = button(text(ctx.i18n.tr("image-editor-light-reset")).size(typography::BODY))
         .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(button_styles::unselected);
+        .width(Length::Fill);
     let reset_btn = if adjustment.has_changes() {
         reset_btn.on_press(SidebarMessage::ResetAdjustments.into())
     } else {
-        reset_btn
+        reset_btn.style(button_styles::disabled())
     };
 
     let apply_btn = button(text(ctx.i18n.tr("image-editor-light-apply")).size(typography::BODY_LG))
         .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(button_styles::selected);
+        .width(Length::Fill);
     let apply_btn = if adjustment.has_changes() {
         apply_btn.on_press(SidebarMessage::ApplyAdjustments.into())
     } else {
-        apply_btn
+        apply_btn.style(button_styles::disabled())
     };
 
     let buttons_row = Row::new()

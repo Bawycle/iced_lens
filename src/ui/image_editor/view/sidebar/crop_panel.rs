@@ -59,12 +59,11 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
     let apply_btn = {
         let btn = button(text(ctx.i18n.tr("image-editor-crop-apply")).size(typography::BODY))
             .padding(spacing::XS)
-            .width(Length::Fill)
-            .style(button_styles::selected);
+            .width(Length::Fill);
         if crop.overlay.visible {
             btn.on_press(SidebarMessage::ApplyCrop.into())
         } else {
-            btn
+            btn.style(button_styles::disabled())
         }
     };
 
