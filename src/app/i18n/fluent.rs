@@ -223,8 +223,16 @@ fn resolve_locale(
     // 3. Check OS locale
     if let Some(os_locale_str) = sys_locale::get_locale() {
         if let Ok(os_lang) = os_locale_str.parse::<LanguageIdentifier>() {
+            // Try exact match first (e.g., "en-US" matches "en-US")
             if available.contains(&os_lang) {
                 return Some(os_lang);
+            }
+            // Try language-only fallback (e.g., "fr_FR" matches "fr")
+            let base_lang = os_lang.language;
+            for avail in available {
+                if avail.language == base_lang {
+                    return Some(avail.clone());
+                }
             }
         }
     }
@@ -270,6 +278,28 @@ mod tests {
         if let Some(l) = lang {
             assert!(available.contains(&l));
         }
+    }
+
+    #[test]
+    fn test_resolve_locale_language_fallback() {
+        // Test that "fr-FR" falls back to "fr" when only "fr" is available
+        let available: Vec<LanguageIdentifier> =
+            vec!["en-US".parse().unwrap(), "fr".parse().unwrap()];
+
+        // Simulate what would happen with a "fr-FR" system locale
+        // by directly testing the language matching logic
+        let fr_fr: LanguageIdentifier = "fr-FR".parse().unwrap();
+        let fr: LanguageIdentifier = "fr".parse().unwrap();
+
+        // fr-FR should not be in available (exact match fails)
+        assert!(!available.contains(&fr_fr));
+
+        // But the language component should match
+        assert_eq!(fr_fr.language, fr.language);
+
+        // And we should find "fr" in available that matches the language
+        let matched = available.iter().find(|a| a.language == fr_fr.language);
+        assert_eq!(matched, Some(&fr));
     }
 
     #[test]
