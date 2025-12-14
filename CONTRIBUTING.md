@@ -72,8 +72,9 @@ IcedLens uses [Fluent](https://projectfluent.org/) for internationalization. Con
 2.  **Naming Convention**: Translation files use the `.ftl` extension and are named according to their language code:
     - `en-US.ftl` for American English
     - `fr.ftl` for French
-    - `es.ftl` for Spanish (example for a new language)
-    - `de.ftl` for German (example for a new language)
+    - `es.ftl` for Spanish
+    - `de.ftl` for German
+    - `it.ftl` for Italian
 
 3.  **Create or Edit Translation File**:
     - **For a new language**:
@@ -81,7 +82,7 @@ IcedLens uses [Fluent](https://projectfluent.org/) for internationalization. Con
       2. Create a new file named after your language code (e.g., `pt-BR.ftl` for Brazilian Portuguese)
       3. Copy all the keys from `en-US.ftl` and translate the values
     - **For updates to an existing language**:
-      1. Find and edit the corresponding `.ftl` file (e.g., `fr.ftl` for French)
+      1. Find and edit the corresponding `.ftl` file (e.g., `fr.ftl`, `es.ftl`, `de.ftl`, `it.ftl`)
 
 4.  **Translation Format**: Each line follows this simple pattern:
     ```fluent

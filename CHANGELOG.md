@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2025-12-14
 
 ### Added
 - **Media metadata panel:** new Info button in navbar displays technical information about the current media file.
@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Image centering recalculates correctly on layout changes.
 - Navigation index now updates correctly after deleting a media file.
 - Video error messages now correctly display the codec name (e.g., "H264 not supported") instead of showing a placeholder.
+- System locale detection now falls back to base language (e.g., `fr_FR` correctly matches `fr` translation).
 
 ## [0.2.0] - 2025-12-12
 
@@ -146,6 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MSRV**: Rust 1.78+
 - **License**: Mozilla Public License 2.0 (MPL-2.0)
 
-[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.2.0...HEAD
+[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.3.0...HEAD
+[0.3.0]: https://codeberg.org/Bawycle/iced_lens/compare/v0.2.0...v0.3.0
 [0.2.0]: https://codeberg.org/Bawycle/iced_lens/releases/tag/v0.2.0
 [0.1.0]: https://codeberg.org/Bawycle/iced_lens/releases/tag/v0.1.0

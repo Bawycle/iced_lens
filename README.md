@@ -2,7 +2,7 @@
 
 Lightweight, internationalized image and video viewer with image editing, powered by the [Iced](https://iced.rs/) GUI toolkit.
 
-[![Release](https://img.shields.io/badge/release-v0.2.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
+[![Release](https://img.shields.io/badge/release-v0.3.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/Rust-1.92.0%2B-blue)](https://www.rust-lang.org)
 ![Locales](https://img.shields.io/badge/i18n-en--US|fr|es|de|it-green)
