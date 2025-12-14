@@ -47,3 +47,7 @@ tokio = { version = "1.48", features = ["macros", "rt", "sync", "time"] }
 [[bench]]
 name = "image_loading"
 harness = false # Let Criterion manage the main function
+
+[[bench]]
+name = "media_navigation"
+harness = false

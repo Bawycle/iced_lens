@@ -218,9 +218,11 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
 
 ## Benchmarks
 
-### To Add
-- [ ] Media navigation benchmark (time to load next/previous image in directory)
-  - Use existing test images in `tests/data/`
+### Added
+- [x] ~~Media navigation benchmark~~ ✅
+  - `benches/media_navigation.rs` with Criterion
+  - Benchmarks: `scan_directory`, `navigate_next`, `navigate_previous`, `navigate_and_load_gif`, `navigate_and_load_png`
+  - Uses valid test files from `tests/data/`
 
 ## Notes
 
