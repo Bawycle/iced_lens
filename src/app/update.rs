@@ -4,14 +4,15 @@
 //! This module contains the main `update` function and all specialized
 //! message handlers for different parts of the application.
 
-use super::{persistence, Message, Screen};
+use super::{notifications, persistence, Message, Screen};
 use crate::config;
 use crate::i18n::fluent::I18n;
-use crate::image_navigation::ImageNavigator;
-use crate::media::{self, frame_export::ExportableFrame, MediaData};
+use crate::media::metadata::MediaMetadata;
+use crate::media::{self, frame_export::ExportableFrame, MediaData, MediaNavigator};
 use crate::ui::about::{self, Event as AboutEvent};
 use crate::ui::help::{self, Event as HelpEvent};
 use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
+use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent};
 use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
@@ -26,7 +27,7 @@ pub struct UpdateContext<'a> {
     pub settings: &'a mut SettingsState,
     pub viewer: &'a mut component::State,
     pub image_editor: &'a mut Option<ImageEditorState>,
-    pub image_navigator: &'a mut ImageNavigator,
+    pub media_navigator: &'a mut MediaNavigator,
     pub fullscreen: &'a mut bool,
     pub window_id: &'a mut Option<window::Id>,
     pub theme_mode: &'a mut ThemeMode,
@@ -35,7 +36,28 @@ pub struct UpdateContext<'a> {
     pub frame_cache_mb: u32,
     pub frame_history_mb: u32,
     pub menu_open: &'a mut bool,
+    pub info_panel_open: &'a mut bool,
+    pub current_metadata: &'a mut Option<MediaMetadata>,
     pub help_state: &'a mut help::State,
+    pub app_state: &'a mut super::persisted_state::AppState,
+    pub notifications: &'a mut notifications::Manager,
+}
+
+impl<'a> UpdateContext<'a> {
+    /// Creates a PreferencesContext for persisting preferences.
+    pub fn preferences_context(&mut self) -> persistence::PreferencesContext<'_> {
+        persistence::PreferencesContext {
+            viewer: self.viewer,
+            settings: self.settings,
+            theme_mode: *self.theme_mode,
+            video_autoplay: *self.video_autoplay,
+            audio_normalization: *self.audio_normalization,
+            frame_cache_mb: self.frame_cache_mb,
+            frame_history_mb: self.frame_history_mb,
+            keyboard_seek_step_secs: self.settings.keyboard_seek_step_secs(),
+            notifications: self.notifications,
+        }
+    }
 }
 
 /// Handles viewer component messages.
@@ -47,18 +69,25 @@ pub fn handle_viewer_message(
         *ctx.window_id = Some(*window);
     }
 
+    // Check if this is a successful ImageLoaded message to extract metadata
+    let is_successful_load = matches!(&message, component::Message::ImageLoaded(Ok(_)));
+
     let (effect, task) = ctx.viewer.handle_message(message, ctx.i18n);
+
+    // Extract metadata after successful media load
+    if is_successful_load {
+        if let Some(path) = ctx.viewer.current_image_path.as_ref() {
+            *ctx.current_metadata = media::metadata::extract_metadata(path);
+        } else {
+            *ctx.current_metadata = None;
+        }
+    }
+
     let viewer_task = task.map(Message::Viewer);
     let side_effect = match effect {
-        component::Effect::PersistPreferences => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-        ),
+        component::Effect::PersistPreferences => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
         component::Effect::ToggleFullscreen => toggle_fullscreen(ctx.fullscreen, ctx.window_id),
         component::Effect::ExitFullscreen => {
             update_fullscreen_mode(ctx.fullscreen, ctx.window_id, false)
@@ -75,6 +104,11 @@ pub fn handle_viewer_message(
             video_path,
             position_secs,
         } => handle_capture_frame(frame, video_path, position_secs),
+        component::Effect::RequestDelete => handle_delete_current_media(ctx),
+        component::Effect::ToggleInfoPanel => {
+            *ctx.info_panel_open = !*ctx.info_panel_open;
+            Task::none()
+        }
         component::Effect::None => Task::none(),
     };
     Task::batch([viewer_task, side_effect])
@@ -88,15 +122,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
             Ok(Some(value)) => {
                 ctx.viewer.set_zoom_step_percent(value);
                 *ctx.screen = target;
-                return persistence::persist_preferences(
-                    ctx.viewer,
-                    ctx.settings,
-                    *ctx.theme_mode,
-                    *ctx.video_autoplay,
-                    *ctx.audio_normalization,
-                    ctx.frame_cache_mb,
-                    ctx.frame_history_mb,
-                );
+                return persistence::persist_preferences(ctx.preferences_context());
             }
             Ok(None) => {
                 *ctx.screen = target;
@@ -119,16 +145,24 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
             let image_data = match media_data {
                 MediaData::Image(img) => img,
                 MediaData::Video(_) => {
-                    eprintln!("Video editing is not supported in this version");
+                    ctx.notifications.push(notifications::Notification::warning(
+                        "notification-video-editing-unsupported",
+                    ));
                     return Task::none();
                 }
             };
 
-            // Synchronize image_navigator with viewer state before entering editor
-            let config = config::load().unwrap_or_default();
-            let sort_order = config.sort_order.unwrap_or_default();
-            if let Err(err) = ctx.image_navigator.scan_directory(&image_path, sort_order) {
-                eprintln!("Failed to scan directory: {:?}", err);
+            // Synchronize media_navigator with viewer state before entering editor
+            let (config, _) = config::load();
+            let sort_order = config.display.sort_order.unwrap_or_default();
+            if ctx
+                .media_navigator
+                .scan_directory(&image_path, sort_order)
+                .is_err()
+            {
+                ctx.notifications.push(notifications::Notification::warning(
+                    "notification-scan-dir-error",
+                ));
             }
 
             match ImageEditorState::new(image_path, image_data) {
@@ -136,8 +170,10 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                     *ctx.image_editor = Some(state);
                     *ctx.screen = target;
                 }
-                Err(err) => {
-                    eprintln!("Failed to enter editor screen: {err:?}");
+                Err(_) => {
+                    ctx.notifications.push(notifications::Notification::error(
+                        "notification-editor-create-error",
+                    ));
                 }
             }
             return Task::none();
@@ -172,113 +208,47 @@ pub fn handle_settings_message(
         SettingsEvent::BackToViewerWithZoomChange(value) => {
             ctx.viewer.set_zoom_step_percent(value);
             *ctx.screen = Screen::Viewer;
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::LanguageSelected(locale) => {
-            persistence::apply_language_change(ctx.i18n, ctx.viewer, locale)
+            persistence::apply_language_change(ctx.i18n, ctx.viewer, locale, ctx.notifications)
         }
         SettingsEvent::ZoomStepChanged(value) => {
             ctx.viewer.set_zoom_step_percent(value);
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
-        SettingsEvent::BackgroundThemeSelected(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-        ),
+        SettingsEvent::BackgroundThemeSelected(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
         SettingsEvent::ThemeModeSelected(mode) => {
             *ctx.theme_mode = mode;
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
-        SettingsEvent::SortOrderSelected(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-        ),
-        SettingsEvent::OverlayTimeoutChanged(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-        ),
+        SettingsEvent::SortOrderSelected(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
+        SettingsEvent::OverlayTimeoutChanged(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
         SettingsEvent::VideoAutoplayChanged(enabled) => {
             *ctx.video_autoplay = enabled;
             ctx.viewer.set_video_autoplay(enabled);
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::AudioNormalizationChanged(enabled) => {
             *ctx.audio_normalization = enabled;
-            persistence::persist_preferences(
-                ctx.viewer,
-                ctx.settings,
-                *ctx.theme_mode,
-                *ctx.video_autoplay,
-                *ctx.audio_normalization,
-                ctx.frame_cache_mb,
-                ctx.frame_history_mb,
-            )
+            persistence::persist_preferences(ctx.preferences_context())
         }
-        SettingsEvent::FrameCacheMbChanged(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-        ),
-        SettingsEvent::FrameHistoryMbChanged(_) => persistence::persist_preferences(
-            ctx.viewer,
-            ctx.settings,
-            *ctx.theme_mode,
-            *ctx.video_autoplay,
-            *ctx.audio_normalization,
-            ctx.frame_cache_mb,
-            ctx.frame_history_mb,
-        ),
+        SettingsEvent::FrameCacheMbChanged(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
+        SettingsEvent::FrameHistoryMbChanged(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
+        SettingsEvent::KeyboardSeekStepChanged(step) => {
+            ctx.viewer.set_keyboard_seek_step_secs(step);
+            persistence::persist_preferences(ctx.preferences_context())
+        }
     }
 }
 
@@ -327,10 +297,14 @@ pub fn handle_editor_message(
             if let Some(editor) = ctx.image_editor.as_mut() {
                 match editor.save_image(&path) {
                     Ok(()) => {
-                        eprintln!("Image saved successfully to: {:?}", path);
+                        ctx.notifications.push(notifications::Notification::success(
+                            "notification-save-success",
+                        ));
                     }
-                    Err(err) => {
-                        eprintln!("Failed to save image: {:?}", err);
+                    Err(_err) => {
+                        ctx.notifications.push(notifications::Notification::error(
+                            "notification-save-error",
+                        ));
                     }
                 }
             }
@@ -338,13 +312,17 @@ pub fn handle_editor_message(
         }
         ImageEditorEvent::SaveAsRequested => {
             let editor_state = ctx.image_editor.as_ref().expect("editor state exists");
-            handle_save_as_dialog(editor_state)
+            let last_dir = ctx.app_state.last_save_directory.clone();
+            handle_save_as_dialog(editor_state, last_dir)
         }
     }
 }
 
 /// Handles Save As dialog request.
-fn handle_save_as_dialog(editor_state: &ImageEditorState) -> Task<Message> {
+fn handle_save_as_dialog(
+    editor_state: &ImageEditorState,
+    last_save_directory: Option<PathBuf>,
+) -> Task<Message> {
     use crate::media::frame_export::{generate_default_filename, ExportFormat};
 
     let image_source = editor_state.image_source().clone();
@@ -372,12 +350,18 @@ fn handle_save_as_dialog(editor_state: &ImageEditorState) -> Task<Message> {
 
     Task::perform(
         async move {
-            rfd::AsyncFileDialog::new()
+            let mut dialog = rfd::AsyncFileDialog::new()
                 .set_file_name(&filename)
-                .add_filter(filter_name, &filter_ext)
-                .save_file()
-                .await
-                .map(|h| h.path().to_path_buf())
+                .add_filter(filter_name, &filter_ext);
+
+            // Use last save directory if available
+            if let Some(dir) = last_save_directory {
+                if dir.exists() {
+                    dialog = dialog.set_directory(&dir);
+                }
+            }
+
+            dialog.save_file().await.map(|h| h.path().to_path_buf())
         },
         Message::SaveAsDialogResult,
     )
@@ -387,22 +371,21 @@ fn handle_save_as_dialog(editor_state: &ImageEditorState) -> Task<Message> {
 fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Rescan directory to handle added/removed images
     if let Some(current_path) = ctx
-        .image_navigator
-        .current_image_path()
+        .media_navigator
+        .current_media_path()
         .map(|p| p.to_path_buf())
     {
-        let config = config::load().unwrap_or_default();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let (config, _) = config::load();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let _ = ctx
-            .image_navigator
+            .media_navigator
             .scan_directory(&current_path, sort_order);
     }
 
-    // Navigate to next image in the list
-    if let Some(next_path) = ctx.image_navigator.navigate_next() {
+    // Navigate to next image in the list (skipping videos)
+    if let Some(next_path) = ctx.media_navigator.navigate_next_image() {
         // Synchronize viewer state immediately
         ctx.viewer.current_image_path = Some(next_path.clone());
-        ctx.viewer.image_list.set_current(&next_path);
 
         // Load the next image and create a new ImageEditorState
         Task::perform(
@@ -418,22 +401,21 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Rescan directory to handle added/removed images
     if let Some(current_path) = ctx
-        .image_navigator
-        .current_image_path()
+        .media_navigator
+        .current_media_path()
         .map(|p| p.to_path_buf())
     {
-        let config = config::load().unwrap_or_default();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let (config, _) = config::load();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let _ = ctx
-            .image_navigator
+            .media_navigator
             .scan_directory(&current_path, sort_order);
     }
 
-    // Navigate to previous image in the list
-    if let Some(prev_path) = ctx.image_navigator.navigate_previous() {
+    // Navigate to previous image in the list (skipping videos)
+    if let Some(prev_path) = ctx.media_navigator.navigate_previous_image() {
         // Synchronize viewer state immediately
         ctx.viewer.current_image_path = Some(prev_path.clone());
-        ctx.viewer.image_list.set_current(&prev_path);
 
         // Load the previous image and create a new ImageEditorState
         Task::perform(
@@ -465,6 +447,10 @@ pub fn handle_navbar_message(
             Task::none()
         }
         NavbarEvent::EnterEditor => handle_screen_switch(ctx, Screen::ImageEditor),
+        NavbarEvent::ToggleInfoPanel => {
+            *ctx.info_panel_open = !*ctx.info_panel_open;
+            Task::none()
+        }
     }
 }
 
@@ -490,27 +476,39 @@ pub fn handle_about_message(ctx: &mut UpdateContext<'_>, message: about::Message
     }
 }
 
+/// Handles metadata panel messages.
+pub fn handle_metadata_panel_message(
+    ctx: &mut UpdateContext<'_>,
+    message: metadata_panel::Message,
+) -> Task<Message> {
+    match metadata_panel::update(message) {
+        MetadataPanelEvent::None => Task::none(),
+        MetadataPanelEvent::Close => {
+            *ctx.info_panel_open = false;
+            Task::none()
+        }
+    }
+}
+
 /// Handles navigation to next image.
 pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Rescan directory to handle added/removed images
     if let Some(current_path) = ctx
-        .image_navigator
-        .current_image_path()
+        .media_navigator
+        .current_media_path()
         .map(|p| p.to_path_buf())
     {
-        let config = config::load().unwrap_or_default();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let (config, _) = config::load();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let _ = ctx
-            .image_navigator
+            .media_navigator
             .scan_directory(&current_path, sort_order);
     }
 
     // Navigate to next image
-    if let Some(next_path) = ctx.image_navigator.navigate_next() {
+    if let Some(next_path) = ctx.media_navigator.navigate_next() {
         // Synchronize viewer state from navigator
         ctx.viewer.current_image_path = Some(next_path.clone());
-        // Also sync viewer.image_list from viewer.current_image_path
-        let _ = ctx.viewer.scan_directory();
 
         // Set loading state directly (before render)
         ctx.viewer.is_loading_media = true;
@@ -529,23 +527,21 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Rescan directory to handle added/removed images
     if let Some(current_path) = ctx
-        .image_navigator
-        .current_image_path()
+        .media_navigator
+        .current_media_path()
         .map(|p| p.to_path_buf())
     {
-        let config = config::load().unwrap_or_default();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let (config, _) = config::load();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let _ = ctx
-            .image_navigator
+            .media_navigator
             .scan_directory(&current_path, sort_order);
     }
 
     // Navigate to previous image
-    if let Some(prev_path) = ctx.image_navigator.navigate_previous() {
+    if let Some(prev_path) = ctx.media_navigator.navigate_previous() {
         // Synchronize viewer state from navigator
         ctx.viewer.current_image_path = Some(prev_path.clone());
-        // Also sync viewer.image_list from viewer.current_image_path
-        let _ = ctx.viewer.scan_directory();
 
         // Set loading state directly (before render)
         ctx.viewer.is_loading_media = true;
@@ -557,6 +553,73 @@ pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         })
     } else {
         Task::none()
+    }
+}
+
+/// Handles deletion of the current media file.
+///
+/// Uses media_navigator to find the next media to display after deletion.
+pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let Some(current_path) = ctx
+        .media_navigator
+        .current_media_path()
+        .map(|p| p.to_path_buf())
+    else {
+        return Task::none();
+    };
+
+    // Get the next candidate before deletion
+    let has_multiple = ctx.media_navigator.len() > 1;
+    let next_candidate = if has_multiple {
+        ctx.media_navigator
+            .navigate_next()
+            .filter(|next| *next != current_path)
+    } else {
+        None
+    };
+
+    // Attempt to delete the file
+    match std::fs::remove_file(&current_path) {
+        Ok(()) => {
+            ctx.notifications.push(notifications::Notification::success(
+                "notification-delete-success",
+            ));
+
+            // Rescan directory after deletion
+            let scan_seed = next_candidate
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| current_path.clone());
+
+            let (config, _) = config::load();
+            let sort_order = config.display.sort_order.unwrap_or_default();
+            let _ = ctx.media_navigator.scan_directory(&scan_seed, sort_order);
+
+            if let Some(next_path) = next_candidate {
+                // Navigate to the next media
+                ctx.media_navigator
+                    .set_current_media_path(next_path.clone());
+                ctx.viewer.current_image_path = Some(next_path.clone());
+
+                // Set loading state
+                ctx.viewer.is_loading_media = true;
+                ctx.viewer.loading_started_at = Some(std::time::Instant::now());
+
+                Task::perform(async move { media::load_media(&next_path) }, |result| {
+                    Message::Viewer(component::Message::ImageLoaded(result))
+                })
+            } else {
+                // No more media in directory
+                ctx.viewer.current_image_path = None;
+                Task::none()
+            }
+        }
+        Err(_err) => {
+            ctx.notifications.push(notifications::Notification::error(
+                "notification-delete-error",
+            ));
+            Task::none()
+        }
     }
 }
 
@@ -598,5 +661,5 @@ fn update_fullscreen_mode(
     } else {
         window::Mode::Windowed
     };
-    window::change_mode::<Message>(window_id, mode)
+    window::set_mode(window_id, mode)
 }

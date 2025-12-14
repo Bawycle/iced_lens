@@ -5,18 +5,21 @@
 use crate::config::BackgroundTheme;
 use crate::media::MediaData;
 use crate::ui::components::checkerboard;
-use crate::ui::design_tokens::{opacity, radius, sizing, spacing};
+use crate::ui::design_tokens::{opacity, radius, sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::styles;
 use crate::ui::theme;
 use crate::ui::viewer::{component::Message, HudIconKind, HudLine};
 use crate::ui::widgets::{wheel_blocking_scrollable::wheel_blocking_scrollable, AnimatedSpinner};
 use iced::mouse;
-use iced::widget::{button, mouse_area, Column, Container, Row, Scrollable, Stack, Text};
+use iced::widget::{
+    button, mouse_area, responsive, Column, Container, Row, Scrollable, Stack, Text,
+};
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::scrollable::{Direction, Id, Scrollbar, Viewport},
-    Background, Element, Length, Padding, Theme,
+    widget::scrollable::{Direction, Scrollbar, Viewport},
+    widget::Id,
+    Background, Element, Length, Padding, Size, Theme,
 };
 
 pub struct ViewContext<'a> {
@@ -29,7 +32,10 @@ pub struct ViewContext<'a> {
 pub struct ViewModel<'a> {
     pub media: &'a MediaData,
     pub zoom_percent: f32,
-    pub padding: Padding,
+    /// Manual zoom percentage (used when fit_to_window is disabled).
+    pub manual_zoom_percent: f32,
+    /// Whether fit-to-window mode is enabled.
+    pub fit_to_window: bool,
     pub is_dragging: bool,
     pub cursor_over_media: bool,
     pub arrows_visible: bool,
@@ -42,7 +48,7 @@ pub struct ViewModel<'a> {
     pub total_count: usize,
     pub position_counter_visible: bool,
     pub hud_visible: bool,
-    pub video_canvas: Option<&'a crate::ui::widgets::VideoCanvas<super::component::Message>>,
+    pub video_shader: Option<&'a crate::ui::widgets::VideoShader<super::component::Message>>,
     pub is_video_playing: bool,
     pub is_loading_media: bool,
     pub spinner_rotation: f32,
@@ -50,6 +56,62 @@ pub struct ViewModel<'a> {
 }
 
 pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Message> {
+    // Use responsive widget to get the available size and calculate fit-to-window zoom
+    responsive(move |available_size: Size| view_inner(&ctx, &model, available_size)).into()
+}
+
+/// Calculate the zoom percentage needed to fit media within available space.
+fn calculate_fit_zoom(media_width: u32, media_height: u32, available: Size) -> f32 {
+    if media_width == 0 || media_height == 0 || available.width <= 0.0 || available.height <= 0.0 {
+        return crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT;
+    }
+
+    let scale_x = available.width / media_width as f32;
+    let scale_y = available.height / media_height as f32;
+    let scale = scale_x.min(scale_y);
+
+    if !scale.is_finite() || scale <= 0.0 {
+        return crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT;
+    }
+
+    crate::ui::state::zoom::clamp_zoom(scale * 100.0)
+}
+
+/// Calculate padding to center media within available space.
+fn calculate_centering_padding(media_size: Size, available: Size) -> Padding {
+    let horizontal = ((available.width - media_size.width) / 2.0).max(0.0);
+    let vertical = ((available.height - media_size.height) / 2.0).max(0.0);
+
+    Padding {
+        top: vertical,
+        right: horizontal,
+        bottom: vertical,
+        left: horizontal,
+    }
+}
+
+fn view_inner<'a>(
+    ctx: &ViewContext<'a>,
+    model: &ViewModel<'a>,
+    available_size: Size,
+) -> Element<'a, Message> {
+    // Calculate effective zoom: use fit-to-window calculation or manual zoom
+    let effective_zoom = if model.fit_to_window {
+        calculate_fit_zoom(model.media.width(), model.media.height(), available_size)
+    } else {
+        model.manual_zoom_percent
+    };
+
+    // Calculate scaled media size
+    let scale = effective_zoom / 100.0;
+    let scaled_width = model.media.width() as f32 * scale;
+    let scaled_height = model.media.height() as f32 * scale;
+    let scaled_size = Size::new(scaled_width, scaled_height);
+
+    // Calculate padding based on current available size (from responsive widget)
+    // This ensures proper centering even when layout changes
+    let effective_padding = calculate_centering_padding(scaled_size, available_size);
+
     // Determine arrow colors based on background theme for optimal visibility
     // Following UX best practices: semi-transparent backgrounds with strong shadows
     let (arrow_text_color, arrow_bg_alpha_normal, arrow_bg_alpha_hover, svg_color) =
@@ -74,30 +136,30 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
             }
         };
 
-    // Use video canvas if it has a frame (playing OR paused with frame),
+    // Use video shader if it has a frame (playing OR paused with frame),
     // otherwise show static media (image or video thumbnail before playback starts)
-    let media_viewer = if let Some(canvas) = model.video_canvas {
-        if canvas.has_frame() {
-            // Show the canvas frame (whether playing or paused)
-            canvas.view()
+    let media_viewer = if let Some(shader) = model.video_shader {
+        if shader.has_frame() {
+            // Show the shader frame (whether playing or paused)
+            shader.view()
         } else {
             // No frame yet, show thumbnail
-            super::view_media(model.media, model.zoom_percent)
+            super::view_media(model.media, effective_zoom)
         }
     } else {
-        // Not a video or no canvas, show static media
-        super::view_media(model.media, model.zoom_percent)
+        // Not a video or no shader, show static media
+        super::view_media(model.media, effective_zoom)
     };
 
-    let media_container = Container::new(media_viewer).padding(model.padding);
+    let media_container = Container::new(media_viewer).padding(effective_padding);
 
     let scrollable = Scrollable::new(media_container)
         .id(Id::new(ctx.scrollable_id))
         .width(Length::Fill)
         .height(Length::Fill)
         .direction(Direction::Both {
-            vertical: Scrollbar::new().width(0).scroller_width(0),
-            horizontal: Scrollbar::new().width(0).scroller_width(0),
+            vertical: Scrollbar::hidden(),
+            horizontal: Scrollbar::hidden(),
         })
         .on_scroll(|viewport: Viewport| {
             let bounds = viewport.bounds();
@@ -161,10 +223,10 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
                     .spacing(spacing::XXS)
                     .align_y(Vertical::Center)
                     .push(loop_icon)
-                    .push(Text::new("◀").size(28))
+                    .push(Text::new("◀").size(typography::TITLE_LG))
                     .into()
             } else {
-                Text::new("◀").size(28).into()
+                Text::new("◀").size(typography::TITLE_LG).into()
             };
             let left_arrow = button(button_content)
                 .on_press(Message::NavigatePrevious)
@@ -193,11 +255,11 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
                 Row::new()
                     .spacing(spacing::XXS)
                     .align_y(Vertical::Center)
-                    .push(Text::new("▶").size(28))
+                    .push(Text::new("▶").size(typography::TITLE_LG))
                     .push(loop_icon)
                     .into()
             } else {
-                Text::new("▶").size(28).into()
+                Text::new("▶").size(typography::TITLE_LG).into()
             };
             let right_arrow = button(button_content)
                 .on_press(Message::NavigateNext)
@@ -266,7 +328,9 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
 
         // Parse error message to get appropriate i18n key and user-friendly message
         let video_error = VideoError::from_message(error_msg);
-        let error_text = ctx.i18n.tr(video_error.i18n_key());
+        let args = video_error.i18n_args();
+        let args_refs: Vec<(&str, &str)> = args.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let error_text = ctx.i18n.tr_with_args(video_error.i18n_key(), &args_refs);
         let heading = ctx.i18n.tr("error-load-video-heading");
 
         let error_icon = icons::sized(icons::warning(), 32.0)
@@ -382,7 +446,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
                 .spacing(spacing::XXS)
                 .align_y(Vertical::Center)
                 .push(styled_icon)
-                .push(Text::new(hud_line.text.clone()).size(12));
+                .push(Text::new(hud_line.text.clone()).size(typography::CAPTION));
 
             hud_column = hud_column.push(line_row);
         }
@@ -405,14 +469,15 @@ pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Messa
     if model.position_counter_visible && model.total_count > 1 {
         if let Some(current) = model.current_index {
             let position_text = format!("{}/{}", current + 1, model.total_count);
-            let position_indicator = Container::new(Text::new(position_text).size(14))
-                .padding(Padding {
-                    top: spacing::XXS,
-                    right: spacing::XS,
-                    bottom: spacing::XXS,
-                    left: spacing::XS,
-                })
-                .style(styles::overlay::indicator(12.0));
+            let position_indicator =
+                Container::new(Text::new(position_text).size(typography::BODY))
+                    .padding(Padding {
+                        top: spacing::XXS,
+                        right: spacing::XS,
+                        bottom: spacing::XXS,
+                        left: spacing::XS,
+                    })
+                    .style(styles::overlay::indicator(12.0));
 
             stack = stack.push(
                 Container::new(position_indicator)

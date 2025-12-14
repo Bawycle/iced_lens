@@ -14,27 +14,24 @@ impl State {
         F: Fn(&DynamicImage) -> DynamicImage,
     {
         let updated = operation(&self.working_image);
-        match image_transform::dynamic_to_image_data(&updated) {
-            Ok(image_data) => {
-                self.working_image = updated;
-                self.current_image = image_data;
-                self.sync_resize_state_dimensions();
-                self.preview_image = None;
+        let Ok(image_data) = image_transform::dynamic_to_image_data(&updated) else {
+            return;
+        };
 
-                // Reset crop state after rotation to match new dimensions
-                if matches!(
-                    transformation,
-                    Transformation::RotateLeft | Transformation::RotateRight
-                ) {
-                    self.sync_crop_state_dimensions();
-                }
+        self.working_image = updated;
+        self.current_image = image_data;
+        self.sync_resize_state_dimensions();
+        self.preview_image = None;
 
-                self.record_transformation(transformation);
-            }
-            Err(err) => {
-                eprintln!("Failed to apply transformation: {err:?}");
-            }
+        // Reset crop state after rotation to match new dimensions
+        if matches!(
+            transformation,
+            Transformation::RotateLeft | Transformation::RotateRight
+        ) {
+            self.sync_crop_state_dimensions();
         }
+
+        self.record_transformation(transformation);
     }
 
     pub(crate) fn sync_resize_state_dimensions(&mut self) {
@@ -77,6 +74,9 @@ impl State {
             && self.crop_state.overlay.visible
         {
             self.finalize_crop_overlay();
+        }
+        if matches!(self.active_tool, Some(EditorTool::Adjust)) {
+            self.commit_adjustment_changes();
         }
     }
 }

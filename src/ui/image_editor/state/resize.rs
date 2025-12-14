@@ -228,14 +228,10 @@ impl State {
 
         let preview_dynamic =
             image_transform::resize(&self.working_image, target_width, target_height);
-        match image_transform::dynamic_to_image_data(&preview_dynamic) {
-            Ok(image_data) => {
-                self.preview_image = Some(image_data);
-            }
-            Err(err) => {
-                eprintln!("Failed to build resize preview: {err:?}");
-                self.preview_image = None;
-            }
+        if let Ok(image_data) = image_transform::dynamic_to_image_data(&preview_dynamic) {
+            self.preview_image = Some(image_data);
+        } else {
+            self.preview_image = None;
         }
     }
 }

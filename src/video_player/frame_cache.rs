@@ -135,20 +135,14 @@ struct CacheEntry {
 
     /// Size of this entry in bytes.
     size_bytes: usize,
-
-    /// Whether this is a keyframe (I-frame).
-    /// Reserved for future use (e.g., prioritized eviction of non-keyframes).
-    #[allow(dead_code)]
-    is_keyframe: bool,
 }
 
 impl CacheEntry {
-    fn new(frame: DecodedFrame, is_keyframe: bool) -> Self {
+    fn new(frame: DecodedFrame) -> Self {
         let size_bytes = frame.size_bytes();
         Self {
             frame: Arc::new(frame),
             size_bytes,
-            is_keyframe,
         }
     }
 }
@@ -233,7 +227,7 @@ impl FrameCache {
             self.current_bytes = self.current_bytes.saturating_sub(existing.size_bytes);
         }
 
-        let entry = CacheEntry::new(frame, is_keyframe);
+        let entry = CacheEntry::new(frame);
         self.current_bytes += entry.size_bytes;
         self.cache.put(pts_micros, entry);
         self.stats.insertions += 1;

@@ -7,7 +7,9 @@ use crate::media::MediaData;
 use crate::ui::about;
 use crate::ui::help;
 use crate::ui::image_editor;
+use crate::ui::metadata_panel;
 use crate::ui::navbar;
+use crate::ui::notifications;
 use crate::ui::settings;
 use crate::ui::viewer::component;
 use std::path::PathBuf;
@@ -26,6 +28,8 @@ pub enum Message {
     Navbar(navbar::Message),
     Help(help::Message),
     About(about::Message),
+    MetadataPanel(metadata_panel::Message),
+    Notification(notifications::NotificationMessage),
     ImageEditorLoaded(Result<MediaData, Error>),
     SaveAsDialogResult(Option<PathBuf>),
     FrameCaptureDialogResult {
@@ -50,4 +54,10 @@ pub struct Flags {
     pub file_path: Option<String>,
     /// Optional directory containing Fluent `.ftl` files for custom builds.
     pub i18n_dir: Option<String>,
+    /// Optional data directory override (for state files).
+    /// Takes precedence over `ICED_LENS_DATA_DIR` environment variable.
+    pub data_dir: Option<String>,
+    /// Optional config directory override (for settings.toml).
+    /// Takes precedence over `ICED_LENS_CONFIG_DIR` environment variable.
+    pub config_dir: Option<String>,
 }

@@ -16,7 +16,8 @@ mod state;
 mod view;
 
 pub use self::state::{
-    CropDragState, CropOverlay, CropRatio, CropState, HandlePosition, ResizeOverlay, ResizeState,
+    AdjustmentState, CropDragState, CropOverlay, CropRatio, CropState, HandlePosition,
+    ResizeOverlay, ResizeState,
 };
 pub use component::{EditorTool, Transformation, ViewContext};
 use image_rs::DynamicImage;
@@ -67,6 +68,8 @@ pub struct State {
     crop_base_height: u32,
     /// Resize state
     resize_state: ResizeState,
+    /// Adjustment state (brightness/contrast)
+    adjustment_state: AdjustmentState,
     /// Optional preview image (used for live adjustments)
     preview_image: Option<ImageData>,
     /// Viewport state for tracking canvas bounds and scroll position

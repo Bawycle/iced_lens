@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Viewer component encapsulating state and update logic.
 
-use crate::directory_scanner::ImageList;
 use crate::error::Error;
 use crate::i18n::fluent::I18n;
+use crate::media::navigator::NavigationInfo;
 use crate::media::MediaData;
 use crate::ui::state::{DragState, ViewportState, ZoomState};
 use crate::ui::viewer::{
     self, controls, pane, state as geometry, video_controls, HudIconKind, HudLine,
 };
-use crate::ui::widgets::VideoCanvas;
+use crate::ui::widgets::VideoShader;
 use crate::video_player::{subscription::PlaybackMessage, SharedLufsCache, VideoPlayer};
-use iced::widget::scrollable::{self, AbsoluteOffset, Id, RelativeOffset};
+use iced::widget::scrollable::{AbsoluteOffset, RelativeOffset};
+use iced::widget::{operation, Id};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -67,6 +68,11 @@ pub enum Effect {
         video_path: PathBuf,
         position_secs: f64,
     },
+    /// Request to delete the current media file.
+    /// App will handle the actual deletion using media_navigator.
+    RequestDelete,
+    /// Toggle the info/metadata panel.
+    ToggleInfoPanel,
 }
 
 #[derive(Debug, Clone)]
@@ -82,7 +88,7 @@ impl ErrorState {
         let friendly_key = match error {
             Error::Io(_) => "error-load-image-io",
             Error::Svg(_) => "error-load-image-svg",
-            #[allow(unreachable_patterns)]
+            // Config and Video errors use the general message
             _ => "error-load-image-general",
         };
 
@@ -109,6 +115,9 @@ pub struct ViewEnv<'a> {
     pub background_theme: crate::config::BackgroundTheme,
     pub is_fullscreen: bool,
     pub overlay_hide_delay: std::time::Duration,
+    /// Navigation state from the central MediaNavigator.
+    /// This is the single source of truth for navigation info.
+    pub navigation: NavigationInfo,
 }
 
 /// Complete viewer component state.
@@ -121,7 +130,6 @@ pub struct State {
     cursor_position: Option<Point>,
     last_click: Option<Instant>,
     pub current_image_path: Option<PathBuf>,
-    pub image_list: ImageList,
     arrows_visible: bool,
     last_mouse_move: Option<Instant>,
     last_overlay_interaction: Option<Instant>,
@@ -135,7 +143,7 @@ pub struct State {
 
     // Video playback state
     video_player: Option<VideoPlayer>,
-    video_canvas: VideoCanvas<Message>,
+    video_shader: VideoShader<Message>,
     current_video_path: Option<PathBuf>,
     playback_session_id: u64, // Incremented each time playback starts, ensures unique subscription ID
 
@@ -156,10 +164,21 @@ pub struct State {
     /// Whether video audio is muted.
     video_muted: bool,
 
+    /// Whether video playback should loop.
+    video_loop: bool,
+
     /// Whether the overflow menu (advanced video controls) is open.
     overflow_menu_open: bool,
+
+    /// Last time a keyboard seek was triggered (for debouncing).
+    last_keyboard_seek: Option<Instant>,
+
+    /// Keyboard seek step in seconds (arrow keys during video playback).
+    keyboard_seek_step_secs: f64,
 }
 
+// Manual Default impl required: video_fit_to_window defaults to true (not false),
+// and video_volume/keyboard_seek_step_secs use config constants instead of 0.0.
 #[allow(clippy::derivable_impls)]
 impl Default for State {
     fn default() -> Self {
@@ -172,7 +191,6 @@ impl Default for State {
             cursor_position: None,
             last_click: None,
             current_image_path: None,
-            image_list: ImageList::default(),
             arrows_visible: false,
             last_mouse_move: None,
             last_overlay_interaction: None,
@@ -182,7 +200,7 @@ impl Default for State {
             loading_started_at: None,
             spinner_rotation: 0.0,
             video_player: None,
-            video_canvas: VideoCanvas::new(),
+            video_shader: VideoShader::new(),
             current_video_path: None,
             playback_session_id: 0,
             video_fit_to_window: true, // Videos always fit-to-window by default
@@ -190,7 +208,10 @@ impl Default for State {
             video_autoplay: false, // Default to no autoplay
             video_volume: crate::config::DEFAULT_VOLUME,
             video_muted: false,
+            video_loop: false,
             overflow_menu_open: false,
+            last_keyboard_seek: None,
+            keyboard_seek_step_secs: crate::config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
         }
     }
 }
@@ -322,18 +343,44 @@ impl State {
         self.video_autoplay = enabled;
     }
 
-    pub fn scan_directory(&mut self) -> crate::error::Result<()> {
-        if let Some(path) = &self.current_image_path {
-            let config = crate::config::load().unwrap_or_default();
-            let sort_order = config.sort_order.unwrap_or_default();
-            self.image_list = ImageList::scan_directory(path, sort_order)?;
-        }
-        Ok(())
+    /// Sets the video volume level (0.0 to 1.0).
+    pub fn set_video_volume(&mut self, volume: f32) {
+        self.video_volume = volume.clamp(crate::config::MIN_VOLUME, crate::config::MAX_VOLUME);
+    }
+
+    /// Returns the current video volume level.
+    pub fn video_volume(&self) -> f32 {
+        self.video_volume
+    }
+
+    /// Sets whether video audio is muted.
+    pub fn set_video_muted(&mut self, muted: bool) {
+        self.video_muted = muted;
+    }
+
+    /// Returns whether video audio is muted.
+    pub fn video_muted(&self) -> bool {
+        self.video_muted
+    }
+
+    /// Sets whether video playback should loop.
+    pub fn set_video_loop(&mut self, enabled: bool) {
+        self.video_loop = enabled;
+    }
+
+    /// Returns whether video playback loops.
+    pub fn video_loop(&self) -> bool {
+        self.video_loop
+    }
+
+    /// Sets the keyboard seek step in seconds.
+    pub fn set_keyboard_seek_step_secs(&mut self, step: f64) {
+        self.keyboard_seek_step_secs = step;
     }
 
     /// Returns an exportable frame from the video canvas, if available.
     pub fn exportable_frame(&self) -> Option<crate::media::frame_export::ExportableFrame> {
-        self.video_canvas.exportable_frame()
+        self.video_shader.exportable_frame()
     }
 
     /// Returns true if media is currently being loaded.
@@ -434,8 +481,9 @@ impl State {
                     }
                     self.video_player = None;
                     self.current_video_path = None;
-                    self.video_canvas.clear(); // Clear frame to release memory
+                    self.video_shader.clear(); // Clear frame to release memory
                     self.seek_preview_position = None;
+                    self.last_keyboard_seek = None;
                     self.playback_session_id += 1; // Ensure old subscription is dropped
                 }
                 // Reset video fit-to-window to default for new media
@@ -466,8 +514,6 @@ impl State {
                         }
 
                         self.refresh_fit_zoom();
-                        // Scan directory on successful image load
-                        let _ = self.scan_directory();
                         (Effect::None, Task::none())
                     }
                     Err(error) => {
@@ -485,21 +531,21 @@ impl State {
             }
             Message::Controls(control) => {
                 if matches!(control, controls::Message::DeleteCurrentImage) {
-                    return self.delete_current_image(i18n);
+                    return (Effect::RequestDelete, Task::none());
                 }
                 let result = self.handle_controls(control);
 
                 // Sync video canvas scale with zoom changes
                 if self.video_player.is_some() {
                     let zoom_scale = self.zoom.zoom_percent / 100.0;
-                    self.video_canvas.set_scale(zoom_scale);
+                    self.video_shader.set_scale(zoom_scale);
                 }
 
                 result
             }
             Message::ViewportChanged { bounds, offset } => {
                 self.viewport.update(bounds, offset);
-                self.refresh_fit_zoom();
+                // Note: centering is now calculated in view via responsive widget
                 (Effect::None, Task::none())
             }
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
@@ -515,7 +561,7 @@ impl State {
                 // Emit effect to let App handle navigation with ImageNavigator
                 (Effect::NavigatePrevious, Task::none())
             }
-            Message::DeleteCurrentImage => self.delete_current_image(i18n),
+            Message::DeleteCurrentImage => (Effect::RequestDelete, Task::none()),
             Message::OpenSettings => (Effect::OpenSettings, Task::none()),
             Message::EnterEditor => (Effect::EnterEditor, Task::none()),
             Message::InitiatePlayback => {
@@ -553,7 +599,7 @@ impl State {
 
                             // Update canvas scale to match current zoom
                             let zoom_scale = self.zoom.zoom_percent / 100.0;
-                            self.video_canvas.set_scale(zoom_scale);
+                            self.video_shader.set_scale(zoom_scale);
                         }
                         Err(e) => {
                             eprintln!("Failed to create video player: {}", e);
@@ -605,7 +651,7 @@ impl State {
 
                                     // Update canvas scale to match current zoom
                                     let zoom_scale = self.zoom.zoom_percent / 100.0;
-                                    self.video_canvas.set_scale(zoom_scale);
+                                    self.video_shader.set_scale(zoom_scale);
                                 }
                                 Err(e) => {
                                     eprintln!("Failed to create video player: {}", e);
@@ -630,11 +676,41 @@ impl State {
                     }
                     VM::SeekRelative(delta_secs) => {
                         // Seek relative to current position
-                        // Used by keyboard shortcuts (e.g., arrow keys for ±5s)
-                        if let Some(player) = &mut self.video_player {
-                            if let Some(current_pos) = player.state().position() {
-                                let target_secs = current_pos + delta_secs;
-                                player.seek(target_secs);
+                        // Used by keyboard shortcuts (e.g., arrow keys)
+                        //
+                        // Important: We use seek_preview_position as our "intended position"
+                        // because player.state().position() may return keyframe positions
+                        // which can differ from our target. This prevents "snap back" behavior.
+                        //
+                        // Time-based debounce: ignore events within 200ms of last seek
+                        const SEEK_DEBOUNCE_MS: u64 = 200;
+
+                        let now = Instant::now();
+                        let should_seek = match self.last_keyboard_seek {
+                            Some(last) => {
+                                now.duration_since(last).as_millis() >= SEEK_DEBOUNCE_MS as u128
+                            }
+                            None => true,
+                        };
+
+                        if should_seek {
+                            if let Some(player) = &mut self.video_player {
+                                // Use seek_preview_position if set (from previous keyboard seek),
+                                // otherwise fall back to player's reported position
+                                let base_position = self
+                                    .seek_preview_position
+                                    .or_else(|| player.state().position());
+
+                                if let Some(current_pos) = base_position {
+                                    let duration = player.video_data().duration_secs;
+                                    let target_secs =
+                                        (current_pos + delta_secs).max(0.0).min(duration);
+
+                                    // Store our intended position for subsequent seeks
+                                    self.seek_preview_position = Some(target_secs);
+                                    player.seek(target_secs);
+                                    self.last_keyboard_seek = Some(now);
+                                }
                             }
                         }
                     }
@@ -646,6 +722,7 @@ impl State {
                         if let Some(player) = &self.video_player {
                             player.set_volume(self.video_volume);
                         }
+                        return (Effect::PersistPreferences, Task::none());
                     }
                     VM::ToggleMute => {
                         self.video_muted = !self.video_muted;
@@ -653,12 +730,14 @@ impl State {
                         if let Some(player) = &self.video_player {
                             player.set_muted(self.video_muted);
                         }
+                        return (Effect::PersistPreferences, Task::none());
                     }
                     VM::ToggleLoop => {
+                        self.video_loop = !self.video_loop;
                         if let Some(player) = &mut self.video_player {
-                            let current = player.is_loop_enabled();
-                            player.set_loop(!current);
+                            player.set_loop(self.video_loop);
                         }
+                        return (Effect::PersistPreferences, Task::none());
                     }
                     VM::CaptureFrame => {
                         // Pause the video if playing
@@ -722,9 +801,10 @@ impl State {
                         if let Some(ref mut player) = self.video_player {
                             player.set_command_sender(command_sender);
 
-                            // Apply current volume and mute state
+                            // Apply current volume, mute, and loop state
                             player.set_volume(self.video_volume);
                             player.set_muted(self.video_muted);
+                            player.set_loop(self.video_loop);
 
                             // Auto-play if enabled
                             if self.video_autoplay {
@@ -739,7 +819,7 @@ impl State {
                         pts_secs,
                     } => {
                         // Update canvas with new frame
-                        self.video_canvas.set_frame(rgba_data, width, height);
+                        self.video_shader.set_frame(rgba_data, width, height);
 
                         // Update player position
                         if let Some(ref mut player) = self.video_player {
@@ -775,7 +855,7 @@ impl State {
                             // Mark that we've reached the end (for step forward button)
                             player.set_at_end_of_stream();
 
-                            if player.is_loop_enabled() {
+                            if self.video_loop {
                                 // Restart playback from beginning
                                 // Clear seek preview so step operations use actual position
                                 self.seek_preview_position = None;
@@ -866,11 +946,12 @@ impl State {
             true
         };
 
+        let effective_fit_to_window = self.fit_to_window();
         let image = self.media.as_ref().map(|image_data| viewer::ImageContext {
             i18n: env.i18n,
             controls_context: controls::ViewContext { i18n: env.i18n },
             zoom: &self.zoom,
-            effective_fit_to_window: self.fit_to_window(),
+            effective_fit_to_window,
             pane_context: pane::ViewContext {
                 background_theme: env.background_theme,
                 hud_lines,
@@ -880,26 +961,29 @@ impl State {
             pane_model: pane::ViewModel {
                 media: image_data,
                 zoom_percent: self.zoom.zoom_percent,
-                padding: geometry_state.media_padding(),
+                manual_zoom_percent: self.zoom.zoom_percent,
+                fit_to_window: effective_fit_to_window,
                 is_dragging: self.drag.is_dragging,
                 cursor_over_media: geometry_state.is_cursor_over_media(),
                 arrows_visible: if env.is_fullscreen {
                     // In fullscreen, arrows use same auto-hide logic as controls
-                    self.arrows_visible && !self.image_list.is_empty() && overlay_should_be_visible
+                    self.arrows_visible
+                        && env.navigation.total_count > 0
+                        && overlay_should_be_visible
                 } else {
                     // In windowed mode, arrows visible on hover (current behavior)
-                    self.arrows_visible && !self.image_list.is_empty()
+                    self.arrows_visible && env.navigation.total_count > 0
                 },
                 overlay_visible: center_overlay_visible,
-                has_next: self.image_list.next().is_some(),
-                has_previous: self.image_list.previous().is_some(),
-                at_first: self.image_list.is_at_first(),
-                at_last: self.image_list.is_at_last(),
-                current_index: self.image_list.current_index(),
-                total_count: self.image_list.len(),
+                has_next: env.navigation.has_next,
+                has_previous: env.navigation.has_previous,
+                at_first: env.navigation.at_first,
+                at_last: env.navigation.at_last,
+                current_index: env.navigation.current_index,
+                total_count: env.navigation.total_count,
                 position_counter_visible: if env.is_fullscreen {
                     // In fullscreen, use same auto-hide logic as arrows and controls
-                    !self.image_list.is_empty() && overlay_should_be_visible
+                    env.navigation.total_count > 0 && overlay_should_be_visible
                 } else {
                     // In windowed mode, always visible
                     true
@@ -911,7 +995,7 @@ impl State {
                     // In windowed mode, always visible
                     true
                 },
-                video_canvas: Some(&self.video_canvas),
+                video_shader: Some(&self.video_shader),
                 // Use is_playing_or_will_resume() to include Seeking state
                 // This prevents the play button from flashing during seek operations
                 is_video_playing: self.is_video_playing_or_will_resume(),
@@ -947,19 +1031,19 @@ impl State {
                         let can_step_fwd = player.can_step_forward();
                         match state {
                             crate::video_player::PlaybackState::Playing { position_secs } => {
-                                (true, *position_secs, player.is_loop_enabled(), false, false)
+                                (true, *position_secs, self.video_loop, false, false)
                             }
                             crate::video_player::PlaybackState::Paused { position_secs } => (
                                 false,
                                 *position_secs,
-                                player.is_loop_enabled(),
+                                self.video_loop,
                                 can_step_back,
                                 can_step_fwd,
                             ),
                             crate::video_player::PlaybackState::Buffering { position_secs } => {
-                                (true, *position_secs, player.is_loop_enabled(), false, false)
+                                (true, *position_secs, self.video_loop, false, false)
                             }
-                            _ => (false, 0.0, player.is_loop_enabled(), false, false),
+                            _ => (false, 0.0, self.video_loop, false, false),
                         }
                     } else {
                         // No player yet - show initial state (paused at 0)
@@ -1199,11 +1283,12 @@ impl State {
                     key: keyboard::Key::Named(keyboard::key::Named::ArrowRight),
                     ..
                 } => {
-                    // ArrowRight: Seek +5s if video is playing, otherwise navigate to next media
+                    // ArrowRight: Seek forward if video is playing, otherwise navigate to next media
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
+                        let step = self.keyboard_seek_step_secs;
                         self.handle_message(
-                            Message::VideoControls(video_controls::Message::SeekRelative(5.0)),
+                            Message::VideoControls(video_controls::Message::SeekRelative(step)),
                             &I18n::default(),
                         )
                     } else {
@@ -1214,11 +1299,12 @@ impl State {
                     key: keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
                     ..
                 } => {
-                    // ArrowLeft: Seek -5s if video is playing, otherwise navigate to previous media
+                    // ArrowLeft: Seek backward if video is playing, otherwise navigate to previous media
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
+                        let step = self.keyboard_seek_step_secs;
                         self.handle_message(
-                            Message::VideoControls(video_controls::Message::SeekRelative(-5.0)),
+                            Message::VideoControls(video_controls::Message::SeekRelative(-step)),
                             &I18n::default(),
                         )
                     } else {
@@ -1332,6 +1418,17 @@ impl State {
                         (Effect::None, Task::none())
                     }
                 }
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(ref c),
+                    modifiers,
+                    ..
+                } if (c.as_str() == "i" || c.as_str() == "I")
+                    && !modifiers.command()
+                    && !modifiers.alt() =>
+                {
+                    // I key: Toggle info/metadata panel
+                    (Effect::ToggleInfoPanel, Task::none())
+                }
                 keyboard::Event::ModifiersChanged(modifiers) => {
                     if modifiers.command() {
                         // no-op currently, but keep placeholder for shortcut support
@@ -1422,7 +1519,7 @@ impl State {
                 0.0
             };
 
-            scrollable::snap_to(
+            operation::snap_to(
                 Id::new(SCROLLABLE_ID),
                 RelativeOffset {
                     x: relative_x,
@@ -1455,6 +1552,12 @@ impl State {
             self.video_fit_to_window = false;
         }
 
+        // Sync video shader scale with zoom changes
+        if self.video_player.is_some() {
+            let zoom_scale = self.zoom.zoom_percent / 100.0;
+            self.video_shader.set_scale(zoom_scale);
+        }
+
         true
     }
 
@@ -1472,7 +1575,7 @@ impl State {
                 // Sync video canvas scale when fit-to-window zoom changes
                 if self.video_player.is_some() {
                     let zoom_scale = fit_zoom / 100.0;
-                    self.video_canvas.set_scale(zoom_scale);
+                    self.video_shader.set_scale(zoom_scale);
                 }
             }
         }
@@ -1516,61 +1619,6 @@ impl State {
             self.zoom.zoom_percent,
             self.cursor_position,
         )
-    }
-
-    fn load_image_task(path: PathBuf) -> Task<Message> {
-        Task::perform(
-            async move { crate::media::load_media(&path) },
-            Message::ImageLoaded,
-        )
-    }
-
-    fn delete_current_image(&mut self, i18n: &I18n) -> (Effect, Task<Message>) {
-        let Some(current_path) = self.current_image_path.clone() else {
-            return (Effect::None, Task::none());
-        };
-
-        let has_multiple = self.image_list.len() > 1;
-        let next_candidate = if has_multiple {
-            self.image_list
-                .next()
-                .map(|path| path.to_path_buf())
-                .filter(|next| next != &current_path)
-        } else {
-            None
-        };
-
-        match std::fs::remove_file(&current_path) {
-            Ok(()) => {
-                self.media = None;
-                self.error = None;
-
-                let scan_seed = next_candidate
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_else(|| current_path.clone());
-                self.current_image_path = Some(scan_seed);
-                let _ = self.scan_directory();
-
-                if let Some(next_path) = next_candidate {
-                    self.current_image_path = Some(next_path.clone());
-                    self.image_list.set_current(&next_path);
-                    (Effect::None, Self::load_image_task(next_path))
-                } else {
-                    self.current_image_path = None;
-                    (Effect::None, Task::none())
-                }
-            }
-            Err(err) => {
-                self.error = Some(ErrorState {
-                    friendly_key: "error-delete-image-io",
-                    friendly_text: i18n.tr("error-delete-image-io"),
-                    details: err.to_string(),
-                    show_details: false,
-                });
-                (Effect::None, Task::none())
-            }
-        }
     }
 }
 

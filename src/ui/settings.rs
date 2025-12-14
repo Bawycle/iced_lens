@@ -8,24 +8,26 @@
 
 use crate::config::{
     BackgroundTheme, SortOrder, DEFAULT_FRAME_CACHE_MB, DEFAULT_FRAME_HISTORY_MB,
-    DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT, MAX_FRAME_CACHE_MB,
-    MAX_FRAME_HISTORY_MB, MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB, MIN_FRAME_HISTORY_MB,
-    MIN_OVERLAY_TIMEOUT_SECS,
+    DEFAULT_KEYBOARD_SEEK_STEP_SECS, DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT,
+    MAX_FRAME_CACHE_MB, MAX_FRAME_HISTORY_MB, MAX_KEYBOARD_SEEK_STEP_SECS,
+    MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB, MIN_FRAME_HISTORY_MB,
+    MIN_KEYBOARD_SEEK_STEP_SECS, MIN_OVERLAY_TIMEOUT_SECS,
 };
 use crate::i18n::fluent::I18n;
-use crate::ui::design_tokens::{radius, sizing, spacing};
+use crate::ui::design_tokens::{radius, sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::state::zoom::{
     format_number, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT, ZOOM_STEP_INVALID_KEY,
     ZOOM_STEP_RANGE_KEY,
 };
 use crate::ui::styles;
+use crate::ui::styles::button as button_styles;
 use crate::ui::theme;
 use crate::ui::theming::ThemeMode;
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
-        button, container, horizontal_rule, scrollable, svg::Svg, text, text_input, Button, Column,
+        button, container, pick_list, rule, scrollable, svg::Svg, text, text_input, Button, Column,
         Container, Row, Slider, Text,
     },
     Border, Element, Length, Theme,
@@ -52,6 +54,7 @@ pub struct StateConfig {
     pub audio_normalization: bool,
     pub frame_cache_mb: u32,
     pub frame_history_mb: u32,
+    pub keyboard_seek_step_secs: f64,
 }
 
 impl Default for StateConfig {
@@ -66,6 +69,7 @@ impl Default for StateConfig {
             audio_normalization: true,
             frame_cache_mb: DEFAULT_FRAME_CACHE_MB,
             frame_history_mb: DEFAULT_FRAME_HISTORY_MB,
+            keyboard_seek_step_secs: DEFAULT_KEYBOARD_SEEK_STEP_SECS,
         }
     }
 }
@@ -85,6 +89,7 @@ pub struct State {
     audio_normalization: bool,
     frame_cache_mb: u32,
     frame_history_mb: u32,
+    keyboard_seek_step_secs: f64,
 }
 
 /// Messages emitted directly by the settings widgets.
@@ -102,6 +107,7 @@ pub enum Message {
     AudioNormalizationChanged(bool),
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
+    KeyboardSeekStepChanged(f64),
 }
 
 /// Events propagated to the parent application for side effects.
@@ -120,6 +126,22 @@ pub enum Event {
     AudioNormalizationChanged(bool),
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
+    KeyboardSeekStepChanged(f64),
+}
+
+/// Language option for the pick_list widget.
+///
+/// Wraps a LanguageIdentifier with a display name for use in the dropdown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageOption {
+    pub locale: LanguageIdentifier,
+    pub display_name: String,
+}
+
+impl std::fmt::Display for LanguageOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display_name)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,6 +190,9 @@ impl State {
         let clamped_history = config
             .frame_history_mb
             .clamp(MIN_FRAME_HISTORY_MB, MAX_FRAME_HISTORY_MB);
+        let clamped_seek_step = config
+            .keyboard_seek_step_secs
+            .clamp(MIN_KEYBOARD_SEEK_STEP_SECS, MAX_KEYBOARD_SEEK_STEP_SECS);
         Self {
             background_theme: config.background_theme,
             sort_order: config.sort_order,
@@ -181,6 +206,7 @@ impl State {
             audio_normalization: config.audio_normalization,
             frame_cache_mb: clamped_cache,
             frame_history_mb: clamped_history,
+            keyboard_seek_step_secs: clamped_seek_step,
         }
     }
 
@@ -220,6 +246,10 @@ impl State {
         self.frame_history_mb
     }
 
+    pub fn keyboard_seek_step_secs(&self) -> f64 {
+        self.keyboard_seek_step_secs
+    }
+
     pub(crate) fn zoom_step_input_value(&self) -> &str {
         &self.zoom_step_input
     }
@@ -240,11 +270,11 @@ impl State {
                 "← {}",
                 ctx.i18n.tr("settings-back-to-viewer-button")
             ))
-            .size(14),
+            .size(typography::BODY),
         )
         .on_press(Message::BackToViewer);
 
-        let title = Text::new(ctx.i18n.tr("settings-title")).size(30);
+        let title = Text::new(ctx.i18n.tr("settings-title")).size(typography::TITLE_LG);
 
         // =========================================================================
         // SECTION: General (Language, Theme)
@@ -283,33 +313,42 @@ impl State {
 
     /// Build the General section (Language, Theme mode).
     fn build_general_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
-        // Language selection
-        let mut language_row = Row::new().spacing(spacing::XS).align_y(Vertical::Center);
-        for locale in &ctx.i18n.available_locales {
-            let display_name = locale.to_string();
-            let translated_name_key = format!("language-name-{}", locale);
-            let translated_name = ctx.i18n.tr(&translated_name_key);
-            let button_text = if translated_name.starts_with("MISSING:") {
-                display_name.clone()
-            } else {
-                format!("{} ({})", translated_name, display_name)
-            };
-
-            let is_current = ctx.i18n.current_locale() == locale;
-            let btn = Button::new(Text::new(button_text))
-                .on_press(Message::LanguageSelected(locale.clone()))
-                .style(if is_current {
-                    button::primary
+        // Language selection using pick_list (dropdown)
+        let language_options: Vec<LanguageOption> = ctx
+            .i18n
+            .available_locales
+            .iter()
+            .map(|locale| {
+                let translated_name_key = format!("language-name-{}", locale);
+                let translated_name = ctx.i18n.tr(&translated_name_key);
+                let display_name = if translated_name.starts_with("MISSING:") {
+                    locale.to_string()
                 } else {
-                    button::secondary
-                });
-            language_row = language_row.push(btn);
-        }
+                    format!("{} ({})", translated_name, locale)
+                };
+                LanguageOption {
+                    locale: locale.clone(),
+                    display_name,
+                }
+            })
+            .collect();
+
+        let current_locale = ctx.i18n.current_locale();
+        let selected = language_options
+            .iter()
+            .find(|opt| &opt.locale == current_locale)
+            .cloned();
+
+        let language_picker = pick_list(language_options, selected, |opt| {
+            Message::LanguageSelected(opt.locale)
+        })
+        .padding(spacing::XS)
+        .text_size(typography::BODY);
 
         let language_setting = self.build_setting_row(
             ctx.i18n.tr("select-language-label"),
             None,
-            language_row.into(),
+            language_picker.into(),
         );
 
         // Theme mode selection
@@ -322,9 +361,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::ThemeModeSelected(mode))
                 .style(if self.theme_mode == mode {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             theme_row = theme_row.push(btn);
         }
@@ -362,9 +401,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::BackgroundThemeSelected(theme))
                 .style(if self.background_theme == theme {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             background_row = background_row.push(btn);
         }
@@ -393,14 +432,14 @@ impl State {
 
         let zoom_hint: Element<'_, Message> = if let Some(error_key) = self.zoom_step_error_key() {
             Text::new(ctx.i18n.tr(error_key))
-                .size(13)
+                .size(typography::BODY_SM)
                 .style(move |_theme: &Theme| text::Style {
                     color: Some(theme::error_text_color()),
                 })
                 .into()
         } else {
             Text::new(ctx.i18n.tr("settings-zoom-step-hint"))
-                .size(13)
+                .size(typography::BODY_SM)
                 .into()
         };
 
@@ -420,9 +459,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::SortOrderSelected(order))
                 .style(if self.sort_order == order {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             sort_row = sort_row.push(btn);
         }
@@ -457,9 +496,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::VideoAutoplayChanged(enabled))
                 .style(if self.video_autoplay == enabled {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             autoplay_row = autoplay_row.push(btn);
         }
@@ -468,7 +507,7 @@ impl State {
             ctx.i18n.tr("settings-video-autoplay-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-video-autoplay-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             autoplay_row.into(),
@@ -483,9 +522,9 @@ impl State {
             let btn = Button::new(Text::new(ctx.i18n.tr(key)))
                 .on_press(Message::AudioNormalizationChanged(enabled))
                 .style(if self.audio_normalization == enabled {
-                    button::primary
+                    button_styles::selected
                 } else {
-                    button::secondary
+                    button_styles::unselected
                 });
             normalization_row = normalization_row.push(btn);
         }
@@ -494,7 +533,7 @@ impl State {
             ctx.i18n.tr("settings-audio-normalization-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-audio-normalization-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             normalization_row.into(),
@@ -525,7 +564,7 @@ impl State {
             ctx.i18n.tr("settings-frame-cache-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-frame-cache-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             cache_control.into(),
@@ -556,10 +595,41 @@ impl State {
             ctx.i18n.tr("settings-frame-history-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-frame-history-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             history_control.into(),
+        );
+
+        // Keyboard seek step slider
+        let seek_step_slider = Slider::new(
+            MIN_KEYBOARD_SEEK_STEP_SECS..=MAX_KEYBOARD_SEEK_STEP_SECS,
+            self.keyboard_seek_step_secs,
+            Message::KeyboardSeekStepChanged,
+        )
+        .step(0.5)
+        .width(Length::Fixed(200.0));
+
+        let seek_step_value = Text::new(format!(
+            "{} {}",
+            self.keyboard_seek_step_secs,
+            ctx.i18n.tr("seconds")
+        ));
+
+        let seek_step_control = Row::new()
+            .spacing(spacing::SM)
+            .align_y(Vertical::Center)
+            .push(seek_step_slider)
+            .push(seek_step_value);
+
+        let seek_step_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-keyboard-seek-step-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-keyboard-seek-step-hint"))
+                    .size(typography::BODY_SM)
+                    .into(),
+            ),
+            seek_step_control.into(),
         );
 
         let content = Column::new()
@@ -567,7 +637,8 @@ impl State {
             .push(autoplay_setting)
             .push(normalization_setting)
             .push(cache_setting)
-            .push(history_setting);
+            .push(history_setting)
+            .push(seek_step_setting);
 
         build_section(
             icons::video_camera(),
@@ -602,7 +673,7 @@ impl State {
             ctx.i18n.tr("settings-overlay-timeout-label"),
             Some(
                 Text::new(ctx.i18n.tr("settings-overlay-timeout-hint"))
-                    .size(13)
+                    .size(typography::BODY_SM)
                     .into(),
             ),
             timeout_control.into(),
@@ -625,7 +696,7 @@ impl State {
         control: Element<'a, Message>,
     ) -> Element<'a, Message> {
         let mut col = Column::new().spacing(spacing::XS);
-        col = col.push(Text::new(label).size(14));
+        col = col.push(Text::new(label).size(typography::BODY));
         col = col.push(control);
         if let Some(hint_element) = hint {
             col = col.push(hint_element);
@@ -697,6 +768,11 @@ impl State {
             Message::FrameHistoryMbChanged(mb) => {
                 update_if_changed(&mut self.frame_history_mb, mb, Event::FrameHistoryMbChanged)
             }
+            Message::KeyboardSeekStepChanged(step) => update_if_changed(
+                &mut self.keyboard_seek_step_secs,
+                step,
+                Event::KeyboardSeekStepChanged,
+            ),
         }
     }
 
@@ -742,12 +818,12 @@ fn build_section<'a>(
         .spacing(spacing::SM)
         .align_y(Vertical::Center)
         .push(icon_sized)
-        .push(Text::new(title).size(18));
+        .push(Text::new(title).size(typography::TITLE_SM));
 
     let inner = Column::new()
         .spacing(spacing::SM)
         .push(header)
-        .push(horizontal_rule(1))
+        .push(rule::horizontal(1))
         .push(content);
 
     Container::new(inner)

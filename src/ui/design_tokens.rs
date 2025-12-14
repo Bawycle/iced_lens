@@ -10,6 +10,8 @@ This module defines all of the application's design tokens, following the W3C De
 - **Opacity**: Standardized opacity levels
 - **Spacing**: Spacing scale (8px grid)
 - **Sizing**: Component sizes
+- **Typography**: Font size scale
+- **Border**: Border width scale
 - **Radius**: Border radii
 - **Shadow**: Shadow definitions
 
@@ -57,10 +59,14 @@ pub mod palette {
     pub const GRAY_200: Color = Color::from_rgb(0.75, 0.75, 0.75);
     pub const GRAY_100: Color = Color::from_rgb(0.85, 0.85, 0.85);
 
-    // Brand colors
-    pub const PRIMARY_500: Color = Color::from_rgb(0.3, 0.6, 0.9);
-    pub const PRIMARY_600: Color = Color::from_rgb(0.2, 0.5, 0.8);
-    pub const PRIMARY_400: Color = Color::from_rgb(0.4, 0.7, 1.0);
+    // Brand colors (blue scale)
+    pub const PRIMARY_100: Color = Color::from_rgb(0.85, 0.92, 1.0); // Very light blue
+    pub const PRIMARY_200: Color = Color::from_rgb(0.7, 0.84, 0.98); // Light blue
+    pub const PRIMARY_400: Color = Color::from_rgb(0.4, 0.7, 1.0); // Medium light blue
+    pub const PRIMARY_500: Color = Color::from_rgb(0.3, 0.6, 0.9); // Primary blue
+    pub const PRIMARY_600: Color = Color::from_rgb(0.2, 0.5, 0.8); // Medium dark blue
+    pub const PRIMARY_700: Color = Color::from_rgb(0.15, 0.4, 0.7); // Dark blue
+    pub const PRIMARY_800: Color = Color::from_rgb(0.1, 0.3, 0.6); // Very dark blue
 
     // Semantic colors
     pub const ERROR_500: Color = Color::from_rgb(0.898, 0.224, 0.208);
@@ -81,6 +87,9 @@ pub mod opacity {
     pub const OVERLAY_HOVER: f32 = 0.8;
     pub const OVERLAY_PRESSED: f32 = 0.9;
     pub const OPAQUE: f32 = 1.0;
+
+    /// Surface background - Semi-transparent panels and containers
+    pub const SURFACE: f32 = 0.95;
 }
 
 // ============================================================================
@@ -102,17 +111,70 @@ pub mod spacing {
 // ============================================================================
 
 pub mod sizing {
+    // Icon sizes
     pub const ICON_SM: f32 = 16.0;
     pub const ICON_MD: f32 = 24.0;
     pub const ICON_LG: f32 = 32.0;
     pub const ICON_XL: f32 = 48.0;
     pub const ICON_XXL: f32 = 64.0;
 
+    // Interactive element heights
     pub const BUTTON_HEIGHT: f32 = 36.0;
     pub const INPUT_HEIGHT: f32 = 40.0;
 
+    // Video controls
     pub const SCRUBBER_THUMB: f32 = 12.0;
     pub const TIMELINE_TRACK: f32 = 4.0;
+
+    // Component widths
+    pub const SIDEBAR_WIDTH: f32 = 290.0;
+    pub const TOAST_WIDTH: f32 = 320.0;
+}
+
+// ============================================================================
+// Typography Scale
+// ============================================================================
+
+pub mod typography {
+    //! Font size scale following Material Design 3 type scale principles.
+    //!
+    //! The scale provides semantic sizes for consistent text hierarchy:
+    //! - Titles: Large headings (pages, dialogs)
+    //! - Body: Primary content text
+    //! - Caption: Secondary, supporting text
+
+    /// Large title - Main page headings (Settings, Help, About)
+    pub const TITLE_LG: f32 = 30.0;
+
+    /// Medium title - App name, prominent labels
+    pub const TITLE_MD: f32 = 20.0;
+
+    /// Small title - Section headers
+    pub const TITLE_SM: f32 = 18.0;
+
+    /// Large body - Form inputs, emphasis text
+    pub const BODY_LG: f32 = 16.0;
+
+    /// Standard body - Most UI text, labels, descriptions
+    pub const BODY: f32 = 14.0;
+
+    /// Small body - Hints, secondary labels
+    pub const BODY_SM: f32 = 13.0;
+
+    /// Caption - Badges, timestamps, small info
+    pub const CAPTION: f32 = 12.0;
+}
+
+// ============================================================================
+// Border Scale
+// ============================================================================
+
+pub mod border {
+    /// Thin border - Subtle separators, input fields
+    pub const WIDTH_SM: f32 = 1.0;
+
+    /// Medium border - Emphasis borders, toast accents
+    pub const WIDTH_MD: f32 = 2.0;
 }
 
 // ============================================================================
@@ -175,10 +237,21 @@ const _: () = {
     assert!(opacity::TRANSPARENT == 0.0);
     assert!(opacity::OPAQUE == 1.0);
     assert!(opacity::OVERLAY_MEDIUM > 0.0 && opacity::OVERLAY_MEDIUM < 1.0);
+    assert!(opacity::SURFACE > 0.0 && opacity::SURFACE < 1.0);
 
     // Sizing validation
     assert!(sizing::ICON_XL > sizing::ICON_LG);
     assert!(sizing::ICON_LG > sizing::ICON_MD);
+
+    // Typography validation
+    assert!(typography::TITLE_LG > typography::TITLE_MD);
+    assert!(typography::TITLE_MD > typography::TITLE_SM);
+    assert!(typography::TITLE_SM > typography::BODY_LG);
+    assert!(typography::BODY > typography::BODY_SM);
+    assert!(typography::BODY_SM > typography::CAPTION);
+
+    // Border validation
+    assert!(border::WIDTH_MD > border::WIDTH_SM);
 
     // Color validation
     assert!(palette::PRIMARY_500.r >= 0.0 && palette::PRIMARY_500.r <= 1.0);

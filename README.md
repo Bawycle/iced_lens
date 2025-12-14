@@ -2,10 +2,10 @@
 
 Lightweight, internationalized image and video viewer with image editing, powered by the [Iced](https://iced.rs/) GUI toolkit.
 
-[![Release](https://img.shields.io/badge/release-v0.2.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
+[![Release](https://img.shields.io/badge/release-v0.3.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/Rust-1.92.0%2B-blue)](https://www.rust-lang.org)
-![Locales](https://img.shields.io/badge/i18n-en--US|fr-green)
+![Locales](https://img.shields.io/badge/i18n-en--US|fr|es|de|it-green)
 ![Status: Pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange)
 
 > **Note**: This is a pre-1.0 release. The software is functional but still under active development. Testing has been performed exclusively on Linux Mint 22.2. Feedback and contributions are welcome!
@@ -37,17 +37,19 @@ IcedLens aims to provide a simple, privacy‑friendly image viewer and editor fo
 ### Viewing
 - **Images:** JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, SVG
 - **Videos:** MP4, AVI, MOV, MKV, WebM (plus animated GIF/WebP)
+- **Metadata panel:** EXIF data for images (camera, exposure, GPS), codec/bitrate info for videos
 - Zoom, pan, fit-to-window, fullscreen with auto-hiding controls
 - Multi-media browsing with keyboard navigation
 - Frame-by-frame video navigation and frame capture
-- Fluent-based localization (en-US, fr)
+- Fluent-based localization (en-US, fr, es, de, it)
 
 ### Editing
 - **Non-destructive pipeline** with undo/redo history and Save / Save As flows
-- **Rotate, Crop, Resize** tools share a live preview canvas
+- **Rotate, Crop, Resize, Light** tools share a live preview canvas
   - Rotate: 90° increments, instant apply
   - Crop: overlay with drag handles and preset ratios (Free, Square, 16:9, 9:16, 4:3, 3:4)
-  - Resize: slider (10–200%), width/height inputs, aspect lock, and live preview (auto-commit when leaving the tool)
+  - Resize: slider (10–200%), width/height inputs, aspect lock, and live preview
+  - Light: brightness and contrast sliders with real-time preview
 - **Keyboard shortcuts** keep the workflow fast (E to edit, Ctrl+S, Ctrl+Z/Y, Esc)
 
 ## 3. Screenshots
@@ -94,13 +96,17 @@ USAGE:
 	iced_lens [OPTIONS] [IMAGE_PATH]
 
 OPTIONS:
-	-h, --help        Show help text
-			--lang <id>   Set locale (en-US, fr)
-			--i18n-dir <path> Override translation directory (defaults to assets/i18n/)
+	-h, --help              Show help text
+	    --lang <id>         Set locale (en-US, fr, es, de, it)
+	    --i18n-dir <path>   Override translation directory (defaults to assets/i18n/)
+	    --data-dir <path>   Override data directory (state files)
+	    --config-dir <path> Override config directory (settings.toml)
 
 ARGS:
 	<IMAGE_PATH>     Path to image file to open
 ```
+
+Path overrides can also be set via environment variables: `ICED_LENS_DATA_DIR` and `ICED_LENS_CONFIG_DIR`.
 
 ### Navigation Controls
 **Image Navigation:**
@@ -120,6 +126,7 @@ ARGS:
 ### Keyboard Shortcuts
 **Viewer Mode:**
 - **E**: Enter editor mode (images only)
+- **I**: Toggle file information panel (metadata)
 - **F11**: Toggle fullscreen
 - **Esc**: Exit fullscreen
 - **← / →**: Navigate media or seek video
@@ -144,7 +151,7 @@ Resetting: remove the config file and restart; defaults will regenerate.
 Localization powered by [Fluent](https://projectfluent.org/).
 - Translation bundles loaded at startup.
 - Runtime language switching updates UI without restart.
-- Current locales: `en-US`, `fr`.
+- Current locales: `en-US`, `fr`, `es`, `de`, `it`.
 To contribute a new locale, see `CONTRIBUTING.md` (translation workflow section).
 Override directory: pass `--i18n-dir /custom/translations` to load `.ftl` files from an alternate location. If the path is invalid, the application falls back to the built‑in `assets/i18n/` directory.
 
@@ -194,10 +201,7 @@ This project does not process untrusted remote input; images are opened from loc
 
 ### Planned / Aspirational
 Future items (subject to change based on community feedback):
-- Migrate to iced 0.14
-- Basic image/video metadata panel (EXIF, codec info)
 - Temporary rotation in viewer (90° increments, session-only)
-- Additional edit tools: flip (horizontal/vertical), brightness/contrast adjustments
 - Filters: grayscale, sepia, blur, sharpen
 - Video editing: trim, basic cuts
 - Batch operations

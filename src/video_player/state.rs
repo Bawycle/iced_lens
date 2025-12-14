@@ -568,13 +568,6 @@ impl VideoPlayer {
         }
     }
 
-    /// Steps forward one frame (only when paused).
-    ///
-    /// Deprecated: Use step_frame() instead which decodes sequentially.
-    pub fn step_forward(&mut self) {
-        self.step_frame();
-    }
-
     /// Steps backward one frame by retrieving from frame history.
     ///
     /// This sends a StepBackward command to the decoder, which retrieves the

@@ -7,7 +7,11 @@
 //! persistence format, localization switching) close to the main update loop so
 //! it is easy to audit user-facing behavior.
 
+pub mod config;
+pub mod i18n;
 mod message;
+pub mod paths;
+pub mod persisted_state;
 mod persistence;
 mod screen;
 mod subscription;
@@ -17,17 +21,17 @@ mod view;
 pub use message::{Flags, Message};
 pub use screen::Screen;
 
-use crate::config;
-use crate::i18n::fluent::I18n;
-use crate::image_navigation::ImageNavigator;
-use crate::media::{self, MediaData};
+use crate::media::metadata::MediaMetadata;
+use crate::media::{self, MediaData, MediaNavigator};
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
+use crate::ui::notifications;
 use crate::ui::settings::{State as SettingsState, StateConfig as SettingsConfig};
 use crate::ui::state::zoom::{MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT};
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
 use crate::video_player::{create_lufs_cache, SharedLufsCache};
+use i18n::fluent::I18n;
 use iced::{window, Element, Subscription, Task, Theme};
 use std::fmt;
 
@@ -39,7 +43,7 @@ pub struct App {
     settings: SettingsState,
     viewer: component::State,
     image_editor: Option<ImageEditorState>,
-    image_navigator: ImageNavigator,
+    media_navigator: MediaNavigator,
     fullscreen: bool,
     window_id: Option<window::Id>,
     theme_mode: ThemeMode,
@@ -55,8 +59,16 @@ pub struct App {
     frame_history_mb: u32,
     /// Whether the hamburger menu is open.
     menu_open: bool,
+    /// Whether the info panel is open.
+    info_panel_open: bool,
+    /// Current media metadata for the info panel.
+    current_metadata: Option<MediaMetadata>,
     /// Help screen state (tracks expanded sections).
     help_state: help::State,
+    /// Persisted application state (last save directory, etc.).
+    app_state: persisted_state::AppState,
+    /// Toast notification manager for user feedback.
+    notifications: notifications::Manager,
 }
 
 impl fmt::Debug for App {
@@ -96,11 +108,25 @@ pub fn window_settings_with_locale() -> window::Settings {
 
 /// Entry point used by `main.rs` to launch the Iced application loop.
 pub fn run(flags: Flags) -> iced::Result {
-    iced::application(|state: &App| state.title(), App::update, App::view)
+    use std::cell::RefCell;
+
+    // Wrap flags in RefCell<Option<_>> to satisfy Fn trait requirement
+    // while only consuming flags once (iced 0.14 requires Fn, not FnOnce)
+    let boot_state = RefCell::new(Some(flags));
+    let boot = move || {
+        let flags = boot_state
+            .borrow_mut()
+            .take()
+            .expect("Boot function called more than once");
+        App::new(flags)
+    };
+
+    iced::application(boot, App::update, App::view)
+        .title(App::title)
         .theme(App::theme)
         .window(window_settings_with_locale())
         .subscription(App::subscription)
-        .run_with(move || App::new(flags))
+        .run()
 }
 
 impl Default for App {
@@ -111,7 +137,7 @@ impl Default for App {
             settings: SettingsState::default(),
             viewer: component::State::new(),
             image_editor: None,
-            image_navigator: ImageNavigator::new(),
+            media_navigator: MediaNavigator::new(),
             fullscreen: false,
             window_id: None,
             theme_mode: ThemeMode::System,
@@ -121,7 +147,11 @@ impl Default for App {
             frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
             frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
             menu_open: false,
+            info_panel_open: false,
+            current_metadata: None,
             help_state: help::State::new(),
+            app_state: persisted_state::AppState::default(),
+            notifications: notifications::Manager::new(),
         }
     }
 }
@@ -130,7 +160,7 @@ impl App {
     /// Initializes application state and optionally kicks off asynchronous image
     /// loading based on `Flags` received from the launcher.
     fn new(flags: Flags) -> (Self, Task<Message>) {
-        let config = config::load().unwrap_or_default();
+        let (config, config_warning) = config::load();
         let i18n = I18n::new(flags.lang.clone(), flags.i18n_dir.clone(), &config);
 
         let mut app = App {
@@ -138,29 +168,36 @@ impl App {
             ..Self::default()
         };
 
-        app.theme_mode = config.theme_mode;
+        app.theme_mode = config.general.theme_mode;
 
-        if let Some(step) = config.zoom_step {
+        if let Some(step) = config.display.zoom_step {
             let clamped = clamp_zoom_step(step);
             app.viewer.set_zoom_step_percent(clamped);
         }
 
-        match config.fit_to_window {
+        match config.display.fit_to_window {
             Some(true) | None => app.viewer.enable_fit_to_window(),
             Some(false) => app.viewer.disable_fit_to_window(),
         }
 
-        let theme = config.background_theme.unwrap_or_default();
-        let sort_order = config.sort_order.unwrap_or_default();
+        let theme = config.display.background_theme.unwrap_or_default();
+        let sort_order = config.display.sort_order.unwrap_or_default();
         let overlay_timeout_secs = config
+            .fullscreen
             .overlay_timeout_secs
             .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
-        let video_autoplay = config.video_autoplay.unwrap_or(false);
-        let audio_normalization = config.audio_normalization.unwrap_or(true);
+        let video_autoplay = config.video.autoplay.unwrap_or(false);
+        let audio_normalization = config.video.audio_normalization.unwrap_or(true);
+        let keyboard_seek_step_secs = config
+            .video
+            .keyboard_seek_step_secs
+            .unwrap_or(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS);
         let frame_cache_mb = config
+            .video
             .frame_cache_mb
             .unwrap_or(config::DEFAULT_FRAME_CACHE_MB);
         let frame_history_mb = config
+            .video
             .frame_history_mb
             .unwrap_or(config::DEFAULT_FRAME_HISTORY_MB);
         app.frame_cache_mb = frame_cache_mb;
@@ -170,24 +207,56 @@ impl App {
             background_theme: theme,
             sort_order,
             overlay_timeout_secs,
-            theme_mode: config.theme_mode,
+            theme_mode: config.general.theme_mode,
             video_autoplay,
             audio_normalization,
             frame_cache_mb,
             frame_history_mb,
+            keyboard_seek_step_secs,
         });
         app.video_autoplay = video_autoplay;
         app.audio_normalization = audio_normalization;
         app.viewer.set_video_autoplay(video_autoplay);
+        app.viewer
+            .set_keyboard_seek_step_secs(keyboard_seek_step_secs);
+
+        // Apply video playback preferences from config
+        if let Some(volume) = config.video.volume {
+            app.viewer.set_video_volume(volume);
+        }
+        if let Some(muted) = config.video.muted {
+            app.viewer.set_video_muted(muted);
+        }
+        if let Some(loop_enabled) = config.video.loop_enabled {
+            app.viewer.set_video_loop(loop_enabled);
+        }
+
+        // Load application state (last save directory, etc.)
+        let (app_state, state_warning) = persisted_state::AppState::load();
+        app.app_state = app_state;
+
+        // Show warnings for config/state loading issues
+        if let Some(key) = config_warning {
+            app.notifications
+                .push(notifications::Notification::warning(&key));
+        }
+        if let Some(key) = state_warning {
+            app.notifications
+                .push(notifications::Notification::warning(&key));
+        }
 
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
 
-            // Initialize ImageNavigator with the initial image
-            let config = config::load().unwrap_or_default();
-            let sort_order = config.sort_order.unwrap_or_default();
-            if let Err(err) = app.image_navigator.scan_directory(&path, sort_order) {
-                eprintln!("Failed to scan directory: {:?}", err);
+            // Initialize MediaNavigator with the initial media (reuse sort_order from config above)
+            if app
+                .media_navigator
+                .scan_directory(&path, sort_order)
+                .is_err()
+            {
+                app.notifications.push(notifications::Notification::warning(
+                    "notification-scan-dir-error",
+                ));
             }
 
             // Synchronize viewer state
@@ -222,8 +291,11 @@ impl App {
 
     fn subscription(&self) -> Subscription<Message> {
         let event_sub = subscription::create_event_subscription(self.screen);
-        let tick_sub =
-            subscription::create_tick_subscription(self.fullscreen, self.viewer.is_loading_media());
+        let tick_sub = subscription::create_tick_subscription(
+            self.fullscreen,
+            self.viewer.is_loading_media(),
+            self.notifications.has_notifications(),
+        );
         let video_sub = subscription::create_video_subscription(
             &self.viewer,
             Some(self.lufs_cache.clone()),
@@ -241,7 +313,7 @@ impl App {
             settings: &mut self.settings,
             viewer: &mut self.viewer,
             image_editor: &mut self.image_editor,
-            image_navigator: &mut self.image_navigator,
+            media_navigator: &mut self.media_navigator,
             fullscreen: &mut self.fullscreen,
             window_id: &mut self.window_id,
             theme_mode: &mut self.theme_mode,
@@ -250,7 +322,11 @@ impl App {
             frame_cache_mb: self.frame_cache_mb,
             frame_history_mb: self.frame_history_mb,
             menu_open: &mut self.menu_open,
+            info_panel_open: &mut self.info_panel_open,
+            current_metadata: &mut self.current_metadata,
             help_state: &mut self.help_state,
+            app_state: &mut self.app_state,
+            notifications: &mut self.notifications,
         };
 
         match message {
@@ -269,6 +345,13 @@ impl App {
             }
             Message::Help(help_message) => update::handle_help_message(&mut ctx, help_message),
             Message::About(about_message) => update::handle_about_message(&mut ctx, about_message),
+            Message::MetadataPanel(panel_message) => {
+                update::handle_metadata_panel_message(&mut ctx, panel_message)
+            }
+            Message::Notification(notification_message) => {
+                self.notifications.handle_message(notification_message);
+                Task::none()
+            }
             Message::ImageEditorLoaded(result) => self.handle_image_editor_loaded(result),
             Message::Tick(_instant) => {
                 // Periodic tick for overlay auto-hide - just trigger a view refresh
@@ -276,6 +359,9 @@ impl App {
 
                 // Also check for loading timeout
                 self.viewer.check_loading_timeout(&self.i18n);
+
+                // Tick notification manager to handle auto-dismiss
+                self.notifications.tick();
 
                 Task::none()
             }
@@ -285,19 +371,29 @@ impl App {
                     if let Some(editor) = self.image_editor.as_mut() {
                         match editor.save_image(&path) {
                             Ok(()) => {
-                                eprintln!("Image saved successfully to: {:?}", path);
-                                // TODO: Show success notification to user
+                                self.notifications
+                                    .push(notifications::Notification::success(
+                                        "notification-save-success",
+                                    ));
+
+                                // Remember the save directory for next time
+                                self.app_state.set_last_save_directory_from_file(&path);
+                                if let Some(key) = self.app_state.save() {
+                                    self.notifications
+                                        .push(notifications::Notification::warning(&key));
+                                }
 
                                 // Rescan directory if saved in the same folder as viewer
                                 persistence::rescan_directory_if_same(
                                     &mut self.viewer,
-                                    &mut self.image_navigator,
+                                    &mut self.media_navigator,
                                     &path,
                                 );
                             }
-                            Err(err) => {
-                                eprintln!("Failed to save image: {:?}", err);
-                                // TODO: Show error notification to user
+                            Err(_err) => {
+                                self.notifications.push(notifications::Notification::error(
+                                    "notification-save-error",
+                                ));
                             }
                         }
                     }
@@ -312,12 +408,22 @@ impl App {
 
                     match frame.save_to_file(&path, format) {
                         Ok(()) => {
-                            eprintln!("Frame captured successfully to: {:?}", path);
-                            // TODO: Show success notification to user
+                            self.notifications
+                                .push(notifications::Notification::success(
+                                    "notification-frame-capture-success",
+                                ));
+
+                            // Remember the save directory for next time
+                            self.app_state.set_last_save_directory_from_file(&path);
+                            if let Some(key) = self.app_state.save() {
+                                self.notifications
+                                    .push(notifications::Notification::warning(&key));
+                            }
                         }
-                        Err(err) => {
-                            eprintln!("Failed to capture frame: {:?}", err);
-                            // TODO: Show error notification to user
+                        Err(_err) => {
+                            self.notifications.push(notifications::Notification::error(
+                                "notification-frame-capture-error",
+                            ));
                         }
                     }
                 }
@@ -333,8 +439,10 @@ impl App {
                         self.image_editor = Some(state);
                         self.screen = Screen::ImageEditor;
                     }
-                    Err(err) => {
-                        eprintln!("Failed to open editor with captured frame: {err:?}");
+                    Err(_) => {
+                        self.notifications.push(notifications::Notification::error(
+                            "notification-editor-frame-error",
+                        ));
                     }
                 }
                 Task::none()
@@ -349,32 +457,31 @@ impl App {
     ) -> Task<Message> {
         match result {
             Ok(media_data) => {
-                // Editor only supports images in v0.2, not videos
-                // Extract ImageData from MediaData
-                let image_data = match media_data {
-                    MediaData::Image(img) => img,
-                    MediaData::Video(_) => {
-                        // Video editing not supported in v0.2
-                        eprintln!("Video editing is not supported in this version");
-                        return Task::none();
-                    }
+                // Editor only supports images - videos are skipped during navigation
+                let MediaData::Image(image_data) = media_data else {
+                    // Should not happen: navigate_*_image() only returns images
+                    return Task::none();
                 };
 
                 // Create a new ImageEditorState with the loaded image
-                if let Some(current_image_path) = self.image_navigator.current_image_path() {
+                if let Some(current_image_path) = self.media_navigator.current_media_path() {
                     let path = current_image_path.to_path_buf();
                     match image_editor::State::new(path, image_data) {
                         Ok(new_editor_state) => {
                             self.image_editor = Some(new_editor_state);
                         }
-                        Err(err) => {
-                            eprintln!("Failed to create editor state: {:?}", err);
+                        Err(_) => {
+                            self.notifications.push(notifications::Notification::error(
+                                "notification-editor-create-error",
+                            ));
                         }
                     }
                 }
             }
-            Err(err) => {
-                eprintln!("Failed to load image for editor: {:?}", err);
+            Err(_) => {
+                self.notifications.push(notifications::Notification::error(
+                    "notification-editor-load-error",
+                ));
             }
         }
         Task::none()
@@ -390,6 +497,10 @@ impl App {
             help_state: &self.help_state,
             fullscreen: self.fullscreen,
             menu_open: self.menu_open,
+            info_panel_open: self.info_panel_open,
+            navigation: self.media_navigator.navigation_info(),
+            current_metadata: self.current_metadata.as_ref(),
+            notifications: &self.notifications,
         })
     }
 }
@@ -467,11 +578,7 @@ mod tests {
     #[test]
     fn new_starts_in_viewer_mode_without_image() {
         with_temp_config_dir(|_| {
-            let (app, _command) = App::new(Flags {
-                lang: None,
-                file_path: None,
-                i18n_dir: None,
-            });
+            let (app, _command) = App::new(Flags::default());
             assert_eq!(app.screen, Screen::Viewer);
             assert!(!app.viewer.has_media());
         });
@@ -819,15 +926,18 @@ mod tests {
             // This should not panic even though the save will fail
             let viewer = component::State::new();
             let settings_state = SettingsState::default();
-            let _ = persistence::persist_preferences(
-                &viewer,
-                &settings_state,
-                crate::ui::theming::ThemeMode::System,
-                false, // video_autoplay
-                true,  // audio_normalization
-                config::DEFAULT_FRAME_CACHE_MB,
-                config::DEFAULT_FRAME_HISTORY_MB,
-            );
+            let mut notifs = notifications::Manager::new();
+            let _ = persistence::persist_preferences(persistence::PreferencesContext {
+                viewer: &viewer,
+                settings: &settings_state,
+                theme_mode: crate::ui::theming::ThemeMode::System,
+                video_autoplay: false,
+                audio_normalization: true,
+                frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
+                frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
+                keyboard_seek_step_secs: config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
+                notifications: &mut notifs,
+            });
             // Test passes if we reach here without panicking
         });
     }
@@ -855,13 +965,10 @@ mod tests {
             sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img1_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
 
-        // Also initialize image_navigator
+        // Initialize media_navigator (single source of truth)
         let _ = app
-            .image_navigator
+            .media_navigator
             .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
 
         let _ = app.update(Message::Viewer(component::Message::NavigateNext));
@@ -897,13 +1004,10 @@ mod tests {
             sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
 
-        // Also initialize image_navigator
+        // Initialize media_navigator (single source of truth)
         let _ = app
-            .image_navigator
+            .media_navigator
             .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
 
         let _ = app.update(Message::Viewer(component::Message::NavigatePrevious));
@@ -939,13 +1043,10 @@ mod tests {
             sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
 
-        // Also initialize image_navigator
+        // Initialize media_navigator (single source of truth)
         let _ = app
-            .image_navigator
+            .media_navigator
             .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
 
         let _ = app.update(Message::Viewer(component::Message::NavigateNext));
@@ -982,13 +1083,10 @@ mod tests {
                 sample_media_data(),
             ))));
             app.viewer.current_image_path = Some(img1_path.clone());
-            app.viewer
-                .scan_directory()
-                .expect("failed to scan directory");
 
-            // Also initialize image_navigator
+            // Initialize media_navigator (single source of truth)
             let _ = app
-                .image_navigator
+                .media_navigator
                 .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
 
             let _ = app.update(Message::Viewer(component::Message::RawEvent {
@@ -1000,6 +1098,7 @@ mod tests {
                     location: keyboard::Location::Standard,
                     modifiers: keyboard::Modifiers::default(),
                     text: None,
+                    repeat: false,
                 }),
             }));
 
@@ -1040,9 +1139,11 @@ mod tests {
             img1_data.clone(),
         ))));
         app.viewer.current_image_path = Some(img1_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
+
+        // Initialize media_navigator (single source of truth)
+        let _ = app
+            .media_navigator
+            .scan_directory(&img1_path, crate::config::SortOrder::Alphabetical);
 
         // Switch to editor screen
         let _ = app.update(Message::SwitchScreen(Screen::ImageEditor));
@@ -1095,9 +1196,11 @@ mod tests {
             img2_data.clone(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
-        app.viewer
-            .scan_directory()
-            .expect("failed to scan directory");
+
+        // Initialize media_navigator (single source of truth)
+        let _ = app
+            .media_navigator
+            .scan_directory(&img2_path, crate::config::SortOrder::Alphabetical);
 
         // Switch to editor screen
         let _ = app.update(Message::SwitchScreen(Screen::ImageEditor));

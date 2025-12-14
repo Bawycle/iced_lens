@@ -1,0 +1,263 @@
+// SPDX-License-Identifier: MPL-2.0
+//! Notification lifecycle management.
+//!
+//! The `Manager` handles queuing, display timing, and dismissal of notifications.
+//! It limits the number of visible toasts and manages auto-dismiss timers.
+
+use super::notification::{Notification, NotificationId};
+use std::collections::VecDeque;
+
+/// Maximum number of notifications visible at once.
+const MAX_VISIBLE: usize = 3;
+
+/// Messages for notification state changes.
+#[derive(Debug, Clone)]
+pub enum Message {
+    /// Dismiss a specific notification by ID.
+    Dismiss(NotificationId),
+    /// Tick for checking auto-dismiss timers.
+    Tick,
+}
+
+/// Manages the notification queue and visible notifications.
+#[derive(Debug, Default)]
+pub struct Manager {
+    /// Currently visible notifications (newest first).
+    visible: VecDeque<Notification>,
+    /// Queued notifications waiting to be displayed.
+    queue: VecDeque<Notification>,
+}
+
+impl Manager {
+    /// Creates a new empty notification manager.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Pushes a new notification to be displayed.
+    ///
+    /// If fewer than `MAX_VISIBLE` notifications are showing, it's displayed
+    /// immediately. Otherwise, it's added to the queue and shown when space
+    /// becomes available.
+    pub fn push(&mut self, notification: Notification) {
+        if self.visible.len() < MAX_VISIBLE {
+            self.visible.push_front(notification);
+        } else {
+            self.queue.push_back(notification);
+        }
+    }
+
+    /// Dismisses a notification by its ID.
+    ///
+    /// Returns `true` if the notification was found and removed.
+    pub fn dismiss(&mut self, id: NotificationId) -> bool {
+        // Try to remove from visible
+        if let Some(pos) = self.visible.iter().position(|n| n.id() == id) {
+            self.visible.remove(pos);
+            self.promote_from_queue();
+            return true;
+        }
+
+        // Try to remove from queue
+        if let Some(pos) = self.queue.iter().position(|n| n.id() == id) {
+            self.queue.remove(pos);
+            return true;
+        }
+
+        false
+    }
+
+    /// Processes a tick event, dismissing any notifications that have expired.
+    ///
+    /// Should be called periodically (e.g., every 100-500ms) to handle auto-dismiss.
+    pub fn tick(&mut self) {
+        // Collect IDs of notifications to dismiss
+        let to_dismiss: Vec<NotificationId> = self
+            .visible
+            .iter()
+            .filter(|n| n.should_auto_dismiss())
+            .map(|n| n.id())
+            .collect();
+
+        // Dismiss them
+        for id in to_dismiss {
+            self.dismiss(id);
+        }
+    }
+
+    /// Handles a notification message.
+    pub fn handle_message(&mut self, message: Message) {
+        match message {
+            Message::Dismiss(id) => {
+                self.dismiss(id);
+            }
+            Message::Tick => {
+                self.tick();
+            }
+        }
+    }
+
+    /// Returns the currently visible notifications.
+    pub fn visible(&self) -> impl Iterator<Item = &Notification> {
+        self.visible.iter()
+    }
+
+    /// Returns the number of visible notifications.
+    pub fn visible_count(&self) -> usize {
+        self.visible.len()
+    }
+
+    /// Returns the number of queued notifications.
+    pub fn queued_count(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// Returns whether there are any notifications (visible or queued).
+    pub fn has_notifications(&self) -> bool {
+        !self.visible.is_empty() || !self.queue.is_empty()
+    }
+
+    /// Clears all notifications (visible and queued).
+    pub fn clear(&mut self) {
+        self.visible.clear();
+        self.queue.clear();
+    }
+
+    /// Promotes a notification from the queue to visible if there's space.
+    fn promote_from_queue(&mut self) {
+        while self.visible.len() < MAX_VISIBLE {
+            if let Some(notification) = self.queue.pop_front() {
+                self.visible.push_back(notification);
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_manager_is_empty() {
+        let manager = Manager::new();
+        assert_eq!(manager.visible_count(), 0);
+        assert_eq!(manager.queued_count(), 0);
+        assert!(!manager.has_notifications());
+    }
+
+    #[test]
+    fn push_adds_to_visible_when_space_available() {
+        let mut manager = Manager::new();
+        manager.push(Notification::success("test"));
+
+        assert_eq!(manager.visible_count(), 1);
+        assert_eq!(manager.queued_count(), 0);
+    }
+
+    #[test]
+    fn push_queues_when_visible_is_full() {
+        let mut manager = Manager::new();
+
+        // Fill visible
+        for i in 0..MAX_VISIBLE {
+            manager.push(Notification::success(format!("test-{}", i)));
+        }
+        assert_eq!(manager.visible_count(), MAX_VISIBLE);
+        assert_eq!(manager.queued_count(), 0);
+
+        // Add one more
+        manager.push(Notification::success("queued"));
+        assert_eq!(manager.visible_count(), MAX_VISIBLE);
+        assert_eq!(manager.queued_count(), 1);
+    }
+
+    #[test]
+    fn dismiss_removes_from_visible() {
+        let mut manager = Manager::new();
+        let notification = Notification::success("test");
+        let id = notification.id();
+
+        manager.push(notification);
+        assert_eq!(manager.visible_count(), 1);
+
+        let removed = manager.dismiss(id);
+        assert!(removed);
+        assert_eq!(manager.visible_count(), 0);
+    }
+
+    #[test]
+    fn dismiss_promotes_from_queue() {
+        let mut manager = Manager::new();
+
+        // Fill visible
+        let mut first_id = None;
+        for i in 0..MAX_VISIBLE {
+            let n = Notification::success(format!("visible-{}", i));
+            if i == 0 {
+                first_id = Some(n.id());
+            }
+            manager.push(n);
+        }
+
+        // Add to queue
+        manager.push(Notification::success("queued"));
+        assert_eq!(manager.queued_count(), 1);
+
+        // Dismiss first visible
+        manager.dismiss(first_id.unwrap());
+
+        // Queued should have been promoted
+        assert_eq!(manager.visible_count(), MAX_VISIBLE);
+        assert_eq!(manager.queued_count(), 0);
+    }
+
+    #[test]
+    fn dismiss_nonexistent_returns_false() {
+        let mut manager = Manager::new();
+        let fake_id = Notification::success("temp").id();
+
+        assert!(!manager.dismiss(fake_id));
+    }
+
+    #[test]
+    fn clear_removes_all() {
+        let mut manager = Manager::new();
+
+        for i in 0..5 {
+            manager.push(Notification::success(format!("test-{}", i)));
+        }
+
+        manager.clear();
+        assert_eq!(manager.visible_count(), 0);
+        assert_eq!(manager.queued_count(), 0);
+    }
+
+    #[test]
+    fn handle_message_dismiss() {
+        let mut manager = Manager::new();
+        let notification = Notification::success("test");
+        let id = notification.id();
+        manager.push(notification);
+
+        manager.handle_message(Message::Dismiss(id));
+        assert_eq!(manager.visible_count(), 0);
+    }
+
+    #[test]
+    fn error_notifications_do_not_auto_dismiss() {
+        let mut manager = Manager::new();
+        let notification = Notification::error("test-error");
+        let id = notification.id();
+        manager.push(notification);
+
+        // Tick should not dismiss errors
+        manager.tick();
+        assert_eq!(manager.visible_count(), 1);
+
+        // Manual dismiss should work
+        manager.dismiss(id);
+        assert_eq!(manager.visible_count(), 0);
+    }
+}

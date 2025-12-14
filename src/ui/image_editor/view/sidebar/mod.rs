@@ -1,26 +1,29 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Sidebar layout composition.
 
+pub mod adjustments_panel;
 pub mod crop_panel;
 pub mod resize_panel;
 
 use crate::media::frame_export::ExportFormat;
-use crate::ui::design_tokens::spacing;
+use crate::ui::design_tokens::{sizing, spacing, typography};
 use crate::ui::icons;
-use crate::ui::image_editor::state::{CropState, ResizeState};
+use crate::ui::image_editor::state::{AdjustmentState, CropState, ResizeState};
 use crate::ui::styles;
+use crate::ui::styles::button as button_styles;
 use iced::widget::scrollable::{Direction, Scrollbar};
-use iced::widget::{button, container, horizontal_rule, text, tooltip, Column, Row, Scrollable};
-use iced::{alignment::Vertical, Element, Length};
+use iced::widget::{button, container, rule, text, tooltip, Column, Row, Scrollable};
+use iced::{alignment::Vertical, Element, Length, Padding};
 
 use super::super::{EditorTool, Message, SidebarMessage, State, ViewContext};
 
-const SIDEBAR_WIDTH: f32 = 290.0;
+const SIDEBAR_WIDTH: f32 = 310.0;
 
 pub struct SidebarModel<'a> {
     pub active_tool: Option<EditorTool>,
     pub crop_state: &'a CropState,
     pub resize_state: &'a ResizeState,
+    pub adjustment_state: &'a AdjustmentState,
     pub can_undo: bool,
     pub can_redo: bool,
     pub has_unsaved_changes: bool,
@@ -36,6 +39,7 @@ impl<'a> SidebarModel<'a> {
             active_tool: state.active_tool,
             crop_state: &state.crop_state,
             resize_state: &state.resize_state,
+            adjustment_state: &state.adjustment_state,
             can_undo: state.can_undo(),
             can_redo: state.can_redo(),
             has_unsaved_changes: state.has_unsaved_changes(),
@@ -46,15 +50,18 @@ impl<'a> SidebarModel<'a> {
 }
 
 pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let mut scrollable_section = Column::new().spacing(spacing::SM);
+    // Right padding provides space for the scrollbar
+    let mut scrollable_section = Column::new()
+        .spacing(spacing::SM)
+        .padding(Padding::ZERO.right(spacing::MD));
 
     scrollable_section =
         scrollable_section.push(undo_redo_section(model.can_undo, model.can_redo, ctx));
-    scrollable_section = scrollable_section.push(horizontal_rule(1));
+    scrollable_section = scrollable_section.push(rule::horizontal(1));
     scrollable_section = scrollable_section.push(rotate_section(ctx));
-    scrollable_section = scrollable_section.push(horizontal_rule(1));
+    scrollable_section = scrollable_section.push(rule::horizontal(1));
     scrollable_section = scrollable_section.push(flip_section(ctx));
-    scrollable_section = scrollable_section.push(horizontal_rule(1));
+    scrollable_section = scrollable_section.push(rule::horizontal(1));
 
     let crop_button = tool_button(
         ctx.i18n.tr("image-editor-tool-crop"),
@@ -76,8 +83,19 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
         scrollable_section = scrollable_section.push(resize_panel::panel(model.resize_state, ctx));
     }
 
+    let light_button = tool_button(
+        ctx.i18n.tr("image-editor-tool-light"),
+        SidebarMessage::SelectTool(EditorTool::Adjust),
+        model.active_tool == Some(EditorTool::Adjust),
+    );
+    scrollable_section = scrollable_section.push(light_button);
+    if model.active_tool == Some(EditorTool::Adjust) {
+        scrollable_section =
+            scrollable_section.push(adjustments_panel::panel(model.adjustment_state, ctx));
+    }
+
     let scrollable = Scrollable::new(scrollable_section)
-        .direction(Direction::Vertical(Scrollbar::new()))
+        .direction(Direction::Vertical(Scrollbar::new().margin(spacing::XXS)))
         .height(Length::Fill)
         .width(Length::Fill);
 
@@ -102,7 +120,7 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
 }
 
 pub fn collapsed<'a>() -> Element<'a, Message> {
-    let toggle_button = button(text("☰").size(24))
+    let toggle_button = button(text("☰").size(sizing::ICON_MD))
         .on_press(SidebarMessage::ToggleSidebar.into())
         .padding(spacing::SM);
 
@@ -115,10 +133,11 @@ pub fn collapsed<'a>() -> Element<'a, Message> {
 }
 
 fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
-    let toggle_button = button(text("☰").size(20))
+    // Hamburger is a toggle: selected when sidebar is expanded (which is the case here)
+    let toggle_button = button(text("☰").size(typography::TITLE_MD))
         .on_press(SidebarMessage::ToggleSidebar.into())
         .padding(spacing::XS)
-        .style(iced::widget::button::secondary);
+        .style(button_styles::selected);
 
     Column::new()
         .spacing(spacing::XS)
@@ -127,20 +146,20 @@ fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
                 .spacing(spacing::XS)
                 .align_y(Vertical::Center)
                 .push(toggle_button)
-                .push(text(ctx.i18n.tr("image-editor-title")).size(18)),
+                .push(text(ctx.i18n.tr("image-editor-title")).size(typography::TITLE_SM)),
         )
-        .push(horizontal_rule(1))
+        .push(rule::horizontal(1))
 }
 
 fn tool_button<'a>(label: String, message: SidebarMessage, active: bool) -> Element<'a, Message> {
-    button(text(label).size(16))
+    button(text(label).size(typography::BODY_LG))
         .on_press(message.into())
         .padding(spacing::SM)
         .width(Length::Fill)
         .style(if active {
-            iced::widget::button::primary
+            button_styles::selected
         } else {
-            iced::widget::button::secondary
+            button_styles::unselected
         })
         .into()
 }
@@ -150,31 +169,29 @@ fn undo_redo_section<'a>(
     can_redo: bool,
     ctx: &ViewContext<'a>,
 ) -> Element<'a, Message> {
-    let undo_btn = button(text(ctx.i18n.tr("image-editor-undo")).size(16))
+    let undo_btn = button(text(ctx.i18n.tr("image-editor-undo")).size(typography::BODY_LG))
         .padding(spacing::XS)
-        .width(Length::Fill)
-        .style(iced::widget::button::secondary);
+        .width(Length::Fill);
     let undo_btn = if can_undo {
         undo_btn.on_press(SidebarMessage::Undo.into())
     } else {
-        undo_btn
+        undo_btn.style(button_styles::disabled())
     };
 
-    let redo_btn = button(text(ctx.i18n.tr("image-editor-redo")).size(16))
+    let redo_btn = button(text(ctx.i18n.tr("image-editor-redo")).size(typography::BODY_LG))
         .padding(spacing::XS)
-        .width(Length::Fill)
-        .style(iced::widget::button::secondary);
+        .width(Length::Fill);
     let redo_btn = if can_redo {
         redo_btn.on_press(SidebarMessage::Redo.into())
     } else {
-        redo_btn
+        redo_btn.style(button_styles::disabled())
     };
 
     let controls = Row::new()
         .spacing(spacing::XS)
         .push(undo_btn)
         .push(redo_btn);
-    let title = text(ctx.i18n.tr("image-editor-undo-redo-section-title")).size(14);
+    let title = text(ctx.i18n.tr("image-editor-undo-redo-section-title")).size(typography::BODY);
 
     container(
         Column::new()
@@ -195,8 +212,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(icons::sized(icons::rotate_left(), icon_size))
             .on_press(SidebarMessage::RotateLeft.into())
             .padding(spacing::XS)
-            .width(Length::Fill)
-            .style(iced::widget::button::secondary),
+            .width(Length::Fill),
         text(ctx.i18n.tr("image-editor-rotate-left-tooltip")),
         tooltip::Position::FollowCursor,
     )
@@ -207,8 +223,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(icons::sized(icons::rotate_right(), icon_size))
             .on_press(SidebarMessage::RotateRight.into())
             .padding(spacing::XS)
-            .width(Length::Fill)
-            .style(iced::widget::button::secondary),
+            .width(Length::Fill),
         text(ctx.i18n.tr("image-editor-rotate-right-tooltip")),
         tooltip::Position::FollowCursor,
     )
@@ -219,7 +234,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .spacing(spacing::XS)
         .push(rotate_left_btn)
         .push(rotate_right_btn);
-    let title = text(ctx.i18n.tr("image-editor-rotate-section-title")).size(14);
+    let title = text(ctx.i18n.tr("image-editor-rotate-section-title")).size(typography::BODY);
 
     container(
         Column::new()
@@ -240,8 +255,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(icons::sized(icons::flip_horizontal(), icon_size))
             .on_press(SidebarMessage::FlipHorizontal.into())
             .padding(spacing::XS)
-            .width(Length::Fill)
-            .style(iced::widget::button::secondary),
+            .width(Length::Fill),
         text(ctx.i18n.tr("image-editor-flip-horizontal-tooltip")),
         tooltip::Position::FollowCursor,
     )
@@ -252,8 +266,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(icons::sized(icons::flip_vertical(), icon_size))
             .on_press(SidebarMessage::FlipVertical.into())
             .padding(spacing::XS)
-            .width(Length::Fill)
-            .style(iced::widget::button::secondary),
+            .width(Length::Fill),
         text(ctx.i18n.tr("image-editor-flip-vertical-tooltip")),
         tooltip::Position::FollowCursor,
     )
@@ -264,7 +277,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .spacing(spacing::XS)
         .push(flip_horizontal_btn)
         .push(flip_vertical_btn);
-    let title = text(ctx.i18n.tr("image-editor-flip-section-title")).size(14);
+    let title = text(ctx.i18n.tr("image-editor-flip-section-title")).size(typography::BODY);
 
     container(
         Column::new()
@@ -284,34 +297,34 @@ fn footer_section<'a>(
     export_format: ExportFormat,
     ctx: &ViewContext<'a>,
 ) -> Column<'a, Message> {
-    let mut footer = Column::new().spacing(spacing::XS).push(horizontal_rule(1));
+    let mut footer = Column::new().spacing(spacing::XS).push(rule::horizontal(1));
 
     // Navigation buttons - only for file mode, not captured frames
     if !is_captured_frame {
         let prev_btn = button(
-            container(text("◀").size(20))
+            container(text("◀").size(typography::TITLE_MD))
                 .center_x(Length::Fill)
                 .center_y(Length::Shrink),
         )
-        .padding([8, 16])
+        .padding([spacing::XS, spacing::MD])
         .width(Length::Fill)
         .height(Length::Shrink);
         let prev_btn = if has_changes {
-            prev_btn
+            prev_btn.style(button_styles::disabled())
         } else {
             prev_btn.on_press(SidebarMessage::NavigatePrevious.into())
         };
 
         let next_btn = button(
-            container(text("▶").size(20))
+            container(text("▶").size(typography::TITLE_MD))
                 .center_x(Length::Fill)
                 .center_y(Length::Shrink),
         )
-        .padding([8, 16])
+        .padding([spacing::XS, spacing::MD])
         .width(Length::Fill)
         .height(Length::Shrink);
         let next_btn = if has_changes {
-            next_btn
+            next_btn.style(button_styles::disabled())
         } else {
             next_btn.on_press(SidebarMessage::NavigateNext.into())
         };
@@ -320,31 +333,29 @@ fn footer_section<'a>(
             .spacing(spacing::XS)
             .push(prev_btn)
             .push(next_btn);
-        footer = footer.push(nav_row).push(horizontal_rule(1));
+        footer = footer.push(nav_row).push(rule::horizontal(1));
     }
 
-    // Cancel button - always available when there are changes
-    let cancel_btn = button(text(ctx.i18n.tr("image-editor-cancel")).size(16))
+    // Cancel button - available when there are changes
+    let cancel_btn = button(text(ctx.i18n.tr("image-editor-cancel")).size(typography::BODY_LG))
         .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(iced::widget::button::secondary);
+        .width(Length::Fill);
     let cancel_btn = if has_changes {
         cancel_btn.on_press(SidebarMessage::Cancel.into())
     } else {
-        cancel_btn
+        cancel_btn.style(button_styles::disabled())
     };
     footer = footer.push(cancel_btn);
 
     // Save button - only for file mode, not captured frames
     if !is_captured_frame {
-        let save_btn = button(text(ctx.i18n.tr("image-editor-save")).size(16))
+        let save_btn = button(text(ctx.i18n.tr("image-editor-save")).size(typography::BODY_LG))
             .padding(spacing::SM)
-            .width(Length::Fill)
-            .style(iced::widget::button::primary);
+            .width(Length::Fill);
         let save_btn = if has_changes {
             save_btn.on_press(SidebarMessage::Save.into())
         } else {
-            save_btn
+            save_btn.style(button_styles::disabled())
         };
         footer = footer.push(save_btn);
     }
@@ -352,16 +363,15 @@ fn footer_section<'a>(
     // Export format selector - shown before Save As button
     footer = footer.push(export_format_section(export_format, ctx));
 
-    // Save As button - always available
-    let save_as_btn = button(text(ctx.i18n.tr("image-editor-save-as")).size(16))
+    // Save As button
+    let save_as_btn = button(text(ctx.i18n.tr("image-editor-save-as")).size(typography::BODY_LG))
         .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(iced::widget::button::primary);
+        .width(Length::Fill);
     // For captured frames, Save As is always enabled (it's the only way to save)
     let save_as_btn = if is_captured_frame || has_changes {
         save_as_btn.on_press(SidebarMessage::SaveAs.into())
     } else {
-        save_as_btn
+        save_as_btn.style(button_styles::disabled())
     };
     footer = footer.push(save_as_btn);
 
@@ -373,7 +383,7 @@ fn export_format_section<'a>(
     current_format: ExportFormat,
     ctx: &ViewContext<'a>,
 ) -> Element<'a, Message> {
-    let format_label = text(ctx.i18n.tr("image-editor-export-format-label")).size(14);
+    let format_label = text(ctx.i18n.tr("image-editor-export-format-label")).size(typography::BODY);
 
     let format_buttons: Vec<Element<'a, Message>> = ExportFormat::all()
         .iter()
@@ -385,13 +395,13 @@ fn export_format_section<'a>(
                 ExportFormat::WebP => "WebP",
             };
 
-            button(text(label).size(14))
-                .padding([8, 12])
+            button(text(label).size(typography::BODY))
+                .padding([spacing::XS, spacing::SM])
                 .width(Length::FillPortion(1))
                 .style(if is_selected {
-                    iced::widget::button::primary
+                    button_styles::selected
                 } else {
-                    iced::widget::button::secondary
+                    button_styles::unselected
                 })
                 .on_press(SidebarMessage::SetExportFormat(format).into())
                 .into()

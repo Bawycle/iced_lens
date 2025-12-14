@@ -7,7 +7,8 @@
 use super::Message;
 use crate::config;
 use crate::i18n::fluent::I18n;
-use crate::image_navigation::ImageNavigator;
+use crate::media::MediaNavigator;
+use crate::ui::notifications;
 use crate::ui::settings::State as SettingsState;
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
@@ -15,38 +16,56 @@ use iced::Task;
 use std::path::Path;
 use unic_langid::LanguageIdentifier;
 
+/// Context for persisting preferences, bundling all required state references.
+pub struct PreferencesContext<'a> {
+    pub viewer: &'a component::State,
+    pub settings: &'a SettingsState,
+    pub theme_mode: ThemeMode,
+    pub video_autoplay: bool,
+    pub audio_normalization: bool,
+    pub frame_cache_mb: u32,
+    pub frame_history_mb: u32,
+    pub keyboard_seek_step_secs: f64,
+    pub notifications: &'a mut notifications::Manager,
+}
+
 /// Persists the current viewer + settings preferences to disk.
 ///
 /// Guarded during tests to keep isolation: unit tests exercise the logic by
 /// calling the function directly rather than through `Effect`s.
-pub fn persist_preferences(
-    viewer: &component::State,
-    settings: &SettingsState,
-    theme_mode: ThemeMode,
-    video_autoplay: bool,
-    audio_normalization: bool,
-    frame_cache_mb: u32,
-    frame_history_mb: u32,
-) -> Task<Message> {
+pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     if cfg!(test) {
         return Task::none();
     }
 
-    let mut cfg = config::load().unwrap_or_default();
-    // Use image_fit_to_window() to only persist the image setting, not video
-    cfg.fit_to_window = Some(viewer.image_fit_to_window());
-    cfg.zoom_step = Some(viewer.zoom_step_percent());
-    cfg.background_theme = Some(settings.background_theme());
-    cfg.sort_order = Some(settings.sort_order());
-    cfg.overlay_timeout_secs = Some(settings.overlay_timeout_secs());
-    cfg.theme_mode = theme_mode;
-    cfg.video_autoplay = Some(video_autoplay);
-    cfg.audio_normalization = Some(audio_normalization);
-    cfg.frame_cache_mb = Some(frame_cache_mb);
-    cfg.frame_history_mb = Some(frame_history_mb);
+    let (mut cfg, load_warning) = config::load();
+    if let Some(key) = load_warning {
+        ctx.notifications
+            .push(notifications::Notification::warning(&key));
+    }
 
-    if let Err(error) = config::save(&cfg) {
-        eprintln!("Failed to save config: {:?}", error);
+    // Use image_fit_to_window() to only persist the image setting, not video
+    cfg.display.fit_to_window = Some(ctx.viewer.image_fit_to_window());
+    cfg.display.zoom_step = Some(ctx.viewer.zoom_step_percent());
+    cfg.display.background_theme = Some(ctx.settings.background_theme());
+    cfg.display.sort_order = Some(ctx.settings.sort_order());
+    cfg.fullscreen.overlay_timeout_secs = Some(ctx.settings.overlay_timeout_secs());
+    cfg.general.theme_mode = ctx.theme_mode;
+    cfg.video.autoplay = Some(ctx.video_autoplay);
+    cfg.video.audio_normalization = Some(ctx.audio_normalization);
+    cfg.video.frame_cache_mb = Some(ctx.frame_cache_mb);
+    cfg.video.frame_history_mb = Some(ctx.frame_history_mb);
+    cfg.video.keyboard_seek_step_secs = Some(ctx.keyboard_seek_step_secs);
+
+    // Video playback preferences (persisted but not in Settings UI)
+    cfg.video.volume = Some(ctx.viewer.video_volume());
+    cfg.video.muted = Some(ctx.viewer.video_muted());
+    cfg.video.loop_enabled = Some(ctx.viewer.video_loop());
+
+    if config::save(&cfg).is_err() {
+        ctx.notifications.push(notifications::Notification::warning(
+            "notification-config-save-error",
+        ));
     }
 
     Task::none()
@@ -58,14 +77,21 @@ pub fn apply_language_change(
     i18n: &mut I18n,
     viewer: &mut component::State,
     locale: LanguageIdentifier,
+    notifications: &mut notifications::Manager,
 ) -> Task<Message> {
     i18n.set_locale(locale.clone());
 
-    let mut cfg = config::load().unwrap_or_default();
-    cfg.language = Some(locale.to_string());
+    let (mut cfg, load_warning) = config::load();
+    if let Some(key) = load_warning {
+        notifications.push(notifications::Notification::warning(&key));
+    }
 
-    if let Err(error) = config::save(&cfg) {
-        eprintln!("Failed to save config: {:?}", error);
+    cfg.general.language = Some(locale.to_string());
+
+    if config::save(&cfg).is_err() {
+        notifications.push(notifications::Notification::warning(
+            "notification-config-save-error",
+        ));
     }
 
     viewer.refresh_error_translation(i18n);
@@ -79,7 +105,7 @@ pub fn apply_language_change(
 /// selected (no auto-switch to the new file).
 pub fn rescan_directory_if_same(
     viewer: &mut component::State,
-    image_navigator: &mut ImageNavigator,
+    media_navigator: &mut MediaNavigator,
     saved_path: &Path,
 ) {
     let saved_dir = saved_path.parent();
@@ -90,14 +116,11 @@ pub fn rescan_directory_if_same(
     // Only rescan if both directories exist and match
     if let (Some(saved), Some(viewer_path)) = (saved_dir, viewer_dir) {
         if saved == viewer_path {
-            // Rescan the viewer's image list
-            let _ = viewer.scan_directory();
-
-            // Also rescan the image navigator
-            let config = config::load().unwrap_or_default();
-            let sort_order = config.sort_order.unwrap_or_default();
+            // Rescan the media navigator (single source of truth)
+            let (config, _) = config::load();
+            let sort_order = config.display.sort_order.unwrap_or_default();
             if let Some(current_path) = viewer.current_image_path.clone() {
-                let _ = image_navigator.scan_directory(&current_path, sort_order);
+                let _ = media_navigator.scan_directory(&current_path, sort_order);
             }
         }
     }

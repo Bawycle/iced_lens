@@ -1,4 +1,7 @@
-window-title = IcedLens
+# Application name term - single source of truth for branding
+-app-name = IcedLens
+
+window-title = { -app-name }
 hello-message = Hello, world!
 open-settings-button = Settings
 settings-back-to-viewer-button = Back to Viewer
@@ -10,6 +13,9 @@ settings-section-fullscreen = Fullscreen
 select-language-label = Select Language:
 language-name-en-US = English
 language-name-fr = French
+language-name-es = Spanish
+language-name-de = German
+language-name-it = Italian
 error-load-image-heading = We couldn't open the image.
 error-load-image-general = Something went wrong while loading the image.
 error-load-image-io = We couldn't read this file. Check that it still exists and that you have permission to open it.
@@ -31,6 +37,9 @@ viewer-delete-tooltip = Delete the current image
 viewer-zoom-in-tooltip = Zoom in
 viewer-zoom-out-tooltip = Zoom out
 viewer-fullscreen-tooltip = Toggle fullscreen
+viewer-double-click = Double-click
+viewer-scroll-wheel = Scroll wheel
+viewer-click-drag = Click + drag
 settings-zoom-step-label = Zoom step
 settings-zoom-step-placeholder = 10
 settings-zoom-step-hint = Choose how much the zoom changes when using the controls (1% to 200%).
@@ -52,8 +61,10 @@ help-arg-image-path = <IMAGE_PATH>      Path to an image file to open
 help-example-1 = iced_lens ./photo.png
 help-example-2 = iced_lens --lang fr ./image.jpg
 help-example-3 = iced_lens --help
-help-description = IcedLens – Image Viewer
+help-description = { -app-name } – Image Viewer
 help-line-option-i18n-dir =     --i18n-dir <path>  Load translations from directory
+help-line-option-data-dir =     --data-dir <path>  Override data directory (state files)
+help-line-option-config-dir =     --config-dir <path>  Override config directory (settings.toml)
 settings-sort-order-label = Image navigation sort order
 settings-sort-alphabetical = Alphabetical
 settings-sort-modified = Modified date
@@ -69,6 +80,7 @@ image-editor-save-as = Save As...
 image-editor-tool-rotate = Rotate
 image-editor-tool-crop = Crop
 image-editor-tool-resize = Resize
+image-editor-tool-light = Light
 image-editor-rotate-section-title = Rotation
 image-editor-rotate-left = Rotate left
 image-editor-rotate-right-tooltip = Rotate image clockwise
@@ -84,6 +96,11 @@ image-editor-resize-height-label = Height (px)
 image-editor-resize-lock-aspect = Lock aspect ratio
 image-editor-resize-presets-label = Presets
 image-editor-resize-apply = Apply resize
+image-editor-light-section-title = Light Adjustments
+image-editor-light-brightness-label = Brightness
+image-editor-light-contrast-label = Contrast
+image-editor-light-reset = Reset
+image-editor-light-apply = Apply
 image-editor-crop-section-title = Crop
 image-editor-crop-ratio-label = Aspect ratio
 image-editor-crop-ratio-free = Free
@@ -121,6 +138,8 @@ settings-frame-cache-label = Video frame cache size
 settings-frame-cache-hint = Higher values improve seek performance but use more memory. Changes apply when opening a new video.
 settings-frame-history-label = Frame stepping history size
 settings-frame-history-hint = Memory used for frame-by-frame backward stepping. Only used during stepping mode, not during normal playback.
+settings-keyboard-seek-step-label = Keyboard seek step
+settings-keyboard-seek-step-hint = Time to skip when using arrow keys during video playback.
 megabytes = MB
 error-load-video-heading = We couldn't play this video.
 error-load-video-general = Something went wrong while loading the video.
@@ -174,6 +193,12 @@ help-viewer-key-navigate = Move to previous/next file
 help-viewer-key-edit = Open image in editor
 help-viewer-key-fullscreen = Enter/exit fullscreen
 help-viewer-key-exit-fullscreen = Exit fullscreen mode
+help-viewer-key-info = Toggle file information panel
+
+help-mouse-title = Mouse Interactions
+help-viewer-mouse-doubleclick = Double-click on image/video to toggle fullscreen
+help-viewer-mouse-wheel = Zoom in/out
+help-viewer-mouse-drag = Pan image when zoomed in
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Video Playback Section
@@ -196,8 +221,10 @@ help-video-tool-capture-desc = Save the current video frame as an image file (op
 
 help-video-key-playpause = Play or pause the video
 help-video-key-mute = Toggle audio mute
-help-video-key-step-back = Step backward one frame
-help-video-key-step-forward = Step forward one frame
+help-video-key-seek = Seek backward/forward (during playback)
+help-video-key-volume = Increase/decrease volume
+help-video-key-step-back = Step backward one frame (when paused)
+help-video-key-step-forward = Step forward one frame (when paused)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Image Editor Section
@@ -224,6 +251,12 @@ help-editor-resize-scale = Scale by percentage (e.g., 50% to halve the size)
 help-editor-resize-dimensions = Enter exact width and height in pixels
 help-editor-resize-lock = Lock aspect ratio to maintain proportions
 help-editor-resize-presets = Use presets for common sizes (HD, Full HD, 4K...)
+
+help-editor-light-title = Light
+help-editor-light-desc = Fine-tune the brightness and contrast of your image.
+help-editor-light-brightness = Brightness: lighten or darken the overall image
+help-editor-light-contrast = Contrast: increase or decrease the difference between light and dark areas
+help-editor-light-preview = Changes are previewed in real-time before applying
 
 help-editor-save-title = Saving
 help-editor-save-overwrite = Save: overwrites the original file
@@ -252,7 +285,7 @@ about-title = About
 about-back-to-viewer-button = Back to Viewer
 
 about-section-app = Application
-about-app-name = IcedLens
+about-app-name = { -app-name }
 about-app-description = Lightweight image and video viewer with basic image editing.
 
 about-section-license = License
@@ -260,8 +293,8 @@ about-license-name = Mozilla Public License 2.0 (MPL-2.0)
 about-license-summary = File-level copyleft: modified files must be shared under the same license. Compatible with proprietary code.
 
 about-section-icon-license = Icon License
-about-icon-license-name = IcedLens Icon License
-about-icon-license-summary = All icons (application logo and UI icons) may only be redistributed unmodified to represent IcedLens.
+about-icon-license-name = { -app-name } Icon License
+about-icon-license-summary = All icons (application logo and UI icons) may only be redistributed unmodified to represent { -app-name }.
 
 about-section-credits = Credits
 about-credits-iced = Built with the Iced GUI toolkit
@@ -271,3 +304,52 @@ about-credits-fluent = Internationalization by Project Fluent
 about-section-links = Links
 about-link-repository = Source Code
 about-link-issues = Report Issues
+
+# Notifications
+notification-save-success = Image saved successfully
+notification-save-error = Failed to save image
+notification-frame-capture-success = Frame captured successfully
+notification-frame-capture-error = Failed to capture frame
+notification-delete-success = File deleted successfully
+notification-delete-error = Failed to delete file
+notification-copy-success = Copied to clipboard
+notification-copy-error = Failed to copy to clipboard
+notification-config-save-error = Failed to save settings
+notification-config-load-error = Failed to load settings, using defaults
+notification-state-parse-error = Failed to read app state, using defaults
+notification-state-read-error = Failed to open app state file
+notification-state-path-error = Cannot determine app data path
+notification-state-dir-error = Failed to create app data directory
+notification-state-write-error = Failed to save app state
+notification-state-create-error = Failed to create app state file
+notification-scan-dir-error = Failed to scan directory
+notification-editor-frame-error = Failed to open editor with captured frame
+notification-editor-create-error = Failed to open image editor
+notification-editor-load-error = Failed to load image for editing
+notification-video-editing-unsupported = Video editing is not supported yet
+
+# Metadata panel
+metadata-panel-title = File Information
+metadata-section-file = File
+metadata-section-camera = Camera
+metadata-section-exposure = Exposure
+metadata-section-video = Video
+metadata-section-audio = Audio
+metadata-section-gps = Location
+metadata-label-dimensions = Dimensions
+metadata-label-file-size = File size
+metadata-label-format = Format
+metadata-label-date-taken = Date taken
+metadata-label-camera = Camera
+metadata-label-exposure = Exposure
+metadata-label-aperture = Aperture
+metadata-label-iso = ISO
+metadata-label-focal-length = Focal length
+metadata-label-gps = Coordinates
+metadata-label-codec = Codec
+metadata-label-bitrate = Bit rate
+metadata-label-duration = Duration
+metadata-label-fps = Frame rate
+metadata-value-unknown = Unknown
+navbar-info-button = Info
+navbar-info-tooltip = Show file information (I)

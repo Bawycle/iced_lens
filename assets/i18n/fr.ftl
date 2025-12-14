@@ -1,4 +1,7 @@
-window-title = IcedLens
+# Terme pour le nom de l'application - source unique pour la marque
+-app-name = IcedLens
+
+window-title = { -app-name }
 hello-message = Bonjour, le monde !
 open-settings-button = Paramètres
 settings-back-to-viewer-button = Retour
@@ -10,6 +13,9 @@ settings-section-fullscreen = Plein écran
 select-language-label = Sélectionner la langue :
 language-name-en-US = Anglais
 language-name-fr = Français
+language-name-es = Espagnol
+language-name-de = Allemand
+language-name-it = Italien
 error-load-image-heading = Impossible d'ouvrir l'image.
 error-load-image-general = Une erreur est survenue lors du chargement de l'image.
 error-load-image-io = Vérifiez que le fichier existe et que vous disposez des permissions nécessaires.
@@ -31,6 +37,9 @@ viewer-delete-tooltip = Supprimer l'image affichée
 viewer-zoom-in-tooltip = Zoom avant
 viewer-zoom-out-tooltip = Zoom arrière
 viewer-fullscreen-tooltip = Basculer en plein écran
+viewer-double-click = Double-clic
+viewer-scroll-wheel = Molette
+viewer-click-drag = Clic + glisser
 settings-zoom-step-label = Incrément de zoom
 settings-zoom-step-placeholder = 10
 settings-zoom-step-hint = Définissez la variation appliquée lors des contrôles de zoom (de 1 % à 200 %).
@@ -52,8 +61,10 @@ help-arg-image-path = <CHEMIN_IMAGE>      Chemin vers un fichier image à ouvrir
 help-example-1 = iced_lens ./photo.png
 help-example-2 = iced_lens --lang fr ./image.jpg
 help-example-3 = iced_lens --help
-help-description = IcedLens – Visionneuse d'images
+help-description = { -app-name } – Visionneuse d'images
 help-line-option-i18n-dir =     --i18n-dir <chemin>  Charger les traductions depuis un dossier
+help-line-option-data-dir =     --data-dir <chemin>  Remplacer le répertoire de données (fichiers d'état)
+help-line-option-config-dir =     --config-dir <chemin>  Remplacer le répertoire de config (settings.toml)
 settings-sort-order-label = Ordre de tri pour la navigation
 settings-sort-alphabetical = Alphabétique
 settings-sort-modified = Date de modification
@@ -69,6 +80,7 @@ image-editor-save-as = Enregistrer sous...
 image-editor-tool-rotate = Pivoter
 image-editor-tool-crop = Rogner
 image-editor-tool-resize = Redimensionner
+image-editor-tool-light = Lumière
 image-editor-rotate-section-title = Rotation
 image-editor-rotate-left = Rotation gauche
 image-editor-rotate-right-tooltip = Tourner l'image dans le sens horaire
@@ -84,6 +96,11 @@ image-editor-resize-height-label = Hauteur (px)
 image-editor-resize-lock-aspect = Conserver les proportions
 image-editor-resize-presets-label = Préréglages
 image-editor-resize-apply = Appliquer le redimensionnement
+image-editor-light-section-title = Ajustements de lumière
+image-editor-light-brightness-label = Luminosité
+image-editor-light-contrast-label = Contraste
+image-editor-light-reset = Réinitialiser
+image-editor-light-apply = Appliquer
 image-editor-crop-section-title = Rogner
 image-editor-crop-ratio-label = Ratio d'aspect
 image-editor-crop-ratio-free = Libre
@@ -121,6 +138,8 @@ settings-frame-cache-label = Taille du cache d'images vidéo
 settings-frame-cache-hint = Des valeurs plus élevées améliorent les performances de navigation mais utilisent plus de mémoire. Les changements s'appliquent à l'ouverture d'une nouvelle vidéo.
 settings-frame-history-label = Taille de l'historique pour reculer
 settings-frame-history-hint = Mémoire utilisée pour reculer image par image. Utilisée uniquement en mode stepping, pas pendant la lecture normale.
+settings-keyboard-seek-step-label = Pas de navigation au clavier
+settings-keyboard-seek-step-hint = Durée à sauter avec les touches fléchées pendant la lecture vidéo.
 megabytes = Mo
 error-load-video-heading = Impossible de lire cette vidéo.
 error-load-video-general = Une erreur est survenue lors du chargement de la vidéo.
@@ -174,6 +193,12 @@ help-viewer-key-navigate = Passer au fichier précédent/suivant
 help-viewer-key-edit = Ouvrir l'image dans l'éditeur
 help-viewer-key-fullscreen = Entrer/quitter le plein écran
 help-viewer-key-exit-fullscreen = Quitter le mode plein écran
+help-viewer-key-info = Afficher/masquer le panneau d'informations
+
+help-mouse-title = Interactions souris
+help-viewer-mouse-doubleclick = Double-clic sur l'image/vidéo pour basculer en plein écran
+help-viewer-mouse-wheel = Zoomer/dézoomer
+help-viewer-mouse-drag = Déplacer l'image lorsqu'elle est zoomée
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Section Lecture vidéo
@@ -196,8 +221,10 @@ help-video-tool-capture-desc = Enregistrez l'image vidéo actuelle comme fichier
 
 help-video-key-playpause = Lire ou mettre en pause la vidéo
 help-video-key-mute = Activer/désactiver le son
-help-video-key-step-back = Reculer d'une image
-help-video-key-step-forward = Avancer d'une image
+help-video-key-seek = Avancer/reculer dans la vidéo (pendant la lecture)
+help-video-key-volume = Augmenter/diminuer le volume
+help-video-key-step-back = Reculer d'une image (en pause)
+help-video-key-step-forward = Avancer d'une image (en pause)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Section Éditeur d'images
@@ -224,6 +251,12 @@ help-editor-resize-scale = Échelle en pourcentage (ex. 50% pour réduire de moi
 help-editor-resize-dimensions = Entrez la largeur et la hauteur exactes en pixels
 help-editor-resize-lock = Verrouillez le ratio pour conserver les proportions
 help-editor-resize-presets = Utilisez les préréglages pour les tailles courantes (HD, Full HD, 4K...)
+
+help-editor-light-title = Lumière
+help-editor-light-desc = Ajustez la luminosité et le contraste de votre image.
+help-editor-light-brightness = Luminosité : éclaircir ou assombrir l'image
+help-editor-light-contrast = Contraste : augmenter ou réduire la différence entre zones claires et sombres
+help-editor-light-preview = Les modifications sont prévisualisées en temps réel avant application
 
 help-editor-save-title = Enregistrement
 help-editor-save-overwrite = Enregistrer : écrase le fichier original
@@ -252,7 +285,7 @@ about-title = À propos
 about-back-to-viewer-button = Retour
 
 about-section-app = Application
-about-app-name = IcedLens
+about-app-name = { -app-name }
 about-app-description = Visionneuse d'images et de vidéos légère avec édition basique d'images.
 
 about-section-license = Licence
@@ -260,8 +293,8 @@ about-license-name = Mozilla Public License 2.0 (MPL-2.0)
 about-license-summary = Copyleft au niveau des fichiers : les fichiers modifiés doivent être partagés sous la même licence. Compatible avec le code propriétaire.
 
 about-section-icon-license = Licence des icônes
-about-icon-license-name = Licence des icônes IcedLens
-about-icon-license-summary = Toutes les icônes (logo et icônes d'interface) ne peuvent être redistribuées que sans modification pour représenter IcedLens.
+about-icon-license-name = Licence des icônes { -app-name }
+about-icon-license-summary = Toutes les icônes (logo et icônes d'interface) ne peuvent être redistribuées que sans modification pour représenter { -app-name }.
 
 about-section-credits = Crédits
 about-credits-iced = Développé avec la bibliothèque Iced
@@ -271,3 +304,52 @@ about-credits-fluent = Internationalisation par Project Fluent
 about-section-links = Liens
 about-link-repository = Code source
 about-link-issues = Signaler un problème
+
+# Notifications
+notification-save-success = Image enregistrée avec succès
+notification-save-error = Échec de l'enregistrement de l'image
+notification-frame-capture-success = Image capturée avec succès
+notification-frame-capture-error = Échec de la capture d'image
+notification-delete-success = Fichier supprimé avec succès
+notification-delete-error = Échec de la suppression du fichier
+notification-copy-success = Copié dans le presse-papiers
+notification-copy-error = Échec de la copie dans le presse-papiers
+notification-config-save-error = Échec de l'enregistrement des paramètres
+notification-config-load-error = Échec du chargement des paramètres, valeurs par défaut utilisées
+notification-state-parse-error = Échec de lecture de l'état, valeurs par défaut utilisées
+notification-state-read-error = Impossible d'ouvrir le fichier d'état
+notification-state-path-error = Impossible de déterminer le chemin des données
+notification-state-dir-error = Impossible de créer le dossier de données
+notification-state-write-error = Échec de l'enregistrement de l'état
+notification-state-create-error = Impossible de créer le fichier d'état
+notification-scan-dir-error = Échec de l'analyse du dossier
+notification-editor-frame-error = Impossible d'ouvrir l'éditeur avec l'image capturée
+notification-editor-create-error = Impossible d'ouvrir l'éditeur d'images
+notification-editor-load-error = Impossible de charger l'image pour l'édition
+notification-video-editing-unsupported = L'édition vidéo n'est pas encore supportée
+
+# Panneau de métadonnées
+metadata-panel-title = Informations du fichier
+metadata-section-file = Fichier
+metadata-section-camera = Appareil photo
+metadata-section-exposure = Exposition
+metadata-section-video = Vidéo
+metadata-section-audio = Audio
+metadata-section-gps = Localisation
+metadata-label-dimensions = Dimensions
+metadata-label-file-size = Taille du fichier
+metadata-label-format = Format
+metadata-label-date-taken = Date de prise de vue
+metadata-label-camera = Appareil
+metadata-label-exposure = Exposition
+metadata-label-aperture = Ouverture
+metadata-label-iso = ISO
+metadata-label-focal-length = Focale
+metadata-label-gps = Coordonnées
+metadata-label-codec = Codec
+metadata-label-bitrate = Débit
+metadata-label-duration = Durée
+metadata-label-fps = Images/seconde
+metadata-value-unknown = Inconnu
+navbar-info-button = Info
+navbar-info-tooltip = Afficher les informations du fichier (I)

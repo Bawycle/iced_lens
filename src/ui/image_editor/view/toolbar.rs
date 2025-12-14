@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Top toolbar for the editor surface.
 
-use crate::ui::design_tokens::spacing;
+use crate::ui::design_tokens::{spacing, typography};
 use crate::ui::styles;
 use iced::widget::{button, container, Row, Text};
 use iced::{Alignment, Element, Length};
@@ -24,7 +24,8 @@ pub fn view<'a>(model: &ToolbarModel, ctx: &ViewContext<'a>) -> Element<'a, Mess
     let has_changes = model.has_unsaved_changes;
     let back_label = format!("← {}", ctx.i18n.tr("image-editor-back-to-viewer"));
 
-    let back_btn = button(Text::new(back_label).size(14)).padding([8, 12]);
+    let back_btn =
+        button(Text::new(back_label).size(typography::BODY)).padding([spacing::XS, spacing::SM]);
     let back_btn = if has_changes {
         back_btn
     } else {

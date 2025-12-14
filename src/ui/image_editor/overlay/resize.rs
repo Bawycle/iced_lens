@@ -21,12 +21,12 @@ impl iced::widget::canvas::Program<Message> for ResizeOverlayRenderer {
     fn update(
         &self,
         _state: &mut Self::State,
-        _event: iced::widget::canvas::Event,
+        _event: &iced::Event,
         _bounds: iced::Rectangle,
         _cursor: iced::mouse::Cursor,
-    ) -> (iced::widget::canvas::event::Status, Option<Message>) {
+    ) -> Option<iced::widget::Action<Message>> {
         // No interaction needed for resize overlay
-        (iced::widget::canvas::event::Status::Ignored, None)
+        None
     }
 
     fn draw(

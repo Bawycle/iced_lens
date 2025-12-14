@@ -66,43 +66,41 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
     fn update(
         &self,
         _state: &mut Self::State,
-        event: iced::widget::canvas::Event,
+        event: &iced::Event,
         bounds: iced::Rectangle,
         cursor: iced::mouse::Cursor,
-    ) -> (iced::widget::canvas::event::Status, Option<Message>) {
-        use iced::widget::canvas::event::Status;
+    ) -> Option<iced::widget::Action<Message>> {
+        use iced::widget::Action;
 
         match event {
             // If cursor leaves the canvas, end any drag operation
-            iced::widget::canvas::Event::Mouse(iced::mouse::Event::CursorLeft) => {
-                return (
-                    Status::Captured,
-                    Some(Message::Canvas(CanvasMessage::CropOverlayMouseUp)),
+            iced::Event::Mouse(iced::mouse::Event::CursorLeft) => {
+                return Some(
+                    Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseUp))
+                        .and_capture(),
                 );
             }
-            iced::widget::canvas::Event::Mouse(iced::mouse::Event::ButtonPressed(
-                iced::mouse::Button::Left,
-            )) => {
+            iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)) => {
                 if let Some(cursor_position) = cursor.position_in(bounds) {
                     if let Some((img_x, img_y)) =
                         self.screen_to_image_coords(cursor_position, bounds)
                     {
-                        return (
-                            Status::Captured,
-                            Some(Message::Canvas(CanvasMessage::CropOverlayMouseDown {
+                        return Some(
+                            Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseDown {
                                 x: img_x,
                                 y: img_y,
-                            })),
+                            }))
+                            .and_capture(),
                         );
                     }
                 }
             }
-            iced::widget::canvas::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) => {
+            iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) => {
                 // If cursor is outside bounds during move, end drag
                 if cursor.position_in(bounds).is_none() {
-                    return (
-                        Status::Captured,
-                        Some(Message::Canvas(CanvasMessage::CropOverlayMouseUp)),
+                    return Some(
+                        Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseUp))
+                            .and_capture(),
                     );
                 }
 
@@ -110,28 +108,26 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
                     if let Some((img_x, img_y)) =
                         self.screen_to_image_coords(cursor_position, bounds)
                     {
-                        return (
-                            Status::Captured,
-                            Some(Message::Canvas(CanvasMessage::CropOverlayMouseMove {
+                        return Some(
+                            Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseMove {
                                 x: img_x,
                                 y: img_y,
-                            })),
+                            }))
+                            .and_capture(),
                         );
                     }
                 }
             }
-            iced::widget::canvas::Event::Mouse(iced::mouse::Event::ButtonReleased(
-                iced::mouse::Button::Left,
-            )) => {
-                return (
-                    Status::Captured,
-                    Some(Message::Canvas(CanvasMessage::CropOverlayMouseUp)),
+            iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
+                return Some(
+                    Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseUp))
+                        .and_capture(),
                 );
             }
             _ => {}
         }
 
-        (Status::Ignored, None)
+        None
     }
 
     fn draw(

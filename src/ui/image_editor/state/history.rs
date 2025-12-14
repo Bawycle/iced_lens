@@ -62,31 +62,27 @@ impl State {
                     let y = rect.y.max(0.0) as u32;
                     let width = rect.width.max(1.0) as u32;
                     let height = rect.height.max(1.0) as u32;
-                    match image_transform::crop(&working_image, x, y, width, height) {
-                        Some(cropped) => cropped,
-                        None => {
-                            eprintln!("Failed to apply crop during replay: invalid crop area");
-                            working_image
-                        }
-                    }
+                    image_transform::crop(&working_image, x, y, width, height)
+                        .unwrap_or(working_image)
                 }
                 Transformation::Resize { width, height } => {
                     image_transform::resize(&working_image, *width, *height)
+                }
+                Transformation::AdjustBrightness { value } => {
+                    image_transform::adjust_brightness(&working_image, *value)
+                }
+                Transformation::AdjustContrast { value } => {
+                    image_transform::adjust_contrast(&working_image, *value)
                 }
             };
         }
 
         // Update current state with replayed image
         self.working_image = working_image;
-        match image_transform::dynamic_to_image_data(&self.working_image) {
-            Ok(image_data) => {
-                self.current_image = image_data;
-                self.sync_resize_state_dimensions();
-                self.preview_image = None;
-            }
-            Err(err) => {
-                eprintln!("Failed to convert replayed image: {err:?}");
-            }
+        if let Ok(image_data) = image_transform::dynamic_to_image_data(&self.working_image) {
+            self.current_image = image_data;
+            self.sync_resize_state_dimensions();
+            self.preview_image = None;
         }
     }
 }

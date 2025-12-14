@@ -14,7 +14,7 @@
 //!
 //! // Initialize I18n
 //! let mut config = Config::default();
-//! config.language = Some("fr".to_string());
+//! config.general.language = Some("fr".to_string());
 //! let mut i18n = I18n::new(None, None, &config);
 //!
 //! // Get a translated string
@@ -28,7 +28,7 @@
 //! ```
 
 use crate::config::Config;
-use fluent_bundle::{FluentBundle, FluentResource};
+use fluent_bundle::{FluentArgs, FluentBundle, FluentResource, FluentValue};
 use std::collections::HashMap;
 use std::fs;
 use unic_langid::LanguageIdentifier;
@@ -146,11 +146,43 @@ impl I18n {
     }
 
     pub fn tr(&self, key: &str) -> String {
+        self.tr_with_args(key, &[])
+    }
+
+    /// Translate a message key with variable substitution.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The message key to look up
+    /// * `args` - Slice of (name, value) pairs for variable substitution
+    ///
+    /// # Example
+    ///
+    /// ```fluent
+    /// error-codec = The codec '{ $codec }' is not supported.
+    /// ```
+    ///
+    /// ```ignore
+    /// i18n.tr_with_args("error-codec", &[("codec", "H264")]);
+    /// // Returns: "The codec 'H264' is not supported."
+    /// ```
+    pub fn tr_with_args(&self, key: &str, args: &[(&str, &str)]) -> String {
         if let Some(bundle) = self.bundles.get(&self.current_locale) {
             if let Some(msg) = bundle.get_message(key) {
                 if let Some(pattern) = msg.value() {
                     let mut errors = vec![];
-                    let value = bundle.format_pattern(pattern, None, &mut errors);
+
+                    let fluent_args = if args.is_empty() {
+                        None
+                    } else {
+                        let mut fa = FluentArgs::new();
+                        for (name, value) in args {
+                            fa.set(*name, FluentValue::from(*value));
+                        }
+                        Some(fa)
+                    };
+
+                    let value = bundle.format_pattern(pattern, fluent_args.as_ref(), &mut errors);
                     if errors.is_empty() {
                         return value.to_string();
                     }
@@ -180,7 +212,7 @@ fn resolve_locale(
     }
 
     // 2. Check config file
-    if let Some(lang_str) = &config.language {
+    if let Some(lang_str) = &config.general.language {
         if let Ok(lang) = lang_str.parse::<LanguageIdentifier>() {
             if available.contains(&lang) {
                 return Some(lang);
@@ -191,8 +223,16 @@ fn resolve_locale(
     // 3. Check OS locale
     if let Some(os_locale_str) = sys_locale::get_locale() {
         if let Ok(os_lang) = os_locale_str.parse::<LanguageIdentifier>() {
+            // Try exact match first (e.g., "en-US" matches "en-US")
             if available.contains(&os_lang) {
                 return Some(os_lang);
+            }
+            // Try language-only fallback (e.g., "fr_FR" matches "fr")
+            let base_lang = os_lang.language;
+            for avail in available {
+                if avail.language == base_lang {
+                    return Some(avail.clone());
+                }
             }
         }
     }
@@ -219,10 +259,8 @@ mod tests {
 
     #[test]
     fn test_resolve_locale_config() {
-        let config = Config {
-            language: Some("fr".to_string()),
-            ..Default::default()
-        };
+        let mut config = Config::default();
+        config.general.language = Some("fr".to_string());
         let available: Vec<LanguageIdentifier> =
             vec!["en-US".parse().unwrap(), "fr".parse().unwrap()];
         let lang = resolve_locale(None, &config, &available);
@@ -243,11 +281,69 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_locale_language_fallback() {
+        // Test that "fr-FR" falls back to "fr" when only "fr" is available
+        let available: Vec<LanguageIdentifier> =
+            vec!["en-US".parse().unwrap(), "fr".parse().unwrap()];
+
+        // Simulate what would happen with a "fr-FR" system locale
+        // by directly testing the language matching logic
+        let fr_fr: LanguageIdentifier = "fr-FR".parse().unwrap();
+        let fr: LanguageIdentifier = "fr".parse().unwrap();
+
+        // fr-FR should not be in available (exact match fails)
+        assert!(!available.contains(&fr_fr));
+
+        // But the language component should match
+        assert_eq!(fr_fr.language, fr.language);
+
+        // And we should find "fr" in available that matches the language
+        let matched = available.iter().find(|a| a.language == fr_fr.language);
+        assert_eq!(matched, Some(&fr));
+    }
+
+    #[test]
     fn test_tr_returns_missing_for_unknown_key() {
         let config = Config::default();
         let i18n = I18n::new(None, None, &config);
         let missing = i18n.tr("non-existent-key");
         assert!(missing.starts_with("MISSING:"));
+    }
+
+    #[test]
+    fn test_tr_with_args_substitutes_variables() {
+        let dir = tempdir().expect("temp dir");
+        let ftl_path = dir.path().join("en-US.ftl");
+        let mut ftl_file = std::fs::File::create(&ftl_path).expect("ftl file");
+        writeln!(ftl_file, "greeting = Hello, {{ $name }}!").expect("write ftl");
+        writeln!(
+            ftl_file,
+            "error-codec = Codec '{{ $codec }}' not supported."
+        )
+        .expect("write ftl");
+
+        let i18n = I18n::new(
+            None,
+            Some(dir.path().display().to_string()),
+            &Config::default(),
+        );
+
+        // Test single variable
+        // Note: Fluent adds Unicode directional isolation characters around interpolated values
+        // for bidirectional text support, so we use contains() instead of exact equality
+        let greeting = i18n.tr_with_args("greeting", &[("name", "Alice")]);
+        assert!(greeting.contains("Hello,"));
+        assert!(greeting.contains("Alice"));
+
+        // Test different variable
+        let error = i18n.tr_with_args("error-codec", &[("codec", "H264")]);
+        assert!(error.contains("H264"));
+        assert!(error.contains("not supported"));
+
+        // Test that calling tr() on a message with variables (without providing them)
+        // returns MISSING since Fluent reports resolver errors for missing variables
+        let no_args = i18n.tr("greeting");
+        assert!(no_args.starts_with("MISSING:")); // Expected: missing variables cause error
     }
 
     #[test]

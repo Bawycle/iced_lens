@@ -16,7 +16,7 @@ pub mod container;
 pub mod editor;
 pub mod overlay;
 
-// Re-exports pour backward compatibility
+// Re-exports for convenience
 pub use button::{overlay as button_overlay, primary as button_primary};
 
 use iced::widget::svg;

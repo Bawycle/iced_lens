@@ -224,7 +224,6 @@ impl State {
     pub(crate) fn apply_crop_from_base(&mut self) {
         // Apply crop from the base image (image when crop tool was opened)
         let Some(ref base_image) = self.crop_base_image else {
-            eprintln!("No base image available for crop");
             return;
         };
 
@@ -235,40 +234,36 @@ impl State {
 
         // Validate crop bounds
         if width == 0 || height == 0 || x >= self.crop_base_width || y >= self.crop_base_height {
-            eprintln!("Invalid crop bounds: ({}, {}, {}×{})", x, y, width, height);
             return;
         }
 
         // Apply crop transformation from base image
-        if let Some(cropped) = image_transform::crop(base_image, x, y, width, height) {
-            match image_transform::dynamic_to_image_data(&cropped) {
-                Ok(image_data) => {
-                    self.working_image = cropped;
-                    self.current_image = image_data;
-                    self.sync_resize_state_dimensions();
+        let Some(cropped) = image_transform::crop(base_image, x, y, width, height) else {
+            return;
+        };
 
-                    // Record transformation for undo/redo
-                    self.record_transformation(Transformation::Crop {
-                        rect: Rectangle {
-                            x: x as f32,
-                            y: y as f32,
-                            width: width as f32,
-                            height: height as f32,
-                        },
-                    });
+        let Ok(image_data) = image_transform::dynamic_to_image_data(&cropped) else {
+            return;
+        };
 
-                    // Note: Do NOT update crop_base_image here!
-                    // All crops within the same session should be relative to the base image
-                    // captured when the Crop tool was opened. The base is only updated when
-                    // the user closes and reopens the Crop tool.
-                }
-                Err(err) => {
-                    eprintln!("Failed to convert cropped image: {err:?}");
-                }
-            }
-        } else {
-            eprintln!("Crop operation returned None");
-        }
+        self.working_image = cropped;
+        self.current_image = image_data;
+        self.sync_resize_state_dimensions();
+
+        // Record transformation for undo/redo
+        self.record_transformation(Transformation::Crop {
+            rect: Rectangle {
+                x: x as f32,
+                y: y as f32,
+                width: width as f32,
+                height: height as f32,
+            },
+        });
+
+        // Note: Do NOT update crop_base_image here!
+        // All crops within the same session should be relative to the base image
+        // captured when the Crop tool was opened. The base is only updated when
+        // the user closes and reopens the Crop tool.
     }
 
     pub(crate) fn finalize_crop_overlay(&mut self) {

@@ -7,7 +7,9 @@
 use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{sizing, spacing};
 use crate::ui::{icons, styles};
-use iced::widget::{button, column, container, row, slider, text, tooltip, Column, Row, Text};
+use iced::widget::{
+    button, column, container, row, slider, text, tooltip, Column, Row, Space, Text,
+};
 use iced::{Element, Length};
 
 /// Slider step in seconds (1ms precision).
@@ -193,7 +195,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
 
     // Apply active style when muted (highlighted like fit-to-window button)
     let volume_button_content: Element<'_, Message> = if state.muted {
-        volume_button.style(styles::button_primary).into()
+        volume_button.style(styles::button::selected).into()
     } else {
         volume_button.into()
     };
@@ -211,14 +213,14 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         .step(0.01);
 
     // More button (overflow menu toggle)
-    let more_button_base = button(icons::sized(icons::more(), icon_size))
+    let more_button_base = button(icons::sized(icons::ellipsis_horizontal(), icon_size))
         .on_press(Message::ToggleOverflowMenu)
         .padding(spacing::XS)
         .width(Length::Shrink)
         .height(Length::Fixed(button_height));
 
     let more_button_content: Element<'_, Message> = if state.overflow_menu_open {
-        more_button_base.style(styles::button_primary).into()
+        more_button_base.style(styles::button::selected).into()
     } else {
         more_button_base.into()
     };
@@ -240,7 +242,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
 
     // Apply active style when loop is enabled (highlighted like mute button)
     let loop_button_content: Element<'_, Message> = if state.loop_enabled {
-        loop_button_base.style(styles::button_primary).into()
+        loop_button_base.style(styles::button::selected).into()
     } else {
         loop_button_base.into()
     };
@@ -296,14 +298,14 @@ fn build_overflow_menu<'a>(
 ) -> Element<'a, Message> {
     // Step backward button (only enabled when paused AND in stepping mode)
     let step_back_content: Element<'_, Message> = if !state.is_playing && state.can_step_backward {
-        button(icons::sized(icons::step_backward(), icon_size))
+        button(icons::sized(icons::triangle_bar_left(), icon_size))
             .on_press(Message::StepBackward)
             .padding(spacing::XS)
             .width(Length::Shrink)
             .height(Length::Fixed(button_height))
             .into()
     } else {
-        button(icons::sized(icons::step_backward(), icon_size))
+        button(icons::sized(icons::triangle_bar_left(), icon_size))
             .padding(spacing::XS)
             .width(Length::Shrink)
             .height(Length::Fixed(button_height))
@@ -319,14 +321,14 @@ fn build_overflow_menu<'a>(
 
     // Step forward button (only enabled when paused AND not at end of video)
     let step_forward_content: Element<'_, Message> = if state.can_step_forward {
-        button(icons::sized(icons::step_forward(), icon_size))
+        button(icons::sized(icons::triangle_bar_right(), icon_size))
             .on_press(Message::StepForward)
             .padding(spacing::XS)
             .width(Length::Shrink)
             .height(Length::Fixed(button_height))
             .into()
     } else {
-        button(icons::sized(icons::step_forward(), icon_size))
+        button(icons::sized(icons::triangle_bar_right(), icon_size))
             .padding(spacing::XS)
             .width(Length::Shrink)
             .height(Length::Fixed(button_height))
@@ -356,7 +358,7 @@ fn build_overflow_menu<'a>(
 
     // Overflow menu container - align to the right
     let menu_content: Row<'a, Message> = row![
-        iced::widget::horizontal_space(),
+        Space::new().width(Length::Fill),
         step_back_button,
         step_forward_button,
         capture_button,

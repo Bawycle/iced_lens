@@ -5,7 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2025-12-14
+
+### Added
+- **Media metadata panel:** new Info button in navbar displays technical information about the current media file.
+  - For images: EXIF data including camera make/model, exposure settings, focal length, and GPS coordinates (decimal degrees).
+  - For videos: codec, container format, bitrate, duration, and frame rate information.
+  - Panel uses push layout in windowed mode, overlay in fullscreen mode.
+  - Toggle with the `I` keyboard shortcut or Info button in navbar.
+- **Light adjustment tool:** brightness and contrast sliders in the image editor with live preview and full undo/redo support.
+- **Help screen enhancements:** tool descriptions now display their corresponding icons, and a new "Mouse Interactions" section documents double-click fullscreen, scroll wheel zoom, and drag to pan.
+- **Toast notification system:** visual feedback for user actions replaces silent console output.
+  - Success notifications for save, delete, copy, and frame capture operations.
+  - Warning notifications for configuration issues (corrupted settings, permission errors).
+  - Error notifications for failed operations requiring user acknowledgment.
+  - Auto-dismiss for success/info (3s) and warnings (5s); errors require manual dismiss.
+- **Path override CLI arguments:** `--data-dir` and `--config-dir` allow overriding default directories for portable installations or testing.
+- **Environment variable overrides:** `ICED_LENS_DATA_DIR` and `ICED_LENS_CONFIG_DIR` for CI/CD and portable deployments.
+- **Keyboard seek step setting:** configurable time skip for arrow keys during video playback (0.5–30 seconds), accessible from the Settings screen (Video section).
+- **Video playback preferences persistence:** volume, mute state, and loop toggle are now saved to `settings.toml` and restored on startup.
+- **Remember last Save As directory:** the file dialog now opens in the last used save location, persisted across sessions.
+- **Additional translations:** Spanish (`es`), German (`de`), and Italian (`it`) are now available in the language selector.
+
+### Changed
+- **Iced 0.14.0 upgrade:** migrated to the latest Iced framework version with VideoShader for persistent GPU textures.
+- **UI style harmonization:** centralized design tokens for typography, spacing, borders, and opacity. All hardcoded values replaced with semantic tokens for consistent styling across screens.
+- **Sectioned configuration file:** `settings.toml` now uses TOML sections (`[general]`, `[display]`, `[video]`, `[fullscreen]`) for better organization. Existing flat config files are automatically migrated on load.
+- Default keyboard seek step reduced from 5 seconds to 2 seconds.
+- Configuration and state loading now provides user feedback when falling back to defaults.
+- **Project structure reorganization:** moved `config/` and `i18n/` modules into `app/` as they are application infrastructure rather than independent business logic. Public API unchanged via re-exports.
+- Image editor navigation now skips videos automatically instead of showing a "video editing unsupported" notification.
+
+### Fixed
+- Fit-to-window now correctly updates when the hamburger menu collapses/expands.
+- Video seeking with arrow keys no longer "snaps back" when held down.
+- Image centering recalculates correctly on layout changes.
+- Navigation index now updates correctly after deleting a media file.
+- Video error messages now correctly display the codec name (e.g., "H264 not supported") instead of showing a placeholder.
+- System locale detection now falls back to base language (e.g., `fr_FR` correctly matches `fr` translation).
 
 ## [0.2.0] - 2025-12-12
 
@@ -110,6 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MSRV**: Rust 1.78+
 - **License**: Mozilla Public License 2.0 (MPL-2.0)
 
-[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.2.0...HEAD
+[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.3.0...HEAD
+[0.3.0]: https://codeberg.org/Bawycle/iced_lens/compare/v0.2.0...v0.3.0
 [0.2.0]: https://codeberg.org/Bawycle/iced_lens/releases/tag/v0.2.0
 [0.1.0]: https://codeberg.org/Bawycle/iced_lens/releases/tag/v0.1.0

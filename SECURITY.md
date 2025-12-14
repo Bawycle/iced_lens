@@ -6,7 +6,9 @@ As IcedLens is currently in pre-1.0 development, security updates are provided f
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| 0.3.x   | :white_check_mark: |
+| 0.2.x   | :x:                |
+| 0.1.x   | :x:                |
 
 Once version 1.0.0 is released, this policy will be updated to reflect long-term support plans.
 

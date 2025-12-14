@@ -182,6 +182,363 @@ enum State {
     },
 }
 
+/// Configuration for video playback subscription.
+/// Used with `run_with` to uniquely identify subscriptions.
+#[derive(Clone)]
+struct VideoPlaybackConfig {
+    video_path: PathBuf,
+    session_id: u64,
+    lufs_cache: Option<SharedLufsCache>,
+    normalization_enabled: bool,
+    cache_config: CacheConfig,
+}
+
+impl std::hash::Hash for VideoPlaybackConfig {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Hash based on session_id for subscription deduplication
+        self.session_id.hash(state);
+    }
+}
+
+/// Creates the playback stream from configuration.
+/// This is a function pointer compatible with `Subscription::run_with`.
+fn create_playback_stream(
+    config: &VideoPlaybackConfig,
+) -> impl iced::futures::Stream<Item = PlaybackMessage> {
+    let config = config.clone();
+    stream::channel(100, move |mut output| {
+        let video_path = config.video_path;
+        let lufs_cache = config.lufs_cache;
+        let normalization_enabled = config.normalization_enabled;
+        let cache_config = config.cache_config;
+        async move {
+            run_playback_loop(
+                &mut output,
+                video_path,
+                lufs_cache,
+                normalization_enabled,
+                cache_config,
+            )
+            .await;
+        }
+    })
+}
+
+/// Internal playback loop extracted for cleaner code structure.
+async fn run_playback_loop(
+    output: &mut iced::futures::channel::mpsc::Sender<PlaybackMessage>,
+    video_path: PathBuf,
+    lufs_cache: Option<SharedLufsCache>,
+    normalization_enabled: bool,
+    cache_config: CacheConfig,
+) {
+    let mut state = State::Idle;
+
+    loop {
+        match &mut state {
+            State::Idle => {
+                // Create external command channels for UI to send commands
+                let (external_cmd_tx, external_cmd_rx) = mpsc::unbounded_channel();
+                let (audio_cmd_tx, audio_cmd_rx) = mpsc::unbounded_channel();
+
+                // Check if this is an animated WebP (requires special decoder)
+                let use_webp_decoder = is_animated_webp(&video_path);
+
+                // Try to create video decoder
+                let video_decoder: VideoDecoderKind = if use_webp_decoder {
+                    // Use WebP decoder for animated WebP files
+                    match WebpAnimDecoder::new(&video_path) {
+                        Ok(decoder) => VideoDecoderKind::Webp(decoder),
+                        Err(e) => {
+                            let _ = output.send(PlaybackMessage::Error(e.to_string())).await;
+                            break;
+                        }
+                    }
+                } else {
+                    // Use FFmpeg decoder for regular videos
+                    match AsyncDecoder::new(&video_path, cache_config) {
+                        Ok(decoder) => VideoDecoderKind::Ffmpeg(decoder),
+                        Err(e) => {
+                            let _ = output.send(PlaybackMessage::Error(e.to_string())).await;
+                            break;
+                        }
+                    }
+                };
+
+                // Try to create audio decoder (optional - video might not have audio)
+                // Note: WebP animations don't have audio, so skip for them
+                let audio_decoder = if use_webp_decoder {
+                    None
+                } else {
+                    match AudioDecoder::new(&video_path) {
+                        Ok(Some(decoder)) => Some(decoder),
+                        Ok(None) => {
+                            // No audio stream in video - this is fine
+                            None
+                        }
+                        Err(e) => {
+                            // Log error but continue without audio
+                            eprintln!("Audio decoder failed: {}", e);
+                            None
+                        }
+                    }
+                };
+
+                // Create audio output if we have audio
+                let audio_output = if audio_decoder.is_some() {
+                    match AudioOutput::new(0.8) {
+                        Ok(output) => Some(output),
+                        Err(e) => {
+                            eprintln!("Audio output failed: {}", e);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                // Create normalization gain
+                let normalization_gain = Arc::new(NormalizationGain::new());
+
+                // Launch LUFS analysis in background if normalization is enabled
+                if normalization_enabled && audio_decoder.is_some() {
+                    let gain_clone = Arc::clone(&normalization_gain);
+                    let path_clone = video_path.clone();
+                    let cache_clone = lufs_cache.clone();
+
+                    tokio::task::spawn_blocking(move || {
+                        // Check cache first
+                        let path_str = path_clone.to_string_lossy().to_string();
+                        if let Some(ref cache) = cache_clone {
+                            if let Some(cached_lufs) = cache.get(&path_str) {
+                                let analyzer = LufsAnalyzer::default();
+                                let gain_db = analyzer.calculate_gain(cached_lufs);
+                                let gain_linear = LufsAnalyzer::db_to_linear(gain_db);
+                                gain_clone.set(gain_linear as f32);
+                                return;
+                            }
+                        }
+
+                        // Analyze LUFS (this is slow, ~1-5 seconds)
+                        let analyzer = LufsAnalyzer::default();
+                        match analyzer.analyze_file(&path_clone) {
+                            Ok(measured_lufs) => {
+                                // Cache the result
+                                if let Some(ref cache) = cache_clone {
+                                    cache.insert(path_str, measured_lufs);
+                                }
+
+                                // Calculate and apply gain
+                                let gain_db = analyzer.calculate_gain(measured_lufs);
+                                let gain_linear = LufsAnalyzer::db_to_linear(gain_db);
+                                gain_clone.set(gain_linear as f32);
+                            }
+                            Err(_) => {
+                                // Keep default gain of 1.0
+                            }
+                        }
+                    });
+                }
+
+                // Send the command sender to UI
+                let cmd_sender = DecoderCommandSender {
+                    video_tx: external_cmd_tx,
+                    audio_tx: if audio_decoder.is_some() {
+                        Some(audio_cmd_tx)
+                    } else {
+                        None
+                    },
+                };
+                let _ = output.send(PlaybackMessage::Started(cmd_sender)).await;
+
+                let has_audio = audio_decoder.is_some();
+                state = State::Decoding {
+                    video_decoder,
+                    audio_decoder,
+                    audio_output,
+                    external_cmd_rx,
+                    audio_cmd_rx: if has_audio { Some(audio_cmd_rx) } else { None },
+                    normalization_gain,
+                };
+            }
+
+            State::Decoding {
+                video_decoder,
+                audio_decoder,
+                audio_output,
+                external_cmd_rx,
+                audio_cmd_rx,
+                normalization_gain,
+            } => {
+                // Use select to handle commands, video events, and audio events
+                tokio::select! {
+                    // Check for external commands from UI
+                    cmd = external_cmd_rx.recv() => {
+                        if let Some(command) = cmd {
+                            // Handle audio output commands
+                            if let Some(ref audio_out) = audio_output {
+                                match &command {
+                                    DecoderCommand::Pause => {
+                                        let _ = audio_out.pause();
+                                    }
+                                    DecoderCommand::Play { .. } => {
+                                        let _ = audio_out.resume();
+                                    }
+                                    DecoderCommand::Stop => {
+                                        let _ = audio_out.stop();
+                                    }
+                                    DecoderCommand::Seek { .. } => {
+                                        // Clear audio buffer on seek without pausing
+                                        // This allows audio to continue if video was playing
+                                        let _ = audio_out.clear_buffer();
+                                    }
+                                    DecoderCommand::StepFrame => {
+                                        // No audio action needed for frame stepping
+                                    }
+                                    DecoderCommand::StepBackward => {
+                                        // No audio action needed for backward stepping
+                                    }
+                                }
+                            }
+
+                            // Forward command to audio decoder for timing sync
+                            if let Some(ref audio_dec) = audio_decoder {
+                                let audio_cmd = match &command {
+                                    DecoderCommand::Play { .. } => Some(AudioDecoderCommand::Play),
+                                    DecoderCommand::Pause => Some(AudioDecoderCommand::Pause),
+                                    DecoderCommand::Seek { target_secs } => {
+                                        Some(AudioDecoderCommand::Seek { target_secs: *target_secs })
+                                    }
+                                    DecoderCommand::Stop => Some(AudioDecoderCommand::Stop),
+                                    DecoderCommand::StepFrame => None, // No audio sync for frame stepping
+                                    DecoderCommand::StepBackward => None, // No audio sync for backward stepping
+                                };
+                                if let Some(cmd) = audio_cmd {
+                                    let _ = audio_dec.send_command(cmd);
+                                }
+                            }
+
+                            // Forward command to video decoder
+                            if let Err(e) = video_decoder.send_command(command) {
+                                let _ = output.send(PlaybackMessage::Error(e.to_string())).await;
+                            }
+                        }
+                    }
+
+                    // Check for audio commands from UI (volume, mute, play, pause, seek, stop)
+                    Some(audio_cmd) = async {
+                        if let Some(ref mut rx) = audio_cmd_rx {
+                            rx.recv().await
+                        } else {
+                            std::future::pending::<Option<AudioDecoderCommand>>().await
+                        }
+                    } => {
+                        // Forward to audio decoder
+                        if let Some(ref audio_dec) = audio_decoder {
+                            let _ = audio_dec.send_command(audio_cmd.clone());
+                        }
+
+                        // Handle audio output commands
+                        if let Some(ref audio_out) = audio_output {
+                            match audio_cmd {
+                                AudioDecoderCommand::Play => {
+                                    let _ = audio_out.resume();
+                                }
+                                AudioDecoderCommand::Pause => {
+                                    let _ = audio_out.pause();
+                                }
+                                AudioDecoderCommand::Seek { .. } => {
+                                    // Clear buffer on seek without pausing
+                                    let _ = audio_out.clear_buffer();
+                                }
+                                AudioDecoderCommand::Stop => {
+                                    let _ = audio_out.stop();
+                                }
+                                AudioDecoderCommand::SetVolume(vol) => {
+                                    let _ = audio_out.set_volume(vol);
+                                }
+                                AudioDecoderCommand::SetMuted(muted) => {
+                                    let _ = audio_out.set_muted(muted);
+                                }
+                            }
+                        }
+                    }
+
+                    // Check for events from video decoder
+                    event = video_decoder.recv_event() => {
+                        if let Some(event) = event {
+                            let message = match event {
+                                DecoderEvent::FrameReady(frame) => PlaybackMessage::FrameReady {
+                                    rgba_data: frame.rgba_data,
+                                    width: frame.width,
+                                    height: frame.height,
+                                    pts_secs: frame.pts_secs,
+                                },
+                                DecoderEvent::Buffering => PlaybackMessage::Buffering,
+                                DecoderEvent::EndOfStream => PlaybackMessage::EndOfStream,
+                                DecoderEvent::Error(msg) => PlaybackMessage::Error(msg),
+                            };
+
+                            let _ = output.send(message).await;
+                        } else {
+                            // Decoder closed, exit loop
+                            break;
+                        }
+                    }
+
+                    // Check for events from audio decoder
+                    Some(audio_event) = async {
+                        if let Some(ref mut audio_dec) = audio_decoder {
+                            audio_dec.recv_event().await
+                        } else {
+                            std::future::pending::<Option<AudioDecoderEvent>>().await
+                        }
+                    } => {
+                        match audio_event {
+                            AudioDecoderEvent::BufferReady(audio) => {
+                                // Send audio samples to output with normalization gain
+                                if let Some(ref audio_out) = audio_output {
+                                    let gain = normalization_gain.get();
+
+                                    // Apply normalization gain if not 1.0
+                                    let samples: AudioSamples = if (gain - 1.0).abs() > 0.001 {
+                                        // Apply gain to samples
+                                        let normalized: Vec<f32> = audio
+                                            .samples
+                                            .iter()
+                                            .map(|s| (s * gain).clamp(-1.0, 1.0))
+                                            .collect();
+                                        Arc::new(normalized)
+                                    } else {
+                                        audio.samples
+                                    };
+
+                                    let _ = audio_out.play(samples);
+                                }
+
+                                // Send PTS update for sync tracking
+                                let _ = output.send(PlaybackMessage::AudioPts(audio.pts_secs)).await;
+                            }
+                            AudioDecoderEvent::StreamInfo(_info) => {
+                                // Stream info available if needed for UI display
+                            }
+                            AudioDecoderEvent::EndOfStream => {
+                                // Audio finished - video might still be playing
+                            }
+                            AudioDecoderEvent::Error(msg) => {
+                                eprintln!("Audio error: {}", msg);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Keep subscription alive but idle
+    std::future::pending::<()>().await;
+}
+
 /// Creates a video playback subscription.
 ///
 /// This subscription manages the async decoder lifecycle and translates
@@ -207,320 +564,14 @@ pub fn video_playback(
     normalization_enabled: bool,
     cache_config: CacheConfig,
 ) -> iced::Subscription<PlaybackMessage> {
-    // Note: cache_config changes take effect on next video load, not immediately
-    // This avoids restarting playback when user changes cache size in settings
-    iced::Subscription::run_with_id(
-        VideoPlaybackId(session_id),
-        stream::channel(100, move |mut output| async move {
-            let mut state = State::Idle;
-
-            loop {
-                match &mut state {
-                    State::Idle => {
-                        // Create external command channels for UI to send commands
-                        let (external_cmd_tx, external_cmd_rx) = mpsc::unbounded_channel();
-                        let (audio_cmd_tx, audio_cmd_rx) = mpsc::unbounded_channel();
-
-                        // Check if this is an animated WebP (requires special decoder)
-                        let use_webp_decoder = is_animated_webp(&video_path);
-
-                        // Try to create video decoder
-                        let video_decoder: VideoDecoderKind = if use_webp_decoder {
-                            // Use WebP decoder for animated WebP files
-                            match WebpAnimDecoder::new(&video_path) {
-                                Ok(decoder) => VideoDecoderKind::Webp(decoder),
-                                Err(e) => {
-                                    let _ =
-                                        output.send(PlaybackMessage::Error(e.to_string())).await;
-                                    break;
-                                }
-                            }
-                        } else {
-                            // Use FFmpeg decoder for regular videos
-                            match AsyncDecoder::new(&video_path, cache_config) {
-                                Ok(decoder) => VideoDecoderKind::Ffmpeg(decoder),
-                                Err(e) => {
-                                    let _ =
-                                        output.send(PlaybackMessage::Error(e.to_string())).await;
-                                    break;
-                                }
-                            }
-                        };
-
-                        // Try to create audio decoder (optional - video might not have audio)
-                        // Note: WebP animations don't have audio, so skip for them
-                        let audio_decoder = if use_webp_decoder {
-                            None
-                        } else {
-                            match AudioDecoder::new(&video_path) {
-                                Ok(Some(decoder)) => Some(decoder),
-                                Ok(None) => {
-                                    // No audio stream in video - this is fine
-                                    None
-                                }
-                                Err(e) => {
-                                    // Log error but continue without audio
-                                    eprintln!("Audio decoder failed: {}", e);
-                                    None
-                                }
-                            }
-                        };
-
-                        // Create audio output if we have audio
-                        let audio_output = if audio_decoder.is_some() {
-                            match AudioOutput::new(0.8) {
-                                Ok(output) => Some(output),
-                                Err(e) => {
-                                    eprintln!("Audio output failed: {}", e);
-                                    None
-                                }
-                            }
-                        } else {
-                            None
-                        };
-
-                        // Create normalization gain
-                        let normalization_gain = Arc::new(NormalizationGain::new());
-
-                        // Launch LUFS analysis in background if normalization is enabled
-                        if normalization_enabled && audio_decoder.is_some() {
-                            let gain_clone = Arc::clone(&normalization_gain);
-                            let path_clone = video_path.clone();
-                            let cache_clone = lufs_cache.clone();
-
-                            tokio::task::spawn_blocking(move || {
-                                // Check cache first
-                                let path_str = path_clone.to_string_lossy().to_string();
-                                if let Some(ref cache) = cache_clone {
-                                    if let Some(cached_lufs) = cache.get(&path_str) {
-                                        let analyzer = LufsAnalyzer::default();
-                                        let gain_db = analyzer.calculate_gain(cached_lufs);
-                                        let gain_linear = LufsAnalyzer::db_to_linear(gain_db);
-                                        gain_clone.set(gain_linear as f32);
-                                        return;
-                                    }
-                                }
-
-                                // Analyze LUFS (this is slow, ~1-5 seconds)
-                                let analyzer = LufsAnalyzer::default();
-                                match analyzer.analyze_file(&path_clone) {
-                                    Ok(measured_lufs) => {
-                                        // Cache the result
-                                        if let Some(ref cache) = cache_clone {
-                                            cache.insert(path_str, measured_lufs);
-                                        }
-
-                                        // Calculate and apply gain
-                                        let gain_db = analyzer.calculate_gain(measured_lufs);
-                                        let gain_linear = LufsAnalyzer::db_to_linear(gain_db);
-                                        gain_clone.set(gain_linear as f32);
-                                    }
-                                    Err(_) => {
-                                        // Keep default gain of 1.0
-                                    }
-                                }
-                            });
-                        }
-
-                        // Send the command sender to UI
-                        let cmd_sender = DecoderCommandSender {
-                            video_tx: external_cmd_tx,
-                            audio_tx: if audio_decoder.is_some() {
-                                Some(audio_cmd_tx)
-                            } else {
-                                None
-                            },
-                        };
-                        let _ = output.send(PlaybackMessage::Started(cmd_sender)).await;
-
-                        let has_audio = audio_decoder.is_some();
-                        state = State::Decoding {
-                            video_decoder,
-                            audio_decoder,
-                            audio_output,
-                            external_cmd_rx,
-                            audio_cmd_rx: if has_audio { Some(audio_cmd_rx) } else { None },
-                            normalization_gain,
-                        };
-                    }
-
-                    State::Decoding {
-                        video_decoder,
-                        audio_decoder,
-                        audio_output,
-                        external_cmd_rx,
-                        audio_cmd_rx,
-                        normalization_gain,
-                    } => {
-                        // Use select to handle commands, video events, and audio events
-                        tokio::select! {
-                            // Check for external commands from UI
-                            cmd = external_cmd_rx.recv() => {
-                                if let Some(command) = cmd {
-                                    // Handle audio output commands
-                                    if let Some(ref audio_out) = audio_output {
-                                        match &command {
-                                            DecoderCommand::Pause => {
-                                                let _ = audio_out.pause();
-                                            }
-                                            DecoderCommand::Play { .. } => {
-                                                let _ = audio_out.resume();
-                                            }
-                                            DecoderCommand::Stop => {
-                                                let _ = audio_out.stop();
-                                            }
-                                            DecoderCommand::Seek { .. } => {
-                                                // Clear audio buffer on seek without pausing
-                                                // This allows audio to continue if video was playing
-                                                let _ = audio_out.clear_buffer();
-                                            }
-                                            DecoderCommand::StepFrame => {
-                                                // No audio action needed for frame stepping
-                                            }
-                                            DecoderCommand::StepBackward => {
-                                                // No audio action needed for backward stepping
-                                            }
-                                        }
-                                    }
-
-                                    // Forward command to audio decoder for timing sync
-                                    if let Some(ref audio_dec) = audio_decoder {
-                                        let audio_cmd = match &command {
-                                            DecoderCommand::Play { .. } => Some(AudioDecoderCommand::Play),
-                                            DecoderCommand::Pause => Some(AudioDecoderCommand::Pause),
-                                            DecoderCommand::Seek { target_secs } => {
-                                                Some(AudioDecoderCommand::Seek { target_secs: *target_secs })
-                                            }
-                                            DecoderCommand::Stop => Some(AudioDecoderCommand::Stop),
-                                            DecoderCommand::StepFrame => None, // No audio sync for frame stepping
-                                            DecoderCommand::StepBackward => None, // No audio sync for backward stepping
-                                        };
-                                        if let Some(cmd) = audio_cmd {
-                                            let _ = audio_dec.send_command(cmd);
-                                        }
-                                    }
-
-                                    // Forward command to video decoder
-                                    if let Err(e) = video_decoder.send_command(command) {
-                                        let _ = output.send(PlaybackMessage::Error(e.to_string())).await;
-                                    }
-                                }
-                            }
-
-                            // Check for audio commands from UI (volume, mute, play, pause, seek, stop)
-                            Some(audio_cmd) = async {
-                                if let Some(ref mut rx) = audio_cmd_rx {
-                                    rx.recv().await
-                                } else {
-                                    std::future::pending::<Option<AudioDecoderCommand>>().await
-                                }
-                            } => {
-                                // Forward to audio decoder
-                                if let Some(ref audio_dec) = audio_decoder {
-                                    let _ = audio_dec.send_command(audio_cmd.clone());
-                                }
-
-                                // Handle audio output commands
-                                if let Some(ref audio_out) = audio_output {
-                                    match audio_cmd {
-                                        AudioDecoderCommand::Play => {
-                                            let _ = audio_out.resume();
-                                        }
-                                        AudioDecoderCommand::Pause => {
-                                            let _ = audio_out.pause();
-                                        }
-                                        AudioDecoderCommand::Seek { .. } => {
-                                            // Clear buffer on seek without pausing
-                                            let _ = audio_out.clear_buffer();
-                                        }
-                                        AudioDecoderCommand::Stop => {
-                                            let _ = audio_out.stop();
-                                        }
-                                        AudioDecoderCommand::SetVolume(vol) => {
-                                            let _ = audio_out.set_volume(vol);
-                                        }
-                                        AudioDecoderCommand::SetMuted(muted) => {
-                                            let _ = audio_out.set_muted(muted);
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Check for events from video decoder
-                            event = video_decoder.recv_event() => {
-                                if let Some(event) = event {
-                                    let message = match event {
-                                        DecoderEvent::FrameReady(frame) => PlaybackMessage::FrameReady {
-                                            rgba_data: frame.rgba_data,
-                                            width: frame.width,
-                                            height: frame.height,
-                                            pts_secs: frame.pts_secs,
-                                        },
-                                        DecoderEvent::Buffering => PlaybackMessage::Buffering,
-                                        DecoderEvent::EndOfStream => PlaybackMessage::EndOfStream,
-                                        DecoderEvent::Error(msg) => PlaybackMessage::Error(msg),
-                                    };
-
-                                    let _ = output.send(message).await;
-                                } else {
-                                    // Decoder closed, exit loop
-                                    break;
-                                }
-                            }
-
-                            // Check for events from audio decoder
-                            Some(audio_event) = async {
-                                if let Some(ref mut audio_dec) = audio_decoder {
-                                    audio_dec.recv_event().await
-                                } else {
-                                    std::future::pending::<Option<AudioDecoderEvent>>().await
-                                }
-                            } => {
-                                match audio_event {
-                                    AudioDecoderEvent::BufferReady(audio) => {
-                                        // Send audio samples to output with normalization gain
-                                        if let Some(ref audio_out) = audio_output {
-                                            let gain = normalization_gain.get();
-
-                                            // Apply normalization gain if not 1.0
-                                            let samples: AudioSamples = if (gain - 1.0).abs() > 0.001 {
-                                                // Apply gain to samples
-                                                let normalized: Vec<f32> = audio
-                                                    .samples
-                                                    .iter()
-                                                    .map(|s| (s * gain).clamp(-1.0, 1.0))
-                                                    .collect();
-                                                Arc::new(normalized)
-                                            } else {
-                                                audio.samples
-                                            };
-
-                                            let _ = audio_out.play(samples);
-                                        }
-
-                                        // Send PTS update for sync tracking
-                                        let _ = output.send(PlaybackMessage::AudioPts(audio.pts_secs)).await;
-                                    }
-                                    AudioDecoderEvent::StreamInfo(_info) => {
-                                        // Stream info available if needed for UI display
-                                    }
-                                    AudioDecoderEvent::EndOfStream => {
-                                        // Audio finished - video might still be playing
-                                    }
-                                    AudioDecoderEvent::Error(msg) => {
-                                        eprintln!("Audio error: {}", msg);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Keep subscription alive but idle
-            std::future::pending::<()>().await;
-        }),
-    )
+    let config = VideoPlaybackConfig {
+        video_path,
+        session_id,
+        lufs_cache,
+        normalization_enabled,
+        cache_config,
+    };
+    iced::Subscription::run_with(config, create_playback_stream)
 }
 
 #[cfg(test)]

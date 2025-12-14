@@ -2,7 +2,7 @@
 //! Viewer controls: zoom inputs, buttons, and fit-to-window toggle.
 
 use crate::i18n::fluent::I18n;
-use crate::ui::design_tokens::spacing;
+use crate::ui::design_tokens::{spacing, typography};
 use crate::ui::icons;
 use crate::ui::state::zoom::ZoomState;
 use crate::ui::styles;
@@ -44,10 +44,10 @@ pub fn view<'a>(
         .on_input(Message::ZoomInputChanged)
         .on_submit(Message::ZoomInputSubmitted)
         .padding(spacing::XXS)
-        .size(16)
+        .size(typography::BODY_LG)
         .width(Length::Fixed(60.0));
 
-    let zoom_percent_label = Text::new("%").size(16);
+    let zoom_percent_label = Text::new("%").size(typography::BODY_LG);
 
     let reset_tooltip = ctx.i18n.tr("viewer-zoom-reset-button");
     let reset_button_content: Element<'_, Message> = button(icons::fill(icons::refresh()))
@@ -105,7 +105,7 @@ pub fn view<'a>(
 
     // Apply different style when fit is active (highlighted)
     let fit_button_content: Element<'_, Message> = if effective_fit_to_window {
-        fit_button.style(styles::button_primary).into()
+        fit_button.style(styles::button::selected).into()
     } else {
         fit_button.into()
     };
@@ -125,7 +125,7 @@ pub fn view<'a>(
 
     // Apply different style when fullscreen is active (highlighted)
     let fullscreen_button_content: Element<'_, Message> = if is_fullscreen {
-        fullscreen_button.style(styles::button_primary).into()
+        fullscreen_button.style(styles::button::selected).into()
     } else {
         fullscreen_button.into()
     };
@@ -160,15 +160,9 @@ pub fn view<'a>(
         .push(zoom_out_button)
         .push(zoom_in_button)
         .push(reset_button)
-        .push(Space::new(
-            Length::Fixed(shared_styles::CONTROL_PADDING),
-            Length::Shrink,
-        ))
+        .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
         .push(fit_toggle)
-        .push(Space::new(
-            Length::Fixed(shared_styles::CONTROL_PADDING),
-            Length::Shrink,
-        ))
+        .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
         .push(delete_button)
         .push(fullscreen_toggle);
 
@@ -176,7 +170,7 @@ pub fn view<'a>(
 
     if let Some(error_key) = zoom.zoom_input_error_key {
         let error_text = Text::new(ctx.i18n.tr(error_key))
-            .size(14)
+            .size(typography::BODY)
             .style(|_theme: &Theme| text::Style {
                 color: Some(theme::error_text_color()),
             });

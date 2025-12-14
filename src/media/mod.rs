@@ -7,6 +7,8 @@
 pub mod frame_export;
 pub mod image;
 pub mod image_transform;
+pub mod metadata;
+pub mod navigator;
 pub mod video;
 
 use image_rs::AnimationDecoder;
@@ -16,6 +18,7 @@ use std::path::Path;
 
 // Re-export commonly used types
 pub use image::{load_image, ImageData, SUPPORTED_EXTENSIONS as IMAGE_EXTENSIONS};
+pub use navigator::{ImageNavigator, MediaNavigator};
 
 /// Represents different types of media formats
 #[derive(Debug, Clone, PartialEq, Eq)]
