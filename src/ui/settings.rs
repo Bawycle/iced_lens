@@ -27,8 +27,8 @@ use crate::ui::theming::ThemeMode;
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
-        button, container, rule, scrollable, svg::Svg, text, text_input, Button, Column, Container,
-        Row, Slider, Text,
+        button, container, pick_list, rule, scrollable, svg::Svg, text, text_input, Button, Column,
+        Container, Row, Slider, Text,
     },
     Border, Element, Length, Theme,
 };
@@ -127,6 +127,21 @@ pub enum Event {
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
     KeyboardSeekStepChanged(f64),
+}
+
+/// Language option for the pick_list widget.
+///
+/// Wraps a LanguageIdentifier with a display name for use in the dropdown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageOption {
+    pub locale: LanguageIdentifier,
+    pub display_name: String,
+}
+
+impl std::fmt::Display for LanguageOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display_name)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -298,33 +313,42 @@ impl State {
 
     /// Build the General section (Language, Theme mode).
     fn build_general_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
-        // Language selection
-        let mut language_row = Row::new().spacing(spacing::XS).align_y(Vertical::Center);
-        for locale in &ctx.i18n.available_locales {
-            let display_name = locale.to_string();
-            let translated_name_key = format!("language-name-{}", locale);
-            let translated_name = ctx.i18n.tr(&translated_name_key);
-            let button_text = if translated_name.starts_with("MISSING:") {
-                display_name.clone()
-            } else {
-                format!("{} ({})", translated_name, display_name)
-            };
-
-            let is_current = ctx.i18n.current_locale() == locale;
-            let btn = Button::new(Text::new(button_text))
-                .on_press(Message::LanguageSelected(locale.clone()))
-                .style(if is_current {
-                    button_styles::selected
+        // Language selection using pick_list (dropdown)
+        let language_options: Vec<LanguageOption> = ctx
+            .i18n
+            .available_locales
+            .iter()
+            .map(|locale| {
+                let translated_name_key = format!("language-name-{}", locale);
+                let translated_name = ctx.i18n.tr(&translated_name_key);
+                let display_name = if translated_name.starts_with("MISSING:") {
+                    locale.to_string()
                 } else {
-                    button_styles::unselected
-                });
-            language_row = language_row.push(btn);
-        }
+                    format!("{} ({})", translated_name, locale)
+                };
+                LanguageOption {
+                    locale: locale.clone(),
+                    display_name,
+                }
+            })
+            .collect();
+
+        let current_locale = ctx.i18n.current_locale();
+        let selected = language_options
+            .iter()
+            .find(|opt| &opt.locale == current_locale)
+            .cloned();
+
+        let language_picker = pick_list(language_options, selected, |opt| {
+            Message::LanguageSelected(opt.locale)
+        })
+        .padding(spacing::XS)
+        .text_size(typography::BODY);
 
         let language_setting = self.build_setting_row(
             ctx.i18n.tr("select-language-label"),
             None,
-            language_row.into(),
+            language_picker.into(),
         );
 
         // Theme mode selection

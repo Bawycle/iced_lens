@@ -131,9 +131,9 @@ Unify how the application communicates with the user. Currently:
   - `src/ui/metadata_panel.rs` with collapsible sections
 
 ### Internationalization
-- [ ] Add Spanish translation (`es.ftl`)
-- [ ] Add German translation (`de.ftl`)
-- [ ] Add Italian translation (`it.ftl`)
+- [x] ~~Add Spanish translation (`es.ftl`)~~ ✅
+- [x] ~~Add German translation (`de.ftl`)~~ ✅
+- [x] ~~Add Italian translation (`it.ftl`)~~ ✅
 
 ### AI Frame Enhancement (Exploratory)
 

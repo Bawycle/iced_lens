@@ -5,7 +5,7 @@ Lightweight, internationalized image and video viewer with image editing, powere
 [![Release](https://img.shields.io/badge/release-v0.2.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/Rust-1.92.0%2B-blue)](https://www.rust-lang.org)
-![Locales](https://img.shields.io/badge/i18n-en--US|fr-green)
+![Locales](https://img.shields.io/badge/i18n-en--US|fr|es|de|it-green)
 ![Status: Pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange)
 
 > **Note**: This is a pre-1.0 release. The software is functional but still under active development. Testing has been performed exclusively on Linux Mint 22.2. Feedback and contributions are welcome!
@@ -41,7 +41,7 @@ IcedLens aims to provide a simple, privacy‑friendly image viewer and editor fo
 - Zoom, pan, fit-to-window, fullscreen with auto-hiding controls
 - Multi-media browsing with keyboard navigation
 - Frame-by-frame video navigation and frame capture
-- Fluent-based localization (en-US, fr)
+- Fluent-based localization (en-US, fr, es, de, it)
 
 ### Editing
 - **Non-destructive pipeline** with undo/redo history and Save / Save As flows
@@ -97,7 +97,7 @@ USAGE:
 
 OPTIONS:
 	-h, --help              Show help text
-	    --lang <id>         Set locale (en-US, fr)
+	    --lang <id>         Set locale (en-US, fr, es, de, it)
 	    --i18n-dir <path>   Override translation directory (defaults to assets/i18n/)
 	    --data-dir <path>   Override data directory (state files)
 	    --config-dir <path> Override config directory (settings.toml)
@@ -151,7 +151,7 @@ Resetting: remove the config file and restart; defaults will regenerate.
 Localization powered by [Fluent](https://projectfluent.org/).
 - Translation bundles loaded at startup.
 - Runtime language switching updates UI without restart.
-- Current locales: `en-US`, `fr`.
+- Current locales: `en-US`, `fr`, `es`, `de`, `it`.
 To contribute a new locale, see `CONTRIBUTING.md` (translation workflow section).
 Override directory: pass `--i18n-dir /custom/translations` to load `.ftl` files from an alternate location. If the path is invalid, the application falls back to the built‑in `assets/i18n/` directory.
 

@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Keyboard seek step setting:** configurable time skip for arrow keys during video playback (0.5–30 seconds), accessible from the Settings screen (Video section).
 - **Video playback preferences persistence:** volume, mute state, and loop toggle are now saved to `settings.toml` and restored on startup.
 - **Remember last Save As directory:** the file dialog now opens in the last used save location, persisted across sessions.
+- **Additional translations:** Spanish (`es`), German (`de`), and Italian (`it`) are now available in the language selector.
 
 ### Changed
 - **Iced 0.14.0 upgrade:** migrated to the latest Iced framework version with VideoShader for persistent GPU textures.
