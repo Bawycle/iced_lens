@@ -29,11 +29,10 @@ fn bench_scan_directory(c: &mut Criterion) {
     group.bench_function("scan_directory", |b| {
         b.iter(|| {
             let mut navigator = MediaNavigator::new();
-            black_box(
-                navigator
-                    .scan_directory(&sample_image, SortOrder::Alphabetical)
-                    .unwrap(),
-            );
+            navigator
+                .scan_directory(&sample_image, SortOrder::Alphabetical)
+                .unwrap();
+            black_box(&navigator);
         });
     });
 
