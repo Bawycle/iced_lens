@@ -21,11 +21,11 @@
   - Possible causes: race condition on window resize, stale viewport dimensions, window manager timing
   - If reproduced: note exact steps, window size, image used, timing between actions
 
-- [ ] **Image editor navigation should skip videos**
-  - Current behavior: navigating to a video shows a notification (can't edit videos)
-  - Proposed: next/previous buttons should automatically skip to the next/previous image
-  - Must handle looping navigation (wrap around if no more images in direction)
-  - Removes need for "can't edit video" notification in this context
+- [x] ~~Image editor navigation should skip videos~~ ✅
+  - Added `navigate_next_image()` and `navigate_previous_image()` methods to `MediaNavigator`
+  - Editor navigation now automatically skips videos and finds the next/previous image
+  - Handles looping navigation (wraps around if no more images in direction)
+  - Removes need for "can't edit video" notification when navigating
 
 ## Planned Features
 

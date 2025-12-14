@@ -457,18 +457,10 @@ impl App {
     ) -> Task<Message> {
         match result {
             Ok(media_data) => {
-                // Editor only supports images in v0.2, not videos
-                // Extract ImageData from MediaData
-                let image_data = match media_data {
-                    MediaData::Image(img) => img,
-                    MediaData::Video(_) => {
-                        // Video editing not supported in v0.2
-                        self.notifications
-                            .push(notifications::Notification::warning(
-                                "notification-video-editing-unsupported",
-                            ));
-                        return Task::none();
-                    }
+                // Editor only supports images - videos are skipped during navigation
+                let MediaData::Image(image_data) = media_data else {
+                    // Should not happen: navigate_*_image() only returns images
+                    return Task::none();
                 };
 
                 // Create a new ImageEditorState with the loaded image
