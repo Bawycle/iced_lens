@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Media metadata panel:** new Info button in navbar displays technical information about the current media file.
+  - For images: EXIF data including camera make/model, exposure settings, focal length, and GPS coordinates (decimal degrees).
+  - For videos: codec, container format, bitrate, duration, and frame rate information.
+  - Panel uses push layout in windowed mode, overlay in fullscreen mode.
+  - Toggle with the `I` keyboard shortcut or Info button in navbar.
 - **Light adjustment tool:** brightness and contrast sliders in the image editor with live preview and full undo/redo support.
 - **Help screen enhancements:** tool descriptions now display their corresponding icons, and a new "Mouse Interactions" section documents double-click fullscreen, scroll wheel zoom, and drag to pan.
 - **Toast notification system:** visual feedback for user actions replaces silent console output.

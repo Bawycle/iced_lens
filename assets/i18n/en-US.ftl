@@ -190,6 +190,7 @@ help-viewer-key-navigate = Move to previous/next file
 help-viewer-key-edit = Open image in editor
 help-viewer-key-fullscreen = Enter/exit fullscreen
 help-viewer-key-exit-fullscreen = Exit fullscreen mode
+help-viewer-key-info = Toggle file information panel
 
 help-mouse-title = Mouse Interactions
 help-viewer-mouse-doubleclick = Double-click on image/video to toggle fullscreen
@@ -323,3 +324,29 @@ notification-editor-frame-error = Failed to open editor with captured frame
 notification-editor-create-error = Failed to open image editor
 notification-editor-load-error = Failed to load image for editing
 notification-video-editing-unsupported = Video editing is not supported yet
+
+# Metadata panel
+metadata-panel-title = File Information
+metadata-section-file = File
+metadata-section-camera = Camera
+metadata-section-exposure = Exposure
+metadata-section-video = Video
+metadata-section-audio = Audio
+metadata-section-gps = Location
+metadata-label-dimensions = Dimensions
+metadata-label-file-size = File size
+metadata-label-format = Format
+metadata-label-date-taken = Date taken
+metadata-label-camera = Camera
+metadata-label-exposure = Exposure
+metadata-label-aperture = Aperture
+metadata-label-iso = ISO
+metadata-label-focal-length = Focal length
+metadata-label-gps = Coordinates
+metadata-label-codec = Codec
+metadata-label-bitrate = Bit rate
+metadata-label-duration = Duration
+metadata-label-fps = Frame rate
+metadata-value-unknown = Unknown
+navbar-info-button = Info
+navbar-info-tooltip = Show file information (I)

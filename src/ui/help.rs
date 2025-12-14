@@ -276,6 +276,7 @@ fn build_viewer_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             ctx.i18n.tr("help-viewer-key-navigate"),
         ))
         .push(build_shortcut_row("E", ctx.i18n.tr("help-viewer-key-edit")))
+        .push(build_shortcut_row("I", ctx.i18n.tr("help-viewer-key-info")))
         .push(build_shortcut_row(
             "F11",
             ctx.i18n.tr("help-viewer-key-fullscreen"),

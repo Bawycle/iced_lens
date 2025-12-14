@@ -37,6 +37,7 @@ IcedLens aims to provide a simple, privacy‑friendly image viewer and editor fo
 ### Viewing
 - **Images:** JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, SVG
 - **Videos:** MP4, AVI, MOV, MKV, WebM (plus animated GIF/WebP)
+- **Metadata panel:** EXIF data for images (camera, exposure, GPS), codec/bitrate info for videos
 - Zoom, pan, fit-to-window, fullscreen with auto-hiding controls
 - Multi-media browsing with keyboard navigation
 - Frame-by-frame video navigation and frame capture
@@ -125,6 +126,7 @@ Path overrides can also be set via environment variables: `ICED_LENS_DATA_DIR` a
 ### Keyboard Shortcuts
 **Viewer Mode:**
 - **E**: Enter editor mode (images only)
+- **I**: Toggle file information panel (metadata)
 - **F11**: Toggle fullscreen
 - **Esc**: Exit fullscreen
 - **← / →**: Navigate media or seek video
@@ -199,9 +201,7 @@ This project does not process untrusted remote input; images are opened from loc
 
 ### Planned / Aspirational
 Future items (subject to change based on community feedback):
-- Basic image/video metadata panel (EXIF, codec info)
 - Temporary rotation in viewer (90° increments, session-only)
-- Additional edit tools: flip (horizontal/vertical)
 - Filters: grayscale, sepia, blur, sharpen
 - Video editing: trim, basic cuts
 - Batch operations
