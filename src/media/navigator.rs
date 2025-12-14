@@ -8,6 +8,7 @@
 use crate::config::SortOrder;
 use crate::directory_scanner::ImageList;
 use crate::error::Result;
+use crate::media::{detect_media_type, MediaType};
 use std::path::{Path, PathBuf};
 
 /// Navigation state information for UI rendering.
@@ -93,6 +94,56 @@ impl MediaNavigator {
         self.current_media_path = Some(prev_path.clone());
         self.media_list.set_current(&prev_path);
         Some(prev_path)
+    }
+
+    /// Navigates to the next image, skipping videos.
+    ///
+    /// Returns `None` if there are no images in the list (only videos).
+    /// Wraps around to the first image when at the last.
+    pub fn navigate_next_image(&mut self) -> Option<PathBuf> {
+        let start_path = self.current_media_path.clone();
+        let total = self.len();
+
+        // Try up to `total` times to find an image (avoid infinite loop)
+        for _ in 0..total {
+            if let Some(next_path) = self.navigate_next() {
+                if matches!(detect_media_type(&next_path), Some(MediaType::Image)) {
+                    return Some(next_path);
+                }
+                // If we've wrapped back to start, no images found
+                if Some(&next_path) == start_path.as_ref() {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        }
+        None
+    }
+
+    /// Navigates to the previous image, skipping videos.
+    ///
+    /// Returns `None` if there are no images in the list (only videos).
+    /// Wraps around to the last image when at the first.
+    pub fn navigate_previous_image(&mut self) -> Option<PathBuf> {
+        let start_path = self.current_media_path.clone();
+        let total = self.len();
+
+        // Try up to `total` times to find an image (avoid infinite loop)
+        for _ in 0..total {
+            if let Some(prev_path) = self.navigate_previous() {
+                if matches!(detect_media_type(&prev_path), Some(MediaType::Image)) {
+                    return Some(prev_path);
+                }
+                // If we've wrapped back to start, no images found
+                if Some(&prev_path) == start_path.as_ref() {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        }
+        None
     }
 
     /// Checks if there is a next media available.
@@ -305,5 +356,127 @@ mod tests {
         assert_eq!(nav.navigate_previous(), None);
         assert!(!nav.has_next());
         assert!(!nav.has_previous());
+    }
+
+    fn create_test_video(dir: &Path, name: &str) -> PathBuf {
+        let path = dir.join(name);
+        let mut file = fs::File::create(&path).expect("failed to create test file");
+        file.write_all(b"fake video data")
+            .expect("failed to write test file");
+        path
+    }
+
+    #[test]
+    fn navigate_next_image_skips_videos() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let _vid2 = create_test_video(temp_dir.path(), "c.mp4");
+        let img2 = create_test_image(temp_dir.path(), "d.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // Should skip b.mp4 and c.mp4, go directly to d.png
+        let next = nav.navigate_next_image();
+        assert_eq!(next.as_deref(), Some(img2.as_path()));
+        assert_eq!(nav.current_media_path(), Some(img2.as_path()));
+    }
+
+    #[test]
+    fn navigate_previous_image_skips_videos() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let _vid2 = create_test_video(temp_dir.path(), "c.mp4");
+        let img2 = create_test_image(temp_dir.path(), "d.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img2, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // Should skip c.mp4 and b.mp4, go directly to a.jpg
+        let prev = nav.navigate_previous_image();
+        assert_eq!(prev.as_deref(), Some(img1.as_path()));
+        assert_eq!(nav.current_media_path(), Some(img1.as_path()));
+    }
+
+    #[test]
+    fn navigate_next_image_wraps_around_skipping_videos() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let img2 = create_test_image(temp_dir.path(), "c.png");
+        let _vid2 = create_test_video(temp_dir.path(), "d.mp4");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img2, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // From c.png, should skip d.mp4, wrap to a.jpg (skipping b.mp4)
+        let next = nav.navigate_next_image();
+        assert_eq!(next.as_deref(), Some(img1.as_path()));
+    }
+
+    #[test]
+    fn navigate_previous_image_wraps_around_skipping_videos() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let _vid1 = create_test_video(temp_dir.path(), "a.mp4");
+        let img1 = create_test_image(temp_dir.path(), "b.jpg");
+        let _vid2 = create_test_video(temp_dir.path(), "c.mp4");
+        let img2 = create_test_image(temp_dir.path(), "d.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // From b.jpg, should skip a.mp4, wrap to d.png (skipping c.mp4)
+        let prev = nav.navigate_previous_image();
+        assert_eq!(prev.as_deref(), Some(img2.as_path()));
+    }
+
+    #[test]
+    fn navigate_next_image_returns_same_if_only_one_image() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let _vid1 = create_test_video(temp_dir.path(), "a.mp4");
+        let img1 = create_test_image(temp_dir.path(), "b.jpg");
+        let _vid2 = create_test_video(temp_dir.path(), "c.mp4");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // Only one image, should wrap back to itself
+        let next = nav.navigate_next_image();
+        assert_eq!(next.as_deref(), Some(img1.as_path()));
+    }
+
+    #[test]
+    fn navigate_previous_image_returns_same_if_only_one_image() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let _vid1 = create_test_video(temp_dir.path(), "a.mp4");
+        let img1 = create_test_image(temp_dir.path(), "b.jpg");
+        let _vid2 = create_test_video(temp_dir.path(), "c.mp4");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // Only one image, should wrap back to itself
+        let prev = nav.navigate_previous_image();
+        assert_eq!(prev.as_deref(), Some(img1.as_path()));
+    }
+
+    #[test]
+    fn navigate_next_image_returns_none_for_empty_navigator() {
+        let mut nav = MediaNavigator::new();
+        assert_eq!(nav.navigate_next_image(), None);
+    }
+
+    #[test]
+    fn navigate_previous_image_returns_none_for_empty_navigator() {
+        let mut nav = MediaNavigator::new();
+        assert_eq!(nav.navigate_previous_image(), None);
     }
 }

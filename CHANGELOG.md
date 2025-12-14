@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default keyboard seek step reduced from 5 seconds to 2 seconds.
 - Configuration and state loading now provides user feedback when falling back to defaults.
 - **Project structure reorganization:** moved `config/` and `i18n/` modules into `app/` as they are application infrastructure rather than independent business logic. Public API unchanged via re-exports.
+- Image editor navigation now skips videos automatically instead of showing a "video editing unsupported" notification.
 
 ### Fixed
 - Fit-to-window now correctly updates when the hamburger menu collapses/expands.

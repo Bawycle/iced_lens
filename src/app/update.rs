@@ -382,8 +382,8 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
             .scan_directory(&current_path, sort_order);
     }
 
-    // Navigate to next image in the list
-    if let Some(next_path) = ctx.media_navigator.navigate_next() {
+    // Navigate to next image in the list (skipping videos)
+    if let Some(next_path) = ctx.media_navigator.navigate_next_image() {
         // Synchronize viewer state immediately
         ctx.viewer.current_image_path = Some(next_path.clone());
 
@@ -412,8 +412,8 @@ fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message>
             .scan_directory(&current_path, sort_order);
     }
 
-    // Navigate to previous image in the list
-    if let Some(prev_path) = ctx.media_navigator.navigate_previous() {
+    // Navigate to previous image in the list (skipping videos)
+    if let Some(prev_path) = ctx.media_navigator.navigate_previous_image() {
         // Synchronize viewer state immediately
         ctx.viewer.current_image_path = Some(prev_path.clone());
 
