@@ -59,10 +59,14 @@ pub mod palette {
     pub const GRAY_200: Color = Color::from_rgb(0.75, 0.75, 0.75);
     pub const GRAY_100: Color = Color::from_rgb(0.85, 0.85, 0.85);
 
-    // Brand colors
-    pub const PRIMARY_500: Color = Color::from_rgb(0.3, 0.6, 0.9);
-    pub const PRIMARY_600: Color = Color::from_rgb(0.2, 0.5, 0.8);
-    pub const PRIMARY_400: Color = Color::from_rgb(0.4, 0.7, 1.0);
+    // Brand colors (blue scale)
+    pub const PRIMARY_100: Color = Color::from_rgb(0.85, 0.92, 1.0); // Very light blue
+    pub const PRIMARY_200: Color = Color::from_rgb(0.7, 0.84, 0.98); // Light blue
+    pub const PRIMARY_400: Color = Color::from_rgb(0.4, 0.7, 1.0); // Medium light blue
+    pub const PRIMARY_500: Color = Color::from_rgb(0.3, 0.6, 0.9); // Primary blue
+    pub const PRIMARY_600: Color = Color::from_rgb(0.2, 0.5, 0.8); // Medium dark blue
+    pub const PRIMARY_700: Color = Color::from_rgb(0.15, 0.4, 0.7); // Dark blue
+    pub const PRIMARY_800: Color = Color::from_rgb(0.1, 0.3, 0.6); // Very dark blue
 
     // Semantic colors
     pub const ERROR_500: Color = Color::from_rgb(0.898, 0.224, 0.208);

@@ -7,10 +7,12 @@
 use super::{notifications, persistence, Message, Screen};
 use crate::config;
 use crate::i18n::fluent::I18n;
+use crate::media::metadata::MediaMetadata;
 use crate::media::{self, frame_export::ExportableFrame, MediaData, MediaNavigator};
 use crate::ui::about::{self, Event as AboutEvent};
 use crate::ui::help::{self, Event as HelpEvent};
 use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
+use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent};
 use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
@@ -34,6 +36,8 @@ pub struct UpdateContext<'a> {
     pub frame_cache_mb: u32,
     pub frame_history_mb: u32,
     pub menu_open: &'a mut bool,
+    pub info_panel_open: &'a mut bool,
+    pub current_metadata: &'a mut Option<MediaMetadata>,
     pub help_state: &'a mut help::State,
     pub app_state: &'a mut super::persisted_state::AppState,
     pub notifications: &'a mut notifications::Manager,
@@ -65,7 +69,20 @@ pub fn handle_viewer_message(
         *ctx.window_id = Some(*window);
     }
 
+    // Check if this is a successful ImageLoaded message to extract metadata
+    let is_successful_load = matches!(&message, component::Message::ImageLoaded(Ok(_)));
+
     let (effect, task) = ctx.viewer.handle_message(message, ctx.i18n);
+
+    // Extract metadata after successful media load
+    if is_successful_load {
+        if let Some(path) = ctx.viewer.current_image_path.as_ref() {
+            *ctx.current_metadata = media::metadata::extract_metadata(path);
+        } else {
+            *ctx.current_metadata = None;
+        }
+    }
+
     let viewer_task = task.map(Message::Viewer);
     let side_effect = match effect {
         component::Effect::PersistPreferences => {
@@ -88,6 +105,10 @@ pub fn handle_viewer_message(
             position_secs,
         } => handle_capture_frame(frame, video_path, position_secs),
         component::Effect::RequestDelete => handle_delete_current_media(ctx),
+        component::Effect::ToggleInfoPanel => {
+            *ctx.info_panel_open = !*ctx.info_panel_open;
+            Task::none()
+        }
         component::Effect::None => Task::none(),
     };
     Task::batch([viewer_task, side_effect])
@@ -426,6 +447,10 @@ pub fn handle_navbar_message(
             Task::none()
         }
         NavbarEvent::EnterEditor => handle_screen_switch(ctx, Screen::ImageEditor),
+        NavbarEvent::ToggleInfoPanel => {
+            *ctx.info_panel_open = !*ctx.info_panel_open;
+            Task::none()
+        }
     }
 }
 
@@ -446,6 +471,20 @@ pub fn handle_about_message(ctx: &mut UpdateContext<'_>, message: about::Message
         AboutEvent::None => Task::none(),
         AboutEvent::BackToViewer => {
             *ctx.screen = Screen::Viewer;
+            Task::none()
+        }
+    }
+}
+
+/// Handles metadata panel messages.
+pub fn handle_metadata_panel_message(
+    ctx: &mut UpdateContext<'_>,
+    message: metadata_panel::Message,
+) -> Task<Message> {
+    match metadata_panel::update(message) {
+        MetadataPanelEvent::None => Task::none(),
+        MetadataPanelEvent::Close => {
+            *ctx.info_panel_open = false;
             Task::none()
         }
     }

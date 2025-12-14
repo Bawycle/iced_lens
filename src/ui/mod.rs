@@ -33,6 +33,7 @@ pub mod design_tokens;
 pub mod help;
 pub mod icons;
 pub mod image_editor;
+pub mod metadata_panel;
 pub mod navbar;
 pub mod notifications;
 pub mod settings;

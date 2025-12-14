@@ -105,7 +105,7 @@ pub fn view<'a>(
 
     // Apply different style when fit is active (highlighted)
     let fit_button_content: Element<'_, Message> = if effective_fit_to_window {
-        fit_button.style(styles::button_control_active).into()
+        fit_button.style(styles::button::selected).into()
     } else {
         fit_button.into()
     };
@@ -125,9 +125,7 @@ pub fn view<'a>(
 
     // Apply different style when fullscreen is active (highlighted)
     let fullscreen_button_content: Element<'_, Message> = if is_fullscreen {
-        fullscreen_button
-            .style(styles::button_control_active)
-            .into()
+        fullscreen_button.style(styles::button::selected).into()
     } else {
         fullscreen_button.into()
     };

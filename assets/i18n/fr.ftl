@@ -190,6 +190,7 @@ help-viewer-key-navigate = Passer au fichier précédent/suivant
 help-viewer-key-edit = Ouvrir l'image dans l'éditeur
 help-viewer-key-fullscreen = Entrer/quitter le plein écran
 help-viewer-key-exit-fullscreen = Quitter le mode plein écran
+help-viewer-key-info = Afficher/masquer le panneau d'informations
 
 help-mouse-title = Interactions souris
 help-viewer-mouse-doubleclick = Double-clic sur l'image/vidéo pour basculer en plein écran
@@ -323,3 +324,29 @@ notification-editor-frame-error = Impossible d'ouvrir l'éditeur avec l'image ca
 notification-editor-create-error = Impossible d'ouvrir l'éditeur d'images
 notification-editor-load-error = Impossible de charger l'image pour l'édition
 notification-video-editing-unsupported = L'édition vidéo n'est pas encore supportée
+
+# Panneau de métadonnées
+metadata-panel-title = Informations du fichier
+metadata-section-file = Fichier
+metadata-section-camera = Appareil photo
+metadata-section-exposure = Exposition
+metadata-section-video = Vidéo
+metadata-section-audio = Audio
+metadata-section-gps = Localisation
+metadata-label-dimensions = Dimensions
+metadata-label-file-size = Taille du fichier
+metadata-label-format = Format
+metadata-label-date-taken = Date de prise de vue
+metadata-label-camera = Appareil
+metadata-label-exposure = Exposition
+metadata-label-aperture = Ouverture
+metadata-label-iso = ISO
+metadata-label-focal-length = Focale
+metadata-label-gps = Coordonnées
+metadata-label-codec = Codec
+metadata-label-bitrate = Débit
+metadata-label-duration = Durée
+metadata-label-fps = Images/seconde
+metadata-value-unknown = Inconnu
+navbar-info-button = Info
+navbar-info-tooltip = Afficher les informations du fichier (I)

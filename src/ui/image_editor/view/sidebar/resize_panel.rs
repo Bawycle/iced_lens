@@ -3,7 +3,6 @@
 
 use crate::ui::design_tokens::{spacing, typography};
 use crate::ui::styles;
-use crate::ui::styles::button as button_styles;
 use iced::widget::{button, checkbox, container, slider, text, text_input, Column, Row};
 use iced::{Element, Length};
 
@@ -30,8 +29,7 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
         presets = presets.push(
             button(text(label))
                 .on_press(SidebarMessage::ApplyResizePreset(preset).into())
-                .padding([spacing::XXS, spacing::XS])
-                .style(button_styles::unselected),
+                .padding([spacing::XXS, spacing::XS]),
         );
     }
 
@@ -81,7 +79,6 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
         button(text(ctx.i18n.tr("image-editor-resize-apply")).size(typography::BODY_LG))
             .padding(spacing::SM)
             .width(Length::Fill)
-            .style(button_styles::selected)
             .on_press(SidebarMessage::ApplyResize.into());
 
     container(

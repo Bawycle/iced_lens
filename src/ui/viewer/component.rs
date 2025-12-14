@@ -71,6 +71,8 @@ pub enum Effect {
     /// Request to delete the current media file.
     /// App will handle the actual deletion using media_navigator.
     RequestDelete,
+    /// Toggle the info/metadata panel.
+    ToggleInfoPanel,
 }
 
 #[derive(Debug, Clone)]
@@ -1415,6 +1417,17 @@ impl State {
                     } else {
                         (Effect::None, Task::none())
                     }
+                }
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(ref c),
+                    modifiers,
+                    ..
+                } if (c.as_str() == "i" || c.as_str() == "I")
+                    && !modifiers.command()
+                    && !modifiers.alt() =>
+                {
+                    // I key: Toggle info/metadata panel
+                    (Effect::ToggleInfoPanel, Task::none())
                 }
                 keyboard::Event::ModifiersChanged(modifiers) => {
                     if modifiers.command() {
