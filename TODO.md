@@ -21,6 +21,12 @@
   - Possible causes: race condition on window resize, stale viewport dimensions, window manager timing
   - If reproduced: note exact steps, window size, image used, timing between actions
 
+- [ ] **Image editor navigation should skip videos**
+  - Current behavior: navigating to a video shows a notification (can't edit videos)
+  - Proposed: next/previous buttons should automatically skip to the next/previous image
+  - Must handle looping navigation (wrap around if no more images in direction)
+  - Removes need for "can't edit video" notification in this context
+
 ## Planned Features
 
 ### Framework Upgrade
@@ -115,10 +121,19 @@ Unify how the application communicates with the user. Currently:
   - Editor: rotate left/right, flip horizontal/vertical icons
   - Uses `action_icons` module for consistency with UI
 
-### Media Metadata
-- [ ] Retrieve metadata from media files (EXIF, video info, etc.)
-- [ ] Design UX/UI for displaying metadata (TBD - needs exploration)
-  - Options to consider: side panel, overlay, modal dialog, info button
+### Media Metadata ✅
+- [x] ~~Retrieve metadata from media files (EXIF, video info, etc.)~~ ✅
+  - Added `kamadak-exif` dependency for EXIF extraction
+  - `src/media/metadata.rs` handles both image EXIF and video metadata
+- [x] ~~Design UX/UI for displaying metadata~~ ✅
+  - Info button in navbar (toggle with `I` shortcut)
+  - Push layout in windowed mode, overlay in fullscreen
+  - `src/ui/metadata_panel.rs` with collapsible sections
+
+### Internationalization
+- [ ] Add Spanish translation (`es.ftl`)
+- [ ] Add German translation (`de.ftl`)
+- [ ] Add Italian translation (`it.ftl`)
 
 ### AI Frame Enhancement (Exploratory)
 
@@ -140,6 +155,13 @@ See `docs/AI_DEBLURRING_MODELS.md` for detailed comparison.
 - [ ] Add a way for the user to choose whether they want to capture the frame with or without AI enhancement.
 
 ## Refactoring
+
+### Legacy Code Review
+- [ ] Audit codebase for deprecated patterns and outdated code
+  - Review old TODOs and FIXMEs in source files
+  - Check for unused code paths
+  - Update patterns to match current architecture
+  - Ensure consistency with latest Iced 0.14 APIs
 
 ### UI Style Harmonization ✅
 - [x] ~~Review and harmonize styles across all screens (viewer, editor, settings)~~ ✅
