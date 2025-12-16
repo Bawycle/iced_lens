@@ -45,7 +45,7 @@
 - [ ] Temporary rotation in viewer (90° increments, session-only) — currently complex to implement
 
 #### Metadata Sidebar
-- [ ] Allow text selection in the metadata sidebar, and the ability to copy the selected text
+- [ ] Allow text selection and copying in the metadata sidebar (blocked, pending native support in Iced 0.15.0)
 - [ ] Add the ability to edit and add new media metadata from the sidebar (in accordance with common standards such as Exif, Dublin Core, etc.). The help screen must be updated accordingly.
 
 ### Image editor
@@ -74,7 +74,7 @@
   - Provide an option for GPU usage if available (configurable in settings)
 
 ### Help
-- [ ] Allow text selection and copying in the help screen
+- [ ] Allow text selection and copying in the help screen (blocked, pending native support in Iced 0.15.0)
 
 ### Video Player
 - [ ] Add new controls to the video player to allow changing the playback speed of the video.
