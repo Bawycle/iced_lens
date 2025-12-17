@@ -15,9 +15,6 @@
 
 ## Planned Features
 
-### UX/UI
-- [ ] Add a collapse control directly on the metadata sidebar. This provides a more intuitive way for users to hide the sidebar than re-clicking the info button.
-
 ### Viewer
 - [ ] Temporary rotation in viewer (90° increments, session-only) — currently complex to implement
 

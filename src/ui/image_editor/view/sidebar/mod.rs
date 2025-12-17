@@ -6,6 +6,7 @@ pub mod crop_panel;
 pub mod resize_panel;
 
 use crate::media::frame_export::ExportFormat;
+use crate::ui::action_icons;
 use crate::ui::design_tokens::{sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::image_editor::state::{AdjustmentState, CropState, ResizeState};
@@ -119,10 +120,14 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
         .into()
 }
 
-pub fn collapsed<'a>() -> Element<'a, Message> {
-    let toggle_button = button(text("☰").size(sizing::ICON_MD))
-        .on_press(SidebarMessage::ToggleSidebar.into())
-        .padding(spacing::SM);
+pub fn collapsed<'a>(is_dark_theme: bool) -> Element<'a, Message> {
+    let toggle_button = button(action_icons::sized(
+        action_icons::navigation::expand_left_panel(is_dark_theme),
+        sizing::ICON_MD,
+    ))
+    .on_press(SidebarMessage::ToggleSidebar.into())
+    .padding(spacing::SM)
+    .style(button_styles::unselected);
 
     container(toggle_button)
         .width(Length::Fixed(60.0))
@@ -133,11 +138,13 @@ pub fn collapsed<'a>() -> Element<'a, Message> {
 }
 
 fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
-    // Hamburger is a toggle: selected when sidebar is expanded (which is the case here)
-    let toggle_button = button(text("☰").size(typography::TITLE_MD))
-        .on_press(SidebarMessage::ToggleSidebar.into())
-        .padding(spacing::XS)
-        .style(button_styles::selected);
+    let toggle_button = button(action_icons::sized(
+        action_icons::navigation::collapse_left_panel(ctx.is_dark_theme),
+        sizing::ICON_SM,
+    ))
+    .on_press(SidebarMessage::ToggleSidebar.into())
+    .padding(spacing::XS)
+    .style(button_styles::unselected);
 
     Column::new()
         .spacing(spacing::XS)

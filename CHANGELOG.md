@@ -27,8 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - macOS: ICNS for `.app` bundle via `cargo-bundle`
   - Linux: PNG icons for `.deb` package via `cargo-bundle`
 - **cargo-bundle support:** Added `[package.metadata.bundle]` configuration for creating macOS `.app` and Linux `.deb` packages with proper icons.
+- **Sidebar collapse buttons:** Both sidebars (metadata panel and image editor) now use consistent double chevron icons for expand/collapse actions, following UX best practices for panel controls.
 
 ### Changed
+- **Image editor sidebar toggle:** Replaced hamburger menu icon (☰) with double chevron icons (`<<`/`>>`) for sidebar expand/collapse, improving visual consistency across the application.
 - **Auto-collapse metadata sidebar in fullscreen:** The metadata sidebar now automatically closes when entering fullscreen mode, providing an unobstructed view.
 - **Non-blocking error notifications:** Media loading errors (invalid path, corrupted file, timeout) now display as toast notifications instead of a modal error panel. This provides a non-blocking UX and preserves the current view when navigation fails.
 - **Migrated from SVG to PNG icons:** All UI icons now use pre-rendered PNG images instead of SVG for consistent cross-platform rendering and improved performance on Windows. Icons are cached using `OnceLock` for optimal memory usage.

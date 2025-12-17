@@ -15,6 +15,8 @@ use super::{state, view, ImageSource, Message, State};
 pub struct ViewContext<'a> {
     pub i18n: &'a crate::i18n::fluent::I18n,
     pub background_theme: BackgroundTheme,
+    /// True if the application is using dark theme.
+    pub is_dark_theme: bool,
 }
 
 impl State {

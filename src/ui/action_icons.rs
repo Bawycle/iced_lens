@@ -196,6 +196,46 @@ pub mod navigation {
     pub fn close() -> Image<Handle> {
         icons::cross()
     }
+
+    /// Collapse a left-side panel (chevron points left).
+    /// Returns dark icon for light theme, light icon for dark theme.
+    pub fn collapse_left_panel(is_dark_theme: bool) -> Image<Handle> {
+        if is_dark_theme {
+            icons::light::chevron_double_left()
+        } else {
+            icons::chevron_double_left()
+        }
+    }
+
+    /// Expand a left-side panel (chevron points right).
+    /// Returns dark icon for light theme, light icon for dark theme.
+    pub fn expand_left_panel(is_dark_theme: bool) -> Image<Handle> {
+        if is_dark_theme {
+            icons::light::chevron_double_right()
+        } else {
+            icons::chevron_double_right()
+        }
+    }
+
+    /// Collapse a right-side panel (chevron points right).
+    /// Returns dark icon for light theme, light icon for dark theme.
+    pub fn collapse_right_panel(is_dark_theme: bool) -> Image<Handle> {
+        if is_dark_theme {
+            icons::light::chevron_double_right()
+        } else {
+            icons::chevron_double_right()
+        }
+    }
+
+    /// Expand a right-side panel (chevron points left).
+    /// Returns dark icon for light theme, light icon for dark theme.
+    pub fn expand_right_panel(is_dark_theme: bool) -> Image<Handle> {
+        if is_dark_theme {
+            icons::light::chevron_double_left()
+        } else {
+            icons::chevron_double_left()
+        }
+    }
 }
 
 // =============================================================================
@@ -310,6 +350,15 @@ mod tests {
         let _ = navigation::help();
         let _ = navigation::about();
         let _ = navigation::close();
+        // Test both theme variants
+        let _ = navigation::collapse_left_panel(false);
+        let _ = navigation::collapse_left_panel(true);
+        let _ = navigation::expand_left_panel(false);
+        let _ = navigation::expand_left_panel(true);
+        let _ = navigation::collapse_right_panel(false);
+        let _ = navigation::collapse_right_panel(true);
+        let _ = navigation::expand_right_panel(false);
+        let _ = navigation::expand_right_panel(true);
     }
 
     #[test]

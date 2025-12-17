@@ -9,12 +9,14 @@ use crate::media::metadata::{
     format_bitrate, format_file_size, format_gps_coordinates, ExtendedVideoMetadata, ImageMetadata,
     MediaMetadata,
 };
+use crate::ui::action_icons;
 use crate::ui::design_tokens::{radius, sizing, spacing, typography};
 use crate::ui::icons;
+use crate::ui::styles::button as button_styles;
 use iced::widget::image::{Handle, Image};
 use iced::{
     alignment::Vertical,
-    widget::{container, rule, scrollable, Column, Container, Row, Text},
+    widget::{button, container, rule, scrollable, Column, Container, Row, Text},
     Border, Element, Length, Theme,
 };
 
@@ -25,6 +27,8 @@ pub const PANEL_WIDTH: f32 = 290.0;
 pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
     pub metadata: Option<&'a MediaMetadata>,
+    /// True if the application is using dark theme.
+    pub is_dark_theme: bool,
 }
 
 /// Messages emitted by the metadata panel.
@@ -51,6 +55,22 @@ pub fn update(message: Message) -> Event {
 pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     let title = Text::new(ctx.i18n.tr("metadata-panel-title")).size(typography::TITLE_SM);
 
+    // Collapse button with double chevron (adapts to theme)
+    let close_button = button(action_icons::sized(
+        action_icons::navigation::collapse_right_panel(ctx.is_dark_theme),
+        sizing::ICON_SM,
+    ))
+    .on_press(Message::Close)
+    .padding(spacing::XS)
+    .style(button_styles::unselected);
+
+    // Header row with title and close button
+    let header = Row::new()
+        .align_y(Vertical::Center)
+        .push(title)
+        .push(iced::widget::Space::new().width(Length::Fill))
+        .push(close_button);
+
     let content = if let Some(metadata) = ctx.metadata {
         match metadata {
             MediaMetadata::Image(image_meta) => build_image_metadata(&ctx, image_meta),
@@ -66,7 +86,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
         .width(Length::Fill)
         .spacing(spacing::MD)
         .padding(spacing::MD)
-        .push(title)
+        .push(header)
         .push(rule::horizontal(1))
         .push(content);
 
@@ -462,6 +482,7 @@ mod tests {
         let ctx = ViewContext {
             i18n: &i18n,
             metadata: None,
+            is_dark_theme: false,
         };
         let _element = view(ctx);
     }
@@ -482,6 +503,7 @@ mod tests {
         let ctx = ViewContext {
             i18n: &i18n,
             metadata: Some(&media_meta),
+            is_dark_theme: false,
         };
         let _element = view(ctx);
     }
@@ -503,6 +525,7 @@ mod tests {
         let ctx = ViewContext {
             i18n: &i18n,
             metadata: Some(&media_meta),
+            is_dark_theme: true,
         };
         let _element = view(ctx);
     }

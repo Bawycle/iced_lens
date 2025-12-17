@@ -26,7 +26,7 @@ pub fn render<'a>(state: &'a State, ctx: ViewContext<'a>) -> Element<'a, Message
         let sidebar = sidebar::expanded(sidebar_model, &ctx);
         main_row = main_row.push(sidebar);
     } else {
-        main_row = main_row.push(sidebar::collapsed());
+        main_row = main_row.push(sidebar::collapsed(ctx.is_dark_theme));
     }
 
     let canvas_model = CanvasModel::from_state(state);

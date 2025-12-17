@@ -1,22 +1,30 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Centralized icon module for PNG icons.
 //!
-//! All UI icons are loaded from `assets/icons/png/dark/` (standard) and
-//! `assets/icons/png/light/` (for dark backgrounds) and exposed as functions
-//! returning [`iced::widget::Image`] widgets. PNG format ensures consistent
-//! cross-platform rendering (no SVG interpretation differences on Windows).
-//!
-//! Icons are embedded in the binary at compile time via `include_bytes!`
+//! PNG format ensures consistent cross-platform rendering (no SVG interpretation
+//! differences on Windows). Icons are embedded at compile time via `include_bytes!`
 //! and handles are cached using `OnceLock` for optimal performance.
+//!
+//! # Module Structure
+//!
+//! - **`icons::*`** - Dark icons (black) from `assets/icons/png/dark/` for light theme
+//! - **`icons::light::*`** - Light icons (white) from `assets/icons/png/light/` for dark theme
+//! - **`icons::overlay::*`** - Light icons for HUD/overlays on dark backgrounds
 //!
 //! # Usage
 //!
 //! ```ignore
 //! use crate::ui::icons;
 //!
-//! let play_button = button(icons::play())
-//!     .on_press(Message::Play);
+//! // For light theme (default)
+//! let play_button = button(icons::play());
+//!
+//! // For dark theme
+//! let play_button = button(icons::light::chevron_double_right());
 //! ```
+//!
+//! For theme-aware icons, use [`action_icons`](super::action_icons) which
+//! automatically selects the correct variant based on theme.
 //!
 //! # Naming Convention
 //!
@@ -204,6 +212,16 @@ define_icon!(
     "../../assets/icons/png/dark/info.png",
     "Info icon: letter 'i' in circle."
 );
+define_icon!(
+    chevron_double_right,
+    "../../assets/icons/png/dark/chevron_double_right.png",
+    "Double chevron right icon: two chevrons pointing right (>>), used for sidebar collapse."
+);
+define_icon!(
+    chevron_double_left,
+    "../../assets/icons/png/dark/chevron_double_left.png",
+    "Double chevron left icon: two chevrons pointing left (<<), used for sidebar expand."
+);
 
 // =============================================================================
 // Settings Section Icons
@@ -249,6 +267,26 @@ define_icon!(
     "../../assets/icons/png/dark/video_camera_audio.png",
     "Video camera with audio icon: camcorder with sound wave."
 );
+
+// =============================================================================
+// Light Icons (White variants for dark theme UI)
+// =============================================================================
+
+/// Light icon variants for use with dark theme (white icons on dark backgrounds).
+pub mod light {
+    use super::*;
+
+    define_icon!(
+        chevron_double_right,
+        "../../assets/icons/png/light/chevron_double_right.png",
+        "Double chevron right icon (white): for dark theme UI."
+    );
+    define_icon!(
+        chevron_double_left,
+        "../../assets/icons/png/light/chevron_double_left.png",
+        "Double chevron left icon (white): for dark theme UI."
+    );
+}
 
 // =============================================================================
 // Overlay Icons (Light variants for dark backgrounds)
@@ -353,6 +391,8 @@ mod tests {
         let _ = hamburger();
         let _ = help();
         let _ = info();
+        let _ = chevron_double_right();
+        let _ = chevron_double_left();
         let _ = warning();
         let _ = checkmark();
         let _ = cross();
@@ -369,6 +409,12 @@ mod tests {
     fn fill_helper_works() {
         let icon = fill(pause());
         let _ = icon;
+    }
+
+    #[test]
+    fn light_icons_load_successfully() {
+        let _ = light::chevron_double_right();
+        let _ = light::chevron_double_left();
     }
 
     #[test]

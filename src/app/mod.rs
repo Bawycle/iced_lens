@@ -560,6 +560,7 @@ impl App {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        let is_dark_theme = self.theme_mode.is_dark();
         view::view(view::ViewContext {
             i18n: &self.i18n,
             screen: self.screen,
@@ -573,6 +574,7 @@ impl App {
             navigation: self.media_navigator.navigation_info(),
             current_metadata: self.current_metadata.as_ref(),
             notifications: &self.notifications,
+            is_dark_theme,
         })
     }
 }

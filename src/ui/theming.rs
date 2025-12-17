@@ -115,6 +115,21 @@ pub enum ThemeMode {
     System,
 }
 
+impl ThemeMode {
+    /// Returns true if the effective theme is dark.
+    /// For System mode, detects the actual system theme.
+    pub fn is_dark(self) -> bool {
+        match self {
+            ThemeMode::Light => false,
+            ThemeMode::Dark => true,
+            ThemeMode::System => {
+                // Detect system theme; default to dark on detection error
+                !matches!(dark_light::detect(), Ok(dark_light::Mode::Light))
+            }
+        }
+    }
+}
+
 impl AppTheme {
     pub fn new(mode: ThemeMode) -> Self {
         let colors = match mode {
@@ -152,5 +167,13 @@ mod tests {
         // Simplified test: ensure they are not grayscale
         assert!(light.brand_primary.b > light.brand_primary.r);
         assert!(dark.brand_primary.b > dark.brand_primary.r);
+    }
+
+    #[test]
+    fn theme_mode_is_dark_returns_correct_values() {
+        assert!(!ThemeMode::Light.is_dark());
+        assert!(ThemeMode::Dark.is_dark());
+        // System mode depends on actual system theme, so we just verify it doesn't panic
+        let _ = ThemeMode::System.is_dark();
     }
 }

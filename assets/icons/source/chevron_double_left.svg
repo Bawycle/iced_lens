@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="64" height="64" fill="white">
+  <!-- License: LicenseRef-IcedLens-Icon (see ICON_LICENSE.md) -->
+  <!-- Double chevron pointing left (<<) for sidebar expand -->
+  <path d="M 26,6 L 18,16 L 26,26" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <path d="M 14,6 L 6,16 L 14,26" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+</svg>

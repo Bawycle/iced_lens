@@ -39,6 +39,8 @@ pub struct ViewContext<'a> {
     pub current_metadata: Option<&'a MediaMetadata>,
     /// Notification manager for rendering toast overlays.
     pub notifications: &'a NotificationManager,
+    /// True if the application is using dark theme.
+    pub is_dark_theme: bool,
 }
 
 /// Context required to render the viewer screen.
@@ -51,6 +53,7 @@ struct ViewerViewContext<'a> {
     info_panel_open: bool,
     navigation: NavigationInfo,
     current_metadata: Option<&'a MediaMetadata>,
+    is_dark_theme: bool,
 }
 
 /// Renders the current application view based on the active screen.
@@ -65,9 +68,12 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
             info_panel_open: ctx.info_panel_open,
             navigation: ctx.navigation,
             current_metadata: ctx.current_metadata,
+            is_dark_theme: ctx.is_dark_theme,
         }),
         Screen::Settings => view_settings(ctx.settings, ctx.i18n),
-        Screen::ImageEditor => view_image_editor(ctx.image_editor, ctx.i18n, ctx.settings),
+        Screen::ImageEditor => {
+            view_image_editor(ctx.image_editor, ctx.i18n, ctx.settings, ctx.is_dark_theme)
+        }
         Screen::Help => view_help(ctx.help_state, ctx.i18n),
         Screen::About => view_about(ctx.i18n),
     };
@@ -112,6 +118,7 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
             metadata_panel::view(MetadataPanelViewContext {
                 i18n: ctx.i18n,
                 metadata: ctx.current_metadata,
+                is_dark_theme: ctx.is_dark_theme,
             })
             .map(Message::MetadataPanel),
         )
@@ -193,12 +200,14 @@ fn view_image_editor<'a>(
     image_editor: Option<&'a ImageEditorState>,
     i18n: &'a I18n,
     settings: &'a SettingsState,
+    is_dark_theme: bool,
 ) -> Element<'a, Message> {
     if let Some(editor_state) = image_editor {
         editor_state
             .view(image_editor::ViewContext {
                 i18n,
                 background_theme: settings.background_theme(),
+                is_dark_theme,
             })
             .map(Message::ImageEditor)
     } else {
