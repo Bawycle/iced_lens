@@ -39,6 +39,9 @@ cpal = "0.16.0"
 lru = "0.16"
 webp-animation = "0.9.0"
 
+[build-dependencies]
+winresource = "0.1"
+
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
 tempfile = "3.23.0"
@@ -51,3 +54,27 @@ harness = false # Let Criterion manage the main function
 [[bench]]
 name = "media_navigation"
 harness = false
+
+# Configuration for cargo-bundle (macOS .app and Linux .deb packaging)
+# Install: cargo install cargo-bundle
+# Usage: cargo bundle --release
+[package.metadata.bundle]
+name = "IcedLens"
+identifier = "iced_lens"
+icon = [
+    "assets/branding/iced_lens.icns",
+    "assets/branding/iced_lens-16.png",
+    "assets/branding/iced_lens-32.png",
+    "assets/branding/iced_lens-48.png",
+    "assets/branding/iced_lens-64.png",
+    "assets/branding/iced_lens-128.png",
+    "assets/branding/iced_lens-256.png",
+    "assets/branding/iced_lens-512.png",
+]
+category = "public.app-category.photography"
+short_description = "Lightweight media viewer and editor"
+long_description = """
+IcedLens is a lightweight, internationalized media viewer and editor
+built with the Iced GUI toolkit. It supports multiple image formats,
+video playback, and provides a clean, intuitive interface.
+"""

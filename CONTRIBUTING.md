@@ -373,8 +373,13 @@ iced_lens/
 │   ├── directory_scanner.rs    # Async directory scanning
 │   └── error.rs                # Error types
 ├── assets/
+│   ├── branding/               # Application icon (SVG, PNG, ICO, ICNS)
 │   ├── i18n/                   # Translation files (.ftl)
-│   └── icons/                  # SVG icons
+│   └── icons/                  # UI icons
+│       ├── source/             # SVG sources (not embedded)
+│       └── png/
+│           ├── dark/           # Dark icons (for light backgrounds)
+│           └── light/          # Light icons (for dark backgrounds)
 ├── tests/                      # Integration tests
 ├── benches/                    # Performance benchmarks
 ├── CONTRIBUTING.md             # This file
@@ -524,7 +529,9 @@ let padding = spacing::MD; // 16px
 
 #### 2. Icons (`src/ui/icons.rs`)
 
-Raw SVG assets named by their **visual appearance**, not their function:
+PNG icons named by their **visual appearance**, not their function. Two variants exist:
+- **`icons::*`** - Dark icons from `assets/icons/png/dark/` (for light backgrounds)
+- **`icons::overlay::*`** - Light icons from `assets/icons/png/light/` (for dark backgrounds)
 
 | Icon | Visual Description |
 |------|-------------------|
@@ -534,6 +541,12 @@ Raw SVG assets named by their **visual appearance**, not their function:
 | `ellipsis_horizontal()` | Three horizontal dots (⋯) |
 
 **Naming rule:** Describe what you see, not what it does.
+
+**Adding a new icon:**
+1. Create SVG in `assets/icons/source/`
+2. Generate PNG: `rsvg-convert -w 32 -h 32 source/icon.svg -o png/dark/icon.png`
+3. If needed for overlays: `rsvg-convert ... | convert - -negate png/light/icon.png`
+4. Add to `src/ui/icons.rs` using the `define_icon!` macro
 
 #### 3. Action Icons (`src/ui/action_icons.rs`)
 

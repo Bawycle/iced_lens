@@ -7,9 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Application executable icons:** The application now has proper icons on all platforms:
+  - Windows: ICO embedded in executable via `build.rs`
+  - macOS: ICNS for `.app` bundle via `cargo-bundle`
+  - Linux: PNG icons for `.deb` package via `cargo-bundle`
+- **cargo-bundle support:** Added `[package.metadata.bundle]` configuration for creating macOS `.app` and Linux `.deb` packages with proper icons.
+
 ### Changed
 - **Auto-collapse metadata sidebar in fullscreen:** The metadata sidebar now automatically closes when entering fullscreen mode, providing an unobstructed view.
 - **Migrated from SVG to PNG icons:** All UI icons now use pre-rendered PNG images instead of SVG for consistent cross-platform rendering and improved performance on Windows. Icons are cached using `OnceLock` for optimal memory usage.
+- **Reorganized icon assets:** Icons are now organized in a cleaner structure:
+  - `assets/branding/` - Application icon (SVG source, PNG exports, ICO, ICNS)
+  - `assets/icons/source/` - SVG sources for UI icons
+  - `assets/icons/png/dark/` - Dark icons for light backgrounds
+  - `assets/icons/png/light/` - Light icons for dark backgrounds (overlays, HUD)
 
 ### Fixed
 - **Frame capture and step unavailable after opening video:** Capture frame and step forward now work immediately after opening a video without requiring playback first.
