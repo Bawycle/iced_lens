@@ -3,6 +3,7 @@
 
 pub mod component;
 pub mod controls;
+pub mod empty_state;
 pub mod pane;
 pub mod shared_styles;
 pub mod state;
@@ -103,7 +104,8 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
         return loading_view(ctx.i18n, ctx.spinner_rotation);
     }
 
-    Text::new(ctx.i18n.tr("hello-message")).into()
+    // No media loaded - show empty state
+    empty_state::view(ctx.i18n)
 }
 
 fn error_view<'a>(i18n: &'a I18n, error: ErrorContext<'a>) -> Element<'a, Message> {

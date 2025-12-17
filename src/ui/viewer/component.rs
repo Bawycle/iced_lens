@@ -28,7 +28,7 @@ const LOADING_TIMEOUT: Duration = Duration::from_secs(10); // Timeout for media 
 #[derive(Debug, Clone)]
 pub enum Message {
     StartLoadingMedia,
-    ImageLoaded(Result<MediaData, Error>),
+    MediaLoaded(Result<MediaData, Error>),
     ToggleErrorDetails,
     Controls(controls::Message),
     VideoControls(video_controls::Message),
@@ -48,6 +48,8 @@ pub enum Message {
     InitiatePlayback,
     PlaybackEvent(PlaybackMessage),
     SpinnerTick,
+    /// Request to open file dialog from empty state.
+    OpenFileRequested,
 }
 
 /// Side effects the application should perform after handling a viewer message.
@@ -73,6 +75,13 @@ pub enum Effect {
     RequestDelete,
     /// Toggle the info/metadata panel.
     ToggleInfoPanel,
+    /// Request to open file dialog (from empty state).
+    OpenFileDialog,
+    /// Show error notification (used when load fails with no media loaded).
+    ShowErrorNotification {
+        /// The i18n key for the notification message.
+        key: &'static str,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -84,22 +93,6 @@ pub struct ErrorState {
 }
 
 impl ErrorState {
-    fn from_error(error: &Error, i18n: &I18n) -> Self {
-        let friendly_key = match error {
-            Error::Io(_) => "error-load-image-io",
-            Error::Svg(_) => "error-load-image-svg",
-            // Config and Video errors use the general message
-            _ => "error-load-image-general",
-        };
-
-        Self {
-            friendly_key,
-            friendly_text: i18n.tr(friendly_key),
-            details: error.to_string(),
-            show_details: false,
-        }
-    }
-
     fn refresh_translation(&mut self, i18n: &I18n) {
         self.friendly_text = i18n.tr(self.friendly_key);
     }
@@ -388,26 +381,21 @@ impl State {
         self.is_loading_media
     }
 
-    /// Checks if loading has timed out and converts to error state if necessary.
-    pub fn check_loading_timeout(&mut self, i18n: &I18n) {
+    /// Checks if loading has timed out.
+    /// Returns `true` if a timeout occurred (caller should show notification).
+    pub fn check_loading_timeout(&mut self) -> bool {
         if self.is_loading_media {
             if let Some(started_at) = self.loading_started_at {
                 if started_at.elapsed() > LOADING_TIMEOUT {
-                    // Loading timed out, convert to error state
+                    // Loading timed out - clear loading state
                     self.is_loading_media = false;
                     self.loading_started_at = None;
-                    self.error = Some(ErrorState {
-                        friendly_key: "error-loading-timeout",
-                        friendly_text: i18n.tr("error-loading-timeout"),
-                        details: format!(
-                            "Media loading timed out after {} seconds",
-                            LOADING_TIMEOUT.as_secs()
-                        ),
-                        show_details: false,
-                    });
+                    self.current_image_path = None;
+                    return true;
                 }
             }
         }
+        false
     }
 
     /// Returns the subscriptions for video playback and spinner animation.
@@ -462,7 +450,7 @@ impl State {
         iced::Subscription::batch([video_subscription, spinner_subscription])
     }
 
-    pub fn handle_message(&mut self, message: Message, i18n: &I18n) -> (Effect, Task<Message>) {
+    pub fn handle_message(&mut self, message: Message, _i18n: &I18n) -> (Effect, Task<Message>) {
         match message {
             Message::StartLoadingMedia => {
                 // Set loading state
@@ -471,7 +459,7 @@ impl State {
                 self.error = None;
                 (Effect::None, Task::none())
             }
-            Message::ImageLoaded(result) => {
+            Message::MediaLoaded(result) => {
                 // Clear loading state
                 self.is_loading_media = false;
                 self.loading_started_at = None;
@@ -521,9 +509,23 @@ impl State {
                         (Effect::None, Task::none())
                     }
                     Err(error) => {
-                        self.media = None;
-                        self.error = Some(ErrorState::from_error(&error, i18n));
-                        (Effect::None, Task::none())
+                        // Use notification for all load errors (consistent UX)
+                        // This is non-blocking and preserves the current view
+                        let notification_key = match &error {
+                            Error::Io(_) => "notification-load-error-io",
+                            Error::Svg(_) => "notification-load-error-svg",
+                            Error::Video(_) => "notification-load-error-video",
+                            Error::Config(_) => "notification-load-error-io", // Fallback
+                        };
+                        // Don't clear current media - keep showing what was there
+                        // Only clear the path we tried to load
+                        self.current_image_path = None;
+                        (
+                            Effect::ShowErrorNotification {
+                                key: notification_key,
+                            },
+                            Task::none(),
+                        )
                     }
                 }
             }
@@ -568,6 +570,7 @@ impl State {
             Message::DeleteCurrentImage => (Effect::RequestDelete, Task::none()),
             Message::OpenSettings => (Effect::OpenSettings, Task::none()),
             Message::EnterEditor => (Effect::EnterEditor, Task::none()),
+            Message::OpenFileRequested => (Effect::OpenFileDialog, Task::none()),
             Message::InitiatePlayback => {
                 // Reset overlay timer on interaction
                 self.last_overlay_interaction = Some(Instant::now());
@@ -1815,46 +1818,41 @@ mod tests {
     }
 
     #[test]
-    fn loading_state_timeout_converts_to_error() {
-        let i18n = I18n::default();
+    fn loading_state_timeout_returns_true_and_clears_state() {
         let mut state = State::new();
 
         // Simulate starting to load media
         state.is_loading_media = true;
         state.loading_started_at = Some(Instant::now() - LOADING_TIMEOUT - Duration::from_secs(1));
 
-        // Check timeout should convert to error
-        state.check_loading_timeout(&i18n);
+        // Check timeout should return true (caller pushes notification)
+        let timed_out = state.check_loading_timeout();
 
+        assert!(timed_out, "should return true when timeout occurred");
         assert!(!state.is_loading_media, "loading flag should be cleared");
         assert!(
             state.loading_started_at.is_none(),
             "loading timestamp should be cleared"
         );
-        assert!(state.error.is_some(), "error should be set");
-
-        let error = state.error.unwrap();
-        assert_eq!(error.friendly_key, "error-loading-timeout");
     }
 
     #[test]
-    fn loading_state_timeout_does_not_trigger_before_timeout() {
-        let i18n = I18n::default();
+    fn loading_state_timeout_returns_false_before_timeout() {
         let mut state = State::new();
 
         // Simulate starting to load media (but not timed out yet)
         state.is_loading_media = true;
         state.loading_started_at = Some(Instant::now() - Duration::from_secs(5));
 
-        // Check timeout should NOT convert to error yet
-        state.check_loading_timeout(&i18n);
+        // Check timeout should NOT trigger yet
+        let timed_out = state.check_loading_timeout();
 
+        assert!(!timed_out, "should return false when timeout not reached");
         assert!(state.is_loading_media, "loading flag should still be set");
         assert!(
             state.loading_started_at.is_some(),
             "loading timestamp should still be set"
         );
-        assert!(state.error.is_none(), "error should not be set");
     }
 
     #[test]
@@ -1866,7 +1864,7 @@ mod tests {
         state.is_loading_media = true;
         state.loading_started_at = Some(Instant::now());
 
-        // Simulate successful load (ImageLoaded with Ok result)
+        // Simulate successful load (MediaLoaded with Ok result)
         use crate::media::ImageData;
         use iced::widget::image::Handle;
 
@@ -1878,7 +1876,7 @@ mod tests {
         };
 
         let (_effect, _task) = state.handle_message(
-            Message::ImageLoaded(Ok(MediaData::Image(image_data))),
+            Message::MediaLoaded(Ok(MediaData::Image(image_data))),
             &i18n,
         );
 

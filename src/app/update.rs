@@ -68,18 +68,29 @@ pub fn handle_viewer_message(
         *ctx.window_id = Some(*window);
     }
 
-    // Check if this is a successful ImageLoaded message to extract metadata
-    let is_successful_load = matches!(&message, component::Message::ImageLoaded(Ok(_)));
+    // Check if this is a successful MediaLoaded message to extract metadata
+    let is_successful_load = matches!(&message, component::Message::MediaLoaded(Ok(_)));
 
     let (effect, task) = ctx.viewer.handle_message(message, ctx.i18n);
 
-    // Extract metadata after successful media load
+    // Handle successful media load
     if is_successful_load {
         if let Some(path) = ctx.viewer.current_image_path.as_ref() {
+            // Extract metadata
             *ctx.current_metadata = media::metadata::extract_metadata(path);
+
+            // Remember the directory for next time and persist
+            ctx.app_state.set_last_open_directory_from_file(path);
+            if let Some(key) = ctx.app_state.save() {
+                ctx.notifications
+                    .push(notifications::Notification::warning(&key));
+            }
         } else {
             *ctx.current_metadata = None;
         }
+
+        // Clear any stale load error notifications (UX: state consistency)
+        ctx.notifications.clear_load_errors();
     }
 
     let viewer_task = task.map(Message::Viewer);
@@ -108,6 +119,14 @@ pub fn handle_viewer_message(
         component::Effect::RequestDelete => handle_delete_current_media(ctx),
         component::Effect::ToggleInfoPanel => {
             *ctx.info_panel_open = !*ctx.info_panel_open;
+            Task::none()
+        }
+        component::Effect::OpenFileDialog => {
+            handle_open_file_dialog(ctx.app_state.last_open_directory.clone())
+        }
+        component::Effect::ShowErrorNotification { key } => {
+            ctx.notifications
+                .push(notifications::Notification::error(key));
             Task::none()
         }
         component::Effect::None => Task::none(),
@@ -282,7 +301,7 @@ pub fn handle_editor_message(
                     // Reload the image in the viewer to show any saved changes
                     Task::perform(
                         async move { media::load_media(&current_image_path) },
-                        |result| Message::Viewer(component::Message::ImageLoaded(result)),
+                        |result| Message::Viewer(component::Message::MediaLoaded(result)),
                     )
                 }
                 image_editor::ImageSource::CapturedFrame { .. } => {
@@ -517,7 +536,7 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
         // Load the next image
         Task::perform(async move { media::load_media(&next_path) }, |result| {
-            Message::Viewer(component::Message::ImageLoaded(result))
+            Message::Viewer(component::Message::MediaLoaded(result))
         })
     } else {
         Task::none()
@@ -550,7 +569,7 @@ pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
         // Load the previous image
         Task::perform(async move { media::load_media(&prev_path) }, |result| {
-            Message::Viewer(component::Message::ImageLoaded(result))
+            Message::Viewer(component::Message::MediaLoaded(result))
         })
     } else {
         Task::none()
@@ -607,7 +626,7 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
                 ctx.viewer.loading_started_at = Some(std::time::Instant::now());
 
                 Task::perform(async move { media::load_media(&next_path) }, |result| {
-                    Message::Viewer(component::Message::ImageLoaded(result))
+                    Message::Viewer(component::Message::MediaLoaded(result))
                 })
             } else {
                 // No more media in directory
@@ -672,4 +691,91 @@ fn update_fullscreen_mode(
         window::Mode::Windowed
     };
     window::set_mode(window_id, mode)
+}
+
+/// Handles the open file dialog request from empty state.
+pub fn handle_open_file_dialog(last_directory: Option<PathBuf>) -> Task<Message> {
+    Task::perform(
+        async move {
+            let mut dialog = rfd::AsyncFileDialog::new().add_filter(
+                "Media",
+                &[
+                    "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "ico", "mp4", "avi",
+                    "mov", "mkv", "webm",
+                ],
+            );
+
+            if let Some(dir) = last_directory {
+                if dir.exists() {
+                    dialog = dialog.set_directory(&dir);
+                }
+            }
+
+            dialog.pick_file().await.map(|h| h.path().to_path_buf())
+        },
+        Message::OpenFileDialogResult,
+    )
+}
+
+/// Handles the result of the open file dialog.
+pub fn handle_open_file_dialog_result(
+    ctx: &mut UpdateContext<'_>,
+    path: Option<PathBuf>,
+) -> Task<Message> {
+    let Some(path) = path else {
+        // User cancelled the dialog
+        return Task::none();
+    };
+
+    // Load the media (last_open_directory is updated on successful load)
+    load_media_from_path(ctx, path)
+}
+
+/// Handles a file dropped on the window.
+pub fn handle_file_dropped(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<Message> {
+    // Check if it's a directory
+    if path.is_dir() {
+        // Scan directory for media and load the first file
+        let (config, _) = config::load();
+        let sort_order = config.display.sort_order.unwrap_or_default();
+        if ctx
+            .media_navigator
+            .scan_from_directory(&path, sort_order)
+            .is_ok()
+        {
+            if let Some(first_path) = ctx
+                .media_navigator
+                .current_media_path()
+                .map(|p| p.to_path_buf())
+            {
+                return load_media_from_path(ctx, first_path);
+            }
+        }
+        // No media found in directory
+        ctx.notifications.push(notifications::Notification::warning(
+            "notification-empty-dir",
+        ));
+        return Task::none();
+    }
+
+    // Load the media file (last_open_directory is updated on successful load)
+    load_media_from_path(ctx, path)
+}
+
+/// Internal helper to load media from a path.
+fn load_media_from_path(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<Message> {
+    // Scan the directory for navigation
+    let (config, _) = config::load();
+    let sort_order = config.display.sort_order.unwrap_or_default();
+    let _ = ctx.media_navigator.scan_directory(&path, sort_order);
+
+    // Set up viewer state
+    ctx.viewer.current_image_path = Some(path.clone());
+    ctx.viewer.is_loading_media = true;
+    ctx.viewer.loading_started_at = Some(std::time::Instant::now());
+
+    // Load the media
+    Task::perform(async move { media::load_media(&path) }, |result| {
+        Message::Viewer(component::Message::MediaLoaded(result))
+    })
 }

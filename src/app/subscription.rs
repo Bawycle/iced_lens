@@ -15,9 +15,16 @@ use iced::{event, time, Subscription};
 /// - Viewer: Routes all events including wheel scroll for zoom
 /// - Editor: Routes keyboard events to editor, window events to viewer
 /// - Settings/Help/About: Routes non-wheel events to viewer
+///
+/// File drop events are handled on all screens to allow opening media at any time.
 pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
     match screen {
         Screen::ImageEditor => event::listen_with(|event, status, window_id| {
+            // Handle file drop on all screens
+            if let event::Event::Window(iced::window::Event::FileDropped(path)) = &event {
+                return Some(Message::FileDropped(path.clone()));
+            }
+
             if let event::Event::Window(iced::window::Event::Resized(_)) = &event {
                 return Some(Message::Viewer(component::Message::RawEvent {
                     window: window_id,
@@ -43,6 +50,11 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
         Screen::Viewer => {
             // In viewer screen, route all events including wheel scroll for zoom
             event::listen_with(|event, status, window_id| {
+                // Handle file drop on all screens
+                if let event::Event::Window(iced::window::Event::FileDropped(path)) = &event {
+                    return Some(Message::FileDropped(path.clone()));
+                }
+
                 if matches!(
                     event,
                     event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
@@ -66,6 +78,11 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
             // In settings/help/about screens, only route non-wheel events to viewer
             // (wheel events are used by scrollable content)
             event::listen_with(|event, status, window_id| {
+                // Handle file drop on all screens
+                if let event::Event::Window(iced::window::Event::FileDropped(path)) = &event {
+                    return Some(Message::FileDropped(path.clone()));
+                }
+
                 // Don't route wheel scroll to viewer - it's used by scrollable content
                 if matches!(
                     event,

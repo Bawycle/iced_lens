@@ -16,12 +16,6 @@
 ## Planned Features
 
 ### UX/UI
-- [ ] Implement an "empty state" view for the main screen when no media is loaded:
-  - This view is shown by a component that replaces the media viewer if the app is launched without a path or if the path is invalid.
-  - The component area should be a drop zone for media files or folders.
-  - It should feature a central button to open a file or folder via the system dialog (`rfd` crate).
-  - All UI controls irrelevant in this state (e.g., zoom, navigation, metadata) must be disabled.
-  - Error handling for failed loads must use the existing notification system.
 - [ ] Add a collapse control directly on the metadata sidebar. This provides a more intuitive way for users to hide the sidebar than re-clicking the info button.
 - [ ] Implement dynamic window title display:
   - Use "Media Title - AppName" if a title is available in the media's metadata.

@@ -35,6 +35,11 @@ pub struct AppState {
     /// Used as the initial directory when opening file save dialogs.
     #[serde(default)]
     pub last_save_directory: Option<PathBuf>,
+
+    /// Last directory used for Open File operations.
+    /// Used as the initial directory when opening file open dialogs.
+    #[serde(default)]
+    pub last_open_directory: Option<PathBuf>,
 }
 
 impl AppState {
@@ -157,6 +162,16 @@ impl AppState {
             self.last_save_directory = Some(parent.to_path_buf());
         }
     }
+
+    /// Sets the last open directory from a file path.
+    ///
+    /// Extracts the parent directory from the given path. If the path has no
+    /// parent (e.g., root path), the directory is not updated.
+    pub fn set_last_open_directory_from_file(&mut self, file_path: &std::path::Path) {
+        if let Some(parent) = file_path.parent() {
+            self.last_open_directory = Some(parent.to_path_buf());
+        }
+    }
 }
 
 #[cfg(test)]
@@ -190,6 +205,25 @@ mod tests {
     }
 
     #[test]
+    fn set_last_open_directory_extracts_parent() {
+        let mut state = AppState::default();
+        state
+            .set_last_open_directory_from_file(std::path::Path::new("/home/user/photos/image.jpg"));
+        assert_eq!(
+            state.last_open_directory,
+            Some(PathBuf::from("/home/user/photos"))
+        );
+    }
+
+    #[test]
+    fn set_last_open_directory_ignores_root() {
+        let mut state = AppState::default();
+        state.set_last_open_directory_from_file(std::path::Path::new("/"));
+        // Root has no parent, so directory should remain None
+        assert!(state.last_open_directory.is_none());
+    }
+
+    #[test]
     fn cbor_round_trip_preserves_state() {
         let temp_dir = tempdir().expect("create temp dir");
         let state_path = temp_dir.path().join("test_state.cbor");
@@ -197,6 +231,7 @@ mod tests {
         // Create state with data
         let original = AppState {
             last_save_directory: Some(PathBuf::from("/home/user/documents")),
+            last_open_directory: Some(PathBuf::from("/home/user/pictures")),
         };
 
         // Write to CBOR
@@ -214,6 +249,7 @@ mod tests {
         };
 
         assert_eq!(original.last_save_directory, loaded.last_save_directory);
+        assert_eq!(original.last_open_directory, loaded.last_open_directory);
     }
 
     #[test]
@@ -234,6 +270,7 @@ mod tests {
         // Create state with data
         let original = AppState {
             last_save_directory: Some(PathBuf::from("/test/save/directory")),
+            last_open_directory: Some(PathBuf::from("/test/open/directory")),
         };
 
         // Save to custom directory
@@ -286,6 +323,7 @@ mod tests {
         let temp_dir_a = tempdir().expect("create temp dir A");
         let state_a = AppState {
             last_save_directory: Some(PathBuf::from("/path/a")),
+            last_open_directory: None,
         };
         state_a.save_to(Some(temp_dir_a.path().to_path_buf()));
 
@@ -293,6 +331,7 @@ mod tests {
         let temp_dir_b = tempdir().expect("create temp dir B");
         let state_b = AppState {
             last_save_directory: Some(PathBuf::from("/path/b")),
+            last_open_directory: None,
         };
         state_b.save_to(Some(temp_dir_b.path().to_path_buf()));
 
@@ -311,6 +350,7 @@ mod tests {
 
         let state = AppState {
             last_save_directory: Some(PathBuf::from("/test")),
+            last_open_directory: None,
         };
 
         // Save should create nested directories
