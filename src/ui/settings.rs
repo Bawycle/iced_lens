@@ -20,14 +20,14 @@ use crate::ui::state::zoom::{
     format_number, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT, ZOOM_STEP_INVALID_KEY,
     ZOOM_STEP_RANGE_KEY,
 };
-use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
 use crate::ui::theme;
 use crate::ui::theming::ThemeMode;
+use iced::widget::image::{Handle, Image};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
-        button, container, pick_list, rule, scrollable, svg::Svg, text, text_input, Button, Column,
+        button, container, pick_list, rule, scrollable, text, text_input, Button, Column,
         Container, Row, Slider, Text,
     },
     Border, Element, Length, Theme,
@@ -808,11 +808,11 @@ impl State {
 
 /// Build a settings section with icon, title, and content.
 fn build_section<'a>(
-    icon: Svg<'a>,
+    icon: Image<Handle>,
     title: String,
     content: Element<'a, Message>,
 ) -> Element<'a, Message> {
-    let icon_sized = icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
+    let icon_sized = icons::sized(icon, sizing::ICON_MD);
 
     let header = Row::new()
         .spacing(spacing::SM)

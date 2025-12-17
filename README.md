@@ -75,6 +75,18 @@ cargo build --release
 ```
 Binary: `target/release/iced_lens`
 
+### Create Application Bundle (Optional)
+For a proper application bundle with icon:
+```bash
+cargo install cargo-bundle
+cargo bundle --release
+```
+This creates:
+- **macOS**: `target/release/bundle/osx/IcedLens.app`
+- **Linux**: `target/release/bundle/deb/iced_lens_*.deb`
+
+On Windows, the executable icon is automatically embedded during build.
+
 ## 5. Usage
 Open an image :
 ```bash
@@ -226,7 +238,7 @@ Key concepts (informative only):
 SPDX: `MPL-2.0`
 
 ### Icon Asset Exception
-The application icon (`assets/icons/iced_lens.svg` and its PNG exports) is **not** covered by MPL-2.0. It uses a restricted license allowing only unmodified redistribution to represent IcedLens. See [`ICON_LICENSE.md`](ICON_LICENSE.md). SPDX reference: `LicenseRef-IcedLens-Icon`.
+The application icon (`assets/branding/`) and UI icons (`assets/icons/`) are **not** covered by MPL-2.0. They use a restricted license allowing only unmodified redistribution to represent IcedLens. See [`ICON_LICENSE.md`](ICON_LICENSE.md). SPDX reference: `LicenseRef-IcedLens-Icon`.
 
 ## 16. FAQ
 **Why not GPL or MIT?** MPL offers balanced file‑level reciprocity without imposing network or full project copyleft.

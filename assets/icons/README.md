@@ -1,75 +1,53 @@
-# Icon Assets
+# UI Icons
 
-This directory contains the vector source for the IcedLens application icon.
+This directory contains the UI icons used throughout the IcedLens application.
 
-## Design Goals
-- Convey a **lens** (viewer) with a subtle **crystalline / icy** inner motif.
-- Use a warm yellow accent (#F2C94C) to add personality while remaining legible on light & dark themes.
-- Keep geometry simple to preserve clarity at small sizes.
-- Provide a neutral base that can adapt if future theming adds a dark or high-contrast variant.
+## Directory Structure
 
-## Files
-- `iced_lens.svg` – Master scalable source (512×512). All raster exports should originate here.
-
-## Recommended Raster Sizes
-Generate PNGs for common desktop integration targets:
-- 16×16, 24×24, 32×32 (toolbars, small lists)
-- 48×48, 64×64 (application menus)
-- 128×128, 256×256 (high‑DPI launcher grids)
-- 512×512 (storefronts / marketing)
-
-## Color Palette
-| Role            | Hex      |
-|-----------------|----------|
-| Accent Yellow   | `#F2C94C` / gradient variant `#F5D059` |
-| Dark Outline    | `#2E3440` |
-| Light Surface   | `#ECEFF4` |
-| Mid Neutral     | `#D8DEE9` |
-| Highlight       | `#FFFFFF` (semi‑transparent) |
-
-## Export Script (Suggested)
-A helper script can automate PNG generation (requires `rsvg-convert` or `inkscape`). Place in `scripts/generate-icons.sh`:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-SRC="assets/icons/iced_lens.svg"
-OUT="assets/icons"
-SIZES=(16 24 32 48 64 128 256 512)
-for s in "${SIZES[@]}"; do
-  rsvg-convert -w "$s" -h "$s" "$SRC" -o "$OUT/iced_lens_${s}.png" || \
-  inkscape "$SRC" --export-type=png -w "$s" -h "$s" -o "$OUT/iced_lens_${s}.png"
-  echo "Generated $OUT/iced_lens_${s}.png"
-done
+```
+icons/
+├── source/           # SVG source files (not embedded in binary)
+│   └── *.svg
+└── png/
+    ├── dark/         # Dark icons for light backgrounds
+    │   └── *.png
+    └── light/        # Light icons for dark backgrounds (overlays, HUD)
+        └── *.png
 ```
 
-Make executable:
-```bash
-chmod +x scripts/generate-icons.sh
-```
-Run:
-```bash
-./scripts/generate-icons.sh
-```
+## Icon Variants
 
-## Desktop Integration
-Add a `.desktop` file later (e.g. `dist/iced_lens.desktop`):
-```ini
-[Desktop Entry]
-Type=Application
-Name=IcedLens
-Exec=iced_lens
-Icon=iced_lens
-Categories=Graphics;Viewer;
-```
-Install icon PNGs under appropriate XDG icon theme directories if packaging.
+- **dark/**: Standard dark icons used on light backgrounds (default UI)
+- **light/**: Light (white) icons used on dark backgrounds (video overlays, HUD indicators)
 
-## Future Variants
-- Monochrome (outline only) for status indicators.
-- High contrast version (swap yellow for pure white accent on dark backgrounds).
+## Naming Convention
+
+Icons use generic visual names describing the icon's appearance, not the action context:
+- `trash` not `delete_image`
+- `play` not `start_video`
+- `loop` not `repeat_playlist`
+
+## Adding New Icons
+
+1. Create the SVG source in `source/` (32x32 recommended)
+2. Generate PNG versions:
+   ```bash
+   # Dark variant (for light backgrounds)
+   rsvg-convert -w 32 -h 32 source/icon.svg -o png/dark/icon.png
+
+   # Light variant (for dark backgrounds) - if needed
+   rsvg-convert -w 32 -h 32 source/icon.svg | convert - -negate png/light/icon.png
+   ```
+3. Add the icon definition in `src/ui/icons.rs`
+
+## Application Icon
+
+The application icon (logo) is located in `assets/branding/`.
 
 ## License
-This icon is **not** under MPL-2.0. It uses a restricted license: see `ICON_LICENSE.md` at the project root.
+
+These icons are **not** under MPL-2.0. They use the same restricted license as the application icon.
+See `ICON_LICENSE.md` at the project root.
 
 Summary (informative only; refer to the full text):
 - May be redistributed **unmodified** solely to represent the IcedLens application.

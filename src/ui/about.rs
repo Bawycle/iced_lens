@@ -8,7 +8,6 @@
 use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{radius, sizing, spacing, typography};
 use crate::ui::icons;
-use crate::ui::styles;
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{button, container, rule, scrollable, text, Column, Container, Row, Text},
@@ -190,11 +189,11 @@ fn build_link_item<'a>(label: &str, url: &'a str) -> Element<'a, Message> {
 
 /// Build a section with icon, title, and content (same pattern as settings/help).
 fn build_section<'a>(
-    icon: iced::widget::Svg<'a>,
+    icon: iced::widget::Image<iced::widget::image::Handle>,
     title: String,
     content: Element<'a, Message>,
 ) -> Element<'a, Message> {
-    let icon_sized = icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
+    let icon_sized = icons::sized(icon, sizing::ICON_MD);
 
     let header = Row::new()
         .spacing(spacing::SM)

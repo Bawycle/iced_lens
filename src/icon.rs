@@ -10,7 +10,7 @@ use resvg::usvg;
 /// Returns `None` if parsing or rendering fails.
 pub fn load_window_icon() -> Option<Icon> {
     // Embed the SVG so packaging does not need to locate assets on disk.
-    const SVG_SOURCE: &str = include_str!("../assets/icons/iced_lens.svg");
+    const SVG_SOURCE: &str = include_str!("../assets/branding/iced_lens.svg");
 
     // Parse SVG using usvg (via resvg)
     let tree = match usvg::Tree::from_data(SVG_SOURCE.as_bytes(), &usvg::Options::default()) {

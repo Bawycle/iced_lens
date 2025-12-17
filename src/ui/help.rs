@@ -8,7 +8,7 @@
 use crate::i18n::fluent::I18n;
 use crate::ui::action_icons;
 use crate::ui::design_tokens::{radius, sizing, spacing, typography};
-use crate::ui::styles;
+use iced::widget::image::{Handle, Image};
 use iced::{
     alignment::{Horizontal, Vertical},
     font::Weight,
@@ -163,12 +163,12 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
 fn build_collapsible_section<'a>(
     ctx: &ViewContext<'a>,
     section: HelpSection,
-    icon: iced::widget::Svg<'a>,
+    icon: Image<Handle>,
     title: String,
     content: Element<'a, Message>,
 ) -> Element<'a, Message> {
     let is_expanded = ctx.state.is_expanded(section);
-    let icon_sized = action_icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
+    let icon_sized = action_icons::sized(icon, sizing::ICON_MD);
 
     // Expand/collapse indicator
     let indicator = Text::new(if is_expanded { "▼" } else { "▶" }).size(typography::BODY);
@@ -560,11 +560,11 @@ const HELP_ICON_SIZE: f32 = 18.0;
 
 /// Build a tool item with an icon, name, and description.
 fn build_tool_item_with_icon<'a>(
-    icon: iced::widget::Svg<'a>,
+    icon: Image<Handle>,
     name: String,
     description: String,
 ) -> Element<'a, Message> {
-    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE).style(styles::tinted_svg);
+    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE);
 
     Row::new()
         .spacing(spacing::SM)
@@ -585,10 +585,10 @@ fn build_tool_item_with_icon<'a>(
 
 /// Build a bullet point with an icon.
 fn build_bullet_with_icon<'a>(
-    icon: iced::widget::Svg<'a>,
+    icon: Image<Handle>,
     content: String,
 ) -> Element<'a, Message> {
-    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE).style(styles::tinted_svg);
+    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE);
 
     Row::new()
         .spacing(spacing::SM)
