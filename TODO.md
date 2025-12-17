@@ -10,7 +10,6 @@
   - If reproduced: note exact steps, window size, image used, timing between actions
 
 ## Modifications
-- [ ] Automatically collapse the metadata sidebar when entering fullscreen mode, if it is currently expanded.
 - [ ] Migrate from SVG icons to PNG icons for better performance (lighter, more universal rendering). Icons should be loaded into memory at application startup or upon first composition, not within components, to prevent repeated disk access on re-renders.
 
 ### Refactoring

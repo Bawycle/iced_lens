@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Auto-collapse metadata sidebar in fullscreen:** The metadata sidebar now automatically closes when entering fullscreen mode, providing an unobstructed view.
 
 ### Fixed
 - **Frame capture and step unavailable after opening video:** Capture frame and step forward now work immediately after opening a video without requiring playback first.

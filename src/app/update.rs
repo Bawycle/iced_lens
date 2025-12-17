@@ -87,7 +87,9 @@ pub fn handle_viewer_message(
         component::Effect::PersistPreferences => {
             persistence::persist_preferences(ctx.preferences_context())
         }
-        component::Effect::ToggleFullscreen => toggle_fullscreen(ctx.fullscreen, ctx.window_id),
+        component::Effect::ToggleFullscreen => {
+            toggle_fullscreen(ctx.fullscreen, ctx.window_id, ctx.info_panel_open)
+        }
         component::Effect::ExitFullscreen => {
             update_fullscreen_mode(ctx.fullscreen, ctx.window_id, false)
         }
@@ -636,8 +638,17 @@ pub fn handle_capture_frame(
 }
 
 /// Toggles fullscreen mode.
-fn toggle_fullscreen(fullscreen: &mut bool, window_id: &Option<window::Id>) -> Task<Message> {
-    update_fullscreen_mode(fullscreen, window_id, !*fullscreen)
+/// When entering fullscreen, automatically closes the info panel if it's open.
+fn toggle_fullscreen(
+    fullscreen: &mut bool,
+    window_id: &Option<window::Id>,
+    info_panel_open: &mut bool,
+) -> Task<Message> {
+    let entering_fullscreen = !*fullscreen;
+    if entering_fullscreen && *info_panel_open {
+        *info_panel_open = false;
+    }
+    update_fullscreen_mode(fullscreen, window_id, entering_fullscreen)
 }
 
 /// Updates fullscreen mode to the desired state.
