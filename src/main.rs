@@ -50,7 +50,7 @@ fn main() -> iced::Result {
 }
 fn help_text(i18n: &iced_lens::i18n::fluent::I18n) -> String {
     format!(
-        "{desc}\n\n{usage}\n  iced_lens [OPTIONS] [IMAGE_PATH]\n\n{opts}\n  {line_help}\n  {line_lang}\n  {line_i18n_dir}\n  {line_data_dir}\n  {line_config_dir}\n\n{args}\n  {arg_path}\n\n{examples}\n  {ex1}\n  {ex2}\n  {ex3}\n",
+        "{desc}\n\n{usage}\n  iced_lens [OPTIONS] [PATH]\n\n{opts}\n  {line_help}\n  {line_lang}\n  {line_i18n_dir}\n  {line_data_dir}\n  {line_config_dir}\n\n{args}\n  {arg_path}\n\n{examples}\n  {ex1}\n  {ex2}\n  {ex3}\n",
         desc = i18n.tr("help-description"),
         usage = i18n.tr("help-usage-heading"),
         opts = i18n.tr("help-options-heading"),

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Directory path as CLI argument:** The application now accepts a directory path as a command-line argument. When provided, it scans the directory for media files and opens the first one (based on the current sorting settings). If no supported media is found, the application starts without loading any file.
 - **Application executable icons:** The application now has proper icons on all platforms:
   - Windows: ICO embedded in executable via `build.rs`
   - macOS: ICNS for `.app` bundle via `cargo-bundle`

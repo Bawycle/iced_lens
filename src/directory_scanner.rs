@@ -55,6 +55,38 @@ impl ImageList {
         })
     }
 
+    /// Scans a directory directly for supported media files and sorts them.
+    /// Sets current_index to 0 (first file) if any media files are found.
+    ///
+    /// Returns an error if the directory cannot be read.
+    pub fn scan_directory_direct(directory: &Path, sort_order: SortOrder) -> Result<Self> {
+        let mut images = Vec::new();
+
+        for entry in std::fs::read_dir(directory)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_file() && is_supported_media(&path) {
+                images.push(path);
+            }
+        }
+
+        sort_images(&mut images, sort_order)?;
+
+        // Set current_index to first file if any exist
+        let current_index = if images.is_empty() { None } else { Some(0) };
+
+        Ok(Self {
+            images,
+            current_index,
+        })
+    }
+
+    /// Returns the first media file in the list, if any.
+    pub fn first(&self) -> Option<&Path> {
+        self.images.first().map(|p| p.as_path())
+    }
+
     /// Returns the current image path.
     pub fn current(&self) -> Option<&Path> {
         self.current_index
@@ -383,5 +415,73 @@ mod tests {
 
         // Previous from video should go back to image
         assert_eq!(list.previous(), Some(img1.as_path()));
+    }
+
+    // Tests for scan_directory_direct
+    #[test]
+    fn scan_directory_direct_finds_all_media() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img_a = create_test_image(temp_dir.path(), "a.jpg");
+        let _img_b = create_test_image(temp_dir.path(), "b.png");
+        let _vid = create_test_video(temp_dir.path(), "c.mp4");
+        create_test_image(temp_dir.path(), "not_media.txt");
+
+        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("failed to scan directory");
+
+        assert_eq!(list.len(), 3);
+        assert_eq!(list.current_index(), Some(0));
+        assert_eq!(list.first(), Some(img_a.as_path()));
+    }
+
+    #[test]
+    fn scan_directory_direct_sorts_alphabetically() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let _img_c = create_test_image(temp_dir.path(), "c.jpg");
+        let img_a = create_test_image(temp_dir.path(), "a.jpg");
+        let _img_b = create_test_image(temp_dir.path(), "b.jpg");
+
+        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("failed to scan directory");
+
+        assert_eq!(list.first(), Some(img_a.as_path()));
+        assert_eq!(list.current(), Some(img_a.as_path()));
+    }
+
+    #[test]
+    fn scan_directory_direct_returns_empty_for_no_media() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        create_test_image(temp_dir.path(), "readme.txt");
+        create_test_image(temp_dir.path(), "document.pdf");
+
+        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("failed to scan directory");
+
+        assert!(list.is_empty());
+        assert_eq!(list.current_index(), None);
+        assert_eq!(list.first(), None);
+    }
+
+    #[test]
+    fn scan_directory_direct_handles_empty_directory() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+
+        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("failed to scan directory");
+
+        assert!(list.is_empty());
+        assert_eq!(list.first(), None);
+    }
+
+    #[test]
+    fn first_returns_first_media_file() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img_a = create_test_image(temp_dir.path(), "a.jpg");
+        let _img_b = create_test_image(temp_dir.path(), "b.jpg");
+
+        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("failed to scan directory");
+
+        assert_eq!(list.first(), Some(img_a.as_path()));
     }
 }
