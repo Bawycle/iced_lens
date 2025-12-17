@@ -289,7 +289,7 @@ impl App {
                 // Load the media
                 let path_string = media_path.to_string_lossy().into_owned();
                 Task::perform(async move { media::load_media(&path_string) }, |result| {
-                    Message::Viewer(component::Message::ImageLoaded(result))
+                    Message::Viewer(component::Message::MediaLoaded(result))
                 })
             } else {
                 Task::none()
@@ -381,7 +381,11 @@ impl App {
                 // The view() function will check elapsed time and hide controls if needed
 
                 // Also check for loading timeout
-                self.viewer.check_loading_timeout(&self.i18n);
+                if self.viewer.check_loading_timeout() {
+                    self.notifications.push(notifications::Notification::error(
+                        "notification-load-error-timeout",
+                    ));
+                }
 
                 // Tick notification manager to handle auto-dismiss
                 self.notifications.tick();
@@ -470,6 +474,13 @@ impl App {
                 }
                 Task::none()
             }
+            Message::OpenFileDialog => {
+                update::handle_open_file_dialog(self.app_state.last_open_directory.clone())
+            }
+            Message::OpenFileDialogResult(path) => {
+                update::handle_open_file_dialog_result(&mut ctx, path)
+            }
+            Message::FileDropped(path) => update::handle_file_dropped(&mut ctx, path),
         }
     }
 
@@ -612,7 +623,7 @@ mod tests {
         let mut app = App::default();
         let data = sample_image_data();
 
-        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             MediaData::Image(data.clone()),
         ))));
 
@@ -703,22 +714,34 @@ mod tests {
     }
 
     #[test]
-    fn update_image_loaded_err_clears_image_and_sets_error() {
+    fn update_image_loaded_err_shows_notification_and_preserves_media() {
         let mut app = App::default();
-        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             sample_media_data(),
         ))));
 
-        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Err(
+        // Verify media is loaded
+        assert!(app.viewer.has_media());
+
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Err(
             Error::Io("boom".into()),
         ))));
 
-        assert!(!app.viewer.has_media());
-        assert!(app
-            .viewer
-            .error()
-            .map(|state| state.details().contains("boom"))
-            .unwrap_or(false));
+        // New behavior: media is preserved, error panel is NOT set
+        // A notification is shown instead (non-blocking UX)
+        assert!(
+            app.viewer.has_media(),
+            "media should be preserved on load error"
+        );
+        assert!(
+            app.viewer.error().is_none(),
+            "error panel should not be set - notifications are used instead"
+        );
+        // Notification was pushed (we can verify via notifications manager)
+        assert!(
+            app.notifications.has_notifications(),
+            "a notification should be shown for the error"
+        );
     }
 
     #[test]
@@ -801,7 +824,7 @@ mod tests {
     fn toggling_fit_to_window_updates_zoom() {
         let mut app = App::default();
         let _ = app.viewer.handle_message(
-            component::Message::ImageLoaded(Ok(build_media(2000, 1000))),
+            component::Message::MediaLoaded(Ok(build_media(2000, 1000))),
             &app.i18n,
         );
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
@@ -853,7 +876,7 @@ mod tests {
         let zoom = app.viewer.zoom_state_mut();
         zoom.zoom_percent = 100.0;
         let _ = app.viewer.handle_message(
-            component::Message::ImageLoaded(Ok(build_media(800, 600))),
+            component::Message::MediaLoaded(Ok(build_media(800, 600))),
             &app.i18n,
         );
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
@@ -883,7 +906,7 @@ mod tests {
 
         // Load image first (this will reset zoom to 100% if fit_to_window is false)
         let _ = app.viewer.handle_message(
-            component::Message::ImageLoaded(Ok(build_media(800, 600))),
+            component::Message::MediaLoaded(Ok(build_media(800, 600))),
             &app.i18n,
         );
 
@@ -984,7 +1007,7 @@ mod tests {
             .expect("failed to write img2");
 
         let mut app = App::default();
-        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img1_path.clone());
@@ -1023,7 +1046,7 @@ mod tests {
             .expect("failed to write img2");
 
         let mut app = App::default();
-        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
@@ -1062,7 +1085,7 @@ mod tests {
             .expect("failed to write img2");
 
         let mut app = App::default();
-        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             sample_media_data(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());
@@ -1102,7 +1125,7 @@ mod tests {
                 .expect("failed to write img2");
 
             let mut app = App::default();
-            let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+            let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
                 sample_media_data(),
             ))));
             app.viewer.current_image_path = Some(img1_path.clone());
@@ -1158,7 +1181,7 @@ mod tests {
 
         // Load first image in viewer
         let img1_data = media::load_media(&img1_path).expect("failed to load img1");
-        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             img1_data.clone(),
         ))));
         app.viewer.current_image_path = Some(img1_path.clone());
@@ -1215,7 +1238,7 @@ mod tests {
 
         // Load second image in viewer
         let img2_data = media::load_media(&img2_path).expect("failed to load img2");
-        let _ = app.update(Message::Viewer(component::Message::ImageLoaded(Ok(
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             img2_data.clone(),
         ))));
         app.viewer.current_image_path = Some(img2_path.clone());

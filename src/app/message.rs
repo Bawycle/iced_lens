@@ -43,6 +43,12 @@ pub enum Message {
         position_secs: f64,
     },
     Tick(Instant), // Periodic tick for overlay auto-hide
+    /// Trigger the open file dialog from the empty state.
+    OpenFileDialog,
+    /// Result from the open file dialog.
+    OpenFileDialogResult(Option<PathBuf>),
+    /// A file was dropped on the window.
+    FileDropped(PathBuf),
 }
 
 /// Runtime flags passed in from the CLI or launcher to tweak startup behavior.

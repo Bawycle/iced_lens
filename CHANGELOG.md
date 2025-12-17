@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Directory path as CLI argument:** The application now accepts a directory path as a command-line argument. When provided, it scans the directory for media files and opens the first one (based on the current sorting settings). If no supported media is found, the application starts without loading any file.
+- **Empty state view:** The application now displays a welcoming UI when no media is loaded:
+  - Shows a large icon, title, and helpful instructions
+  - Provides an "Open File" button to launch the file picker dialog
+  - Accepts drag-and-drop of files and folders anywhere in the window
+  - Disables Edit and Info buttons when no media is present
+  - Supports both single files and directories (loads first media file in directory)
+- **Remember last opened directory:** The file picker dialog now opens in the directory of the last successfully loaded media file, persisted across sessions.
+- **Automatic error notification cleanup:** Load error notifications are automatically dismissed when a media file is successfully loaded, keeping the UI in sync with the application state.
 - **Application executable icons:** The application now has proper icons on all platforms:
   - Windows: ICO embedded in executable via `build.rs`
   - macOS: ICNS for `.app` bundle via `cargo-bundle`
@@ -17,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Auto-collapse metadata sidebar in fullscreen:** The metadata sidebar now automatically closes when entering fullscreen mode, providing an unobstructed view.
+- **Non-blocking error notifications:** Media loading errors (invalid path, corrupted file, timeout) now display as toast notifications instead of a modal error panel. This provides a non-blocking UX and preserves the current view when navigation fails.
 - **Migrated from SVG to PNG icons:** All UI icons now use pre-rendered PNG images instead of SVG for consistent cross-platform rendering and improved performance on Windows. Icons are cached using `OnceLock` for optimal memory usage.
 - **Reorganized icon assets:** Icons are now organized in a cleaner structure:
   - `assets/branding/` - Application icon (SVG source, PNG exports, ICO, ICNS)

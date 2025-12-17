@@ -143,11 +143,13 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
         }
     } else {
         // Add navbar above the viewer content
+        let has_media = ctx.viewer.has_media();
         let navbar_view = navbar::view(NavbarViewContext {
             i18n: ctx.i18n,
             menu_open: ctx.menu_open,
-            can_edit: !ctx.viewer.is_video(),
+            can_edit: has_media && !ctx.viewer.is_video(),
             info_panel_open: ctx.info_panel_open,
+            has_media,
         })
         .map(Message::Navbar);
 

@@ -115,6 +115,7 @@ fn test_isolated_directories_for_state_and_config() {
     // Save app state to state_dir
     let state = AppState {
         last_save_directory: Some(PathBuf::from("/test/isolated/state")),
+        last_open_directory: None,
     };
     let state_result = state.save_to(Some(state_dir.path().to_path_buf()));
     assert!(state_result.is_none(), "state save should succeed");
@@ -178,6 +179,7 @@ fn test_parallel_test_isolation() {
 
     let state_a = AppState {
         last_save_directory: Some(PathBuf::from("/user/a/downloads")),
+        last_open_directory: None,
     };
     state_a.save_to(Some(base_a.clone()));
 
@@ -192,6 +194,7 @@ fn test_parallel_test_isolation() {
 
     let state_b = AppState {
         last_save_directory: Some(PathBuf::from("/user/b/pictures")),
+        last_open_directory: None,
     };
     state_b.save_to(Some(base_b.clone()));
 
@@ -230,6 +233,7 @@ fn test_explicit_override_takes_precedence_over_env_var() {
     // Save using explicit override (should ignore env var)
     let state = AppState {
         last_save_directory: Some(PathBuf::from("/explicit/path")),
+        last_open_directory: None,
     };
     state.save_to(Some(explicit_dir.path().to_path_buf()));
 
@@ -265,6 +269,7 @@ fn test_ci_friendly_isolated_tests() {
 
             let state = AppState {
                 last_save_directory: Some(PathBuf::from(format!("/run/{}/save", i))),
+                last_open_directory: None,
             };
             state.save_to(Some(base.clone()));
 

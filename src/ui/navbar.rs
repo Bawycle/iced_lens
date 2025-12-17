@@ -22,6 +22,8 @@ pub struct ViewContext<'a> {
     pub menu_open: bool,
     pub can_edit: bool,
     pub info_panel_open: bool,
+    /// Whether media is loaded (used to enable/disable info button).
+    pub has_media: bool,
 }
 
 /// Messages emitted by the navbar.
@@ -112,12 +114,17 @@ fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     };
 
     // Info button with toggle styling (highlighted when panel is open)
+    // Disabled when no media is loaded (no metadata to show)
     let info_label = ctx.i18n.tr("navbar-info-button");
-    let info_button_base = button(Text::new(info_label)).on_press(Message::ToggleInfoPanel);
-    let info_button = if ctx.info_panel_open {
-        info_button_base.style(styles::button::selected)
+    let info_button = if ctx.has_media {
+        let info_button_base = button(Text::new(info_label)).on_press(Message::ToggleInfoPanel);
+        if ctx.info_panel_open {
+            info_button_base.style(styles::button::selected)
+        } else {
+            info_button_base // Default style when inactive, like Edit button
+        }
     } else {
-        info_button_base // Default style when inactive, like Edit button
+        button(Text::new(info_label)).style(styles::button::disabled())
     };
 
     let row = Row::new()
@@ -240,6 +247,7 @@ mod tests {
             menu_open: false,
             can_edit: true,
             info_panel_open: false,
+            has_media: true,
         };
         let _element = view(ctx);
     }
@@ -252,6 +260,7 @@ mod tests {
             menu_open: true,
             can_edit: true,
             info_panel_open: false,
+            has_media: true,
         };
         let _element = view(ctx);
     }
@@ -264,6 +273,20 @@ mod tests {
             menu_open: false,
             can_edit: true,
             info_panel_open: true,
+            has_media: true,
+        };
+        let _element = view(ctx);
+    }
+
+    #[test]
+    fn navbar_view_renders_without_media() {
+        let i18n = I18n::default();
+        let ctx = ViewContext {
+            i18n: &i18n,
+            menu_open: false,
+            can_edit: false,
+            info_panel_open: false,
+            has_media: false,
         };
         let _element = view(ctx);
     }

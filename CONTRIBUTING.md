@@ -678,10 +678,12 @@ IcedLens uses a toast notification system for user feedback. Understanding when 
 
 | Type | Method | When to use |
 |------|--------|-------------|
-| **Toast Notification** | `notifications.push(...)` | User-initiated actions (save, delete, copy). Non-blocking feedback. |
-| **ErrorDisplay** | `ErrorDisplay::new()` | Content loading failures (image, video). Contextual, shown in viewer area. |
+| **Toast Notification** | `notifications.push(...)` | User-initiated actions (save, delete, copy) and media loading errors (invalid path, corrupted file, timeout). Non-blocking feedback that preserves the current view. |
+| **ErrorDisplay** | `ErrorDisplay::new()` | Reserved for critical blocking errors where the application cannot continue (rare). |
 | **Silent** | Early return / `let else` | Recoverable internal errors with acceptable fallback. |
 | **eprintln!** | `eprintln!()` | Developer info only (FTL parsing). Never for user-facing issues. |
+
+**Note:** Media loading errors use notifications instead of ErrorDisplay to provide a non-blocking UX. When a load fails, the current media is preserved and the user can retry or navigate to another file without dismissing a modal.
 
 ### Adding a Toast Notification
 

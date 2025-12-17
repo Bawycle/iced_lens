@@ -2,8 +2,6 @@
 -app-name = IcedLens
 
 window-title = { -app-name }
-hello-message = Hello, world!
-open-settings-button = Settings
 settings-back-to-viewer-button = Back to Viewer
 settings-title = Settings
 settings-section-general = General
@@ -17,22 +15,16 @@ language-name-es = Spanish
 language-name-de = German
 language-name-it = Italian
 error-load-image-heading = We couldn't open the image.
-error-load-image-general = Something went wrong while loading the image.
-error-load-image-io = We couldn't read this file. Check that it still exists and that you have permission to open it.
-error-load-image-svg = We couldn't render this SVG file. It may be malformed or unsupported.
 error-details-show = Show details
 error-details-hide = Hide details
 error-details-technical-heading = Technical details
 viewer-zoom-label = Zoom
-viewer-zoom-indicator-label = Zoom
 viewer-zoom-input-placeholder = 100
 viewer-zoom-reset-button = Reset
 viewer-fit-to-window-toggle = Fit to window
-viewer-fit-percentage-label = Fit zoom
 viewer-zoom-input-error-invalid = Please enter a valid number.
 viewer-zoom-step-error-invalid = The zoom step must be a number.
 viewer-zoom-step-error-range = The zoom step must be between 1% and 200%.
-viewer-position-label = Position
 viewer-delete-tooltip = Delete the current image
 viewer-zoom-in-tooltip = Zoom in
 viewer-zoom-out-tooltip = Zoom out
@@ -77,12 +69,10 @@ image-editor-back-to-viewer = Back to Viewer
 image-editor-cancel = Cancel
 image-editor-save = Save
 image-editor-save-as = Save As...
-image-editor-tool-rotate = Rotate
 image-editor-tool-crop = Crop
 image-editor-tool-resize = Resize
 image-editor-tool-light = Light
 image-editor-rotate-section-title = Rotation
-image-editor-rotate-left = Rotate left
 image-editor-rotate-right-tooltip = Rotate image clockwise
 image-editor-rotate-left-tooltip = Rotate image counter-clockwise
 image-editor-flip-section-title = Flip
@@ -114,9 +104,7 @@ image-editor-undo-redo-section-title = Last modification
 image-editor-undo = Undo
 image-editor-redo = Redo
 image-editor-export-format-label = Export format
-error-delete-image-io = We couldn't delete this file. Make sure it isn't open elsewhere and that you can remove it.
 media-loading = Loading...
-error-loading-timeout = Loading timed out. The file may be too large or inaccessible.
 settings-video-autoplay-label = Video autoplay
 settings-video-autoplay-enabled = Enabled
 settings-video-autoplay-disabled = Disabled
@@ -149,12 +137,8 @@ error-load-video-corrupted = The video file appears to be corrupted or invalid.
 error-load-video-no-video-stream = No video track was found in this file.
 error-load-video-decoding-failed = Video decoding failed: { $message }
 error-load-video-io = We couldn't read this file. Check that it still exists and that you have permission to open it.
-error-video-retry = Retry
-video-editor-unavailable = Video editing is not available in this version.
-video-editor-future = Video editing is planned for a future release.
 
 # Navigation bar
-menu-button-tooltip = Menu
 menu-settings = Settings
 menu-help = Help
 menu-about = About
@@ -165,7 +149,6 @@ help-title = Help
 help-back-to-viewer-button = Back to Viewer
 
 # Common labels
-help-toc-title = Contents
 help-tools-title = Available Tools
 help-shortcuts-title = Keyboard Shortcuts
 help-usage-title = How to Use
@@ -312,8 +295,6 @@ notification-frame-capture-success = Frame captured successfully
 notification-frame-capture-error = Failed to capture frame
 notification-delete-success = File deleted successfully
 notification-delete-error = Failed to delete file
-notification-copy-success = Copied to clipboard
-notification-copy-error = Failed to copy to clipboard
 notification-config-save-error = Failed to save settings
 notification-config-load-error = Failed to load settings, using defaults
 notification-state-parse-error = Failed to read app state, using defaults
@@ -352,4 +333,16 @@ metadata-label-duration = Duration
 metadata-label-fps = Frame rate
 metadata-value-unknown = Unknown
 navbar-info-button = Info
-navbar-info-tooltip = Show file information (I)
+
+# Empty state (no media loaded)
+empty-state-title = No media loaded
+empty-state-subtitle = Drop files here or click to open
+empty-state-button = Open File
+empty-state-drop-hint = Drag and drop images or videos anywhere
+
+# Additional notifications
+notification-empty-dir = No supported media files found in this folder
+notification-load-error-io = Could not open file. Check that it exists and you have permission.
+notification-load-error-svg = Could not render SVG. The file may be malformed.
+notification-load-error-video = Could not play video. The format may be unsupported.
+notification-load-error-timeout = Loading timed out. The file may be too large or the system is busy.

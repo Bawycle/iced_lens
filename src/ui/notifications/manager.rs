@@ -123,6 +123,26 @@ impl Manager {
         self.queue.clear();
     }
 
+    /// Clears all load error notifications.
+    ///
+    /// This should be called when a media is successfully loaded, to avoid
+    /// showing stale error notifications that are no longer relevant.
+    pub fn clear_load_errors(&mut self) {
+        // Remove from visible
+        let visible_before = self.visible.len();
+        self.visible
+            .retain(|n| !n.message_key().starts_with("notification-load-error-"));
+
+        // Remove from queue
+        self.queue
+            .retain(|n| !n.message_key().starts_with("notification-load-error-"));
+
+        // Promote from queue if we removed visible notifications
+        if self.visible.len() < visible_before {
+            self.promote_from_queue();
+        }
+    }
+
     /// Promotes a notification from the queue to visible if there's space.
     fn promote_from_queue(&mut self) {
         while self.visible.len() < MAX_VISIBLE {
@@ -259,5 +279,36 @@ mod tests {
         // Manual dismiss should work
         manager.dismiss(id);
         assert_eq!(manager.visible_count(), 0);
+    }
+
+    #[test]
+    fn clear_load_errors_removes_only_load_error_notifications() {
+        let mut manager = Manager::new();
+
+        // Add various notifications
+        manager.push(Notification::error("notification-load-error-io"));
+        manager.push(Notification::error("notification-load-error-timeout"));
+        manager.push(Notification::success("notification-save-success"));
+        manager.push(Notification::error("some-other-error"));
+
+        assert_eq!(manager.visible_count(), 3);
+        assert_eq!(manager.queued_count(), 1);
+
+        // Clear load errors
+        manager.clear_load_errors();
+
+        // Only non-load-error notifications should remain
+        assert_eq!(manager.visible_count(), 2);
+        assert_eq!(manager.queued_count(), 0);
+
+        // Verify the remaining notifications are not load errors
+        for notification in manager.visible() {
+            assert!(
+                !notification
+                    .message_key()
+                    .starts_with("notification-load-error-"),
+                "load error notification should have been removed"
+            );
+        }
     }
 }

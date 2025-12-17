@@ -2,8 +2,6 @@
 -app-name = IcedLens
 
 window-title = { -app-name }
-hello-message = Ciao, mondo!
-open-settings-button = Impostazioni
 settings-back-to-viewer-button = Torna al visualizzatore
 settings-title = Impostazioni
 settings-section-general = Generale
@@ -17,22 +15,16 @@ language-name-es = Spagnolo
 language-name-de = Tedesco
 language-name-it = Italiano
 error-load-image-heading = Impossibile aprire l'immagine.
-error-load-image-general = Si è verificato un errore durante il caricamento dell'immagine.
-error-load-image-io = Impossibile leggere questo file. Verifica che esista ancora e che tu abbia il permesso di aprirlo.
-error-load-image-svg = Impossibile visualizzare questo file SVG. Potrebbe essere malformato o non supportato.
 error-details-show = Mostra dettagli
 error-details-hide = Nascondi dettagli
 error-details-technical-heading = Dettagli tecnici
 viewer-zoom-label = Zoom
-viewer-zoom-indicator-label = Zoom
 viewer-zoom-input-placeholder = 100
 viewer-zoom-reset-button = Ripristina
 viewer-fit-to-window-toggle = Adatta alla finestra
-viewer-fit-percentage-label = Zoom adattato
 viewer-zoom-input-error-invalid = Inserisci un numero valido.
 viewer-zoom-step-error-invalid = Il passo dello zoom deve essere un numero.
 viewer-zoom-step-error-range = Il passo dello zoom deve essere compreso tra 1% e 200%.
-viewer-position-label = Posizione
 viewer-delete-tooltip = Elimina l'immagine corrente
 viewer-zoom-in-tooltip = Ingrandisci
 viewer-zoom-out-tooltip = Riduci
@@ -77,12 +69,10 @@ image-editor-back-to-viewer = Torna al visualizzatore
 image-editor-cancel = Annulla
 image-editor-save = Salva
 image-editor-save-as = Salva come...
-image-editor-tool-rotate = Ruota
 image-editor-tool-crop = Ritaglia
 image-editor-tool-resize = Ridimensiona
 image-editor-tool-light = Luce
 image-editor-rotate-section-title = Rotazione
-image-editor-rotate-left = Ruota a sinistra
 image-editor-rotate-right-tooltip = Ruota l'immagine in senso orario
 image-editor-rotate-left-tooltip = Ruota l'immagine in senso antiorario
 image-editor-flip-section-title = Capovolgi
@@ -114,9 +104,7 @@ image-editor-undo-redo-section-title = Ultima modifica
 image-editor-undo = Annulla
 image-editor-redo = Ripeti
 image-editor-export-format-label = Formato di esportazione
-error-delete-image-io = Impossibile eliminare questo file. Assicurati che non sia aperto altrove e che tu possa rimuoverlo.
 media-loading = Caricamento...
-error-loading-timeout = Timeout del caricamento. Il file potrebbe essere troppo grande o inaccessibile.
 settings-video-autoplay-label = Riproduzione automatica video
 settings-video-autoplay-enabled = Attivata
 settings-video-autoplay-disabled = Disattivata
@@ -149,12 +137,8 @@ error-load-video-corrupted = Il file video sembra essere danneggiato o non valid
 error-load-video-no-video-stream = Nessuna traccia video trovata in questo file.
 error-load-video-decoding-failed = Decodifica video fallita: { $message }
 error-load-video-io = Impossibile leggere questo file. Verifica che esista ancora e che tu abbia il permesso di aprirlo.
-error-video-retry = Riprova
-video-editor-unavailable = La modifica video non è disponibile in questa versione.
-video-editor-future = La modifica video è pianificata per una versione futura.
 
 # Navigation bar
-menu-button-tooltip = Menu
 menu-settings = Impostazioni
 menu-help = Aiuto
 menu-about = Informazioni
@@ -165,7 +149,6 @@ help-title = Aiuto
 help-back-to-viewer-button = Torna al visualizzatore
 
 # Common labels
-help-toc-title = Contenuti
 help-tools-title = Strumenti disponibili
 help-shortcuts-title = Scorciatoie da tastiera
 help-usage-title = Come usare
@@ -312,8 +295,6 @@ notification-frame-capture-success = Fotogramma catturato con successo
 notification-frame-capture-error = Errore nella cattura del fotogramma
 notification-delete-success = File eliminato con successo
 notification-delete-error = Errore nell'eliminazione del file
-notification-copy-success = Copiato negli appunti
-notification-copy-error = Errore nella copia negli appunti
 notification-config-save-error = Errore nel salvataggio delle impostazioni
 notification-config-load-error = Errore nel caricamento delle impostazioni, uso dei valori predefiniti
 notification-state-parse-error = Errore nella lettura dello stato dell'applicazione, uso dei valori predefiniti
@@ -352,4 +333,16 @@ metadata-label-duration = Durata
 metadata-label-fps = Fotogrammi al secondo
 metadata-value-unknown = Sconosciuto
 navbar-info-button = Info
-navbar-info-tooltip = Mostra informazioni file (I)
+
+# Empty state (no media loaded)
+empty-state-title = Nessun contenuto multimediale
+empty-state-subtitle = Trascina i file qui o clicca per aprire
+empty-state-button = Apri file
+empty-state-drop-hint = Trascina e rilascia immagini o video ovunque
+
+# Additional notifications
+notification-empty-dir = Nessun file multimediale supportato trovato in questa cartella
+notification-load-error-io = Impossibile aprire il file. Verifica che esista e di avere i permessi necessari.
+notification-load-error-svg = Impossibile renderizzare il SVG. Il file potrebbe essere malformato.
+notification-load-error-video = Impossibile riprodurre il video. Il formato potrebbe non essere supportato.
+notification-load-error-timeout = Caricamento scaduto. Il file potrebbe essere troppo grande o il sistema è occupato.
