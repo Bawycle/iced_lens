@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports both single files and directories (loads first media file in directory)
 - **Remember last opened directory:** The file picker dialog now opens in the directory of the last successfully loaded media file, persisted across sessions.
 - **Automatic error notification cleanup:** Load error notifications are automatically dismissed when a media file is successfully loaded, keeping the UI in sync with the application state.
+- **Dynamic window title:** The window title now displays contextual information:
+  - Shows "AppName" when no media is loaded
+  - Shows "FileName.ext - AppName" when a media file is loaded
+  - Shows "*FileName.ext - AppName" when the image editor has unsaved changes on an existing file
+  - Shows "New Image - AppName" when editing a captured video frame (no asterisk since it's a new document)
 - **Application executable icons:** The application now has proper icons on all platforms:
   - Windows: ICO embedded in executable via `build.rs`
   - macOS: ICNS for `.app` bundle via `cargo-bundle`

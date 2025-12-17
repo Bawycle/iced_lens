@@ -122,7 +122,7 @@ pub struct State {
     pub drag: DragState,
     cursor_position: Option<Point>,
     last_click: Option<Instant>,
-    pub current_image_path: Option<PathBuf>,
+    pub current_media_path: Option<PathBuf>,
     arrows_visible: bool,
     last_mouse_move: Option<Instant>,
     last_overlay_interaction: Option<Instant>,
@@ -183,7 +183,7 @@ impl Default for State {
             drag: DragState::default(),
             cursor_position: None,
             last_click: None,
-            current_image_path: None,
+            current_media_path: None,
             arrows_visible: false,
             last_mouse_move: None,
             last_overlay_interaction: None,
@@ -390,7 +390,7 @@ impl State {
                     // Loading timed out - clear loading state
                     self.is_loading_media = false;
                     self.loading_started_at = None;
-                    self.current_image_path = None;
+                    self.current_media_path = None;
                     return true;
                 }
             }
@@ -488,7 +488,7 @@ impl State {
                             match VideoPlayer::new(video_data) {
                                 Ok(player) => {
                                     self.video_player = Some(player);
-                                    self.current_video_path = self.current_image_path.clone();
+                                    self.current_video_path = self.current_media_path.clone();
                                 }
                                 Err(e) => {
                                     eprintln!("Failed to create video player: {}", e);
@@ -519,7 +519,7 @@ impl State {
                         };
                         // Don't clear current media - keep showing what was there
                         // Only clear the path we tried to load
-                        self.current_image_path = None;
+                        self.current_media_path = None;
                         (
                             Effect::ShowErrorNotification {
                                 key: notification_key,
@@ -599,7 +599,7 @@ impl State {
                             self.video_player = Some(player);
 
                             // Store video path for subscription
-                            self.current_video_path = self.current_image_path.clone();
+                            self.current_video_path = self.current_media_path.clone();
 
                             // Increment session ID to create a new unique subscription
                             self.playback_session_id = self.playback_session_id.wrapping_add(1);
@@ -652,7 +652,7 @@ impl State {
                                 Ok(mut player) => {
                                     player.play();
                                     self.video_player = Some(player);
-                                    self.current_video_path = self.current_image_path.clone();
+                                    self.current_video_path = self.current_media_path.clone();
                                     self.playback_session_id =
                                         self.playback_session_id.wrapping_add(1);
 
@@ -1394,7 +1394,7 @@ impl State {
                 {
                     // E key: Enter edit mode (only if image is loaded and not a video)
                     // Video editing is not supported in v0.2
-                    if self.current_image_path.is_some() && !self.is_video() {
+                    if self.current_media_path.is_some() && !self.is_video() {
                         (Effect::EnterEditor, Task::none())
                     } else {
                         (Effect::None, Task::none())

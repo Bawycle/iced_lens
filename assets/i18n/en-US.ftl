@@ -2,6 +2,7 @@
 -app-name = IcedLens
 
 window-title = { -app-name }
+new-image-title = New Image
 settings-back-to-viewer-button = Back to Viewer
 settings-title = Settings
 settings-section-general = General

@@ -17,11 +17,6 @@
 
 ### UX/UI
 - [ ] Add a collapse control directly on the metadata sidebar. This provides a more intuitive way for users to hide the sidebar than re-clicking the info button.
-- [ ] Implement dynamic window title display:
-  - Use "Media Title - AppName" if a title is available in the media's metadata.
-  - Fallback to "FileName.ext - AppName" if no title metadata is found.
-  - Just "AppName" if no media loaded.
-  - Prefix with an asterisk (*Media Title/FileName.ext - AppName) if the file has unsaved modifications.
 
 ### Viewer
 - [ ] Temporary rotation in viewer (90° increments, session-only) — currently complex to implement

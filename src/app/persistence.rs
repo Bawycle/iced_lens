@@ -111,7 +111,7 @@ pub fn rescan_directory_if_same(
     let saved_dir = saved_path.parent();
 
     // Get the viewer's current directory
-    let viewer_dir = viewer.current_image_path.as_ref().and_then(|p| p.parent());
+    let viewer_dir = viewer.current_media_path.as_ref().and_then(|p| p.parent());
 
     // Only rescan if both directories exist and match
     if let (Some(saved), Some(viewer_path)) = (saved_dir, viewer_dir) {
@@ -119,7 +119,7 @@ pub fn rescan_directory_if_same(
             // Rescan the media navigator (single source of truth)
             let (config, _) = config::load();
             let sort_order = config.display.sort_order.unwrap_or_default();
-            if let Some(current_path) = viewer.current_image_path.clone() {
+            if let Some(current_path) = viewer.current_media_path.clone() {
                 let _ = media_navigator.scan_directory(&current_path, sort_order);
             }
         }

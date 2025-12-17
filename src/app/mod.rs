@@ -280,7 +280,7 @@ impl App {
 
             if let Some(media_path) = resolved_path {
                 // Synchronize viewer state
-                app.viewer.current_image_path = Some(media_path.clone());
+                app.viewer.current_media_path = Some(media_path.clone());
 
                 // Set loading state directly (before first render)
                 app.viewer.is_loading_media = true;
@@ -302,7 +302,45 @@ impl App {
     }
 
     fn title(&self) -> String {
-        self.i18n.tr("window-title")
+        let app_name = self.i18n.tr("window-title");
+
+        // Special handling for image editor screen
+        if self.screen == Screen::ImageEditor {
+            if let Some(editor) = &self.image_editor {
+                // Captured frame: show "New Image" without asterisk
+                // (it's a new document, not a modified existing file)
+                if editor.is_captured_frame() {
+                    let new_image = self.i18n.tr("new-image-title");
+                    return format!("{new_image} - {app_name}");
+                }
+
+                // Existing file: show filename with asterisk if unsaved changes
+                if let Some(path) = editor.image_path() {
+                    let file_name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("Unknown");
+
+                    return if editor.has_unsaved_changes() {
+                        format!("*{file_name} - {app_name}")
+                    } else {
+                        format!("{file_name} - {app_name}")
+                    };
+                }
+            }
+        }
+
+        // All other screens: use viewer's current media path
+        let file_name = self.viewer.current_media_path.as_ref().and_then(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(String::from)
+        });
+
+        match file_name {
+            Some(name) => format!("{name} - {app_name}"),
+            None => app_name,
+        }
     }
 
     fn theme(&self) -> Theme {
@@ -498,8 +536,8 @@ impl App {
                 };
 
                 // Create a new ImageEditorState with the loaded image
-                if let Some(current_image_path) = self.media_navigator.current_media_path() {
-                    let path = current_image_path.to_path_buf();
+                if let Some(current_media_path) = self.media_navigator.current_media_path() {
+                    let path = current_media_path.to_path_buf();
                     match image_editor::State::new(path, image_data) {
                         Ok(new_editor_state) => {
                             self.image_editor = Some(new_editor_state);
@@ -555,7 +593,7 @@ mod tests {
     use iced::widget::scrollable::AbsoluteOffset;
     use iced::{event, keyboard, mouse, window, Point, Rectangle, Size};
     use std::fs;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::sync::{Mutex, OnceLock};
     use tempfile::tempdir;
 
@@ -607,6 +645,23 @@ mod tests {
 
     fn build_media(width: u32, height: u32) -> MediaData {
         MediaData::Image(build_image(width, height))
+    }
+
+    /// Creates a real PNG file for tests that require file I/O (like image editor).
+    fn create_test_png(width: u32, height: u32) -> (tempfile::TempDir, PathBuf, ImageData) {
+        use image_rs::{Rgba, RgbaImage};
+
+        let temp_dir = tempdir().expect("temp dir");
+        let path = temp_dir.path().join("test.png");
+        let img = RgbaImage::from_pixel(width, height, Rgba([0, 0, 0, 255]));
+        img.save(&path).expect("write png");
+        let pixels = vec![0; (width * height * 4) as usize];
+        let image = ImageData {
+            handle: Handle::from_rgba(width, height, pixels),
+            width,
+            height,
+        };
+        (temp_dir, path, image)
     }
 
     #[test]
@@ -1010,7 +1065,7 @@ mod tests {
         let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             sample_media_data(),
         ))));
-        app.viewer.current_image_path = Some(img1_path.clone());
+        app.viewer.current_media_path = Some(img1_path.clone());
 
         // Initialize media_navigator (single source of truth)
         let _ = app
@@ -1021,7 +1076,7 @@ mod tests {
 
         assert!(app
             .viewer
-            .current_image_path
+            .current_media_path
             .as_ref()
             .map(|p| p.ends_with("b.jpg"))
             .unwrap_or(false));
@@ -1049,7 +1104,7 @@ mod tests {
         let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             sample_media_data(),
         ))));
-        app.viewer.current_image_path = Some(img2_path.clone());
+        app.viewer.current_media_path = Some(img2_path.clone());
 
         // Initialize media_navigator (single source of truth)
         let _ = app
@@ -1060,7 +1115,7 @@ mod tests {
 
         assert!(app
             .viewer
-            .current_image_path
+            .current_media_path
             .as_ref()
             .map(|p| p.ends_with("a.jpg"))
             .unwrap_or(false));
@@ -1088,7 +1143,7 @@ mod tests {
         let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             sample_media_data(),
         ))));
-        app.viewer.current_image_path = Some(img2_path.clone());
+        app.viewer.current_media_path = Some(img2_path.clone());
 
         // Initialize media_navigator (single source of truth)
         let _ = app
@@ -1099,7 +1154,7 @@ mod tests {
 
         assert!(app
             .viewer
-            .current_image_path
+            .current_media_path
             .as_ref()
             .map(|p| p.ends_with("a.jpg"))
             .unwrap_or(false));
@@ -1128,7 +1183,7 @@ mod tests {
             let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
                 sample_media_data(),
             ))));
-            app.viewer.current_image_path = Some(img1_path.clone());
+            app.viewer.current_media_path = Some(img1_path.clone());
 
             // Initialize media_navigator (single source of truth)
             let _ = app
@@ -1150,7 +1205,7 @@ mod tests {
 
             assert!(app
                 .viewer
-                .current_image_path
+                .current_media_path
                 .as_ref()
                 .map(|p| p.ends_with("b.jpg"))
                 .unwrap_or(false));
@@ -1184,7 +1239,7 @@ mod tests {
         let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             img1_data.clone(),
         ))));
-        app.viewer.current_image_path = Some(img1_path.clone());
+        app.viewer.current_media_path = Some(img1_path.clone());
 
         // Initialize media_navigator (single source of truth)
         let _ = app
@@ -1202,7 +1257,7 @@ mod tests {
         // Verify the viewer's current image path has changed to the next image
         assert!(app
             .viewer
-            .current_image_path
+            .current_media_path
             .as_ref()
             .map(|p| p.ends_with("b.png"))
             .unwrap_or(false));
@@ -1241,7 +1296,7 @@ mod tests {
         let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             img2_data.clone(),
         ))));
-        app.viewer.current_image_path = Some(img2_path.clone());
+        app.viewer.current_media_path = Some(img2_path.clone());
 
         // Initialize media_navigator (single source of truth)
         let _ = app
@@ -1259,7 +1314,7 @@ mod tests {
         // Verify the viewer's current image path has changed to the previous image
         assert!(app
             .viewer
-            .current_image_path
+            .current_media_path
             .as_ref()
             .map(|p| p.ends_with("a.png"))
             .unwrap_or(false));
@@ -1277,5 +1332,129 @@ mod tests {
                 "Editor should have loaded a.png"
             );
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Dynamic window title tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn title_shows_app_name_when_no_media_loaded() {
+        let app = App::default();
+        let title = app.title();
+
+        // Should just be the app name (from window-title translation)
+        assert_eq!(title, "IcedLens");
+    }
+
+    #[test]
+    fn title_shows_filename_when_media_loaded() {
+        let mut app = App::default();
+
+        // Load a media file
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
+            sample_media_data(),
+        ))));
+        app.viewer.current_media_path = Some(PathBuf::from("/path/to/image.jpg"));
+
+        let title = app.title();
+
+        // Should show "filename - AppName"
+        assert_eq!(title, "image.jpg - IcedLens");
+    }
+
+    #[test]
+    fn title_shows_asterisk_when_editor_has_unsaved_changes() {
+        // Create a real PNG file for the image editor
+        let (_temp_dir, img_path, img_data) = create_test_png(4, 3);
+
+        let mut app = App::default();
+
+        // Load image and set the path
+        let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
+            MediaData::Image(img_data.clone()),
+        ))));
+        app.viewer.current_media_path = Some(img_path.clone());
+
+        // Create editor state with actual PNG file
+        let editor_state =
+            image_editor::State::new(img_path, img_data).expect("create editor state");
+        app.image_editor = Some(editor_state);
+        app.screen = Screen::ImageEditor;
+
+        // Title without changes - file name is "test.png" from helper
+        let title_clean = app.title();
+        assert_eq!(
+            title_clean, "test.png - IcedLens",
+            "Should not have asterisk without changes"
+        );
+
+        // Apply a transformation to create unsaved changes
+        let _ = app.update(Message::ImageEditor(image_editor::Message::Sidebar(
+            crate::ui::image_editor::SidebarMessage::RotateRight,
+        )));
+
+        // Title with unsaved changes
+        let title_dirty = app.title();
+        assert_eq!(
+            title_dirty, "*test.png - IcedLens",
+            "Should have asterisk with unsaved changes"
+        );
+    }
+
+    #[test]
+    fn title_shows_new_image_for_captured_frame() {
+        use crate::media::frame_export::ExportableFrame;
+
+        // Create a captured frame (4x3 black pixels)
+        let rgba_data = vec![0u8; 4 * 3 * 4]; // width * height * 4 channels
+        let frame = ExportableFrame::new(rgba_data, 4, 3);
+        let video_path = PathBuf::from("/path/to/video.mp4");
+
+        let mut app = App::default();
+
+        // Create editor state from captured frame
+        let editor_state = image_editor::State::from_captured_frame(frame, video_path, 5.0)
+            .expect("create editor state from captured frame");
+        app.image_editor = Some(editor_state);
+        app.screen = Screen::ImageEditor;
+
+        // Title should show "New Image" without asterisk
+        let title = app.title();
+        assert_eq!(
+            title, "New Image - IcedLens",
+            "Captured frame should show 'New Image' without asterisk"
+        );
+    }
+
+    #[test]
+    fn title_shows_new_image_for_captured_frame_even_with_changes() {
+        use crate::media::frame_export::ExportableFrame;
+
+        // Create a captured frame
+        let rgba_data = vec![0u8; 4 * 3 * 4];
+        let frame = ExportableFrame::new(rgba_data, 4, 3);
+        let video_path = PathBuf::from("/path/to/video.mp4");
+
+        let mut app = App::default();
+
+        // Create editor state from captured frame
+        let editor_state = image_editor::State::from_captured_frame(frame, video_path, 5.0)
+            .expect("create editor state from captured frame");
+        app.image_editor = Some(editor_state);
+        app.screen = Screen::ImageEditor;
+
+        // Apply a transformation
+        let _ = app.update(Message::ImageEditor(image_editor::Message::Sidebar(
+            crate::ui::image_editor::SidebarMessage::FlipHorizontal,
+        )));
+
+        // Title should still show "New Image" without asterisk
+        // (captured frames are new documents, not modified existing files)
+        let title = app.title();
+        assert_eq!(
+            title, "New Image - IcedLens",
+            "Captured frame should show 'New Image' even with changes (no asterisk)"
+        );
     }
 }

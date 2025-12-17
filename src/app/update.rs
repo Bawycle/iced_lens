@@ -75,7 +75,7 @@ pub fn handle_viewer_message(
 
     // Handle successful media load
     if is_successful_load {
-        if let Some(path) = ctx.viewer.current_image_path.as_ref() {
+        if let Some(path) = ctx.viewer.current_media_path.as_ref() {
             // Extract metadata
             *ctx.current_metadata = media::metadata::extract_metadata(path);
 
@@ -158,7 +158,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
     // Handle Viewer → Editor transition
     if matches!(target, Screen::ImageEditor) && matches!(ctx.screen, Screen::Viewer) {
         if let (Some(image_path), Some(media_data)) = (
-            ctx.viewer.current_image_path.clone(),
+            ctx.viewer.current_media_path.clone(),
             ctx.viewer.media().cloned(),
         ) {
             // Editor only supports images in v0.2, not videos
@@ -293,14 +293,14 @@ pub fn handle_editor_message(
             // For file mode: reload the image in the viewer to show any saved changes
             // For captured frame mode: just return to viewer without reloading
             match image_source {
-                image_editor::ImageSource::File(current_image_path) => {
+                image_editor::ImageSource::File(current_media_path) => {
                     // Set loading state directly (before render)
                     ctx.viewer.is_loading_media = true;
                     ctx.viewer.loading_started_at = Some(std::time::Instant::now());
 
                     // Reload the image in the viewer to show any saved changes
                     Task::perform(
-                        async move { media::load_media(&current_image_path) },
+                        async move { media::load_media(&current_media_path) },
                         |result| Message::Viewer(component::Message::MediaLoaded(result)),
                     )
                 }
@@ -405,7 +405,7 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Navigate to next image in the list (skipping videos)
     if let Some(next_path) = ctx.media_navigator.navigate_next_image() {
         // Synchronize viewer state immediately
-        ctx.viewer.current_image_path = Some(next_path.clone());
+        ctx.viewer.current_media_path = Some(next_path.clone());
 
         // Load the next image and create a new ImageEditorState
         Task::perform(
@@ -435,7 +435,7 @@ fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message>
     // Navigate to previous image in the list (skipping videos)
     if let Some(prev_path) = ctx.media_navigator.navigate_previous_image() {
         // Synchronize viewer state immediately
-        ctx.viewer.current_image_path = Some(prev_path.clone());
+        ctx.viewer.current_media_path = Some(prev_path.clone());
 
         // Load the previous image and create a new ImageEditorState
         Task::perform(
@@ -528,7 +528,7 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Navigate to next image
     if let Some(next_path) = ctx.media_navigator.navigate_next() {
         // Synchronize viewer state from navigator
-        ctx.viewer.current_image_path = Some(next_path.clone());
+        ctx.viewer.current_media_path = Some(next_path.clone());
 
         // Set loading state directly (before render)
         ctx.viewer.is_loading_media = true;
@@ -561,7 +561,7 @@ pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Navigate to previous image
     if let Some(prev_path) = ctx.media_navigator.navigate_previous() {
         // Synchronize viewer state from navigator
-        ctx.viewer.current_image_path = Some(prev_path.clone());
+        ctx.viewer.current_media_path = Some(prev_path.clone());
 
         // Set loading state directly (before render)
         ctx.viewer.is_loading_media = true;
@@ -619,7 +619,7 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
                 // Navigate to the next media
                 ctx.media_navigator
                     .set_current_media_path(next_path.clone());
-                ctx.viewer.current_image_path = Some(next_path.clone());
+                ctx.viewer.current_media_path = Some(next_path.clone());
 
                 // Set loading state
                 ctx.viewer.is_loading_media = true;
@@ -630,7 +630,7 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
                 })
             } else {
                 // No more media in directory
-                ctx.viewer.current_image_path = None;
+                ctx.viewer.current_media_path = None;
                 Task::none()
             }
         }
@@ -770,7 +770,7 @@ fn load_media_from_path(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<Mess
     let _ = ctx.media_navigator.scan_directory(&path, sort_order);
 
     // Set up viewer state
-    ctx.viewer.current_image_path = Some(path.clone());
+    ctx.viewer.current_media_path = Some(path.clone());
     ctx.viewer.is_loading_media = true;
     ctx.viewer.loading_started_at = Some(std::time::Instant::now());
 
