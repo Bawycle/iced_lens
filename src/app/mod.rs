@@ -248,28 +248,52 @@ impl App {
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
 
-            // Initialize MediaNavigator with the initial media (reuse sort_order from config above)
-            if app
-                .media_navigator
-                .scan_directory(&path, sort_order)
-                .is_err()
-            {
-                app.notifications.push(notifications::Notification::warning(
-                    "notification-scan-dir-error",
-                ));
+            // Determine if path is a directory or a file and resolve the media path
+            let resolved_path = if path.is_dir() {
+                // Directory path: scan for media files and select the first one
+                match app.media_navigator.scan_from_directory(&path, sort_order) {
+                    Ok(Some(first_media)) => Some(first_media),
+                    Ok(None) => {
+                        // No media files found in directory - start without media
+                        None
+                    }
+                    Err(_) => {
+                        app.notifications.push(notifications::Notification::warning(
+                            "notification-scan-dir-error",
+                        ));
+                        None
+                    }
+                }
+            } else {
+                // File path: use existing behavior
+                if app
+                    .media_navigator
+                    .scan_directory(&path, sort_order)
+                    .is_err()
+                {
+                    app.notifications.push(notifications::Notification::warning(
+                        "notification-scan-dir-error",
+                    ));
+                }
+                Some(path)
+            };
+
+            if let Some(media_path) = resolved_path {
+                // Synchronize viewer state
+                app.viewer.current_image_path = Some(media_path.clone());
+
+                // Set loading state directly (before first render)
+                app.viewer.is_loading_media = true;
+                app.viewer.loading_started_at = Some(std::time::Instant::now());
+
+                // Load the media
+                let path_string = media_path.to_string_lossy().into_owned();
+                Task::perform(async move { media::load_media(&path_string) }, |result| {
+                    Message::Viewer(component::Message::ImageLoaded(result))
+                })
+            } else {
+                Task::none()
             }
-
-            // Synchronize viewer state
-            app.viewer.current_image_path = Some(path.clone());
-
-            // Set loading state directly (before first render)
-            app.viewer.is_loading_media = true;
-            app.viewer.loading_started_at = Some(std::time::Instant::now());
-
-            // Load the media
-            Task::perform(async move { media::load_media(&path_str) }, |result| {
-                Message::Viewer(component::Message::ImageLoaded(result))
-            })
         } else {
             Task::none()
         };

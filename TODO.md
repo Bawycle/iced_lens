@@ -15,12 +15,6 @@
 
 ## Planned Features
 
-### Core
-- [ ] Support providing a directory path as a command-line argument.
-  - When a directory path is given, the application should scan it for media files.
-  - The first supported media file (based on current sorting settings) will be opened.
-  - If no supported media is found, the application will start as if no argument was provided.
-
 ### UX/UI
 - [ ] Implement an "empty state" view for the main screen when no media is loaded:
   - This view is shown by a component that replaces the media viewer if the app is launched without a path or if the path is invalid.

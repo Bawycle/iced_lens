@@ -584,10 +584,7 @@ fn build_tool_item_with_icon<'a>(
 }
 
 /// Build a bullet point with an icon.
-fn build_bullet_with_icon<'a>(
-    icon: Image<Handle>,
-    content: String,
-) -> Element<'a, Message> {
+fn build_bullet_with_icon<'a>(icon: Image<Handle>, content: String) -> Element<'a, Message> {
     let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE);
 
     Row::new()

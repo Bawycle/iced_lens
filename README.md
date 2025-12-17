@@ -88,9 +88,13 @@ This creates:
 On Windows, the executable icon is automatically embedded during build.
 
 ## 5. Usage
-Open an image :
+Open a media file:
 ```bash
 iced_lens /path/to/image.png
+```
+Open a directory (opens first media file based on sort order):
+```bash
+iced_lens /path/to/photos/
 ```
 Specify language:
 ```bash
@@ -105,7 +109,7 @@ iced_lens --help
 Output includes syntax:
 ```
 USAGE:
-	iced_lens [OPTIONS] [IMAGE_PATH]
+	iced_lens [OPTIONS] [PATH]
 
 OPTIONS:
 	-h, --help              Show help text
@@ -115,7 +119,7 @@ OPTIONS:
 	    --config-dir <path> Override config directory (settings.toml)
 
 ARGS:
-	<IMAGE_PATH>     Path to image file to open
+	<PATH>     Path to a media file or directory to open
 ```
 
 Path overrides can also be set via environment variables: `ICED_LENS_DATA_DIR` and `ICED_LENS_CONFIG_DIR`.
