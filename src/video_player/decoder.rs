@@ -74,6 +74,10 @@ pub enum DecoderEvent {
 
     /// An error occurred during decoding.
     Error(String),
+
+    /// Frame history is exhausted (no more frames to step backward).
+    /// Sent when StepBackward is requested but no previous frame is available.
+    HistoryExhausted,
 }
 
 /// Async video decoder that runs in a Tokio task.
@@ -95,7 +99,14 @@ impl AsyncDecoder {
     /// The `cache_config` parameter controls frame caching behavior for
     /// optimized seek performance. Use `CacheConfig::default()` for standard
     /// caching or `CacheConfig::disabled()` to disable caching.
-    pub fn new<P: AsRef<Path>>(video_path: P, cache_config: CacheConfig) -> Result<Self> {
+    ///
+    /// The `history_mb` parameter controls the maximum memory for frame history
+    /// (used for backward frame stepping). Set to 0 to use a default based on cache_config.
+    pub fn new<P: AsRef<Path>>(
+        video_path: P,
+        cache_config: CacheConfig,
+        history_mb: u32,
+    ) -> Result<Self> {
         let path = video_path.as_ref().to_path_buf();
 
         // Validate file exists
@@ -113,7 +124,9 @@ impl AsyncDecoder {
         // Spawn the decoder task in a blocking thread
         // FFmpeg operations are not Send, so we use spawn_blocking
         tokio::task::spawn_blocking(move || {
-            if let Err(e) = Self::decoder_loop_blocking(path, command_rx, event_tx, cache_config) {
+            if let Err(e) =
+                Self::decoder_loop_blocking(path, command_rx, event_tx, cache_config, history_mb)
+            {
                 eprintln!("Decoder task failed: {}", e);
             }
         });
@@ -158,6 +171,7 @@ impl AsyncDecoder {
         mut command_rx: mpsc::UnboundedReceiver<DecoderCommand>,
         event_tx: mpsc::Sender<DecoderEvent>,
         cache_config: CacheConfig,
+        history_mb: u32,
     ) -> Result<()> {
         // Initialize FFmpeg (with log level set to suppress warnings)
         crate::media::video::init_ffmpeg()?;
@@ -217,9 +231,13 @@ impl AsyncDecoder {
         let mut frame_cache = FrameCache::new(cache_config);
 
         // Frame history for backward stepping
-        // Default to 128MB - convert from cache's max_bytes to MB
-        let history_mb = (cache_config.max_bytes / (1024 * 1024)).clamp(32, 512) as u32;
-        let mut frame_history = FrameHistory::new(history_mb);
+        // Use provided history_mb, or fall back to a default based on cache config
+        let effective_history_mb = if history_mb > 0 {
+            history_mb
+        } else {
+            (cache_config.max_bytes / (1024 * 1024)).clamp(32, 512) as u32
+        };
+        let mut frame_history = FrameHistory::new(effective_history_mb);
 
         // Main loop: process commands and decode frames
         loop {
@@ -278,20 +296,35 @@ impl AsyncDecoder {
                     }
                 }
                 Ok(DecoderCommand::StepFrame) => {
-                    // Step forward one frame without seeking
-                    // This decodes the next frame in sequence
+                    // Step forward one frame
                     if !is_playing {
                         // Clear any pending seek target - stepping uses sequential decoding
                         seek_target_secs = None;
+
                         // When entering stepping mode, add the current frame to history first
                         // This allows stepping backward to the frame shown before stepping started
                         if !in_stepping_mode {
                             if let Some(ref initial_frame) = last_paused_frame {
                                 frame_history.push(initial_frame.clone());
                             }
+                            in_stepping_mode = true;
                         }
-                        in_stepping_mode = true;
-                        decode_single_frame = true;
+
+                        // First, try to step forward within existing history
+                        // (this happens when user stepped backward and now wants to go forward)
+                        if let Some(next_frame) = frame_history.step_forward() {
+                            // Re-emit the frame from history
+                            let decoded = DecodedFrame {
+                                rgba_data: Arc::clone(&next_frame.rgba_data),
+                                width: next_frame.width,
+                                height: next_frame.height,
+                                pts_secs: next_frame.pts_secs,
+                            };
+                            let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
+                        } else {
+                            // At end of history - need to decode a new frame
+                            decode_single_frame = true;
+                        }
                     }
                 }
                 Ok(DecoderCommand::StepBackward) => {
@@ -308,6 +341,9 @@ impl AsyncDecoder {
                                 pts_secs: prev_frame.pts_secs,
                             };
                             let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
+                        } else {
+                            // No more frames in history - notify UI to disable button
+                            let _ = event_tx.blocking_send(DecoderEvent::HistoryExhausted);
                         }
                     }
                 }
@@ -333,6 +369,124 @@ impl AsyncDecoder {
             let mut frame_decoded = false;
             // Track last decoded frame for end-of-stream during precise seek
             let mut last_decoded_for_seek: Option<(ffmpeg_next::frame::Video, f64, bool)> = None;
+
+            // First, try to receive a frame already in the decoder's buffer.
+            // This is important for frame stepping: codecs like H.264/H.265 may have
+            // multiple frames buffered due to B-frame reordering. We must drain
+            // these before sending new packets, otherwise we skip frames.
+            let mut buffered_frame = ffmpeg_next::frame::Video::empty();
+            if decoder.receive_frame(&mut buffered_frame).is_ok() {
+                // Process the buffered frame
+                let pts_secs = if let Some(pts) = buffered_frame.timestamp() {
+                    pts as f64 * time_base_f64
+                } else {
+                    0.0
+                };
+
+                let is_keyframe = buffered_frame.is_key();
+
+                // Precise seeking: skip frames before target PTS
+                if let Some(target) = seek_target_secs {
+                    if pts_secs < target {
+                        // Frame is before target - store it and continue to get more frames
+                        last_decoded_for_seek = Some((buffered_frame, pts_secs, is_keyframe));
+                        // Don't set frame_decoded, continue to packet loop
+                    } else {
+                        // Frame is at or after target - emit it
+                        first_pts = Some(target);
+                        seek_target_secs = None;
+
+                        // Convert to RGBA and emit
+                        let mut rgb_frame = ffmpeg_next::frame::Video::empty();
+                        if scaler.run(&buffered_frame, &mut rgb_frame).is_ok() {
+                            let rgba_data = Self::extract_rgba_data(&rgb_frame);
+
+                            let decoded = DecodedFrame {
+                                rgba_data: Arc::new(rgba_data),
+                                width,
+                                height,
+                                pts_secs,
+                            };
+
+                            if is_keyframe {
+                                frame_cache.insert(decoded.clone(), true);
+                            }
+
+                            if !is_playing && !in_stepping_mode {
+                                last_paused_frame = Some(decoded.clone());
+                            }
+
+                            if in_stepping_mode {
+                                frame_history.push(decoded.clone());
+                            }
+
+                            if event_tx
+                                .blocking_send(DecoderEvent::FrameReady(decoded))
+                                .is_ok()
+                            {
+                                frame_decoded = true;
+                                decode_single_frame = false;
+                            }
+                        }
+                    }
+                } else {
+                    // No seek target - emit the frame directly
+                    let mut rgb_frame = ffmpeg_next::frame::Video::empty();
+                    if scaler.run(&buffered_frame, &mut rgb_frame).is_ok() {
+                        let rgba_data = Self::extract_rgba_data(&rgb_frame);
+
+                        // Frame pacing during playback
+                        if is_playing {
+                            if let Some(start_time) = playback_start_time {
+                                if first_pts.is_none() {
+                                    first_pts = Some(pts_secs);
+                                }
+                                if let Some(first) = first_pts {
+                                    let frame_delay = pts_secs - first;
+                                    let target_time = start_time
+                                        + std::time::Duration::from_secs_f64(frame_delay);
+                                    let now = std::time::Instant::now();
+                                    if target_time > now {
+                                        std::thread::sleep(target_time - now);
+                                    }
+                                }
+                            }
+                        }
+
+                        let decoded = DecodedFrame {
+                            rgba_data: Arc::new(rgba_data),
+                            width,
+                            height,
+                            pts_secs,
+                        };
+
+                        if is_keyframe {
+                            frame_cache.insert(decoded.clone(), true);
+                        }
+
+                        if !is_playing && !in_stepping_mode {
+                            last_paused_frame = Some(decoded.clone());
+                        }
+
+                        if in_stepping_mode {
+                            frame_history.push(decoded.clone());
+                        }
+
+                        if event_tx
+                            .blocking_send(DecoderEvent::FrameReady(decoded))
+                            .is_ok()
+                        {
+                            frame_decoded = true;
+                            decode_single_frame = false;
+                        }
+                    }
+                }
+            }
+
+            // If we got a frame from buffer, skip packet reading
+            if frame_decoded {
+                continue;
+            }
 
             for (stream, packet) in ictx.packets() {
                 if stream.index() != video_stream_index {
@@ -585,9 +739,19 @@ impl FrameHistory {
             // Move to previous frame (position - 2 because position is 1-indexed after last frame)
             self.position -= 1;
             self.frames.get(self.position - 1)
-        } else if self.position == 1 && !self.frames.is_empty() {
-            // Already at first frame, return it again (can't go further back)
-            self.frames.front()
+        } else {
+            // Already at first frame or empty - can't go further back
+            None
+        }
+    }
+
+    /// Gets the next frame from history (for forward stepping after backward).
+    ///
+    /// Returns None if we're already at the end of history (need to decode new frame).
+    fn step_forward(&mut self) -> Option<&DecodedFrame> {
+        if self.position < self.frames.len() {
+            self.position += 1;
+            self.frames.get(self.position - 1)
         } else {
             None
         }
@@ -606,13 +770,13 @@ mod tests {
         let video_path = temp_dir.path().join("test.mp4");
         std::fs::write(&video_path, b"fake video data").unwrap();
 
-        let decoder = AsyncDecoder::new(&video_path, CacheConfig::default());
+        let decoder = AsyncDecoder::new(&video_path, CacheConfig::default(), 0);
         assert!(decoder.is_ok());
     }
 
     #[tokio::test]
     async fn decoder_fails_for_nonexistent_file() {
-        let result = AsyncDecoder::new("/nonexistent/video.mp4", CacheConfig::default());
+        let result = AsyncDecoder::new("/nonexistent/video.mp4", CacheConfig::default(), 0);
         assert!(result.is_err());
     }
 
@@ -622,7 +786,7 @@ mod tests {
         let video_path = temp_dir.path().join("test.mp4");
         std::fs::write(&video_path, b"fake video data").unwrap();
 
-        let decoder = AsyncDecoder::new(&video_path, CacheConfig::default()).unwrap();
+        let decoder = AsyncDecoder::new(&video_path, CacheConfig::default(), 0).unwrap();
 
         // Send commands (should not error)
         assert!(decoder
@@ -646,7 +810,7 @@ mod tests {
             return;
         }
 
-        let mut decoder = AsyncDecoder::new(video_path, CacheConfig::default()).unwrap();
+        let mut decoder = AsyncDecoder::new(video_path, CacheConfig::default(), 0).unwrap();
 
         // Send play command
         decoder

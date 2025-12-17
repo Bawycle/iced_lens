@@ -301,6 +301,7 @@ impl App {
             Some(self.lufs_cache.clone()),
             self.audio_normalization,
             self.frame_cache_mb,
+            self.settings.frame_history_mb(),
         );
 
         Subscription::batch([event_sub, tick_sub, video_sub])
@@ -319,8 +320,6 @@ impl App {
             theme_mode: &mut self.theme_mode,
             video_autoplay: &mut self.video_autoplay,
             audio_normalization: &mut self.audio_normalization,
-            frame_cache_mb: self.frame_cache_mb,
-            frame_history_mb: self.frame_history_mb,
             menu_open: &mut self.menu_open,
             info_panel_open: &mut self.info_panel_open,
             current_metadata: &mut self.current_metadata,

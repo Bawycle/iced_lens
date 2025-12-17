@@ -33,8 +33,6 @@ pub struct UpdateContext<'a> {
     pub theme_mode: &'a mut ThemeMode,
     pub video_autoplay: &'a mut bool,
     pub audio_normalization: &'a mut bool,
-    pub frame_cache_mb: u32,
-    pub frame_history_mb: u32,
     pub menu_open: &'a mut bool,
     pub info_panel_open: &'a mut bool,
     pub current_metadata: &'a mut Option<MediaMetadata>,
@@ -52,8 +50,9 @@ impl<'a> UpdateContext<'a> {
             theme_mode: *self.theme_mode,
             video_autoplay: *self.video_autoplay,
             audio_normalization: *self.audio_normalization,
-            frame_cache_mb: self.frame_cache_mb,
-            frame_history_mb: self.frame_history_mb,
+            // Use settings values directly to ensure changes are persisted immediately
+            frame_cache_mb: self.settings.frame_cache_mb(),
+            frame_history_mb: self.settings.frame_history_mb(),
             keyboard_seek_step_secs: self.settings.keyboard_seek_step_secs(),
             notifications: self.notifications,
         }

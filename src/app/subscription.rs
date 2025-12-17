@@ -106,8 +106,9 @@ pub fn create_video_subscription(
     lufs_cache: Option<SharedLufsCache>,
     audio_normalization: bool,
     frame_cache_mb: u32,
+    history_mb: u32,
 ) -> Subscription<Message> {
     viewer
-        .subscription(lufs_cache, audio_normalization, frame_cache_mb)
+        .subscription(lufs_cache, audio_normalization, frame_cache_mb, history_mb)
         .map(Message::Viewer)
 }

@@ -415,11 +415,14 @@ impl State {
     /// # Arguments
     /// * `lufs_cache` - Optional shared cache for LUFS measurements (audio normalization)
     /// * `normalization_enabled` - Whether to apply audio normalization
+    /// * `frame_cache_mb` - Maximum memory for frame cache (seek optimization), in MB
+    /// * `history_mb` - Maximum memory for frame history (backward stepping), in MB
     pub fn subscription(
         &self,
         lufs_cache: Option<SharedLufsCache>,
         normalization_enabled: bool,
         frame_cache_mb: u32,
+        history_mb: u32,
     ) -> iced::Subscription<Message> {
         // Keep subscription active for ALL playback states including Stopped
         // This ensures the decoder stays alive and can receive pause/resume commands
@@ -442,6 +445,7 @@ impl State {
                 lufs_cache,
                 normalization_enabled,
                 cache_config,
+                history_mb,
             )
             .map(Message::PlaybackEvent)
         } else {
@@ -806,6 +810,14 @@ impl State {
                             player.set_muted(self.video_muted);
                             player.set_loop(self.video_loop);
 
+                            // Load the first frame immediately so capture and step work
+                            // without requiring play+pause first.
+                            // This seeks to 0 and decodes the first frame without starting playback.
+                            if matches!(player.state(), crate::video_player::PlaybackState::Stopped)
+                            {
+                                player.seek(0.0);
+                            }
+
                             // Auto-play if enabled
                             if self.video_autoplay {
                                 player.play();
@@ -879,6 +891,13 @@ impl State {
                         // Update sync clock with audio PTS for A/V synchronization
                         if let Some(ref player) = self.video_player {
                             player.update_audio_pts(pts_secs);
+                        }
+                    }
+                    PlaybackMessage::HistoryExhausted => {
+                        // Frame history buffer is exhausted - reset history position
+                        // so the step backward button gets disabled
+                        if let Some(ref mut player) = self.video_player {
+                            player.reset_history_position();
                         }
                     }
                 }

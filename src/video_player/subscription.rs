@@ -119,6 +119,9 @@ pub enum PlaybackMessage {
 
     /// An error occurred.
     Error(String),
+
+    /// Frame history is exhausted (no more frames to step backward).
+    HistoryExhausted,
 }
 
 /// Shared normalization gain (stored as f32 bits for atomic access).
@@ -191,6 +194,8 @@ struct VideoPlaybackConfig {
     lufs_cache: Option<SharedLufsCache>,
     normalization_enabled: bool,
     cache_config: CacheConfig,
+    /// Maximum memory for frame history (backward stepping), in MB.
+    history_mb: u32,
 }
 
 impl std::hash::Hash for VideoPlaybackConfig {
@@ -211,6 +216,7 @@ fn create_playback_stream(
         let lufs_cache = config.lufs_cache;
         let normalization_enabled = config.normalization_enabled;
         let cache_config = config.cache_config;
+        let history_mb = config.history_mb;
         async move {
             run_playback_loop(
                 &mut output,
@@ -218,6 +224,7 @@ fn create_playback_stream(
                 lufs_cache,
                 normalization_enabled,
                 cache_config,
+                history_mb,
             )
             .await;
         }
@@ -231,6 +238,7 @@ async fn run_playback_loop(
     lufs_cache: Option<SharedLufsCache>,
     normalization_enabled: bool,
     cache_config: CacheConfig,
+    history_mb: u32,
 ) {
     let mut state = State::Idle;
 
@@ -256,7 +264,7 @@ async fn run_playback_loop(
                     }
                 } else {
                     // Use FFmpeg decoder for regular videos
-                    match AsyncDecoder::new(&video_path, cache_config) {
+                    match AsyncDecoder::new(&video_path, cache_config, history_mb) {
                         Ok(decoder) => VideoDecoderKind::Ffmpeg(decoder),
                         Err(e) => {
                             let _ = output.send(PlaybackMessage::Error(e.to_string())).await;
@@ -477,6 +485,7 @@ async fn run_playback_loop(
                                 DecoderEvent::Buffering => PlaybackMessage::Buffering,
                                 DecoderEvent::EndOfStream => PlaybackMessage::EndOfStream,
                                 DecoderEvent::Error(msg) => PlaybackMessage::Error(msg),
+                                DecoderEvent::HistoryExhausted => PlaybackMessage::HistoryExhausted,
                             };
 
                             let _ = output.send(message).await;
@@ -557,12 +566,16 @@ async fn run_playback_loop(
 ///
 /// The `cache_config` parameter controls frame caching for optimized seek
 /// performance. Use `CacheConfig::default()` for standard caching.
+///
+/// The `history_mb` parameter controls the maximum memory for frame history
+/// (used for backward frame stepping).
 pub fn video_playback(
     video_path: PathBuf,
     session_id: u64,
     lufs_cache: Option<SharedLufsCache>,
     normalization_enabled: bool,
     cache_config: CacheConfig,
+    history_mb: u32,
 ) -> iced::Subscription<PlaybackMessage> {
     let config = VideoPlaybackConfig {
         video_path,
@@ -570,6 +583,7 @@ pub fn video_playback(
         lufs_cache,
         normalization_enabled,
         cache_config,
+        history_mb,
     };
     iced::Subscription::run_with(config, create_playback_stream)
 }

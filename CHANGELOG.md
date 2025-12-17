@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+### Fixed
+- **Frame capture and step unavailable after opening video:** Capture frame and step forward now work immediately after opening a video without requiring playback first.
+- **Frame stepping skipping frames:** Stepping through video frames one by one no longer skips frames due to FFmpeg decoder buffering.
+- **Frame navigation after stepping backward:** Stepping forward after stepping backward now correctly replays frames from history instead of decoding new frames.
+- **Step backward button not disabling:** The step backward button now correctly disables when frame history is exhausted.
+- **Frame history size setting not saved:** The `frame_history_mb` setting is now correctly persisted to `settings.toml`.
+- **Frame history size setting ignored:** The `frame_history_mb` setting now correctly controls the maximum memory used for frame history.
+
 ## [0.3.0] - 2025-12-14
 
 ### Added

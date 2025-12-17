@@ -3,9 +3,6 @@
 > This file tracks planned work for the next release. It lives only in the `dev` branch and is not included in releases.
 
 ## Bugs to Fix
-- [ ] **[Bug]** Cannot capture frame or navigate to next frame immediately after opening a video from preview.
-  - Observed: After opening a video, only the first frame is displayed. To capture this frame or navigate to the next frame, the user must first start the video, pause it, and then interact with the navigation/capture controls. This is cumbersome.
-  - Expected: The capture frame and frame navigation next button should be active and functional immediately upon opening a video in preview mode, allowing direct interaction with the initial frame and subsequent frames without needing to start and pause playback.
 - [ ] **[Intermittent]** Image horizontal offset after exiting fullscreen
   - Observed: vertical image with fit-to-window, enter fullscreen, exit fullscreen → image shifted horizontally
   - Not reliably reproducible (happened once, couldn't reproduce after restart)

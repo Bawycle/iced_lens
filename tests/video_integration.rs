@@ -189,7 +189,7 @@ fn test_video_decoding(path: &str, format_name: &str) {
     let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
     rt.block_on(async {
-        let decoder = AsyncDecoder::new(path, CacheConfig::disabled())
+        let decoder = AsyncDecoder::new(path, CacheConfig::disabled(), 0)
             .unwrap_or_else(|_| panic!("Should create decoder for {}", format_name));
 
         // Send play command
@@ -237,7 +237,7 @@ fn test_video_decoding(path: &str, format_name: &str) {
                                 format_name
                             );
                         }
-                        DecoderEvent::Buffering => {
+                        DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => {
                             // Continue waiting
                         }
                     }
@@ -304,7 +304,7 @@ fn test_decode_corrupted_file() {
 
     rt.block_on(async {
         // Corrupted file should either fail to create decoder or produce an error event
-        match AsyncDecoder::new(path, CacheConfig::disabled()) {
+        match AsyncDecoder::new(path, CacheConfig::disabled(), 0) {
             Ok(mut decoder) => {
                 decoder
                     .send_command(DecoderCommand::Play {
@@ -323,7 +323,9 @@ fn test_decode_corrupted_file() {
                                     // Unexpected but not necessarily wrong
                                     return true;
                                 }
-                                DecoderEvent::Buffering => continue,
+                                DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => {
+                                    continue
+                                }
                             }
                         }
                     }
@@ -410,7 +412,7 @@ fn test_decode_performance() {
         rt.block_on(async {
             let start = std::time::Instant::now();
 
-            let decoder = match AsyncDecoder::new(path, CacheConfig::disabled()) {
+            let decoder = match AsyncDecoder::new(path, CacheConfig::disabled(), 0) {
                 Ok(d) => d,
                 Err(_) => return,
             };
