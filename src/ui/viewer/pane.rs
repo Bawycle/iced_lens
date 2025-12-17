@@ -213,6 +213,11 @@ fn view_inner<'a>(
     let mut stack = Stack::new().push(base_surface);
 
     // Add navigation arrows if visible
+    // Navigation zones extend the clickable area beyond the visible button
+    // to make it easier to click on navigation arrows, especially during video playback
+    // where the user might not click precisely on the small button.
+    const NAVIGATION_ZONE_WIDTH: f32 = 80.0;
+
     if model.arrows_visible {
         if model.has_previous {
             // Show loop icon at boundaries to indicate wrap-around behavior
@@ -237,13 +242,23 @@ fn view_inner<'a>(
                     arrow_bg_alpha_hover,
                 ));
 
+            // Create a fixed-width clickable zone that contains the button
+            // Clicks anywhere in this zone (not just on the button) trigger navigation
+            let left_zone = Container::new(left_arrow)
+                .width(Length::Fixed(NAVIGATION_ZONE_WIDTH))
+                .height(Length::Fill)
+                .padding(spacing::MD)
+                .align_x(Horizontal::Left)
+                .align_y(Vertical::Center);
+
+            // Wrap in mouse_area to capture clicks outside the button but within the zone
+            let left_zone_clickable = mouse_area(left_zone).on_release(Message::NavigatePrevious);
+
             stack = stack.push(
-                Container::new(left_arrow)
+                Container::new(left_zone_clickable)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .padding(spacing::MD)
-                    .align_x(Horizontal::Left)
-                    .align_y(Vertical::Center),
+                    .align_x(Horizontal::Left),
             );
         }
 
@@ -270,13 +285,23 @@ fn view_inner<'a>(
                     arrow_bg_alpha_hover,
                 ));
 
+            // Create a fixed-width clickable zone that contains the button
+            // Clicks anywhere in this zone (not just on the button) trigger navigation
+            let right_zone = Container::new(right_arrow)
+                .width(Length::Fixed(NAVIGATION_ZONE_WIDTH))
+                .height(Length::Fill)
+                .padding(spacing::MD)
+                .align_x(Horizontal::Right)
+                .align_y(Vertical::Center);
+
+            // Wrap in mouse_area to capture clicks outside the button but within the zone
+            let right_zone_clickable = mouse_area(right_zone).on_release(Message::NavigateNext);
+
             stack = stack.push(
-                Container::new(right_arrow)
+                Container::new(right_zone_clickable)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .padding(spacing::MD)
-                    .align_x(Horizontal::Right)
-                    .align_y(Vertical::Center),
+                    .align_x(Horizontal::Right),
             );
         }
     }

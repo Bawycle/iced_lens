@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Step backward button not disabling:** The step backward button now correctly disables when frame history is exhausted.
 - **Frame history size setting not saved:** The `frame_history_mb` setting is now correctly persisted to `settings.toml`.
 - **Frame history size setting ignored:** The `frame_history_mb` setting now correctly controls the maximum memory used for frame history.
+- **Navigation arrows unresponsive during video playback:** Clicking near (but not exactly on) the navigation arrows during video playback now correctly triggers navigation instead of shifting the viewport. The clickable zone has been extended to 80px on each edge.
 
 ## [0.3.0] - 2025-12-14
 

@@ -8,7 +8,6 @@
   - Not reliably reproducible (happened once, couldn't reproduce after restart)
   - Possible causes: race condition on window resize, stale viewport dimensions, window manager timing
   - If reproduced: note exact steps, window size, image used, timing between actions
-- [ ] **[Frequent]** When a video is playing, clicking the overlay navigation arrows (previous/next) often does not switch to the previous or next media, but instead shifts the currently displayed frame.
 
 ## Modifications
 - [ ] Automatically collapse the metadata sidebar when entering fullscreen mode, if it is currently expanded.
