@@ -114,27 +114,17 @@ fn view_inner<'a>(
 
     // Determine arrow colors based on background theme for optimal visibility
     // Following UX best practices: semi-transparent backgrounds with strong shadows
-    let (arrow_text_color, arrow_bg_alpha_normal, arrow_bg_alpha_hover, svg_color) =
-        match ctx.background_theme {
-            BackgroundTheme::Light => {
-                // Light background: dark arrows with light background on hover
-                (
-                    theme::overlay_arrow_dark_color(),
-                    0.0,
-                    0.2,
-                    theme::overlay_arrow_dark_color(),
-                )
-            }
-            BackgroundTheme::Dark | BackgroundTheme::Checkerboard => {
-                // Dark/checkerboard: white arrows with dark background on hover
-                (
-                    theme::overlay_arrow_light_color(),
-                    0.0,
-                    0.5,
-                    theme::overlay_arrow_light_color(),
-                )
-            }
-        };
+    let (arrow_text_color, arrow_bg_alpha_normal, arrow_bg_alpha_hover) = match ctx.background_theme
+    {
+        BackgroundTheme::Light => {
+            // Light background: dark arrows with light background on hover
+            (theme::overlay_arrow_dark_color(), 0.0, 0.2)
+        }
+        BackgroundTheme::Dark | BackgroundTheme::Checkerboard => {
+            // Dark/checkerboard: white arrows with dark background on hover
+            (theme::overlay_arrow_light_color(), 0.0, 0.5)
+        }
+    };
 
     // Use video shader if it has a frame (playing OR paused with frame),
     // otherwise show static media (image or video thumbnail before playback starts)
@@ -222,8 +212,7 @@ fn view_inner<'a>(
         if model.has_previous {
             // Show loop icon at boundaries to indicate wrap-around behavior
             let button_content: Element<'_, Message> = if model.at_first {
-                let loop_icon = icons::sized(icons::loop_icon(), 20.0)
-                    .style(styles::overlay::loop_icon(svg_color));
+                let loop_icon = icons::sized(icons::loop_icon(), 20.0);
                 Row::new()
                     .spacing(spacing::XXS)
                     .align_y(Vertical::Center)
@@ -265,8 +254,7 @@ fn view_inner<'a>(
         if model.has_next {
             // Show loop icon at boundaries to indicate wrap-around behavior
             let button_content: Element<'_, Message> = if model.at_last {
-                let loop_icon = icons::sized(icons::loop_icon(), 20.0)
-                    .style(styles::overlay::loop_icon(svg_color));
+                let loop_icon = icons::sized(icons::loop_icon(), 20.0);
                 Row::new()
                     .spacing(spacing::XXS)
                     .align_y(Vertical::Center)
@@ -358,8 +346,7 @@ fn view_inner<'a>(
         let error_text = ctx.i18n.tr_with_args(video_error.i18n_key(), &args_refs);
         let heading = ctx.i18n.tr("error-load-video-heading");
 
-        let error_icon = icons::sized(icons::warning(), 32.0)
-            .style(styles::overlay::play_icon(theme::error_color()));
+        let error_icon = icons::sized(icons::warning(), 32.0);
 
         let error_content = Column::new()
             .spacing(spacing::SM)
@@ -403,9 +390,7 @@ fn view_inner<'a>(
             && !model.is_video_playing
             && model.video_error.is_none()
         {
-            let play_icon = icons::sized(icons::play(), 32.0).style(styles::overlay::play_icon(
-                theme::overlay_arrow_light_color(),
-            ));
+            let play_icon = icons::sized(icons::play(), 32.0);
 
             let play_button = button(play_icon)
                 .on_press(Message::InitiatePlayback)
@@ -423,9 +408,7 @@ fn view_inner<'a>(
         }
         // Show pause button when playing and overlay is visible and no error
         else if model.overlay_visible && model.is_video_playing && model.video_error.is_none() {
-            let pause_icon = icons::sized(icons::pause(), 32.0).style(styles::overlay::play_icon(
-                theme::overlay_arrow_light_color(),
-            ));
+            let pause_icon = icons::sized(icons::pause(), 32.0);
 
             // This should send a message to pause the video
             // For now, we'll reuse InitiatePlayback which should toggle
@@ -463,9 +446,7 @@ fn view_inner<'a>(
                 }
             };
 
-            let styled_icon = icons::sized(icon, HUD_ICON_SIZE).style(styles::overlay::loop_icon(
-                theme::overlay_arrow_light_color(),
-            ));
+            let styled_icon = icons::sized(icon, HUD_ICON_SIZE);
 
             let line_row = Row::new()
                 .spacing(spacing::XXS)

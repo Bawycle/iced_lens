@@ -9,6 +9,7 @@ use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{radius, sizing, spacing};
 use crate::ui::icons;
 use crate::ui::styles;
+use iced::widget::image::{Handle, Image};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{button, container, Column, Container, Row, Text},
@@ -168,7 +169,7 @@ fn build_dropdown<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 
 /// Build a single menu item with icon and label.
 fn build_menu_item<'a>(
-    icon: iced::widget::Svg<'a>,
+    icon: Image<Handle>,
     label: String,
     message: Message,
 ) -> Element<'a, Message> {

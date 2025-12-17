@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Auto-collapse metadata sidebar in fullscreen:** The metadata sidebar now automatically closes when entering fullscreen mode, providing an unobstructed view.
+- **Migrated from SVG to PNG icons:** All UI icons now use pre-rendered PNG images instead of SVG for consistent cross-platform rendering and improved performance on Windows. Icons are cached using `OnceLock` for optimal memory usage.
 
 ### Fixed
 - **Frame capture and step unavailable after opening video:** Capture frame and step forward now work immediately after opening a video without requiring playback first.

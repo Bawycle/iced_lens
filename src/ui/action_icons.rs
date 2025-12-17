@@ -35,7 +35,7 @@
 //! The underlying visual icon can change without affecting call sites.
 
 use super::icons;
-use iced::widget::svg::Svg;
+use iced::widget::image::{Handle, Image};
 
 // =============================================================================
 // Video Playback Actions
@@ -46,47 +46,47 @@ pub mod video {
     use super::*;
 
     /// Play video.
-    pub fn play<'a>() -> Svg<'a> {
+    pub fn play() -> Image<Handle> {
         icons::play()
     }
 
     /// Pause video.
-    pub fn pause<'a>() -> Svg<'a> {
+    pub fn pause() -> Image<Handle> {
         icons::pause()
     }
 
     /// Step forward one frame.
-    pub fn step_forward<'a>() -> Svg<'a> {
+    pub fn step_forward() -> Image<Handle> {
         icons::triangle_bar_right()
     }
 
     /// Step backward one frame.
-    pub fn step_backward<'a>() -> Svg<'a> {
+    pub fn step_backward() -> Image<Handle> {
         icons::triangle_bar_left()
     }
 
     /// Capture current frame as image.
-    pub fn capture_frame<'a>() -> Svg<'a> {
+    pub fn capture_frame() -> Image<Handle> {
         icons::camera()
     }
 
     /// Toggle loop playback.
-    pub fn toggle_loop<'a>() -> Svg<'a> {
+    pub fn toggle_loop() -> Image<Handle> {
         icons::loop_icon()
     }
 
     /// Volume control (unmuted state).
-    pub fn volume<'a>() -> Svg<'a> {
+    pub fn volume() -> Image<Handle> {
         icons::volume()
     }
 
     /// Volume muted state.
-    pub fn volume_muted<'a>() -> Svg<'a> {
+    pub fn volume_muted() -> Image<Handle> {
         icons::volume_mute()
     }
 
     /// More options / overflow menu.
-    pub fn more_options<'a>() -> Svg<'a> {
+    pub fn more_options() -> Image<Handle> {
         icons::ellipsis_horizontal()
     }
 }
@@ -100,22 +100,22 @@ pub mod editor {
     use super::*;
 
     /// Rotate image 90° counter-clockwise.
-    pub fn rotate_left<'a>() -> Svg<'a> {
+    pub fn rotate_left() -> Image<Handle> {
         icons::rotate_left()
     }
 
     /// Rotate image 90° clockwise.
-    pub fn rotate_right<'a>() -> Svg<'a> {
+    pub fn rotate_right() -> Image<Handle> {
         icons::rotate_right()
     }
 
     /// Flip image horizontally.
-    pub fn flip_horizontal<'a>() -> Svg<'a> {
+    pub fn flip_horizontal() -> Image<Handle> {
         icons::flip_horizontal()
     }
 
     /// Flip image vertically.
-    pub fn flip_vertical<'a>() -> Svg<'a> {
+    pub fn flip_vertical() -> Image<Handle> {
         icons::flip_vertical()
     }
 }
@@ -129,37 +129,37 @@ pub mod viewer {
     use super::*;
 
     /// Zoom in.
-    pub fn zoom_in<'a>() -> Svg<'a> {
+    pub fn zoom_in() -> Image<Handle> {
         icons::zoom_in()
     }
 
     /// Zoom out.
-    pub fn zoom_out<'a>() -> Svg<'a> {
+    pub fn zoom_out() -> Image<Handle> {
         icons::zoom_out()
     }
 
     /// Reset zoom to original size.
-    pub fn zoom_reset<'a>() -> Svg<'a> {
+    pub fn zoom_reset() -> Image<Handle> {
         icons::refresh()
     }
 
     /// Fit image to window (enabled state).
-    pub fn fit_to_window<'a>() -> Svg<'a> {
+    pub fn fit_to_window() -> Image<Handle> {
         icons::compress()
     }
 
     /// Fit image to window (disabled state / expand).
-    pub fn expand<'a>() -> Svg<'a> {
+    pub fn expand() -> Image<Handle> {
         icons::expand()
     }
 
     /// Enter/exit fullscreen mode.
-    pub fn fullscreen<'a>() -> Svg<'a> {
+    pub fn fullscreen() -> Image<Handle> {
         icons::fullscreen()
     }
 
     /// Delete current media file.
-    pub fn delete<'a>() -> Svg<'a> {
+    pub fn delete() -> Image<Handle> {
         icons::trash()
     }
 }
@@ -173,27 +173,27 @@ pub mod navigation {
     use super::*;
 
     /// Open hamburger menu.
-    pub fn menu<'a>() -> Svg<'a> {
+    pub fn menu() -> Image<Handle> {
         icons::hamburger()
     }
 
     /// Open settings.
-    pub fn settings<'a>() -> Svg<'a> {
+    pub fn settings() -> Image<Handle> {
         icons::cog()
     }
 
     /// Open help.
-    pub fn help<'a>() -> Svg<'a> {
+    pub fn help() -> Image<Handle> {
         icons::help()
     }
 
     /// Open about screen.
-    pub fn about<'a>() -> Svg<'a> {
+    pub fn about() -> Image<Handle> {
         icons::info()
     }
 
     /// Close / dismiss.
-    pub fn close<'a>() -> Svg<'a> {
+    pub fn close() -> Image<Handle> {
         icons::cross()
     }
 }
@@ -207,22 +207,22 @@ pub mod notification {
     use super::*;
 
     /// Success notification.
-    pub fn success<'a>() -> Svg<'a> {
+    pub fn success() -> Image<Handle> {
         icons::checkmark()
     }
 
     /// Warning notification.
-    pub fn warning<'a>() -> Svg<'a> {
+    pub fn warning() -> Image<Handle> {
         icons::warning()
     }
 
     /// Error notification.
-    pub fn error<'a>() -> Svg<'a> {
+    pub fn error() -> Image<Handle> {
         icons::warning()
     }
 
     /// Info notification.
-    pub fn info<'a>() -> Svg<'a> {
+    pub fn info() -> Image<Handle> {
         icons::info()
     }
 }
@@ -236,22 +236,22 @@ pub mod sections {
     use super::*;
 
     /// Image/video viewer section.
-    pub fn viewer<'a>() -> Svg<'a> {
+    pub fn viewer() -> Image<Handle> {
         icons::image()
     }
 
     /// Video playback section.
-    pub fn video<'a>() -> Svg<'a> {
+    pub fn video() -> Image<Handle> {
         icons::video_camera()
     }
 
     /// Frame capture section.
-    pub fn capture<'a>() -> Svg<'a> {
+    pub fn capture() -> Image<Handle> {
         icons::camera()
     }
 
     /// Image editor section.
-    pub fn editor<'a>() -> Svg<'a> {
+    pub fn editor() -> Image<Handle> {
         icons::rotate_right()
     }
 }

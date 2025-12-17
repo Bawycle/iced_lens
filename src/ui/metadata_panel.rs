@@ -11,7 +11,7 @@ use crate::media::metadata::{
 };
 use crate::ui::design_tokens::{radius, sizing, spacing, typography};
 use crate::ui::icons;
-use crate::ui::styles;
+use iced::widget::image::{Handle, Image};
 use iced::{
     alignment::Vertical,
     widget::{container, rule, scrollable, Column, Container, Row, Text},
@@ -417,11 +417,11 @@ fn build_metadata_row<'a>(label: String, value: String) -> Element<'a, Message> 
 
 /// Build a section with icon, title, and content.
 fn build_section<'a>(
-    icon: iced::widget::Svg<'a>,
+    icon: Image<Handle>,
     title: String,
     content: Element<'a, Message>,
 ) -> Element<'a, Message> {
-    let icon_sized = icons::sized(icon, sizing::ICON_SM).style(styles::tinted_svg);
+    let icon_sized = icons::sized(icon, sizing::ICON_SM);
 
     let header = Row::new()
         .spacing(spacing::XS)
