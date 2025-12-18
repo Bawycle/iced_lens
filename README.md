@@ -2,7 +2,7 @@
 
 Privacy-first media viewer and editor with AI deblurring.
 
-[![Release](https://img.shields.io/badge/release-v0.3.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
+[![Release](https://img.shields.io/badge/release-v0.4.0-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 [![Rust 1.92+](https://img.shields.io/badge/Rust-1.92.0%2B-blue)](https://www.rust-lang.org)
 ![i18n](https://img.shields.io/badge/i18n-en--US|fr|es|de|it-green)

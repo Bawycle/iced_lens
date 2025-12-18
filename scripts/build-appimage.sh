@@ -146,7 +146,7 @@ mkdir -p "$I18N_DEST"
 cp -a "$I18N_SRC/." "$I18N_DEST/"
 
 # Desktop environments discover the app icon through the standard hicolor path.
-ICON_SRC="$ROOT_DIR/assets/icons/iced_lens.svg"
+ICON_SRC="$ROOT_DIR/assets/branding/iced_lens.svg"
 ICON_DEST="$APPDIR/usr/share/icons/hicolor/scalable/apps/iced_lens.svg"
 if [[ ! -f "$ICON_SRC" ]]; then
   echo "Missing icon: $ICON_SRC" >&2
@@ -167,7 +167,7 @@ cat >"$DESKTOP_FILE" <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=Iced Lens
-Comment=Image and video viewer built with Iced
+Comment=Privacy-first media viewer and editor with AI deblurring
 Exec=iced_lens %F
 Icon=iced_lens
 Categories=Graphics;Viewer;Video;AudioVideo;
