@@ -13,8 +13,9 @@ Thank you for your interest in contributing to IcedLens! We welcome contribution
 7. [Development Workflow](#development-workflow)
 8. [Pull Request Process](#pull-request-process)
 9. [Project Structure](#project-structure)
-10. [Style Architecture](#style-architecture)
-11. [Notification System](#notification-system)
+10. [Event-Driven Architecture](#event-driven-architecture)
+11. [Style Architecture](#style-architecture)
+12. [Notification System](#notification-system)
 
 ## Code of Conduct
 
@@ -413,6 +414,79 @@ Loads and transforms images and video metadata:
 User preferences and application settings:
 - **`defaults.rs`**: Centralized default values for all constants (zoom, volume, cache sizes, etc.). **Always add new defaults here** rather than scattering them across the codebase. Includes compile-time validation to ensure constraints are valid.
 - **`mod.rs`**: User settings persistence (`settings.toml`)
+
+### Event-Driven Architecture
+
+IcedLens follows an event-driven architecture based on the Elm/Iced pattern. Understanding this is critical for contributing code.
+
+#### Core Principles
+
+1. **Each domain owns its state**: The viewer manages viewer state, settings manages settings state, etc.
+2. **State changes via messages**: Components update their state by handling messages, not by external direct mutation.
+3. **App orchestrates via Effects**: Components emit `Effect` enums that the app handles to coordinate between domains.
+4. **No cross-domain mutations**: Avoid patterns like `ctx.viewer.field = value` from app handlers.
+
+#### Message Flow
+
+```
+User Action → Message → Component.handle_message() → (Effect, Task)
+                                                         ↓
+                                                    App handles Effect
+                                                         ↓
+                                                    Dispatch new Messages to other components
+```
+
+#### Example: Correct vs Incorrect Patterns
+
+**❌ Incorrect (direct cross-domain mutation):**
+```rust
+// In app/update.rs - don't do this
+fn handle_delete_last_media(ctx: &mut UpdateContext) {
+    ctx.viewer.current_media_path = None;  // Direct mutation!
+    ctx.viewer.media = None;               // Direct mutation!
+    *ctx.metadata_editor_state = None;
+}
+```
+
+**✅ Correct (message-driven):**
+```rust
+// In app/update.rs
+fn handle_delete_last_media(ctx: &mut UpdateContext) -> Task<Message> {
+    *ctx.metadata_editor_state = None;  // App's own state - OK
+    // Send message to viewer to handle its own state
+    Task::done(Message::Viewer(component::Message::ClearMedia))
+}
+
+// In viewer/component.rs - viewer handles its own state
+Message::ClearMedia => {
+    self.media = None;
+    self.current_media_path = None;
+    self.video_player = None;
+    // ...
+    (Effect::None, Task::none())
+}
+```
+
+#### Key Messages and Effects
+
+| Message | Domain | Purpose |
+|---------|--------|---------|
+| `StartLoadingMedia` | Viewer | Set loading state before async load |
+| `MediaLoaded(Result)` | Viewer | Handle load result, update media state |
+| `ClearMedia` | Viewer | Clear all media state (no media available) |
+
+| Effect | Emitted By | Handled By |
+|--------|------------|------------|
+| `NavigateNext/Previous` | Viewer | App (triggers media loading) |
+| `ToggleFullscreen` | Viewer | App (manages window state) |
+| `EnterEditor` | Viewer | App (screen transition) |
+
+#### Benefits
+
+- **Testability**: Each component can be tested in isolation
+- **Maintainability**: Clear boundaries between domains
+- **Consistency**: State changes happen in predictable places
+- **Debugging**: Easy to trace message flow
 
 ### Path Injection for Testing
 

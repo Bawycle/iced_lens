@@ -771,12 +771,11 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
                     Message::Viewer(component::Message::MediaLoaded(result))
                 })
             } else {
-                // No more media in directory
-                ctx.viewer.current_media_path = None;
-                // Clear metadata state (no media = no metadata context)
+                // No more media in directory - send ClearMedia message to viewer
+                // This is event-driven: the viewer handles its own state clearing
                 *ctx.metadata_editor_state = None;
                 *ctx.current_metadata = None;
-                Task::none()
+                Task::done(Message::Viewer(component::Message::ClearMedia))
             }
         }
         Err(_err) => {

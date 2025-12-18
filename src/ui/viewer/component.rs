@@ -29,6 +29,8 @@ const LOADING_TIMEOUT: Duration = Duration::from_secs(10); // Timeout for media 
 pub enum Message {
     StartLoadingMedia,
     MediaLoaded(Result<MediaData, Error>),
+    /// Clear all media state (used when no media is available, e.g., after deleting last media).
+    ClearMedia,
     ToggleErrorDetails,
     Controls(controls::Message),
     VideoControls(video_controls::Message),
@@ -459,6 +461,33 @@ impl State {
                 self.is_loading_media = true;
                 self.loading_started_at = Some(Instant::now());
                 self.error = None;
+                (Effect::None, Task::none())
+            }
+            Message::ClearMedia => {
+                // Clear all media state - used when no media is available
+                // (e.g., after deleting the last media in directory)
+
+                // Stop any video playback
+                if let Some(ref mut player) = self.video_player {
+                    player.stop();
+                }
+                self.video_player = None;
+                self.current_video_path = None;
+                self.video_shader.clear_frame();
+
+                // Clear media and error state
+                self.media = None;
+                self.error = None;
+                self.current_media_path = None;
+
+                // Reset loading state
+                self.is_loading_media = false;
+                self.loading_started_at = None;
+
+                // Reset zoom to defaults
+                self.zoom = ZoomState::default();
+                self.viewport = ViewportState::default();
+
                 (Effect::None, Task::none())
             }
             Message::MediaLoaded(result) => {
