@@ -22,28 +22,7 @@
 
 ### Image editor
 - [ ] Image centering in editor canvas — currently complex to implement
-- [ ] Add an image deblurring tool based on the Nafnet AI model
-  - The tool will be optional to avoid bundling the large ONNX model file in the binary.
-  - The download URL for the ONNX model must be configurable in the settings. The application will provide a default URL already configured.
-  - In the settings, the user can enable/disable the option:
-    - If enabled:
-      - the model will be automatically downloaded into the "data directory"
-      - the model's checksum will be verified
-      - the application will check that deblurring is functional
-      - if all checks pass, the option is enabled and the tool becomes available in the image editor
-      - the user is informed of each step via the notification system
-    - If disabled:
-      - the option is disabled, the tool is no longer available, and the ONNX file is deleted
-  - In the image editor, the deblurring tool must:
-    - display a message advising to export only in Webp lossless or PNG for optimal deblurring quality
-    - elegantly indicate that deblurring is in progress (e.g., spinner)
-    - allow the user to cancel the ongoing deblurring
-    - use the notification system to inform the user of success or failure
-  - The UI for the deblurring tool must be in a dedicated file (like crop_panel.rs, resize_panel.rs, adjustments_panel.rs)
-  - The help screen must be updated
-  - The business logic must be in image_transform.rs or a dedicated file in src/media/
-  - Use the "experiment/ai-deblur-nafnet" branch as inspiration for model use
-  - Provide an option for GPU usage if available (configurable in settings)
+- [x] Add an image deblurring tool based on the NAFNet AI model (implemented in v0.4.0)
 
 ### Help
 - [ ] Allow text selection and copying in the help screen (blocked, pending native support in Iced 0.15.0)

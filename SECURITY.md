@@ -14,12 +14,12 @@ Once version 1.0.0 is released, this policy will be updated to reflect long-term
 
 ## Security Context
 
-IcedLens is a local image viewer and editor that:
-- **Does NOT** connect to the network
-- **Does NOT** process untrusted remote content
-- **Only** opens image files from local filesystem paths provided by the user
+IcedLens is a local-first image viewer and editor:
+- **Local processing**: Images and videos are processed entirely on your machine
+- **Minimal network activity**: The only network connection is the optional AI Deblur feature, which downloads an ONNX model (~92 MB) from Hugging Face on first use. The model integrity is verified with a BLAKE3 checksum.
+- **No telemetry**: No usage data, analytics, or tracking
 
-While the application is designed for local use only, security vulnerabilities may still arise from:
+Security vulnerabilities may arise from:
 - Malformed image files triggering bugs in image decoding libraries
 - Path traversal or file access issues
 - Unsafe handling of user inputs (zoom values, file paths, etc.)

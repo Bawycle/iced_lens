@@ -3,7 +3,7 @@ name = "iced_lens"
 version = "0.3.0"
 edition = "2021"
 authors = ["Bawycle"]
-description = "Lightweight, internationalized image viewer and editor built with the Iced GUI toolkit"
+description = "Privacy-first media viewer and editor with AI deblurring"
 repository = "https://codeberg.org/Bawycle/iced_lens"
 homepage = "https://codeberg.org/Bawycle/iced_lens"
 license = "MPL-2.0"
@@ -86,9 +86,10 @@ icon = [
     "assets/branding/iced_lens-512.png",
 ]
 category = "public.app-category.photography"
-short_description = "Lightweight media viewer and editor"
+short_description = "Privacy-first media viewer and editor"
 long_description = """
-IcedLens is a lightweight, internationalized media viewer and editor
-built with the Iced GUI toolkit. It supports multiple image formats,
-video playback, and provides a clean, intuitive interface.
+IcedLens is a privacy-first media viewer and editor with AI-powered
+deblurring. Built with the Iced GUI toolkit, it processes everything
+locally with no cloud, no tracking. Supports images, videos, and
+metadata editing.
 """

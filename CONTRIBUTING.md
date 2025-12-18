@@ -52,7 +52,7 @@ When submitting a bug report, please include:
 
 Feature suggestions are welcome! Before opening a feature request:
 1. Check if a similar feature request already exists
-2. Consider whether the feature aligns with the project's goals (lightweight, privacy-focused image viewing and editing)
+2. Consider whether the feature aligns with the project's goals (privacy-first, local-only media viewing and editing)
 
 When suggesting a feature, please:
 - Describe the **problem** the feature would solve
@@ -206,8 +206,11 @@ Code contributions should follow the project's development practices and quality
 ### Prerequisites
 
 - **Rust 1.92.0 or newer** (install via [rustup](https://rustup.rs/))
+- **FFmpeg development libraries** and **Clang** (see [User Guide](docs/USER_GUIDE.md#requirements) for platform-specific packages)
 - Familiarity with the [Iced GUI framework](https://iced.rs/)
 - Understanding of the project structure (see below)
+
+> **Platform Note:** IcedLens is primarily developed and tested on Linux Mint. While contributions for macOS and Windows compatibility are welcome, please note that these platforms have not been extensively tested. If you're developing on macOS or Windows, consider testing on Linux before submitting PRs that affect platform-specific behavior.
 
 ### Before You Start
 
