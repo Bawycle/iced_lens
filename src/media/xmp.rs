@@ -162,7 +162,7 @@ fn parse_xmp_xml(xmp_data: &[u8]) -> Option<DublinCoreMetadata> {
             }
             Ok(Event::Text(ref e)) => {
                 if let Some(ref element) = current_element {
-                    let text = e.unescape().ok()?.trim().to_string();
+                    let text = e.decode().ok()?.trim().to_string();
                     if !text.is_empty() {
                         match element.as_str() {
                             "title" => metadata.title = Some(text),
