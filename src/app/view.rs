@@ -7,6 +7,7 @@
 use super::{Message, Screen};
 use crate::config;
 use crate::i18n::fluent::I18n;
+use crate::media::deblur::ModelStatus;
 use crate::media::metadata::MediaMetadata;
 use crate::media::navigator::NavigationInfo;
 use crate::ui::about::{self, ViewContext as AboutViewContext};
@@ -48,6 +49,8 @@ pub struct ViewContext<'a> {
     pub notifications: &'a NotificationManager,
     /// True if the application is using dark theme.
     pub is_dark_theme: bool,
+    /// Current status of the AI deblur model.
+    pub deblur_model_status: &'a ModelStatus,
 }
 
 /// Context required to render the viewer screen.
@@ -84,9 +87,13 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
             is_dark_theme: ctx.is_dark_theme,
         }),
         Screen::Settings => view_settings(ctx.settings, ctx.i18n),
-        Screen::ImageEditor => {
-            view_image_editor(ctx.image_editor, ctx.i18n, ctx.settings, ctx.is_dark_theme)
-        }
+        Screen::ImageEditor => view_image_editor(
+            ctx.image_editor,
+            ctx.i18n,
+            ctx.settings,
+            ctx.is_dark_theme,
+            ctx.deblur_model_status,
+        ),
         Screen::Help => view_help(ctx.help_state, ctx.i18n),
         Screen::About => view_about(ctx.i18n),
     };
@@ -224,6 +231,7 @@ fn view_image_editor<'a>(
     i18n: &'a I18n,
     settings: &'a SettingsState,
     is_dark_theme: bool,
+    deblur_model_status: &'a ModelStatus,
 ) -> Element<'a, Message> {
     if let Some(editor_state) = image_editor {
         editor_state
@@ -231,6 +239,7 @@ fn view_image_editor<'a>(
                 i18n,
                 background_theme: settings.background_theme(),
                 is_dark_theme,
+                deblur_model_status,
             })
             .map(Message::ImageEditor)
     } else {

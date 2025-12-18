@@ -72,6 +72,10 @@ pub struct App {
     app_state: persisted_state::AppState,
     /// Toast notification manager for user feedback.
     notifications: notifications::Manager,
+    /// Whether the application is shutting down (used to cancel background tasks).
+    shutting_down: bool,
+    /// Cancellation token for background tasks (shared with async tasks).
+    cancellation_token: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl fmt::Debug for App {
@@ -156,6 +160,8 @@ impl Default for App {
             help_state: help::State::new(),
             app_state: persisted_state::AppState::default(),
             notifications: notifications::Manager::new(),
+            shutting_down: false,
+            cancellation_token: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 }
@@ -206,6 +212,28 @@ impl App {
             .unwrap_or(config::DEFAULT_FRAME_HISTORY_MB);
         app.frame_cache_mb = frame_cache_mb;
         app.frame_history_mb = frame_history_mb;
+        // Load application state (last save directory, deblur enabled, etc.)
+        let (app_state, state_warning) = persisted_state::AppState::load();
+        app.app_state = app_state.clone();
+
+        // AI settings (enable_deblur comes from persisted state, not config)
+        let enable_deblur = app_state.enable_deblur;
+        let deblur_model_url = config
+            .ai
+            .deblur_model_url
+            .clone()
+            .unwrap_or_else(|| config::DEFAULT_DEBLUR_MODEL_URL.to_string());
+
+        // Check if the deblur model needs validation at startup
+        // If enable_deblur is true and model exists, we need to validate it before making it available
+        let (deblur_model_status, needs_startup_validation) =
+            if enable_deblur && media::deblur::is_model_downloaded() {
+                // Model exists but needs validation - set to Validating, not Ready
+                (crate::media::deblur::ModelStatus::Validating, true)
+            } else {
+                (crate::media::deblur::ModelStatus::NotDownloaded, false)
+            };
+
         app.settings = SettingsState::new(SettingsConfig {
             zoom_step_percent: app.viewer.zoom_step_percent(),
             background_theme: theme,
@@ -217,6 +245,9 @@ impl App {
             frame_cache_mb,
             frame_history_mb,
             keyboard_seek_step_secs,
+            enable_deblur,
+            deblur_model_url,
+            deblur_model_status,
         });
         app.video_autoplay = video_autoplay;
         app.audio_normalization = audio_normalization;
@@ -234,10 +265,6 @@ impl App {
         if let Some(loop_enabled) = config.video.loop_enabled {
             app.viewer.set_video_loop(loop_enabled);
         }
-
-        // Load application state (last save directory, etc.)
-        let (app_state, state_warning) = persisted_state::AppState::load();
-        app.app_state = app_state;
 
         // Show warnings for config/state loading issues
         if let Some(key) = config_warning {
@@ -301,7 +328,40 @@ impl App {
             Task::none()
         };
 
-        (app, task)
+        // If deblur was enabled and model exists, start validation in background
+        // Use spawn_blocking to avoid blocking the tokio runtime during CPU-intensive ONNX inference
+        let validation_task = if needs_startup_validation {
+            let cancel_token = app.cancellation_token.clone();
+            Task::perform(
+                async move {
+                    tokio::task::spawn_blocking(move || {
+                        let mut manager = media::deblur::DeblurManager::new();
+                        manager.load_session(Some(&cancel_token))?;
+                        media::deblur::validate_model(&mut manager, Some(&cancel_token))?;
+                        Ok::<(), media::deblur::DeblurError>(())
+                    })
+                    .await
+                    .map_err(|e| media::deblur::DeblurError::InferenceFailed(e.to_string()))?
+                },
+                |result: media::deblur::DeblurResult<()>| match result {
+                    Ok(()) => Message::DeblurValidationCompleted {
+                        result: Ok(()),
+                        is_startup: true,
+                    },
+                    Err(e) => Message::DeblurValidationCompleted {
+                        result: Err(e.to_string()),
+                        is_startup: true,
+                    },
+                },
+            )
+        } else {
+            Task::none()
+        };
+
+        // Combine tasks
+        let combined_task = Task::batch([task, validation_task]);
+
+        (app, combined_task)
     }
 
     fn title(&self) -> String {
@@ -400,7 +460,14 @@ impl App {
             self.settings.frame_history_mb(),
         );
 
-        Subscription::batch([event_sub, tick_sub, video_sub])
+        // Editor subscription for spinner animation during deblur processing
+        let editor_sub = self
+            .image_editor
+            .as_ref()
+            .map(|editor| editor.subscription().map(Message::ImageEditor))
+            .unwrap_or_else(Subscription::none);
+
+        Subscription::batch([event_sub, tick_sub, video_sub, editor_sub])
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -560,7 +627,60 @@ impl App {
                     Task::none()
                 }
             }
+            Message::DeblurDownloadProgress(progress) => {
+                self.settings
+                    .set_deblur_model_status(media::deblur::ModelStatus::Downloading { progress });
+                Task::none()
+            }
+            Message::DeblurDownloadCompleted(result) => {
+                self.handle_deblur_download_completed(result)
+            }
+            Message::DeblurValidationCompleted { result, is_startup } => {
+                self.handle_deblur_validation_completed(result, is_startup)
+            }
+            Message::DeblurApplyCompleted(result) => {
+                self.handle_deblur_apply_completed(result)
+            }
+            Message::WindowCloseRequested(id) => {
+                // Mark app as shutting down to cancel background tasks
+                self.shutting_down = true;
+                // Signal cancellation to background tasks
+                self.cancellation_token
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                // Close the window
+                window::close(id)
+            }
         }
+    }
+
+    /// Handles the result of applying AI deblur to an image.
+    fn handle_deblur_apply_completed(
+        &mut self,
+        result: Result<Box<image_rs::DynamicImage>, String>,
+    ) -> Task<Message> {
+        // Ignore results if shutting down
+        if self.shutting_down {
+            return Task::none();
+        }
+
+        if let Some(editor) = self.image_editor.as_mut() {
+            match result {
+                Ok(deblurred_image) => {
+                    editor.apply_deblur_result(*deblurred_image);
+                    self.notifications.push(notifications::Notification::success(
+                        "notification-deblur-apply-success",
+                    ));
+                }
+                Err(e) => {
+                    editor.deblur_failed();
+                    self.notifications.push(
+                        notifications::Notification::error("notification-deblur-apply-error")
+                            .with_arg("error", e),
+                    );
+                }
+            }
+        }
+        Task::none()
     }
 
     /// Handles the metadata Save As dialog result.
@@ -618,6 +738,114 @@ impl App {
         Task::none()
     }
 
+    /// Handles the result of deblur model download.
+    fn handle_deblur_download_completed(&mut self, result: Result<(), String>) -> Task<Message> {
+        // Don't start validation if shutting down
+        if self.shutting_down {
+            return Task::none();
+        }
+
+        match result {
+            Ok(()) => {
+                // Download succeeded - start validation
+                self.settings
+                    .set_deblur_model_status(media::deblur::ModelStatus::Validating);
+
+                // Start validation task using spawn_blocking for CPU-intensive ONNX inference
+                let cancel_token = self.cancellation_token.clone();
+                Task::perform(
+                    async move {
+                        tokio::task::spawn_blocking(move || {
+                            // Create manager and try to load + validate the model
+                            let mut manager = media::deblur::DeblurManager::new();
+                            manager.load_session(Some(&cancel_token))?;
+                            media::deblur::validate_model(&mut manager, Some(&cancel_token))?;
+                            Ok::<(), media::deblur::DeblurError>(())
+                        })
+                        .await
+                        .map_err(|e| media::deblur::DeblurError::InferenceFailed(e.to_string()))?
+                    },
+                    |result: media::deblur::DeblurResult<()>| match result {
+                        Ok(()) => Message::DeblurValidationCompleted {
+                            result: Ok(()),
+                            is_startup: false,
+                        },
+                        Err(e) => Message::DeblurValidationCompleted {
+                            result: Err(e.to_string()),
+                            is_startup: false,
+                        },
+                    },
+                )
+            }
+            Err(e) => {
+                // Download failed
+                self.settings
+                    .set_deblur_model_status(media::deblur::ModelStatus::Error(e.clone()));
+                self.notifications
+                    .push(
+                        notifications::Notification::error("notification-deblur-download-error")
+                            .with_arg("error", e),
+                    );
+                Task::none()
+            }
+        }
+    }
+
+    /// Handles the result of deblur model validation.
+    ///
+    /// When `is_startup` is true, success notifications are suppressed (the user expects
+    /// the feature to work from previous sessions). Failure notifications are always shown.
+    /// If the app is shutting down, the result is ignored.
+    fn handle_deblur_validation_completed(
+        &mut self,
+        result: Result<(), String>,
+        is_startup: bool,
+    ) -> Task<Message> {
+        // Ignore validation results if the app is shutting down
+        if self.shutting_down {
+            return Task::none();
+        }
+
+        match result {
+            Ok(()) => {
+                // Validation succeeded - enable deblur and persist state
+                self.settings
+                    .set_deblur_model_status(media::deblur::ModelStatus::Ready);
+                self.settings.set_enable_deblur(true);
+                self.app_state.enable_deblur = true;
+                if let Some(key) = self.app_state.save() {
+                    self.notifications
+                        .push(notifications::Notification::warning(&key));
+                }
+                // Only show success notification for user-initiated activation, not startup
+                if !is_startup {
+                    self.notifications
+                        .push(notifications::Notification::success(
+                            "notification-deblur-ready",
+                        ));
+                }
+            }
+            Err(e) => {
+                // Validation failed - reset enable_deblur, delete the model and show error
+                self.settings
+                    .set_deblur_model_status(media::deblur::ModelStatus::Error(e.clone()));
+                self.settings.set_enable_deblur(false);
+                self.app_state.enable_deblur = false;
+                if let Some(key) = self.app_state.save() {
+                    self.notifications
+                        .push(notifications::Notification::warning(&key));
+                }
+                // Delete the invalid model file
+                let _ = std::fs::remove_file(media::deblur::get_model_path());
+                self.notifications.push(
+                    notifications::Notification::error("notification-deblur-validation-error")
+                        .with_arg("error", e),
+                );
+            }
+        }
+        Task::none()
+    }
+
     /// Handles async image loading result for the editor.
     fn handle_image_editor_loaded(
         &mut self,
@@ -661,6 +889,7 @@ impl App {
             self.current_metadata,
             Some(crate::media::metadata::MediaMetadata::Image(_))
         );
+
         view::view(view::ViewContext {
             i18n: &self.i18n,
             screen: self.screen,
@@ -678,6 +907,7 @@ impl App {
             is_image,
             notifications: &self.notifications,
             is_dark_theme,
+            deblur_model_status: self.settings.deblur_model_status(),
         })
     }
 }

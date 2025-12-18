@@ -40,6 +40,12 @@ pub struct AppState {
     /// Used as the initial directory when opening file open dialogs.
     #[serde(default)]
     pub last_open_directory: Option<PathBuf>,
+
+    /// Whether AI deblurring is enabled.
+    /// This is application-managed state, not a user preference.
+    /// The value depends on whether the model has been successfully downloaded and validated.
+    #[serde(default)]
+    pub enable_deblur: bool,
 }
 
 impl AppState {
@@ -232,6 +238,7 @@ mod tests {
         let original = AppState {
             last_save_directory: Some(PathBuf::from("/home/user/documents")),
             last_open_directory: Some(PathBuf::from("/home/user/pictures")),
+            enable_deblur: false,
         };
 
         // Write to CBOR
@@ -271,6 +278,7 @@ mod tests {
         let original = AppState {
             last_save_directory: Some(PathBuf::from("/test/save/directory")),
             last_open_directory: Some(PathBuf::from("/test/open/directory")),
+            enable_deblur: true,
         };
 
         // Save to custom directory
@@ -324,6 +332,7 @@ mod tests {
         let state_a = AppState {
             last_save_directory: Some(PathBuf::from("/path/a")),
             last_open_directory: None,
+            enable_deblur: false,
         };
         state_a.save_to(Some(temp_dir_a.path().to_path_buf()));
 
@@ -332,6 +341,7 @@ mod tests {
         let state_b = AppState {
             last_save_directory: Some(PathBuf::from("/path/b")),
             last_open_directory: None,
+            enable_deblur: true,
         };
         state_b.save_to(Some(temp_dir_b.path().to_path_buf()));
 
@@ -351,6 +361,7 @@ mod tests {
         let state = AppState {
             last_save_directory: Some(PathBuf::from("/test")),
             last_open_directory: None,
+            enable_deblur: false,
         };
 
         // Save should create nested directories

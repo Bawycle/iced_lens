@@ -9,6 +9,7 @@ settings-section-general = General
 settings-section-display = Visualización
 settings-section-video = Vídeo
 settings-section-fullscreen = Pantalla completa
+settings-section-ai = IA / Aprendizaje automático
 select-language-label = Seleccionar idioma:
 language-name-en-US = Inglés
 language-name-fr = Francés
@@ -416,3 +417,46 @@ notification-load-error-io = No se pudo abrir el archivo. Verifica que existe y 
 notification-load-error-svg = No se pudo renderizar el SVG. El archivo puede estar malformado.
 notification-load-error-video = No se pudo reproducir el vídeo. El formato puede no ser compatible.
 notification-load-error-timeout = La carga ha expirado. El archivo puede ser demasiado grande o el sistema está ocupado.
+
+# Configuración de IA
+settings-enable-deblur-label = Desenfoque IA
+settings-enable-deblur-hint = Habilitar el desenfoque de imágenes con IA usando el modelo NAFNet (~92 MB de descarga).
+settings-deblur-model-url-label = URL del modelo
+settings-deblur-model-url-placeholder = https://huggingface.co/...
+settings-deblur-model-url-hint = URL para descargar el modelo NAFNet ONNX.
+settings-deblur-status-label = Estado del modelo
+settings-deblur-status-downloading = Descargando modelo ({ $progress }%)...
+settings-deblur-status-validating = Validando modelo...
+settings-deblur-status-ready = Modelo listo
+settings-deblur-status-error = Error: { $message }
+settings-deblur-status-not-downloaded = Modelo no descargado
+settings-deblur-enabled = Habilitado
+settings-deblur-disabled = Deshabilitado
+
+# Herramienta de desenfoque del editor
+image-editor-tool-deblur = Desenfoque IA
+image-editor-deblur-lossless-warning = Para mejor calidad, exportar como WebP sin pérdida o PNG.
+image-editor-deblur-apply = Aplicar desenfoque
+image-editor-deblur-processing = Procesando
+image-editor-deblur-cancel = Cancelar
+image-editor-deblur-model-not-ready = Habilita primero el desenfoque IA en Configuración
+image-editor-deblur-validating = Validando modelo, por favor espera...
+image-editor-deblur-downloading = Descargando modelo ({ $progress }%)...
+image-editor-deblur-error = Error: { $error }
+image-editor-deblur-already-applied = Desenfoque ya aplicado. Usa Deshacer para revertir si es necesario.
+
+# Sección de ayuda de IA
+help-editor-deblur-title = Desenfoque IA
+help-editor-deblur-desc = Usa IA para mejorar la nitidez de imágenes borrosas con la red neuronal NAFNet.
+help-editor-deblur-enable = Habilitar en Configuración → IA / Aprendizaje automático (descarga modelo de ~92 MB)
+help-editor-deblur-lossless = Para mejor calidad, exportar como WebP sin pérdida o PNG
+
+# Notificaciones de IA
+notification-deblur-success = Imagen desenfocada con éxito
+notification-deblur-error = Error de desenfoque: { $error }
+notification-deblur-download-success = Modelo de desenfoque descargado con éxito
+notification-deblur-download-error = Error al descargar el modelo: { $error }
+notification-deblur-validation-error = Error en la validación del modelo: { $error }
+notification-deblur-ready = El desenfoque IA está listo para usar
+notification-deblur-apply-success = Imagen desenfocada exitosamente
+notification-deblur-apply-error = Error al desenfocar: { $error }

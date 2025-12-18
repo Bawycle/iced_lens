@@ -9,6 +9,7 @@ settings-section-general = Generale
 settings-section-display = Visualizzazione
 settings-section-video = Video
 settings-section-fullscreen = Schermo intero
+settings-section-ai = IA / Apprendimento automatico
 select-language-label = Seleziona lingua:
 language-name-en-US = Inglese
 language-name-fr = Francese
@@ -416,3 +417,46 @@ notification-load-error-io = Impossibile aprire il file. Verifica che esista e d
 notification-load-error-svg = Impossibile renderizzare il SVG. Il file potrebbe essere malformato.
 notification-load-error-video = Impossibile riprodurre il video. Il formato potrebbe non essere supportato.
 notification-load-error-timeout = Caricamento scaduto. Il file potrebbe essere troppo grande o il sistema è occupato.
+
+# Impostazioni IA
+settings-enable-deblur-label = Sfocatura IA
+settings-enable-deblur-hint = Abilita la sfocatura delle immagini con IA usando il modello NAFNet (~92 MB da scaricare).
+settings-deblur-model-url-label = URL del modello
+settings-deblur-model-url-placeholder = https://huggingface.co/...
+settings-deblur-model-url-hint = URL per scaricare il modello NAFNet ONNX.
+settings-deblur-status-label = Stato del modello
+settings-deblur-status-downloading = Download del modello in corso ({ $progress }%)...
+settings-deblur-status-validating = Validazione del modello in corso...
+settings-deblur-status-ready = Modello pronto
+settings-deblur-status-error = Errore: { $message }
+settings-deblur-status-not-downloaded = Modello non scaricato
+settings-deblur-enabled = Abilitato
+settings-deblur-disabled = Disabilitato
+
+# Strumento di sfocatura dell'editor
+image-editor-tool-deblur = Sfocatura IA
+image-editor-deblur-lossless-warning = Per una qualità migliore, esporta come WebP lossless o PNG.
+image-editor-deblur-apply = Applica sfocatura
+image-editor-deblur-processing = Elaborazione in corso
+image-editor-deblur-cancel = Annulla
+image-editor-deblur-model-not-ready = Abilita prima la sfocatura IA nelle impostazioni
+image-editor-deblur-validating = Validazione modello in corso, attendere...
+image-editor-deblur-downloading = Download modello ({ $progress }%)...
+image-editor-deblur-error = Errore: { $error }
+image-editor-deblur-already-applied = Sfocatura già applicata a questa immagine
+
+# Sezione di aiuto IA
+help-editor-deblur-title = Sfocatura IA
+help-editor-deblur-desc = Usa l'IA per migliorare la nitidezza delle immagini sfocate con la rete neurale NAFNet.
+help-editor-deblur-enable = Abilita in Impostazioni → IA / Apprendimento automatico (scarica modello di ~92 MB)
+help-editor-deblur-lossless = Per una qualità migliore, esporta come WebP lossless o PNG
+
+# Notifiche IA
+notification-deblur-success = Immagine sfocata con successo
+notification-deblur-error = Errore di sfocatura: { $error }
+notification-deblur-download-success = Modello di sfocatura scaricato con successo
+notification-deblur-download-error = Impossibile scaricare il modello: { $error }
+notification-deblur-validation-error = Validazione del modello fallita: { $error }
+notification-deblur-ready = La sfocatura IA è pronta per l'uso
+notification-deblur-apply-success = Immagine sfocata con successo
+notification-deblur-apply-error = Errore di sfocatura: { $error }

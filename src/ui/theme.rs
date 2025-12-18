@@ -34,6 +34,16 @@ pub fn error_color() -> Color {
     palette::ERROR_500
 }
 
+/// Standard color for success text.
+pub fn success_text_color() -> Color {
+    palette::SUCCESS_500
+}
+
+/// Standard color for muted/secondary text.
+pub fn muted_text_color() -> Color {
+    palette::GRAY_400
+}
+
 // ============================================================================
 // Fullscreen Overlay Styles
 // ============================================================================

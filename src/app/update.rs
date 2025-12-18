@@ -316,6 +316,121 @@ pub fn handle_settings_message(
             ctx.viewer.set_keyboard_seek_step_secs(step);
             persistence::persist_preferences(ctx.preferences_context())
         }
+        // AI settings events
+        SettingsEvent::RequestEnableDeblur => {
+            use iced::futures::channel::{mpsc, oneshot};
+            use iced::futures::stream;
+            use iced::futures::StreamExt;
+
+            // Start the download/validation process
+            // Set status to downloading and start async task
+            ctx.settings
+                .set_deblur_model_status(crate::media::deblur::ModelStatus::Downloading {
+                    progress: 0.0,
+                });
+
+            let url = ctx.settings.deblur_model_url().to_string();
+
+            // Channels for progress and result
+            let (progress_tx, progress_rx) = mpsc::channel::<f32>(100);
+            let (result_tx, result_rx) = oneshot::channel::<Result<u64, String>>();
+
+            // Spawn the download task
+            let url_clone = url.clone();
+            tokio::spawn(async move {
+                let mut progress_tx = progress_tx;
+                let download_result =
+                    crate::media::deblur::download_model(&url_clone, |progress| {
+                        let _ = progress_tx.try_send(progress);
+                    })
+                    .await;
+
+                // Send the result through oneshot channel
+                let _ = result_tx.send(download_result.map_err(|e| e.to_string()));
+                // progress_tx is dropped here, closing the channel
+            });
+
+            // State for the stream
+            enum DownloadPhase {
+                ReceivingProgress {
+                    progress_rx: mpsc::Receiver<f32>,
+                    result_rx: oneshot::Receiver<Result<u64, String>>,
+                },
+                WaitingForResult {
+                    result_rx: oneshot::Receiver<Result<u64, String>>,
+                },
+                Completed,
+            }
+
+            let download_stream = stream::unfold(
+                DownloadPhase::ReceivingProgress {
+                    progress_rx,
+                    result_rx,
+                },
+                |phase| async move {
+                    match phase {
+                        DownloadPhase::ReceivingProgress {
+                            mut progress_rx,
+                            result_rx,
+                        } => {
+                            // Try to receive progress
+                            match progress_rx.next().await {
+                                Some(progress) => Some((
+                                    Message::DeblurDownloadProgress(progress),
+                                    DownloadPhase::ReceivingProgress {
+                                        progress_rx,
+                                        result_rx,
+                                    },
+                                )),
+                                None => {
+                                    // Progress channel closed, wait for result
+                                    Some((
+                                        Message::DeblurDownloadProgress(1.0), // Show 100%
+                                        DownloadPhase::WaitingForResult { result_rx },
+                                    ))
+                                }
+                            }
+                        }
+                        DownloadPhase::WaitingForResult { result_rx } => {
+                            // Get the download result
+                            match result_rx.await {
+                                Ok(Ok(_bytes)) => Some((
+                                    Message::DeblurDownloadCompleted(Ok(())),
+                                    DownloadPhase::Completed,
+                                )),
+                                Ok(Err(e)) => Some((
+                                    Message::DeblurDownloadCompleted(Err(e)),
+                                    DownloadPhase::Completed,
+                                )),
+                                Err(_) => Some((
+                                    Message::DeblurDownloadCompleted(Err(
+                                        "Download task cancelled".to_string(),
+                                    )),
+                                    DownloadPhase::Completed,
+                                )),
+                            }
+                        }
+                        DownloadPhase::Completed => None, // Terminate the stream
+                    }
+                },
+            );
+
+            Task::stream(download_stream)
+        }
+        SettingsEvent::DisableDeblur => {
+            // User disabled the feature - persist the state and delete the model
+            ctx.app_state.enable_deblur = false;
+            if let Some(key) = ctx.app_state.save() {
+                ctx.notifications
+                    .push(notifications::Notification::warning(&key));
+            }
+            // Delete the model file
+            let _ = std::fs::remove_file(crate::media::deblur::get_model_path());
+            Task::none()
+        }
+        SettingsEvent::DeblurModelUrlChanged(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
     }
 }
 
@@ -381,7 +496,42 @@ pub fn handle_editor_message(
             let last_dir = ctx.app_state.last_save_directory.clone();
             handle_save_as_dialog(editor_state, last_dir)
         }
+        ImageEditorEvent::DeblurRequested => {
+            handle_deblur_request(ctx)
+        }
+        ImageEditorEvent::DeblurCancelRequested => {
+            // Cancel is handled by the editor state itself (sets cancel_requested flag)
+            // The actual inference task will check this flag and stop
+            Task::none()
+        }
     }
+}
+
+/// Handles the request to apply AI deblur to the current image in the editor.
+fn handle_deblur_request(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let Some(editor_state) = ctx.image_editor.as_ref() else {
+        return Task::none();
+    };
+
+    // Get the current working image from the editor
+    let working_image = editor_state.working_image().clone();
+
+    // Run the deblur inference in a blocking task to avoid blocking the UI
+    Task::perform(
+        async move {
+            tokio::task::spawn_blocking(move || {
+                let mut manager = crate::media::deblur::DeblurManager::new();
+                manager.load_session(None)?; // No cancellation for user-initiated deblur
+                manager.deblur(&working_image)
+            })
+            .await
+            .map_err(|e| crate::media::deblur::DeblurError::InferenceFailed(e.to_string()))?
+        },
+        |result: crate::media::deblur::DeblurResult<image_rs::DynamicImage>| match result {
+            Ok(deblurred) => Message::DeblurApplyCompleted(Ok(Box::new(deblurred))),
+            Err(e) => Message::DeblurApplyCompleted(Err(e.to_string())),
+        },
+    )
 }
 
 /// Handles Save As dialog request.

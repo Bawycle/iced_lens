@@ -22,7 +22,7 @@ pub fn render<'a>(state: &'a State, ctx: ViewContext<'a>) -> Element<'a, Message
     let mut main_row = Row::new().spacing(0.0);
 
     if state.sidebar_expanded {
-        let sidebar_model = SidebarModel::from_state(state);
+        let sidebar_model = SidebarModel::from_state(state, &ctx);
         let sidebar = sidebar::expanded(sidebar_model, &ctx);
         main_row = main_row.push(sidebar);
     } else {

@@ -9,6 +9,7 @@ settings-section-general = General
 settings-section-display = Display
 settings-section-video = Video
 settings-section-fullscreen = Fullscreen
+settings-section-ai = AI / Machine Learning
 select-language-label = Select Language:
 language-name-en-US = English
 language-name-fr = French
@@ -416,3 +417,46 @@ notification-load-error-io = Could not open file. Check that it exists and you h
 notification-load-error-svg = Could not render SVG. The file may be malformed.
 notification-load-error-video = Could not play video. The format may be unsupported.
 notification-load-error-timeout = Loading timed out. The file may be too large or the system is busy.
+
+# AI Settings
+settings-enable-deblur-label = AI Deblurring
+settings-enable-deblur-hint = Enable AI-powered image deblurring using the NAFNet model (~92 MB download).
+settings-deblur-model-url-label = Model URL
+settings-deblur-model-url-placeholder = https://huggingface.co/...
+settings-deblur-model-url-hint = URL to download the NAFNet ONNX model from.
+settings-deblur-status-label = Model Status
+settings-deblur-status-downloading = Downloading model ({ $progress }%)...
+settings-deblur-status-validating = Validating model...
+settings-deblur-status-ready = Model ready
+settings-deblur-status-error = Error: { $message }
+settings-deblur-status-not-downloaded = Model not downloaded
+settings-deblur-enabled = Enabled
+settings-deblur-disabled = Disabled
+
+# AI Editor tool
+image-editor-tool-deblur = AI Deblur
+image-editor-deblur-lossless-warning = For best quality, export as WebP lossless or PNG.
+image-editor-deblur-apply = Apply Deblur
+image-editor-deblur-processing = Processing
+image-editor-deblur-cancel = Cancel
+image-editor-deblur-model-not-ready = Enable AI deblur in Settings first
+image-editor-deblur-validating = Validating model, please wait...
+image-editor-deblur-downloading = Downloading model ({ $progress }%)...
+image-editor-deblur-error = Error: { $error }
+image-editor-deblur-already-applied = Deblur already applied. Use Undo to revert if needed.
+
+# AI Help section
+help-editor-deblur-title = AI Deblur
+help-editor-deblur-desc = Use AI to sharpen blurry images using the NAFNet neural network.
+help-editor-deblur-enable = Enable in Settings → AI / Machine Learning (downloads ~92 MB model)
+help-editor-deblur-lossless = For best quality, export as WebP lossless or PNG
+
+# AI Notifications
+notification-deblur-success = Image deblurred successfully
+notification-deblur-error = Deblurring failed: { $error }
+notification-deblur-download-success = Deblur model downloaded successfully
+notification-deblur-download-error = Failed to download deblur model: { $error }
+notification-deblur-validation-error = Model validation failed: { $error }
+notification-deblur-ready = AI Deblur is ready to use
+notification-deblur-apply-success = Image deblurred successfully
+notification-deblur-apply-error = Deblurring failed: { $error }

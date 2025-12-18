@@ -50,6 +50,10 @@ IcedLens aims to provide a simple, privacy‑friendly image viewer and editor fo
   - Crop: overlay with drag handles and preset ratios (Free, Square, 16:9, 9:16, 4:3, 3:4)
   - Resize: slider (10–200%), width/height inputs, aspect lock, and live preview
   - Light: brightness and contrast sliders with real-time preview
+- **AI Deblur** (experimental): neural network-based image deblurring using NAFNet ONNX model
+  - One-time model download (~92 MB) from Hugging Face
+  - Automatic padding for small images, works with any size
+  - Enable in Settings → AI / Machine Learning section
 - **Keyboard shortcuts** keep the workflow fast (E to edit, Ctrl+S, Ctrl+Z/Y, Esc)
 
 ## 3. Screenshots

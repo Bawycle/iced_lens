@@ -9,6 +9,7 @@
 //! - `[display]` - Viewer display settings (zoom, background, sorting)
 //! - `[video]` - Video playback settings (volume, caching, seek step)
 //! - `[fullscreen]` - Fullscreen overlay settings
+//! - `[ai]` - AI/Machine Learning settings (deblurring model)
 //!
 //! # Path Resolution
 //!
@@ -218,6 +219,29 @@ impl Default for FullscreenConfig {
     }
 }
 
+/// AI/Machine Learning settings.
+///
+/// Note: The `enable_deblur` state is stored in persistent application state,
+/// not in configuration, as it's managed by the application (download/validation)
+/// rather than being a user preference.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AiConfig {
+    /// URL for downloading the NAFNet ONNX model.
+    #[serde(
+        default = "default_deblur_model_url",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub deblur_model_url: Option<String>,
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        Self {
+            deblur_model_url: default_deblur_model_url(),
+        }
+    }
+}
+
 // =============================================================================
 // Main Config Struct (Sectioned)
 // =============================================================================
@@ -240,6 +264,10 @@ pub struct Config {
     /// Fullscreen overlay settings.
     #[serde(default)]
     pub fullscreen: FullscreenConfig,
+
+    /// AI/Machine Learning settings.
+    #[serde(default)]
+    pub ai: AiConfig,
 }
 
 // =============================================================================
@@ -310,6 +338,7 @@ impl From<LegacyConfig> for Config {
             fullscreen: FullscreenConfig {
                 overlay_timeout_secs: legacy.overlay_timeout_secs,
             },
+            ai: AiConfig::default(),
         }
     }
 }
@@ -352,6 +381,10 @@ fn default_keyboard_seek_step_secs() -> Option<f64> {
 
 fn default_overlay_timeout_secs() -> Option<u32> {
     Some(DEFAULT_OVERLAY_TIMEOUT_SECS)
+}
+
+fn default_deblur_model_url() -> Option<String> {
+    Some(DEFAULT_DEBLUR_MODEL_URL.to_string())
 }
 
 fn deserialize_theme_mode<'de, D>(deserializer: D) -> std::result::Result<ThemeMode, D::Error>
@@ -503,6 +536,7 @@ mod tests {
             fullscreen: FullscreenConfig {
                 overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
             },
+            ai: AiConfig::default(),
         };
         let temp_dir = tempdir().expect("failed to create temp dir");
         let config_path = temp_dir.path().join("nested").join("settings.toml");
@@ -557,6 +591,7 @@ mod tests {
             fullscreen: FullscreenConfig {
                 overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
             },
+            ai: AiConfig::default(),
         };
 
         save_to_path(&config, &config_path).expect("save should create directories");
@@ -713,6 +748,7 @@ mod tests {
             fullscreen: FullscreenConfig {
                 overlay_timeout_secs: Some(7),
             },
+            ai: AiConfig::default(),
         };
 
         save_with_override(&config, Some(base_dir.clone())).expect("save should succeed");

@@ -3,13 +3,15 @@
 
 pub mod adjustments_panel;
 pub mod crop_panel;
+pub mod deblur_panel;
 pub mod resize_panel;
 
+use crate::media::deblur::ModelStatus;
 use crate::media::frame_export::ExportFormat;
 use crate::ui::action_icons;
 use crate::ui::design_tokens::{sizing, spacing, typography};
 use crate::ui::icons;
-use crate::ui::image_editor::state::{AdjustmentState, CropState, ResizeState};
+use crate::ui::image_editor::state::{AdjustmentState, CropState, DeblurState, ResizeState};
 use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
 use iced::widget::scrollable::{Direction, Scrollbar};
@@ -25,6 +27,7 @@ pub struct SidebarModel<'a> {
     pub crop_state: &'a CropState,
     pub resize_state: &'a ResizeState,
     pub adjustment_state: &'a AdjustmentState,
+    pub deblur_state: &'a DeblurState,
     pub can_undo: bool,
     pub can_redo: bool,
     pub has_unsaved_changes: bool,
@@ -32,20 +35,27 @@ pub struct SidebarModel<'a> {
     pub is_captured_frame: bool,
     /// Selected export format for Save As.
     pub export_format: ExportFormat,
+    /// Current status of the deblur model.
+    pub deblur_model_status: &'a ModelStatus,
+    /// True if deblur has already been applied to this image.
+    pub has_deblur_applied: bool,
 }
 
 impl<'a> SidebarModel<'a> {
-    pub fn from_state(state: &'a State) -> Self {
+    pub fn from_state(state: &'a State, ctx: &ViewContext<'a>) -> Self {
         Self {
             active_tool: state.active_tool,
             crop_state: &state.crop_state,
             resize_state: &state.resize_state,
             adjustment_state: &state.adjustment_state,
+            deblur_state: &state.deblur_state,
             can_undo: state.can_undo(),
             can_redo: state.can_redo(),
             has_unsaved_changes: state.has_unsaved_changes(),
             is_captured_frame: state.is_captured_frame(),
             export_format: state.export_format(),
+            deblur_model_status: ctx.deblur_model_status,
+            has_deblur_applied: state.has_deblur_applied(),
         }
     }
 }
@@ -93,6 +103,21 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
     if model.active_tool == Some(EditorTool::Adjust) {
         scrollable_section =
             scrollable_section.push(adjustments_panel::panel(model.adjustment_state, ctx));
+    }
+
+    let deblur_button = tool_button(
+        ctx.i18n.tr("image-editor-tool-deblur"),
+        SidebarMessage::SelectTool(EditorTool::Deblur),
+        model.active_tool == Some(EditorTool::Deblur),
+    );
+    scrollable_section = scrollable_section.push(deblur_button);
+    if model.active_tool == Some(EditorTool::Deblur) {
+        scrollable_section = scrollable_section.push(deblur_panel::panel(
+            model.deblur_state,
+            model.deblur_model_status,
+            model.has_deblur_applied,
+            ctx,
+        ));
     }
 
     let scrollable = Scrollable::new(scrollable_section)

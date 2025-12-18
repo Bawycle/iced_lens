@@ -39,6 +39,10 @@ pub enum SidebarMessage {
     ApplyAdjustments,
     /// Reset adjustments to default
     ResetAdjustments,
+    /// Apply AI deblurring to the image
+    ApplyDeblur,
+    /// Cancel ongoing deblur operation
+    CancelDeblur,
     Undo,
     Redo,
     NavigateNext,
@@ -74,6 +78,8 @@ pub enum Message {
         bounds: Rectangle,
         offset: AbsoluteOffset,
     },
+    /// Spinner animation tick (for deblur processing overlay)
+    SpinnerTick,
 }
 
 impl From<ToolbarMessage> for Message {
@@ -111,4 +117,8 @@ pub enum Event {
     NavigateNext,
     /// Request to navigate to previous image
     NavigatePrevious,
+    /// Request to apply AI deblurring to the current image
+    DeblurRequested,
+    /// Request to cancel ongoing deblur operation
+    DeblurCancelRequested,
 }

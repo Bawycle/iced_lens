@@ -9,6 +9,7 @@ settings-section-general = Allgemein
 settings-section-display = Anzeige
 settings-section-video = Video
 settings-section-fullscreen = Vollbild
+settings-section-ai = KI / Maschinelles Lernen
 select-language-label = Sprache auswählen:
 language-name-en-US = Englisch
 language-name-fr = Französisch
@@ -416,3 +417,46 @@ notification-load-error-io = Datei konnte nicht geöffnet werden. Prüfen Sie, o
 notification-load-error-svg = SVG konnte nicht gerendert werden. Die Datei ist möglicherweise fehlerhaft.
 notification-load-error-video = Video konnte nicht abgespielt werden. Das Format wird möglicherweise nicht unterstützt.
 notification-load-error-timeout = Laden hat zu lange gedauert. Die Datei ist möglicherweise zu groß oder das System ist ausgelastet.
+
+# KI-Einstellungen
+settings-enable-deblur-label = KI-Entunschärfung
+settings-enable-deblur-hint = KI-gestützte Bildentunschärfung mit dem NAFNet-Modell aktivieren (~92 MB Download).
+settings-deblur-model-url-label = Modell-URL
+settings-deblur-model-url-placeholder = https://huggingface.co/...
+settings-deblur-model-url-hint = URL zum Herunterladen des NAFNet ONNX-Modells.
+settings-deblur-status-label = Modellstatus
+settings-deblur-status-downloading = Modell wird heruntergeladen ({ $progress }%)...
+settings-deblur-status-validating = Modell wird validiert...
+settings-deblur-status-ready = Modell bereit
+settings-deblur-status-error = Fehler: { $message }
+settings-deblur-status-not-downloaded = Modell nicht heruntergeladen
+settings-deblur-enabled = Aktiviert
+settings-deblur-disabled = Deaktiviert
+
+# KI-Editor-Werkzeug
+image-editor-tool-deblur = KI-Entunschärfung
+image-editor-deblur-lossless-warning = Für beste Qualität als verlustfreies WebP oder PNG exportieren.
+image-editor-deblur-apply = Entunschärfung anwenden
+image-editor-deblur-processing = Verarbeitung
+image-editor-deblur-cancel = Abbrechen
+image-editor-deblur-model-not-ready = Aktivieren Sie zuerst KI-Entunschärfung in den Einstellungen
+image-editor-deblur-validating = Modell wird validiert, bitte warten...
+image-editor-deblur-downloading = Modell wird heruntergeladen ({ $progress }%)...
+image-editor-deblur-error = Fehler: { $error }
+image-editor-deblur-already-applied = Entunschärfung bereits angewendet. Verwenden Sie Rückgängig, um bei Bedarf zurückzusetzen.
+
+# KI-Hilfeabschnitt
+help-editor-deblur-title = KI-Entunschärfung
+help-editor-deblur-desc = Verwenden Sie KI, um unscharfe Bilder mit dem neuronalen Netzwerk NAFNet zu schärfen.
+help-editor-deblur-enable = Aktivieren unter Einstellungen → KI / Maschinelles Lernen (lädt ~92 MB Modell herunter)
+help-editor-deblur-lossless = Für beste Qualität als verlustfreies WebP oder PNG exportieren
+
+# KI-Benachrichtigungen
+notification-deblur-success = Bild erfolgreich entschärft
+notification-deblur-error = Entunschärfung fehlgeschlagen: { $error }
+notification-deblur-download-success = Entunschärfungs-Modell erfolgreich heruntergeladen
+notification-deblur-download-error = Herunterladen des Modells fehlgeschlagen: { $error }
+notification-deblur-validation-error = Modellvalidierung fehlgeschlagen: { $error }
+notification-deblur-ready = KI-Entunschärfung ist einsatzbereit
+notification-deblur-apply-success = Bild erfolgreich entunschärft
+notification-deblur-apply-error = Entunschärfung fehlgeschlagen: { $error }

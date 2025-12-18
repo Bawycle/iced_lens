@@ -9,6 +9,7 @@ settings-section-general = Général
 settings-section-display = Affichage
 settings-section-video = Vidéo
 settings-section-fullscreen = Plein écran
+settings-section-ai = IA / Apprentissage automatique
 select-language-label = Sélectionner la langue :
 language-name-en-US = Anglais
 language-name-fr = Français
@@ -416,3 +417,46 @@ notification-load-error-io = Impossible d'ouvrir le fichier. Vérifiez qu'il exi
 notification-load-error-svg = Impossible de rendre le SVG. Le fichier est peut-être malformé.
 notification-load-error-video = Impossible de lire la vidéo. Le format n'est peut-être pas supporté.
 notification-load-error-timeout = Le chargement a expiré. Le fichier est peut-être trop volumineux ou le système est occupé.
+
+# Paramètres IA
+settings-enable-deblur-label = Défloutage IA
+settings-enable-deblur-hint = Activer le défloutage d'images par IA avec le modèle NAFNet (~92 Mo à télécharger).
+settings-deblur-model-url-label = URL du modèle
+settings-deblur-model-url-placeholder = https://huggingface.co/...
+settings-deblur-model-url-hint = URL pour télécharger le modèle NAFNet ONNX.
+settings-deblur-status-label = État du modèle
+settings-deblur-status-downloading = Téléchargement du modèle ({ $progress }%)...
+settings-deblur-status-validating = Validation du modèle...
+settings-deblur-status-ready = Modèle prêt
+settings-deblur-status-error = Erreur : { $message }
+settings-deblur-status-not-downloaded = Modèle non téléchargé
+settings-deblur-enabled = Activé
+settings-deblur-disabled = Désactivé
+
+# Outil défloutage de l'éditeur
+image-editor-tool-deblur = Défloutage IA
+image-editor-deblur-lossless-warning = Pour une meilleure qualité, exportez en WebP sans perte ou PNG.
+image-editor-deblur-apply = Appliquer le défloutage
+image-editor-deblur-processing = Traitement en cours
+image-editor-deblur-cancel = Annuler
+image-editor-deblur-model-not-ready = Activez d'abord le défloutage IA dans les paramètres
+image-editor-deblur-validating = Validation du modèle en cours...
+image-editor-deblur-downloading = Téléchargement du modèle ({ $progress }%)...
+image-editor-deblur-error = Erreur : { $error }
+image-editor-deblur-already-applied = Défloutage déjà appliqué. Utilisez Annuler pour revenir en arrière si nécessaire.
+
+# Section d'aide IA
+help-editor-deblur-title = Défloutage IA
+help-editor-deblur-desc = Utilisez l'IA pour améliorer la netteté des images floues avec le réseau neuronal NAFNet.
+help-editor-deblur-enable = À activer dans Paramètres → IA / Apprentissage automatique (télécharge un modèle de ~92 Mo)
+help-editor-deblur-lossless = Pour une meilleure qualité, exportez en WebP sans perte ou PNG
+
+# Notifications IA
+notification-deblur-success = Image défloutée avec succès
+notification-deblur-error = Échec du défloutage : { $error }
+notification-deblur-download-success = Modèle de défloutage téléchargé avec succès
+notification-deblur-download-error = Échec du téléchargement du modèle : { $error }
+notification-deblur-validation-error = Échec de la validation du modèle : { $error }
+notification-deblur-ready = Le défloutage IA est prêt à l'emploi
+notification-deblur-apply-success = Image défloutée avec succès
+notification-deblur-apply-error = Échec du défloutage : { $error }

@@ -3,6 +3,7 @@
 
 use crate::config::BackgroundTheme;
 use crate::error::{Error, Result};
+use crate::media::deblur::ModelStatus;
 use crate::media::frame_export::{ExportFormat, ExportableFrame};
 use crate::media::ImageData;
 use iced::{Element, Rectangle};
@@ -17,6 +18,8 @@ pub struct ViewContext<'a> {
     pub background_theme: BackgroundTheme,
     /// True if the application is using dark theme.
     pub is_dark_theme: bool,
+    /// Current status of the AI deblur model.
+    pub deblur_model_status: &'a ModelStatus,
 }
 
 impl State {
@@ -38,6 +41,7 @@ impl State {
             crop_modified: false,
             resize_state: state::ResizeState::from_image(&image),
             adjustment_state: state::AdjustmentState::default(),
+            deblur_state: state::DeblurState::default(),
             crop_base_image: None,
             crop_base_width: image.width,
             crop_base_height: image.height,
@@ -74,6 +78,7 @@ impl State {
             crop_modified: false,
             resize_state: state::ResizeState::from_image(&image),
             adjustment_state: state::AdjustmentState::default(),
+            deblur_state: state::DeblurState::default(),
             crop_base_image: None,
             crop_base_width: image.width,
             crop_base_height: image.height,
@@ -100,17 +105,35 @@ pub enum EditorTool {
     Crop,
     Resize,
     Adjust,
+    Deblur,
 }
 
 /// Image transformations that can be applied and undone.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// Note: Deblur stores the result image because the AI model inference
+/// is non-deterministic and expensive to re-run during undo/redo.
+#[derive(Debug, Clone)]
 pub enum Transformation {
     RotateLeft,
     RotateRight,
     FlipHorizontal,
     FlipVertical,
-    Crop { rect: Rectangle },
-    Resize { width: u32, height: u32 },
-    AdjustBrightness { value: i32 },
-    AdjustContrast { value: i32 },
+    Crop {
+        rect: Rectangle,
+    },
+    Resize {
+        width: u32,
+        height: u32,
+    },
+    AdjustBrightness {
+        value: i32,
+    },
+    AdjustContrast {
+        value: i32,
+    },
+    /// AI deblur transformation with cached result for undo/redo.
+    Deblur {
+        /// The deblurred image result (boxed to keep enum size small).
+        result: Box<image_rs::DynamicImage>,
+    },
 }

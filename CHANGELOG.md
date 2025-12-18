@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **AI-powered image deblurring:** new experimental tool using the NAFNet neural network model.
+  - Downloads the ONNX model (~92 MB) from Hugging Face on first use
+  - BLAKE3 checksum verification ensures model integrity
+  - Automatic image padding for small images (works with any size)
+  - Processing overlay with animated spinner during inference
+  - Prevents multiple deblur applications (degrades quality)
+  - Graceful cancellation when closing the app during validation
+  - Full i18n support (en-US, fr, de, es, it)
+  - Enable in Settings → AI / Machine Learning section
 - **Directory path as CLI argument:** The application now accepts a directory path as a command-line argument. When provided, it scans the directory for media files and opens the first one (based on the current sorting settings). If no supported media is found, the application starts without loading any file.
 - **Empty state view:** The application now displays a welcoming UI when no media is loaded:
   - Shows a large icon, title, and helpful instructions

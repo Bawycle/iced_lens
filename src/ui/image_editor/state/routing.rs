@@ -28,6 +28,7 @@ impl State {
                         EditorTool::Crop => self.teardown_crop_tool(),
                         EditorTool::Resize => self.hide_resize_overlay(),
                         EditorTool::Adjust => self.teardown_adjustment_tool(),
+                        EditorTool::Deblur => self.teardown_deblur_tool(),
                         EditorTool::Rotate => {}
                     }
                 } else {
@@ -41,6 +42,9 @@ impl State {
                     if self.active_tool == Some(EditorTool::Adjust) {
                         self.teardown_adjustment_tool();
                     }
+                    if self.active_tool == Some(EditorTool::Deblur) {
+                        self.teardown_deblur_tool();
+                    }
                     self.active_tool = Some(tool);
                     self.preview_image = None;
 
@@ -50,6 +54,7 @@ impl State {
                             // Option A2: No overlay - preview shows directly on canvas
                         }
                         EditorTool::Adjust => self.prepare_adjustment_tool(),
+                        EditorTool::Deblur => self.prepare_deblur_tool(),
                         EditorTool::Rotate => {}
                     }
                 }
@@ -122,6 +127,14 @@ impl State {
             SidebarMessage::ResetAdjustments => {
                 self.sidebar_reset_adjustments();
                 Event::None
+            }
+            SidebarMessage::ApplyDeblur => {
+                self.sidebar_apply_deblur();
+                Event::DeblurRequested
+            }
+            SidebarMessage::CancelDeblur => {
+                self.sidebar_cancel_deblur();
+                Event::DeblurCancelRequested
             }
             SidebarMessage::Undo => {
                 self.commit_active_tool_changes();

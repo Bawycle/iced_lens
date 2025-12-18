@@ -62,6 +62,9 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     cfg.video.muted = Some(ctx.viewer.video_muted());
     cfg.video.loop_enabled = Some(ctx.viewer.video_loop());
 
+    // AI preferences (note: enable_deblur is stored in AppState, not config)
+    cfg.ai.deblur_model_url = Some(ctx.settings.deblur_model_url().to_string());
+
     if config::save(&cfg).is_err() {
         ctx.notifications.push(notifications::Notification::warning(
             "notification-config-save-error",

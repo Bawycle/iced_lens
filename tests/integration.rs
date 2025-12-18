@@ -2,7 +2,7 @@
 use iced_lens::app::paths;
 use iced_lens::app::persisted_state::AppState;
 use iced_lens::config::{
-    self, Config, DisplayConfig, FullscreenConfig, GeneralConfig, VideoConfig,
+    self, AiConfig, Config, DisplayConfig, FullscreenConfig, GeneralConfig, VideoConfig,
     DEFAULT_FRAME_CACHE_MB, DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT,
 };
 use iced_lens::i18n::fluent::I18n;
@@ -53,6 +53,7 @@ fn test_language_change_via_config() {
         fullscreen: FullscreenConfig {
             overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
         },
+        ai: AiConfig::default(),
     };
     config::save_to_path(&initial_config, &temp_config_file_path)
         .expect("Failed to write initial config file");
@@ -88,6 +89,7 @@ fn test_language_change_via_config() {
         fullscreen: FullscreenConfig {
             overlay_timeout_secs: Some(DEFAULT_OVERLAY_TIMEOUT_SECS),
         },
+        ai: AiConfig::default(),
     };
     config::save_to_path(&french_config, &temp_config_file_path)
         .expect("Failed to write french config file");
@@ -116,6 +118,7 @@ fn test_isolated_directories_for_state_and_config() {
     let state = AppState {
         last_save_directory: Some(PathBuf::from("/test/isolated/state")),
         last_open_directory: None,
+        enable_deblur: false,
     };
     let state_result = state.save_to(Some(state_dir.path().to_path_buf()));
     assert!(state_result.is_none(), "state save should succeed");
@@ -180,6 +183,7 @@ fn test_parallel_test_isolation() {
     let state_a = AppState {
         last_save_directory: Some(PathBuf::from("/user/a/downloads")),
         last_open_directory: None,
+        enable_deblur: false,
     };
     state_a.save_to(Some(base_a.clone()));
 
@@ -195,6 +199,7 @@ fn test_parallel_test_isolation() {
     let state_b = AppState {
         last_save_directory: Some(PathBuf::from("/user/b/pictures")),
         last_open_directory: None,
+        enable_deblur: true,
     };
     state_b.save_to(Some(base_b.clone()));
 
@@ -234,6 +239,7 @@ fn test_explicit_override_takes_precedence_over_env_var() {
     let state = AppState {
         last_save_directory: Some(PathBuf::from("/explicit/path")),
         last_open_directory: None,
+        enable_deblur: false,
     };
     state.save_to(Some(explicit_dir.path().to_path_buf()));
 
@@ -270,6 +276,7 @@ fn test_ci_friendly_isolated_tests() {
             let state = AppState {
                 last_save_directory: Some(PathBuf::from(format!("/run/{}/save", i))),
                 last_open_directory: None,
+                enable_deblur: false,
             };
             state.save_to(Some(base.clone()));
 

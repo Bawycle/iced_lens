@@ -24,10 +24,18 @@ impl Toast {
         let severity = notification.severity();
         let accent_color = severity.color();
 
-        // Resolve the message text using i18n
-        // Note: For now we use simple tr() without argument interpolation.
-        // Message keys should be self-contained strings.
-        let message_text = i18n.tr(notification.message_key());
+        // Resolve the message text using i18n with optional arguments
+        let message_text = if notification.message_args().is_empty() {
+            i18n.tr(notification.message_key())
+        } else {
+            // Convert (String, String) to (&str, &str) for tr_with_args
+            let args: Vec<(&str, &str)> = notification
+                .message_args()
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            i18n.tr_with_args(notification.message_key(), &args)
+        };
 
         // Severity icon (PNG icons have fixed colors)
         let icon = Self::severity_icon(severity);
