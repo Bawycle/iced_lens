@@ -31,6 +31,9 @@ CLAUDE.md
 # Added by cargo
 /target
 
+# Python
+/venv/
+
 # External documentation
 .ext_doc/
 
@@ -40,3 +43,4 @@ tests/data/*.avi
 tests/data/*.webm
 tests/data/*.mov
 tests/data/*.mkv
+tests/samples/

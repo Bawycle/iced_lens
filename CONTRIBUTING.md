@@ -13,8 +13,9 @@ Thank you for your interest in contributing to IcedLens! We welcome contribution
 7. [Development Workflow](#development-workflow)
 8. [Pull Request Process](#pull-request-process)
 9. [Project Structure](#project-structure)
-10. [Style Architecture](#style-architecture)
-11. [Notification System](#notification-system)
+10. [Event-Driven Architecture](#event-driven-architecture)
+11. [Style Architecture](#style-architecture)
+12. [Notification System](#notification-system)
 
 ## Code of Conduct
 
@@ -51,7 +52,7 @@ When submitting a bug report, please include:
 
 Feature suggestions are welcome! Before opening a feature request:
 1. Check if a similar feature request already exists
-2. Consider whether the feature aligns with the project's goals (lightweight, privacy-focused image viewing and editing)
+2. Consider whether the feature aligns with the project's goals (privacy-first, local-only media viewing and editing)
 
 When suggesting a feature, please:
 - Describe the **problem** the feature would solve
@@ -205,8 +206,11 @@ Code contributions should follow the project's development practices and quality
 ### Prerequisites
 
 - **Rust 1.92.0 or newer** (install via [rustup](https://rustup.rs/))
+- **FFmpeg development libraries** and **Clang** (see [User Guide](docs/USER_GUIDE.md#requirements) for platform-specific packages)
 - Familiarity with the [Iced GUI framework](https://iced.rs/)
 - Understanding of the project structure (see below)
+
+> **Platform Note:** IcedLens is primarily developed and tested on Linux Mint. While contributions for macOS and Windows compatibility are welcome, please note that these platforms have not been extensively tested. If you're developing on macOS or Windows, consider testing on Linux before submitting PRs that affect platform-specific behavior.
 
 ### Before You Start
 
@@ -373,8 +377,13 @@ iced_lens/
 │   ├── directory_scanner.rs    # Async directory scanning
 │   └── error.rs                # Error types
 ├── assets/
+│   ├── branding/               # Application icon (SVG, PNG, ICO, ICNS)
 │   ├── i18n/                   # Translation files (.ftl)
-│   └── icons/                  # SVG icons
+│   └── icons/                  # UI icons
+│       ├── source/             # SVG sources (not embedded)
+│       └── png/
+│           ├── dark/           # Dark icons (for light backgrounds)
+│           └── light/          # Light icons (for dark backgrounds)
 ├── tests/                      # Integration tests
 ├── benches/                    # Performance benchmarks
 ├── CONTRIBUTING.md             # This file
@@ -408,6 +417,79 @@ Loads and transforms images and video metadata:
 User preferences and application settings:
 - **`defaults.rs`**: Centralized default values for all constants (zoom, volume, cache sizes, etc.). **Always add new defaults here** rather than scattering them across the codebase. Includes compile-time validation to ensure constraints are valid.
 - **`mod.rs`**: User settings persistence (`settings.toml`)
+
+### Event-Driven Architecture
+
+IcedLens follows an event-driven architecture based on the Elm/Iced pattern. Understanding this is critical for contributing code.
+
+#### Core Principles
+
+1. **Each domain owns its state**: The viewer manages viewer state, settings manages settings state, etc.
+2. **State changes via messages**: Components update their state by handling messages, not by external direct mutation.
+3. **App orchestrates via Effects**: Components emit `Effect` enums that the app handles to coordinate between domains.
+4. **No cross-domain mutations**: Avoid patterns like `ctx.viewer.field = value` from app handlers.
+
+#### Message Flow
+
+```
+User Action → Message → Component.handle_message() → (Effect, Task)
+                                                         ↓
+                                                    App handles Effect
+                                                         ↓
+                                                    Dispatch new Messages to other components
+```
+
+#### Example: Correct vs Incorrect Patterns
+
+**❌ Incorrect (direct cross-domain mutation):**
+```rust
+// In app/update.rs - don't do this
+fn handle_delete_last_media(ctx: &mut UpdateContext) {
+    ctx.viewer.current_media_path = None;  // Direct mutation!
+    ctx.viewer.media = None;               // Direct mutation!
+    *ctx.metadata_editor_state = None;
+}
+```
+
+**✅ Correct (message-driven):**
+```rust
+// In app/update.rs
+fn handle_delete_last_media(ctx: &mut UpdateContext) -> Task<Message> {
+    *ctx.metadata_editor_state = None;  // App's own state - OK
+    // Send message to viewer to handle its own state
+    Task::done(Message::Viewer(component::Message::ClearMedia))
+}
+
+// In viewer/component.rs - viewer handles its own state
+Message::ClearMedia => {
+    self.media = None;
+    self.current_media_path = None;
+    self.video_player = None;
+    // ...
+    (Effect::None, Task::none())
+}
+```
+
+#### Key Messages and Effects
+
+| Message | Domain | Purpose |
+|---------|--------|---------|
+| `StartLoadingMedia` | Viewer | Set loading state before async load |
+| `MediaLoaded(Result)` | Viewer | Handle load result, update media state |
+| `ClearMedia` | Viewer | Clear all media state (no media available) |
+
+| Effect | Emitted By | Handled By |
+|--------|------------|------------|
+| `NavigateNext/Previous` | Viewer | App (triggers media loading) |
+| `ToggleFullscreen` | Viewer | App (manages window state) |
+| `EnterEditor` | Viewer | App (screen transition) |
+
+#### Benefits
+
+- **Testability**: Each component can be tested in isolation
+- **Maintainability**: Clear boundaries between domains
+- **Consistency**: State changes happen in predictable places
+- **Debugging**: Easy to trace message flow
 
 ### Path Injection for Testing
 
@@ -524,7 +606,9 @@ let padding = spacing::MD; // 16px
 
 #### 2. Icons (`src/ui/icons.rs`)
 
-Raw SVG assets named by their **visual appearance**, not their function:
+PNG icons named by their **visual appearance**, not their function. Two variants exist:
+- **`icons::*`** - Dark icons from `assets/icons/png/dark/` (for light backgrounds)
+- **`icons::overlay::*`** - Light icons from `assets/icons/png/light/` (for dark backgrounds)
 
 | Icon | Visual Description |
 |------|-------------------|
@@ -534,6 +618,12 @@ Raw SVG assets named by their **visual appearance**, not their function:
 | `ellipsis_horizontal()` | Three horizontal dots (⋯) |
 
 **Naming rule:** Describe what you see, not what it does.
+
+**Adding a new icon:**
+1. Create SVG in `assets/icons/source/`
+2. Generate PNG: `rsvg-convert -w 32 -h 32 source/icon.svg -o png/dark/icon.png`
+3. If needed for overlays: `rsvg-convert ... | convert - -negate png/light/icon.png`
+4. Add to `src/ui/icons.rs` using the `define_icon!` macro
 
 #### 3. Action Icons (`src/ui/action_icons.rs`)
 
@@ -665,10 +755,12 @@ IcedLens uses a toast notification system for user feedback. Understanding when 
 
 | Type | Method | When to use |
 |------|--------|-------------|
-| **Toast Notification** | `notifications.push(...)` | User-initiated actions (save, delete, copy). Non-blocking feedback. |
-| **ErrorDisplay** | `ErrorDisplay::new()` | Content loading failures (image, video). Contextual, shown in viewer area. |
+| **Toast Notification** | `notifications.push(...)` | User-initiated actions (save, delete, copy) and media loading errors (invalid path, corrupted file, timeout). Non-blocking feedback that preserves the current view. |
+| **ErrorDisplay** | `ErrorDisplay::new()` | Reserved for critical blocking errors where the application cannot continue (rare). |
 | **Silent** | Early return / `let else` | Recoverable internal errors with acceptable fallback. |
 | **eprintln!** | `eprintln!()` | Developer info only (FTL parsing). Never for user-facing issues. |
+
+**Note:** Media loading errors use notifications instead of ErrorDisplay to provide a non-blocking UX. When a load fails, the current media is preserved and the user can retry or navigate to another file without dismissing a modal.
 
 ### Adding a Toast Notification
 

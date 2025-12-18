@@ -43,6 +43,28 @@ pub enum Message {
         position_secs: f64,
     },
     Tick(Instant), // Periodic tick for overlay auto-hide
+    /// Trigger the open file dialog from the empty state.
+    OpenFileDialog,
+    /// Result from the open file dialog.
+    OpenFileDialogResult(Option<PathBuf>),
+    /// A file was dropped on the window.
+    FileDropped(PathBuf),
+    /// Result from the metadata Save As dialog.
+    MetadataSaveAsDialogResult(Option<PathBuf>),
+    /// Progress update during deblur model download (0.0 - 1.0).
+    DeblurDownloadProgress(f32),
+    /// Result from deblur model download.
+    DeblurDownloadCompleted(Result<(), String>),
+    /// Result from deblur model validation.
+    /// The boolean indicates whether this is a startup validation (true) vs user-initiated (false).
+    DeblurValidationCompleted {
+        result: Result<(), String>,
+        is_startup: bool,
+    },
+    /// Result from applying AI deblur to an image.
+    DeblurApplyCompleted(Result<Box<image_rs::DynamicImage>, String>),
+    /// Window close was requested (user clicked X or pressed Alt+F4).
+    WindowCloseRequested(iced::window::Id),
 }
 
 /// Runtime flags passed in from the CLI or launcher to tweak startup behavior.

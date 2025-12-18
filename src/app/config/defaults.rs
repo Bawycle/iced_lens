@@ -102,6 +102,14 @@ pub const MIN_FRAME_HISTORY_MB: u32 = 32;
 pub const MAX_FRAME_HISTORY_MB: u32 = 512;
 
 // ==========================================================================
+// AI/Deblur Defaults
+// ==========================================================================
+
+/// Default URL for downloading the NAFNet ONNX deblurring model.
+pub const DEFAULT_DEBLUR_MODEL_URL: &str =
+    "https://huggingface.co/opencv/deblurring_nafnet/resolve/main/deblurring_nafnet_2025may.onnx";
+
+// ==========================================================================
 // Compile-time Validation
 // ==========================================================================
 

@@ -240,6 +240,14 @@ impl VideoPlayer {
         self.at_end_of_stream = true;
     }
 
+    /// Resets the history position to indicate no backward stepping is available.
+    ///
+    /// Called when HistoryExhausted event is received from the decoder,
+    /// indicating that the frame history buffer has been exhausted.
+    pub fn reset_history_position(&mut self) {
+        self.history_position = 0;
+    }
+
     /// Starts or resumes playback.
     ///
     /// State transitions:

@@ -62,6 +62,9 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     cfg.video.muted = Some(ctx.viewer.video_muted());
     cfg.video.loop_enabled = Some(ctx.viewer.video_loop());
 
+    // AI preferences (note: enable_deblur is stored in AppState, not config)
+    cfg.ai.deblur_model_url = Some(ctx.settings.deblur_model_url().to_string());
+
     if config::save(&cfg).is_err() {
         ctx.notifications.push(notifications::Notification::warning(
             "notification-config-save-error",
@@ -103,24 +106,26 @@ pub fn apply_language_change(
 /// This is called after Save As to update the file list when a new image
 /// is saved in the currently viewed directory. The current media remains
 /// selected (no auto-switch to the new file).
-pub fn rescan_directory_if_same(
-    viewer: &mut component::State,
-    media_navigator: &mut MediaNavigator,
-    saved_path: &Path,
-) {
+pub fn rescan_directory_if_same(media_navigator: &mut MediaNavigator, saved_path: &Path) {
     let saved_dir = saved_path.parent();
 
-    // Get the viewer's current directory
-    let viewer_dir = viewer.current_image_path.as_ref().and_then(|p| p.parent());
+    // Get the current directory from media_navigator (single source of truth)
+    let current_dir = media_navigator
+        .current_media_path()
+        .and_then(|p| p.parent());
 
     // Only rescan if both directories exist and match
-    if let (Some(saved), Some(viewer_path)) = (saved_dir, viewer_dir) {
-        if saved == viewer_path {
-            // Rescan the media navigator (single source of truth)
-            let (config, _) = config::load();
-            let sort_order = config.display.sort_order.unwrap_or_default();
-            if let Some(current_path) = viewer.current_image_path.clone() {
-                let _ = media_navigator.scan_directory(&current_path, sort_order);
+    if let (Some(saved), Some(current_path)) = (saved_dir, current_dir) {
+        if saved == current_path {
+            // Clone the path to avoid borrow conflict
+            if let Some(path) = media_navigator
+                .current_media_path()
+                .map(|p| p.to_path_buf())
+            {
+                // Rescan the media navigator
+                let (config, _) = config::load();
+                let sort_order = config.display.sort_order.unwrap_or_default();
+                let _ = media_navigator.scan_directory(&path, sort_order);
             }
         }
     }

@@ -9,6 +9,7 @@ use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{radius, sizing, spacing};
 use crate::ui::icons;
 use crate::ui::styles;
+use iced::widget::image::{Handle, Image};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{button, container, Column, Container, Row, Text},
@@ -21,6 +22,10 @@ pub struct ViewContext<'a> {
     pub menu_open: bool,
     pub can_edit: bool,
     pub info_panel_open: bool,
+    /// Whether media is loaded (used to enable/disable info button).
+    pub has_media: bool,
+    /// Whether metadata editor has unsaved changes (disables edit button).
+    pub metadata_editor_has_changes: bool,
 }
 
 /// Messages emitted by the navbar.
@@ -104,19 +109,34 @@ fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .padding(spacing::XS);
 
     let edit_label = ctx.i18n.tr("navbar-edit-button");
-    let edit_button = if ctx.can_edit {
+    let edit_button = if ctx.metadata_editor_has_changes {
+        // Disabled: metadata editor has unsaved changes
+        button(Text::new(edit_label)).style(styles::button::disabled())
+    } else if ctx.can_edit {
         button(Text::new(edit_label)).on_press(Message::EnterEditor)
     } else {
         button(Text::new(edit_label)).style(styles::button::disabled())
     };
 
     // Info button with toggle styling (highlighted when panel is open)
+    // Disabled when:
+    // - No media is loaded (no metadata to show)
+    // - Panel is open with unsaved changes (can't close it)
     let info_label = ctx.i18n.tr("navbar-info-button");
-    let info_button_base = button(Text::new(info_label)).on_press(Message::ToggleInfoPanel);
-    let info_button = if ctx.info_panel_open {
-        info_button_base.style(styles::button::selected)
+    let info_button = if !ctx.has_media {
+        // No media: disabled
+        button(Text::new(info_label)).style(styles::button::disabled())
+    } else if ctx.info_panel_open && ctx.metadata_editor_has_changes {
+        // Panel open with unsaved changes: disabled (can't close)
+        button(Text::new(info_label)).style(styles::button::selected)
+    } else if ctx.info_panel_open {
+        // Panel open, no unsaved changes: can close
+        button(Text::new(info_label))
+            .on_press(Message::ToggleInfoPanel)
+            .style(styles::button::selected)
     } else {
-        info_button_base // Default style when inactive, like Edit button
+        // Panel closed: can open
+        button(Text::new(info_label)).on_press(Message::ToggleInfoPanel)
     };
 
     let row = Row::new()
@@ -168,7 +188,7 @@ fn build_dropdown<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 
 /// Build a single menu item with icon and label.
 fn build_menu_item<'a>(
-    icon: iced::widget::Svg<'a>,
+    icon: Image<Handle>,
     label: String,
     message: Message,
 ) -> Element<'a, Message> {
@@ -239,6 +259,8 @@ mod tests {
             menu_open: false,
             can_edit: true,
             info_panel_open: false,
+            has_media: true,
+            metadata_editor_has_changes: false,
         };
         let _element = view(ctx);
     }
@@ -251,6 +273,8 @@ mod tests {
             menu_open: true,
             can_edit: true,
             info_panel_open: false,
+            has_media: true,
+            metadata_editor_has_changes: false,
         };
         let _element = view(ctx);
     }
@@ -263,6 +287,22 @@ mod tests {
             menu_open: false,
             can_edit: true,
             info_panel_open: true,
+            has_media: true,
+            metadata_editor_has_changes: false,
+        };
+        let _element = view(ctx);
+    }
+
+    #[test]
+    fn navbar_view_renders_without_media() {
+        let i18n = I18n::default();
+        let ctx = ViewContext {
+            i18n: &i18n,
+            menu_open: false,
+            can_edit: false,
+            info_panel_open: false,
+            has_media: false,
+            metadata_editor_has_changes: false,
         };
         let _element = view(ctx);
     }

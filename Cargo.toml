@@ -1,9 +1,9 @@
 [package]
 name = "iced_lens"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Bawycle"]
-description = "Lightweight, internationalized image viewer and editor built with the Iced GUI toolkit"
+description = "Privacy-first media viewer and editor with AI deblurring"
 repository = "https://codeberg.org/Bawycle/iced_lens"
 homepage = "https://codeberg.org/Bawycle/iced_lens"
 license = "MPL-2.0"
@@ -26,7 +26,7 @@ rust-embed = "8.9.0"
 serde = { version = "1.0.228", features = ["derive"] }
 sys-locale = "0.3.2"
 tiny-skia = "0.11.4"
-toml = "0.9.8"
+toml = "0.9.10"
 unic-langid = "0.9.6"
 iced_core = "0.14.0"
 iced_widget = "0.14.0"
@@ -36,8 +36,25 @@ bytemuck = { version = "1.16", features = ["derive"] }
 ciborium = "0.2"
 wgpu = "27.0"
 cpal = "0.16.0"
+little_exif = "0.6"
 lru = "0.16"
 webp-animation = "0.9.0"
+xmp-writer = "0.3"
+quick-xml = "0.38"
+chrono = "0.4.42"
+
+# AI/ML dependencies
+ort = { version = "2.0.0-rc.10", features = ["ndarray"] }
+ndarray = "0.16"
+blake3 = "1.5"
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+
+[features]
+default = []
+
+[build-dependencies]
+winresource = "0.1"
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
@@ -51,3 +68,28 @@ harness = false # Let Criterion manage the main function
 [[bench]]
 name = "media_navigation"
 harness = false
+
+# Configuration for cargo-bundle (macOS .app and Linux .deb packaging)
+# Install: cargo install cargo-bundle
+# Usage: cargo bundle --release
+[package.metadata.bundle]
+name = "IcedLens"
+identifier = "iced_lens"
+icon = [
+    "assets/branding/iced_lens.icns",
+    "assets/branding/iced_lens-16.png",
+    "assets/branding/iced_lens-32.png",
+    "assets/branding/iced_lens-48.png",
+    "assets/branding/iced_lens-64.png",
+    "assets/branding/iced_lens-128.png",
+    "assets/branding/iced_lens-256.png",
+    "assets/branding/iced_lens-512.png",
+]
+category = "public.app-category.photography"
+short_description = "Privacy-first media viewer and editor"
+long_description = """
+IcedLens is a privacy-first media viewer and editor with AI-powered
+deblurring. Built with the Iced GUI toolkit, it processes everything
+locally with no cloud, no tracking. Supports images, videos, and
+metadata editing.
+"""

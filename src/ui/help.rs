@@ -8,7 +8,7 @@
 use crate::i18n::fluent::I18n;
 use crate::ui::action_icons;
 use crate::ui::design_tokens::{radius, sizing, spacing, typography};
-use crate::ui::styles;
+use iced::widget::image::{Handle, Image};
 use iced::{
     alignment::{Horizontal, Vertical},
     font::Weight,
@@ -163,12 +163,12 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
 fn build_collapsible_section<'a>(
     ctx: &ViewContext<'a>,
     section: HelpSection,
-    icon: iced::widget::Svg<'a>,
+    icon: Image<Handle>,
     title: String,
     content: Element<'a, Message>,
 ) -> Element<'a, Message> {
     let is_expanded = ctx.state.is_expanded(section);
-    let icon_sized = action_icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
+    let icon_sized = action_icons::sized(icon, sizing::ICON_MD);
 
     // Expand/collapse indicator
     let indicator = Text::new(if is_expanded { "▼" } else { "▶" }).size(typography::BODY);
@@ -463,6 +463,14 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(build_bullet(ctx.i18n.tr("help-editor-light-contrast")))
         .push(build_bullet(ctx.i18n.tr("help-editor-light-preview")));
 
+    // AI Deblur tool
+    let deblur_title = build_tool_title(ctx.i18n.tr("help-editor-deblur-title"));
+    let deblur_content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_paragraph(ctx.i18n.tr("help-editor-deblur-desc")))
+        .push(build_bullet(ctx.i18n.tr("help-editor-deblur-enable")))
+        .push(build_bullet(ctx.i18n.tr("help-editor-deblur-lossless")));
+
     // Save options
     let save_title = build_tool_title(ctx.i18n.tr("help-editor-save-title"));
     let save_content = Column::new()
@@ -503,6 +511,8 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(resize_content)
         .push(light_title)
         .push(light_content)
+        .push(deblur_title)
+        .push(deblur_content)
         .push(save_title)
         .push(save_content)
         .push(shortcuts_title)
@@ -560,11 +570,11 @@ const HELP_ICON_SIZE: f32 = 18.0;
 
 /// Build a tool item with an icon, name, and description.
 fn build_tool_item_with_icon<'a>(
-    icon: iced::widget::Svg<'a>,
+    icon: Image<Handle>,
     name: String,
     description: String,
 ) -> Element<'a, Message> {
-    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE).style(styles::tinted_svg);
+    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE);
 
     Row::new()
         .spacing(spacing::SM)
@@ -584,11 +594,8 @@ fn build_tool_item_with_icon<'a>(
 }
 
 /// Build a bullet point with an icon.
-fn build_bullet_with_icon<'a>(
-    icon: iced::widget::Svg<'a>,
-    content: String,
-) -> Element<'a, Message> {
-    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE).style(styles::tinted_svg);
+fn build_bullet_with_icon<'a>(icon: Image<Handle>, content: String) -> Element<'a, Message> {
+    let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE);
 
     Row::new()
         .spacing(spacing::SM)

@@ -4,13 +4,16 @@
 use crate::config::BackgroundTheme;
 use crate::media::ImageData;
 use crate::ui::components::checkerboard;
+use crate::ui::design_tokens::{opacity, radius, spacing, typography};
 use crate::ui::theme;
-use iced::widget::{container, image, Canvas, Stack};
-use iced::{Element, Length};
+use crate::ui::widgets::AnimatedSpinner;
+use iced::alignment::Horizontal;
+use iced::widget::{container, image, text, Canvas, Column, Stack};
+use iced::{Background, Color, Element, Length, Theme};
 
 use super::super::{
     overlay::{CropOverlayRenderer, ResizeOverlayRenderer},
-    CropState, Message, ResizeState, State, ViewContext,
+    CropState, DeblurState, Message, ResizeState, State, ViewContext,
 };
 use super::scrollable_canvas;
 
@@ -18,6 +21,7 @@ pub struct CanvasModel<'a> {
     pub display_image: &'a ImageData,
     pub crop_state: &'a CropState,
     pub resize_state: &'a ResizeState,
+    pub deblur_state: &'a DeblurState,
     pub image_width: f32,
     pub image_height: f32,
 }
@@ -29,6 +33,7 @@ impl<'a> CanvasModel<'a> {
             display_image,
             crop_state: &state.crop_state,
             resize_state: &state.resize_state,
+            deblur_state: &state.deblur_state,
             image_width: display_image.width as f32,
             image_height: display_image.height as f32,
         }
@@ -45,7 +50,49 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
         .width(Length::Fixed(img_width as f32))
         .height(Length::Fixed(img_height as f32));
 
-    let image_with_overlay: Element<'a, Message> = if model.crop_state.overlay.visible {
+    let image_with_overlay: Element<'a, Message> = if model.deblur_state.is_processing {
+        // Deblur processing overlay: animated spinner with text (consistent with media loading)
+        let spinner = AnimatedSpinner::new(
+            theme::overlay_arrow_light_color(),
+            model.deblur_state.spinner_rotation,
+        )
+        .into_element();
+
+        let loading_text =
+            text(ctx.i18n.tr("image-editor-deblur-processing")).size(typography::BODY_LG);
+
+        let loading_content = Column::new()
+            .spacing(spacing::SM)
+            .align_x(Horizontal::Center)
+            .push(spinner)
+            .push(loading_text);
+
+        let loading_overlay =
+            container(loading_content)
+                .padding(spacing::MD)
+                .style(move |_theme: &Theme| container::Style {
+                    background: Some(Background::Color(Color {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: opacity::OVERLAY_MEDIUM,
+                    })),
+                    border: iced::Border {
+                        radius: radius::MD.into(),
+                        ..Default::default()
+                    },
+                    text_color: Some(theme::overlay_arrow_light_color()),
+                    ..Default::default()
+                });
+
+        let overlay = container(loading_overlay)
+            .width(Length::Fixed(img_width as f32))
+            .height(Length::Fixed(img_height as f32))
+            .align_x(Horizontal::Center)
+            .align_y(iced::alignment::Vertical::Center);
+
+        Stack::new().push(image_widget).push(overlay).into()
+    } else if model.crop_state.overlay.visible {
         Stack::new()
             .push(image_widget)
             .push(

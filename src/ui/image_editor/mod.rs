@@ -16,7 +16,7 @@ mod state;
 mod view;
 
 pub use self::state::{
-    AdjustmentState, CropDragState, CropOverlay, CropRatio, CropState, HandlePosition,
+    AdjustmentState, CropDragState, CropOverlay, CropRatio, CropState, DeblurState, HandlePosition,
     ResizeOverlay, ResizeState,
 };
 pub use component::{EditorTool, Transformation, ViewContext};
@@ -70,6 +70,8 @@ pub struct State {
     resize_state: ResizeState,
     /// Adjustment state (brightness/contrast)
     adjustment_state: AdjustmentState,
+    /// Deblur state (AI-powered deblurring)
+    deblur_state: DeblurState,
     /// Optional preview image (used for live adjustments)
     preview_image: Option<ImageData>,
     /// Viewport state for tracking canvas bounds and scroll position
@@ -103,6 +105,20 @@ impl State {
                 self.viewport.update(bounds, offset);
                 Event::None
             }
+            Message::SpinnerTick => {
+                self.deblur_state.tick_spinner();
+                Event::None
+            }
+        }
+    }
+
+    /// Returns the subscriptions needed for the editor (spinner animation during deblur).
+    pub fn subscription(&self) -> iced::Subscription<Message> {
+        if self.deblur_state.is_processing {
+            // Animate spinner at 60 FPS while processing
+            iced::time::every(std::time::Duration::from_millis(16)).map(|_| Message::SpinnerTick)
+        } else {
+            iced::Subscription::none()
         }
     }
 
@@ -111,6 +127,11 @@ impl State {
     /// Get the current image data.
     pub fn current_image(&self) -> &ImageData {
         &self.current_image
+    }
+
+    /// Get the working image for transformations.
+    pub fn working_image(&self) -> &DynamicImage {
+        &self.working_image
     }
 
     /// Get the image source.

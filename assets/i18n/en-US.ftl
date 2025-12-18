@@ -2,14 +2,14 @@
 -app-name = IcedLens
 
 window-title = { -app-name }
-hello-message = Hello, world!
-open-settings-button = Settings
+new-image-title = New Image
 settings-back-to-viewer-button = Back to Viewer
 settings-title = Settings
 settings-section-general = General
 settings-section-display = Display
 settings-section-video = Video
 settings-section-fullscreen = Fullscreen
+settings-section-ai = AI / Machine Learning
 select-language-label = Select Language:
 language-name-en-US = English
 language-name-fr = French
@@ -17,26 +17,21 @@ language-name-es = Spanish
 language-name-de = German
 language-name-it = Italian
 error-load-image-heading = We couldn't open the image.
-error-load-image-general = Something went wrong while loading the image.
-error-load-image-io = We couldn't read this file. Check that it still exists and that you have permission to open it.
-error-load-image-svg = We couldn't render this SVG file. It may be malformed or unsupported.
 error-details-show = Show details
 error-details-hide = Hide details
 error-details-technical-heading = Technical details
 viewer-zoom-label = Zoom
-viewer-zoom-indicator-label = Zoom
 viewer-zoom-input-placeholder = 100
 viewer-zoom-reset-button = Reset
 viewer-fit-to-window-toggle = Fit to window
-viewer-fit-percentage-label = Fit zoom
 viewer-zoom-input-error-invalid = Please enter a valid number.
 viewer-zoom-step-error-invalid = The zoom step must be a number.
 viewer-zoom-step-error-range = The zoom step must be between 1% and 200%.
-viewer-position-label = Position
 viewer-delete-tooltip = Delete the current image
 viewer-zoom-in-tooltip = Zoom in
 viewer-zoom-out-tooltip = Zoom out
 viewer-fullscreen-tooltip = Toggle fullscreen
+viewer-fullscreen-disabled-unsaved = Save or cancel metadata changes first
 viewer-double-click = Double-click
 viewer-scroll-wheel = Scroll wheel
 viewer-click-drag = Click + drag
@@ -57,10 +52,10 @@ help-args-heading = ARGS:
 help-examples-heading = EXAMPLES:
 help-line-option-help = -h, --help        Show this help text
 help-line-option-lang =     --lang <id>    Set locale (e.g. en-US, fr)
-help-arg-image-path = <IMAGE_PATH>      Path to an image file to open
+help-arg-image-path = <PATH>      Path to a media file or directory to open
 help-example-1 = iced_lens ./photo.png
-help-example-2 = iced_lens --lang fr ./image.jpg
-help-example-3 = iced_lens --help
+help-example-2 = iced_lens ./my_photos/
+help-example-3 = iced_lens --lang fr ./image.jpg
 help-description = { -app-name } – Image Viewer
 help-line-option-i18n-dir =     --i18n-dir <path>  Load translations from directory
 help-line-option-data-dir =     --data-dir <path>  Override data directory (state files)
@@ -77,12 +72,10 @@ image-editor-back-to-viewer = Back to Viewer
 image-editor-cancel = Cancel
 image-editor-save = Save
 image-editor-save-as = Save As...
-image-editor-tool-rotate = Rotate
 image-editor-tool-crop = Crop
 image-editor-tool-resize = Resize
 image-editor-tool-light = Light
 image-editor-rotate-section-title = Rotation
-image-editor-rotate-left = Rotate left
 image-editor-rotate-right-tooltip = Rotate image clockwise
 image-editor-rotate-left-tooltip = Rotate image counter-clockwise
 image-editor-flip-section-title = Flip
@@ -114,9 +107,7 @@ image-editor-undo-redo-section-title = Last modification
 image-editor-undo = Undo
 image-editor-redo = Redo
 image-editor-export-format-label = Export format
-error-delete-image-io = We couldn't delete this file. Make sure it isn't open elsewhere and that you can remove it.
 media-loading = Loading...
-error-loading-timeout = Loading timed out. The file may be too large or inaccessible.
 settings-video-autoplay-label = Video autoplay
 settings-video-autoplay-enabled = Enabled
 settings-video-autoplay-disabled = Disabled
@@ -134,10 +125,10 @@ settings-audio-normalization-label = Audio volume normalization
 settings-audio-normalization-enabled = Enabled
 settings-audio-normalization-disabled = Disabled
 settings-audio-normalization-hint = Automatically levels audio volume between different media files to prevent sudden volume changes.
-settings-frame-cache-label = Video frame cache size
-settings-frame-cache-hint = Higher values improve seek performance but use more memory. Changes apply when opening a new video.
-settings-frame-history-label = Frame stepping history size
-settings-frame-history-hint = Memory used for frame-by-frame backward stepping. Only used during stepping mode, not during normal playback.
+settings-frame-cache-label = Keyframe cache size (for seeking)
+settings-frame-cache-hint = Caches video keyframes to speed up timeline scrubbing and jumping to specific times. Higher values store more keyframes for faster seeking. Changes apply when opening a new video.
+settings-frame-history-label = Frame history size (for stepping back)
+settings-frame-history-hint = Stores recently displayed frames to allow stepping backward frame-by-frame. Only used when manually stepping through frames, not during normal playback.
 settings-keyboard-seek-step-label = Keyboard seek step
 settings-keyboard-seek-step-hint = Time to skip when using arrow keys during video playback.
 megabytes = MB
@@ -149,12 +140,8 @@ error-load-video-corrupted = The video file appears to be corrupted or invalid.
 error-load-video-no-video-stream = No video track was found in this file.
 error-load-video-decoding-failed = Video decoding failed: { $message }
 error-load-video-io = We couldn't read this file. Check that it still exists and that you have permission to open it.
-error-video-retry = Retry
-video-editor-unavailable = Video editing is not available in this version.
-video-editor-future = Video editing is planned for a future release.
 
 # Navigation bar
-menu-button-tooltip = Menu
 menu-settings = Settings
 menu-help = Help
 menu-about = About
@@ -165,7 +152,6 @@ help-title = Help
 help-back-to-viewer-button = Back to Viewer
 
 # Common labels
-help-toc-title = Contents
 help-tools-title = Available Tools
 help-shortcuts-title = Keyboard Shortcuts
 help-usage-title = How to Use
@@ -280,6 +266,28 @@ help-capture-step4 = The frame opens in the editor — save as PNG, JPEG, or Web
 
 help-capture-formats = Supported export formats: PNG (lossless), JPEG (smaller file size), WebP (modern format with good compression).
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Metadata Editing Section
+# ─────────────────────────────────────────────────────────────────────────────
+help-section-metadata = Metadata Editing
+help-metadata-role = View and edit EXIF metadata embedded in your image files. Modify camera information, date taken, GPS coordinates, and exposure settings.
+
+help-metadata-tool-view = View mode
+help-metadata-tool-view-desc = See file information, camera details, exposure settings, and GPS coordinates in the info panel.
+help-metadata-tool-edit = Edit mode
+help-metadata-tool-edit-desc = Click the Edit button to modify metadata fields. Changes are validated in real-time.
+help-metadata-tool-save = Save options
+help-metadata-tool-save-desc = Save to update the original file, or Save As to create a copy with the new metadata.
+
+help-metadata-fields-title = Editable Fields
+help-metadata-field-camera = Camera make and model
+help-metadata-field-date = Date taken (EXIF format)
+help-metadata-field-exposure = Exposure time, aperture, ISO
+help-metadata-field-focal = Focal length and 35mm equivalent
+help-metadata-field-gps = GPS latitude and longitude
+
+help-metadata-note = Note: Metadata editing is only available for images. Video metadata editing is planned for a future release.
+
 # About screen
 about-title = About
 about-back-to-viewer-button = Back to Viewer
@@ -312,8 +320,6 @@ notification-frame-capture-success = Frame captured successfully
 notification-frame-capture-error = Failed to capture frame
 notification-delete-success = File deleted successfully
 notification-delete-error = Failed to delete file
-notification-copy-success = Copied to clipboard
-notification-copy-error = Failed to copy to clipboard
 notification-config-save-error = Failed to save settings
 notification-config-load-error = Failed to load settings, using defaults
 notification-state-parse-error = Failed to read app state, using defaults
@@ -330,6 +336,8 @@ notification-video-editing-unsupported = Video editing is not supported yet
 
 # Metadata panel
 metadata-panel-title = File Information
+metadata-panel-close = Close panel
+metadata-panel-close-disabled = Save or cancel changes first
 metadata-section-file = File
 metadata-section-camera = Camera
 metadata-section-exposure = Exposure
@@ -351,5 +359,104 @@ metadata-label-bitrate = Bit rate
 metadata-label-duration = Duration
 metadata-label-fps = Frame rate
 metadata-value-unknown = Unknown
+
+# Metadata editing
+metadata-edit-button = Edit
+metadata-edit-disabled-video = Metadata editing is not available for videos
+metadata-cancel-button = Cancel
+metadata-save-button = Save
+metadata-save-as-button = Save As...
+metadata-save-warning = Save will modify the original file
+metadata-label-make = Make
+metadata-label-model = Model
+metadata-label-focal-length-35mm = Focal length (35mm)
+metadata-label-flash = Flash
+metadata-label-latitude = Latitude
+metadata-label-longitude = Longitude
+metadata-validation-date-format = Format: YYYY:MM:DD HH:MM:SS
+metadata-validation-date-invalid = Invalid date/time values
+metadata-date-placeholder = YYYY-MM-DD HH:MM:SS
+metadata-date-now = Now
+metadata-date-help = Accepts: YYYY-MM-DD, DD/MM/YYYY, etc.
+metadata-validation-exposure-format = Format: 1/250 or 0.004
+metadata-validation-aperture-format = Format: f/2.8 or 2.8
+metadata-validation-iso-positive = Must be a positive integer
+metadata-validation-focal-format = Format: 50 mm or 50
+metadata-validation-lat-range = Must be between -90 and 90
+metadata-validation-lon-range = Must be between -180 and 180
+metadata-validation-invalid-number = Invalid number
+
+# Metadata notifications
+notification-metadata-save-success = Metadata saved successfully
+notification-metadata-save-error = Failed to save metadata
+notification-metadata-validation-error = Please fix validation errors before saving
+
+# Metadata progressive disclosure
+metadata-add-field = Add metadata field...
+metadata-no-fields-message = No metadata fields. Use "Add metadata field" to add fields.
+
+# Dublin Core / XMP metadata
+metadata-section-dublin-core = Dublin Core
+metadata-label-dc-title = Title
+metadata-label-dc-creator = Creator
+metadata-label-dc-description = Description
+metadata-label-dc-subject = Keywords
+metadata-label-dc-rights = Copyright
+
 navbar-info-button = Info
-navbar-info-tooltip = Show file information (I)
+
+# Empty state (no media loaded)
+empty-state-title = No media loaded
+empty-state-subtitle = Drop files here or click to open
+empty-state-button = Open File
+empty-state-drop-hint = Drag and drop images or videos anywhere
+
+# Additional notifications
+notification-empty-dir = No supported media files found in this folder
+notification-load-error-io = Could not open file. Check that it exists and you have permission.
+notification-load-error-svg = Could not render SVG. The file may be malformed.
+notification-load-error-video = Could not play video. The format may be unsupported.
+notification-load-error-timeout = Loading timed out. The file may be too large or the system is busy.
+
+# AI Settings
+settings-enable-deblur-label = AI Deblurring
+settings-enable-deblur-hint = Enable AI-powered image deblurring using the NAFNet model (~92 MB download).
+settings-deblur-model-url-label = Model URL
+settings-deblur-model-url-placeholder = https://huggingface.co/...
+settings-deblur-model-url-hint = URL to download the NAFNet ONNX model from.
+settings-deblur-status-label = Model Status
+settings-deblur-status-downloading = Downloading model ({ $progress }%)...
+settings-deblur-status-validating = Validating model...
+settings-deblur-status-ready = Model ready
+settings-deblur-status-error = Error: { $message }
+settings-deblur-status-not-downloaded = Model not downloaded
+settings-deblur-enabled = Enabled
+settings-deblur-disabled = Disabled
+
+# AI Editor tool
+image-editor-tool-deblur = AI Deblur
+image-editor-deblur-lossless-warning = For best quality, export as WebP lossless or PNG.
+image-editor-deblur-apply = Apply Deblur
+image-editor-deblur-processing = Processing
+image-editor-deblur-cancel = Cancel
+image-editor-deblur-model-not-ready = Enable AI deblur in Settings first
+image-editor-deblur-validating = Validating model, please wait...
+image-editor-deblur-downloading = Downloading model ({ $progress }%)...
+image-editor-deblur-error = Error: { $error }
+image-editor-deblur-already-applied = Deblur already applied. Use Undo to revert if needed.
+
+# AI Help section
+help-editor-deblur-title = AI Deblur
+help-editor-deblur-desc = Use AI to sharpen blurry images using the NAFNet neural network.
+help-editor-deblur-enable = Enable in Settings → AI / Machine Learning (downloads ~92 MB model)
+help-editor-deblur-lossless = For best quality, export as WebP lossless or PNG
+
+# AI Notifications
+notification-deblur-success = Image deblurred successfully
+notification-deblur-error = Deblurring failed: { $error }
+notification-deblur-download-success = Deblur model downloaded successfully
+notification-deblur-download-error = Failed to download deblur model: { $error }
+notification-deblur-validation-error = Model validation failed: { $error }
+notification-deblur-ready = AI Deblur is ready to use
+notification-deblur-apply-success = Image deblurred successfully
+notification-deblur-apply-error = Deblurring failed: { $error }

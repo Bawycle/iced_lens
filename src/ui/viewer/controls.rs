@@ -17,6 +17,8 @@ use iced::{
 #[derive(Clone)]
 pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
+    /// Whether metadata editor has unsaved changes (disables fullscreen).
+    pub metadata_editor_has_changes: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -116,19 +118,35 @@ pub fn view<'a>(
     )
     .gap(spacing::XXS);
 
-    let fullscreen_tooltip = ctx.i18n.tr("viewer-fullscreen-tooltip");
+    // Fullscreen button - disabled when metadata editor has unsaved changes
     let fullscreen_button = button(icons::fill(icons::fullscreen()))
-        .on_press(Message::ToggleFullscreen)
         .padding(spacing::XXS)
         .width(Length::Fixed(shared_styles::ICON_SIZE))
         .height(Length::Fixed(shared_styles::ICON_SIZE));
 
-    // Apply different style when fullscreen is active (highlighted)
-    let fullscreen_button_content: Element<'_, Message> = if is_fullscreen {
-        fullscreen_button.style(styles::button::selected).into()
-    } else {
-        fullscreen_button.into()
-    };
+    let (fullscreen_button_content, fullscreen_tooltip): (Element<'_, Message>, String) =
+        if ctx.metadata_editor_has_changes {
+            // Disabled: cannot toggle fullscreen with unsaved metadata changes
+            (
+                fullscreen_button.style(styles::button::disabled()).into(),
+                ctx.i18n.tr("viewer-fullscreen-disabled-unsaved"),
+            )
+        } else if is_fullscreen {
+            // Highlighted: fullscreen is active
+            (
+                fullscreen_button
+                    .on_press(Message::ToggleFullscreen)
+                    .style(styles::button::selected)
+                    .into(),
+                ctx.i18n.tr("viewer-fullscreen-tooltip"),
+            )
+        } else {
+            // Normal: can toggle fullscreen
+            (
+                fullscreen_button.on_press(Message::ToggleFullscreen).into(),
+                ctx.i18n.tr("viewer-fullscreen-tooltip"),
+            )
+        };
     let fullscreen_toggle = tooltip(
         fullscreen_button_content,
         Text::new(fullscreen_tooltip),
@@ -190,6 +208,14 @@ mod tests {
     fn controls_view_renders() {
         let i18n = I18n::default();
         let zoom = ZoomState::default();
-        let _element = view(ViewContext { i18n: &i18n }, &zoom, true, false);
+        let _element = view(
+            ViewContext {
+                i18n: &i18n,
+                metadata_editor_has_changes: false,
+            },
+            &zoom,
+            true,
+            false,
+        );
     }
 }

@@ -7,28 +7,29 @@
 //! bubble up for the parent application to handle side effects.
 
 use crate::config::{
-    BackgroundTheme, SortOrder, DEFAULT_FRAME_CACHE_MB, DEFAULT_FRAME_HISTORY_MB,
-    DEFAULT_KEYBOARD_SEEK_STEP_SECS, DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_ZOOM_STEP_PERCENT,
-    MAX_FRAME_CACHE_MB, MAX_FRAME_HISTORY_MB, MAX_KEYBOARD_SEEK_STEP_SECS,
-    MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB, MIN_FRAME_HISTORY_MB,
-    MIN_KEYBOARD_SEEK_STEP_SECS, MIN_OVERLAY_TIMEOUT_SECS,
+    BackgroundTheme, SortOrder, DEFAULT_DEBLUR_MODEL_URL, DEFAULT_FRAME_CACHE_MB,
+    DEFAULT_FRAME_HISTORY_MB, DEFAULT_KEYBOARD_SEEK_STEP_SECS, DEFAULT_OVERLAY_TIMEOUT_SECS,
+    DEFAULT_ZOOM_STEP_PERCENT, MAX_FRAME_CACHE_MB, MAX_FRAME_HISTORY_MB,
+    MAX_KEYBOARD_SEEK_STEP_SECS, MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB,
+    MIN_FRAME_HISTORY_MB, MIN_KEYBOARD_SEEK_STEP_SECS, MIN_OVERLAY_TIMEOUT_SECS,
 };
 use crate::i18n::fluent::I18n;
+use crate::media::deblur::ModelStatus;
 use crate::ui::design_tokens::{radius, sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::state::zoom::{
     format_number, MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT, ZOOM_STEP_INVALID_KEY,
     ZOOM_STEP_RANGE_KEY,
 };
-use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
 use crate::ui::theme;
 use crate::ui::theming::ThemeMode;
+use iced::widget::image::{Handle, Image};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
-        button, container, pick_list, rule, scrollable, svg::Svg, text, text_input, Button, Column,
-        Container, Row, Slider, Text,
+        button, container, pick_list, progress_bar, rule, scrollable, text, text_input, Button,
+        Column, Container, Row, Slider, Text,
     },
     Border, Element, Length, Theme,
 };
@@ -55,6 +56,10 @@ pub struct StateConfig {
     pub frame_cache_mb: u32,
     pub frame_history_mb: u32,
     pub keyboard_seek_step_secs: f64,
+    // AI settings
+    pub enable_deblur: bool,
+    pub deblur_model_url: String,
+    pub deblur_model_status: ModelStatus,
 }
 
 impl Default for StateConfig {
@@ -70,6 +75,9 @@ impl Default for StateConfig {
             frame_cache_mb: DEFAULT_FRAME_CACHE_MB,
             frame_history_mb: DEFAULT_FRAME_HISTORY_MB,
             keyboard_seek_step_secs: DEFAULT_KEYBOARD_SEEK_STEP_SECS,
+            enable_deblur: false,
+            deblur_model_url: DEFAULT_DEBLUR_MODEL_URL.to_string(),
+            deblur_model_status: ModelStatus::NotDownloaded,
         }
     }
 }
@@ -90,6 +98,10 @@ pub struct State {
     frame_cache_mb: u32,
     frame_history_mb: u32,
     keyboard_seek_step_secs: f64,
+    // AI settings
+    enable_deblur: bool,
+    deblur_model_url: String,
+    deblur_model_status: ModelStatus,
 }
 
 /// Messages emitted directly by the settings widgets.
@@ -108,6 +120,10 @@ pub enum Message {
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
     KeyboardSeekStepChanged(f64),
+    // AI messages
+    RequestEnableDeblur,
+    DisableDeblur,
+    DeblurModelUrlChanged(String),
 }
 
 /// Events propagated to the parent application for side effects.
@@ -127,6 +143,12 @@ pub enum Event {
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
     KeyboardSeekStepChanged(f64),
+    // AI events
+    /// User requested to enable deblur - triggers download/validation flow.
+    RequestEnableDeblur,
+    /// User requested to disable deblur.
+    DisableDeblur,
+    DeblurModelUrlChanged(String),
 }
 
 /// Language option for the pick_list widget.
@@ -207,6 +229,9 @@ impl State {
             frame_cache_mb: clamped_cache,
             frame_history_mb: clamped_history,
             keyboard_seek_step_secs: clamped_seek_step,
+            enable_deblur: config.enable_deblur,
+            deblur_model_url: config.deblur_model_url,
+            deblur_model_status: config.deblur_model_status,
         }
     }
 
@@ -248,6 +273,32 @@ impl State {
 
     pub fn keyboard_seek_step_secs(&self) -> f64 {
         self.keyboard_seek_step_secs
+    }
+
+    pub fn enable_deblur(&self) -> bool {
+        self.enable_deblur
+    }
+
+    pub fn deblur_model_url(&self) -> &str {
+        &self.deblur_model_url
+    }
+
+    /// Returns the current status of the deblur model.
+    pub fn deblur_model_status(&self) -> &ModelStatus {
+        &self.deblur_model_status
+    }
+
+    /// Updates the deblur model status (called from app when status changes).
+    pub fn set_deblur_model_status(&mut self, status: ModelStatus) {
+        self.deblur_model_status = status;
+    }
+
+    /// Sets the enable_deblur flag (called from app after successful validation).
+    ///
+    /// This should only be called by the application after the model has been
+    /// successfully downloaded and validated, not in response to user UI action.
+    pub fn set_enable_deblur(&mut self, enabled: bool) {
+        self.enable_deblur = enabled;
     }
 
     pub(crate) fn zoom_step_input_value(&self) -> &str {
@@ -296,6 +347,11 @@ impl State {
         // =========================================================================
         let fullscreen_section = self.build_fullscreen_section(&ctx);
 
+        // =========================================================================
+        // SECTION: AI (Deblur model)
+        // =========================================================================
+        let ai_section = self.build_ai_section(&ctx);
+
         let content = Column::new()
             .width(Length::Fill)
             .spacing(spacing::LG)
@@ -306,7 +362,8 @@ impl State {
             .push(general_section)
             .push(display_section)
             .push(video_section)
-            .push(fullscreen_section);
+            .push(fullscreen_section)
+            .push(ai_section);
 
         scrollable(content).into()
     }
@@ -647,6 +704,155 @@ impl State {
         )
     }
 
+    /// Build the AI section (Deblur model).
+    fn build_ai_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+        // Determine if an operation is in progress (downloading or validating)
+        let is_busy = matches!(
+            self.deblur_model_status,
+            ModelStatus::Downloading { .. } | ModelStatus::Validating
+        );
+
+        // Enable/disable deblur toggle
+        let mut enable_row = Row::new().spacing(spacing::XS);
+
+        // "Disabled" button
+        let disable_btn = {
+            let btn = Button::new(Text::new(ctx.i18n.tr("settings-deblur-disabled")));
+            if is_busy {
+                // During operation, button is visually disabled
+                btn.style(button_styles::disabled())
+            } else if !self.enable_deblur {
+                // Currently disabled state - this button shows current state (disabled style)
+                btn.style(button_styles::disabled())
+            } else {
+                // Feature is enabled - this button can be clicked to disable (default style)
+                btn.on_press(Message::DisableDeblur)
+            }
+        };
+        enable_row = enable_row.push(disable_btn);
+
+        // "Enabled" button
+        let enable_btn = {
+            let btn = Button::new(Text::new(ctx.i18n.tr("settings-deblur-enabled")));
+            if is_busy {
+                // During operation, button is visually disabled
+                btn.style(button_styles::disabled())
+            } else if self.enable_deblur {
+                // Currently enabled state - this button shows current state (disabled style)
+                btn.style(button_styles::disabled())
+            } else {
+                // Feature is disabled - this button can be clicked to enable (default style)
+                btn.on_press(Message::RequestEnableDeblur)
+            }
+        };
+        enable_row = enable_row.push(enable_btn);
+
+        let enable_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-enable-deblur-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-enable-deblur-hint"))
+                    .size(typography::BODY_SM)
+                    .into(),
+            ),
+            enable_row.into(),
+        );
+
+        let mut content = Column::new().spacing(spacing::MD).push(enable_setting);
+
+        // Model URL input - show when NOT busy (allow configuration before enabling or when ready)
+        // Hide during download/validation to prevent URL changes during operation
+        if !is_busy {
+            let url_input = text_input(
+                &ctx.i18n.tr("settings-deblur-model-url-placeholder"),
+                &self.deblur_model_url,
+            )
+            .on_input(Message::DeblurModelUrlChanged)
+            .padding(spacing::XXS)
+            .width(Length::Fixed(400.0));
+
+            let url_setting = self.build_setting_row(
+                ctx.i18n.tr("settings-deblur-model-url-label"),
+                Some(
+                    Text::new(ctx.i18n.tr("settings-deblur-model-url-hint"))
+                        .size(typography::BODY_SM)
+                        .into(),
+                ),
+                url_input.into(),
+            );
+
+            content = content.push(url_setting);
+        }
+
+        // Show status and progress when enabled OR when an operation is in progress
+        let show_status = self.enable_deblur || is_busy;
+        if show_status {
+            // Progress bar during download
+            if let ModelStatus::Downloading { progress } = &self.deblur_model_status {
+                let progress_bar_widget = progress_bar(0.0..=1.0, *progress);
+                let progress_percent = format!("{}", (progress * 100.0) as u32);
+                let progress_text = Text::new(ctx.i18n.tr_with_args(
+                    "settings-deblur-status-downloading",
+                    &[("progress", progress_percent.as_str())],
+                ))
+                .size(typography::BODY_SM)
+                .style(|_: &Theme| text::Style {
+                    color: Some(theme::muted_text_color()),
+                });
+
+                let progress_column = Column::new()
+                    .spacing(spacing::XS)
+                    .push(progress_bar_widget)
+                    .push(progress_text);
+
+                let progress_setting = self.build_setting_row(
+                    ctx.i18n.tr("settings-deblur-status-label"),
+                    None,
+                    progress_column.into(),
+                );
+                content = content.push(progress_setting);
+            } else {
+                // Status text for other states
+                let status_text = match &self.deblur_model_status {
+                    ModelStatus::NotDownloaded => {
+                        ctx.i18n.tr("settings-deblur-status-not-downloaded")
+                    }
+                    ModelStatus::Downloading { .. } => unreachable!(),
+                    ModelStatus::Validating => ctx.i18n.tr("settings-deblur-status-validating"),
+                    ModelStatus::Ready => ctx.i18n.tr("settings-deblur-status-ready"),
+                    ModelStatus::Error(msg) => ctx
+                        .i18n
+                        .tr_with_args("settings-deblur-status-error", &[("message", msg.as_str())]),
+                };
+
+                let status_style = match &self.deblur_model_status {
+                    ModelStatus::Ready => theme::success_text_color(),
+                    ModelStatus::Error(_) => theme::error_text_color(),
+                    _ => theme::muted_text_color(),
+                };
+
+                let status_display =
+                    Text::new(status_text)
+                        .size(typography::BODY_SM)
+                        .style(move |_: &Theme| text::Style {
+                            color: Some(status_style),
+                        });
+
+                let status_setting = self.build_setting_row(
+                    ctx.i18n.tr("settings-deblur-status-label"),
+                    None,
+                    status_display.into(),
+                );
+                content = content.push(status_setting);
+            }
+        }
+
+        build_section(
+            icons::cog(),
+            ctx.i18n.tr("settings-section-ai"),
+            content.into(),
+        )
+    }
+
     /// Build the Fullscreen section (Overlay timeout).
     fn build_fullscreen_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         let timeout_slider = Slider::new(
@@ -773,6 +979,19 @@ impl State {
                 step,
                 Event::KeyboardSeekStepChanged,
             ),
+            Message::RequestEnableDeblur => {
+                // Don't set enable_deblur here - it will be set after successful validation
+                Event::RequestEnableDeblur
+            }
+            Message::DisableDeblur => {
+                self.enable_deblur = false;
+                self.deblur_model_status = ModelStatus::NotDownloaded;
+                Event::DisableDeblur
+            }
+            Message::DeblurModelUrlChanged(url) => {
+                self.deblur_model_url = url.clone();
+                Event::DeblurModelUrlChanged(url)
+            }
         }
     }
 
@@ -808,11 +1027,11 @@ impl State {
 
 /// Build a settings section with icon, title, and content.
 fn build_section<'a>(
-    icon: Svg<'a>,
+    icon: Image<Handle>,
     title: String,
     content: Element<'a, Message>,
 ) -> Element<'a, Message> {
-    let icon_sized = icons::sized(icon, sizing::ICON_MD).style(styles::tinted_svg);
+    let icon_sized = icons::sized(icon, sizing::ICON_MD);
 
     let header = Row::new()
         .spacing(spacing::SM)

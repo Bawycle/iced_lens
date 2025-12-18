@@ -74,6 +74,10 @@ impl State {
                 Transformation::AdjustContrast { value } => {
                     image_transform::adjust_contrast(&working_image, *value)
                 }
+                Transformation::Deblur { result } => {
+                    // Use the cached deblurred image (AI inference is expensive)
+                    result.as_ref().clone()
+                }
             };
         }
 

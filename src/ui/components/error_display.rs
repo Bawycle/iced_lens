@@ -24,7 +24,8 @@
 use crate::ui::design_tokens::{palette, radius, sizing, spacing};
 use crate::ui::icons;
 use crate::ui::styles::button as button_styles;
-use iced::widget::{button, container, rule, svg, text, Column, Container, Row, Text};
+use iced::widget::image::{Handle, Image};
+use iced::widget::{button, container, rule, text, Column, Container, Row, Text};
 use iced::{alignment, Color, Element, Length, Theme};
 
 /// Severity level determines the color scheme and default icon.
@@ -50,7 +51,7 @@ impl ErrorSeverity {
     }
 
     /// Returns the appropriate icon for this severity level.
-    pub fn icon<'a>(&self) -> svg::Svg<'a> {
+    pub fn icon(&self) -> Image<Handle> {
         // Warning icon is used for all severity levels as it's the most recognizable
         // The color differentiation handles the severity communication
         icons::warning()
@@ -154,12 +155,8 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
     pub fn view(self) -> Element<'static, Message> {
         let accent_color = self.severity.color();
 
-        // Icon with severity color
-        let icon = icons::sized(self.severity.icon(), sizing::ICON_XL).style(
-            move |_theme: &Theme, _status| svg::Style {
-                color: Some(accent_color),
-            },
-        );
+        // Icon with severity color (PNG icons have fixed colors)
+        let icon = icons::sized(self.severity.icon(), sizing::ICON_XL);
 
         let icon_container = Container::new(icon)
             .width(Length::Shrink)

@@ -1,255 +1,351 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Centralized icon module for SVG icons.
+//! Centralized icon module for PNG icons.
 //!
-//! All UI icons are loaded from `assets/icons/` and exposed as functions
-//! returning [`iced::widget::Svg`] widgets. This ensures consistent icon
-//! management across the application.
+//! PNG format ensures consistent cross-platform rendering (no SVG interpretation
+//! differences on Windows). Icons are embedded at compile time via `include_bytes!`
+//! and handles are cached using `OnceLock` for optimal performance.
+//!
+//! # Module Structure
+//!
+//! - **`icons::*`** - Dark icons (black) from `assets/icons/png/dark/` for light theme
+//! - **`icons::light::*`** - Light icons (white) from `assets/icons/png/light/` for dark theme
+//! - **`icons::overlay::*`** - Light icons for HUD/overlays on dark backgrounds
 //!
 //! # Usage
 //!
 //! ```ignore
 //! use crate::ui::icons;
 //!
-//! let play_button = button(icons::play())
-//!     .on_press(Message::Play);
+//! // For light theme (default)
+//! let play_button = button(icons::play());
+//!
+//! // For dark theme
+//! let play_button = button(icons::light::chevron_double_right());
 //! ```
+//!
+//! For theme-aware icons, use [`action_icons`](super::action_icons) which
+//! automatically selects the correct variant based on theme.
 //!
 //! # Naming Convention
 //!
 //! Icons use generic visual names describing the icon's appearance,
 //! not the action context (e.g., `trash` not `delete_image`).
 
-use iced::widget::svg::{Handle, Svg};
+use iced::widget::image::{Handle, Image};
 use iced::Length;
+use std::sync::OnceLock;
+
+// =============================================================================
+// Macro for icon definition with cached handle
+// =============================================================================
+
+/// Macro to define an icon function with a cached handle.
+/// The handle is created once on first access and reused thereafter.
+macro_rules! define_icon {
+    ($name:ident, $path:literal, $doc:literal) => {
+        #[doc = $doc]
+        pub fn $name() -> Image<Handle> {
+            static HANDLE: OnceLock<Handle> = OnceLock::new();
+            static DATA: &[u8] = include_bytes!($path);
+            let handle = HANDLE.get_or_init(|| Handle::from_bytes(DATA));
+            Image::new(handle.clone())
+        }
+    };
+}
 
 // =============================================================================
 // Video Playback Icons
 // =============================================================================
 
-/// Play icon: triangle pointing right.
-pub fn play<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/play.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Pause icon: two vertical bars.
-pub fn pause<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/pause.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Volume icon: speaker with sound waves.
-pub fn volume<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/volume.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Volume mute icon: speaker with X (crossed out).
-pub fn volume_mute<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/volume_mute.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Loop icon: circular arrows indicating repeat.
-pub fn loop_icon<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/loop.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Camera icon: for frame capture/screenshot.
-pub fn camera<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/camera.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Triangle with bar on right: play/skip next shape (▶|).
-pub fn triangle_bar_right<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/triangle_bar_right.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Triangle with bar on left: skip previous shape (|◀).
-pub fn triangle_bar_left<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/triangle_bar_left.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Horizontal ellipsis: three dots in a row (⋯).
-pub fn ellipsis_horizontal<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/ellipsis_horizontal.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
+define_icon!(
+    play,
+    "../../assets/icons/png/dark/play.png",
+    "Play icon: triangle pointing right."
+);
+define_icon!(
+    pause,
+    "../../assets/icons/png/dark/pause.png",
+    "Pause icon: two vertical bars."
+);
+define_icon!(
+    volume,
+    "../../assets/icons/png/dark/volume.png",
+    "Volume icon: speaker with sound waves."
+);
+define_icon!(
+    volume_mute,
+    "../../assets/icons/png/dark/volume_mute.png",
+    "Volume mute icon: speaker with X (crossed out)."
+);
+define_icon!(
+    loop_icon,
+    "../../assets/icons/png/dark/loop.png",
+    "Loop icon: circular arrows indicating repeat."
+);
+define_icon!(
+    camera,
+    "../../assets/icons/png/dark/camera.png",
+    "Camera icon: for frame capture/screenshot."
+);
+define_icon!(
+    triangle_bar_right,
+    "../../assets/icons/png/dark/triangle_bar_right.png",
+    "Triangle with bar on right: play/skip next shape."
+);
+define_icon!(
+    triangle_bar_left,
+    "../../assets/icons/png/dark/triangle_bar_left.png",
+    "Triangle with bar on left: skip previous shape."
+);
+define_icon!(
+    ellipsis_horizontal,
+    "../../assets/icons/png/dark/ellipsis_horizontal.png",
+    "Horizontal ellipsis: three dots in a row."
+);
 
 // =============================================================================
 // Status & Feedback Icons
 // =============================================================================
 
-/// Warning icon: triangle with exclamation mark.
-pub fn warning<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/warning.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Checkmark icon: check/tick mark for success.
-pub fn checkmark<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/checkmark.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Cross icon: X mark shape (✕).
-pub fn cross<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/cross.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
+define_icon!(
+    warning,
+    "../../assets/icons/png/dark/warning.png",
+    "Warning icon: triangle with exclamation mark."
+);
+define_icon!(
+    checkmark,
+    "../../assets/icons/png/dark/checkmark.png",
+    "Checkmark icon: check/tick mark for success."
+);
+define_icon!(
+    cross,
+    "../../assets/icons/png/dark/cross.png",
+    "Cross icon: X mark shape."
+);
 
 // =============================================================================
 // Zoom & View Icons
 // =============================================================================
 
-/// Zoom in icon: magnifying glass with plus.
-pub fn zoom_in<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/zoom_in.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Zoom out icon: magnifying glass with minus.
-pub fn zoom_out<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/zoom_out.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Refresh icon: circular arrow (used for reset zoom).
-pub fn refresh<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/refresh.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Expand icon: arrows pointing outward (fit-to-window off).
-pub fn expand<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/expand.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Compress icon: arrows pointing inward (fit-to-window on).
-pub fn compress<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/compress.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Fullscreen icon: four corners expanding.
-pub fn fullscreen<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/fullscreen.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
+define_icon!(
+    zoom_in,
+    "../../assets/icons/png/dark/zoom_in.png",
+    "Zoom in icon: magnifying glass with plus."
+);
+define_icon!(
+    zoom_out,
+    "../../assets/icons/png/dark/zoom_out.png",
+    "Zoom out icon: magnifying glass with minus."
+);
+define_icon!(
+    refresh,
+    "../../assets/icons/png/dark/refresh.png",
+    "Refresh icon: circular arrow (used for reset zoom)."
+);
+define_icon!(
+    expand,
+    "../../assets/icons/png/dark/expand.png",
+    "Expand icon: arrows pointing outward (fit-to-window off)."
+);
+define_icon!(
+    compress,
+    "../../assets/icons/png/dark/compress.png",
+    "Compress icon: arrows pointing inward (fit-to-window on)."
+);
+define_icon!(
+    fullscreen,
+    "../../assets/icons/png/dark/fullscreen.png",
+    "Fullscreen icon: four corners expanding."
+);
 
 // =============================================================================
 // Action Icons
 // =============================================================================
 
-/// Trash icon: garbage bin (used for delete).
-pub fn trash<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/trash.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
+define_icon!(
+    trash,
+    "../../assets/icons/png/dark/trash.png",
+    "Trash icon: garbage bin (used for delete)."
+);
+define_icon!(
+    pencil,
+    "../../assets/icons/png/dark/pencil.png",
+    "Pencil icon: for edit actions."
+);
 
 // =============================================================================
 // Transform Icons (Editor)
 // =============================================================================
 
-/// Rotate left icon: counter-clockwise arrow.
-pub fn rotate_left<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/rotate_left.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Rotate right icon: clockwise arrow.
-pub fn rotate_right<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/rotate_right.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Flip horizontal icon: mirror left-right.
-pub fn flip_horizontal<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/flip_horizontal.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Flip vertical icon: mirror top-bottom.
-pub fn flip_vertical<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/flip_vertical.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
+define_icon!(
+    rotate_left,
+    "../../assets/icons/png/dark/rotate_left.png",
+    "Rotate left icon: counter-clockwise arrow."
+);
+define_icon!(
+    rotate_right,
+    "../../assets/icons/png/dark/rotate_right.png",
+    "Rotate right icon: clockwise arrow."
+);
+define_icon!(
+    flip_horizontal,
+    "../../assets/icons/png/dark/flip_horizontal.png",
+    "Flip horizontal icon: mirror left-right."
+);
+define_icon!(
+    flip_vertical,
+    "../../assets/icons/png/dark/flip_vertical.png",
+    "Flip vertical icon: mirror top-bottom."
+);
 
 // =============================================================================
 // Navigation Icons
 // =============================================================================
 
-/// Hamburger menu icon: three horizontal lines.
-pub fn hamburger<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/hamburger.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Help icon: question mark in circle.
-pub fn help<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/help.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Info icon: letter "i" in circle.
-pub fn info<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/info.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
+define_icon!(
+    hamburger,
+    "../../assets/icons/png/dark/hamburger.png",
+    "Hamburger menu icon: three horizontal lines."
+);
+define_icon!(
+    help,
+    "../../assets/icons/png/dark/help.png",
+    "Help icon: question mark in circle."
+);
+define_icon!(
+    info,
+    "../../assets/icons/png/dark/info.png",
+    "Info icon: letter 'i' in circle."
+);
+define_icon!(
+    chevron_double_right,
+    "../../assets/icons/png/dark/chevron_double_right.png",
+    "Double chevron right icon: two chevrons pointing right (>>), used for sidebar collapse."
+);
+define_icon!(
+    chevron_double_left,
+    "../../assets/icons/png/dark/chevron_double_left.png",
+    "Double chevron left icon: two chevrons pointing left (<<), used for sidebar expand."
+);
 
 // =============================================================================
 // Settings Section Icons
 // =============================================================================
 
-/// Globe icon: world/international (for general settings).
-pub fn globe<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/globe.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Image icon: picture frame (for display settings).
-pub fn image<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/image.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
-
-/// Cog icon: gear/settings.
-pub fn cog<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/cog.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
+define_icon!(
+    globe,
+    "../../assets/icons/png/dark/globe.png",
+    "Globe icon: world/international (for general settings)."
+);
+define_icon!(
+    image,
+    "../../assets/icons/png/dark/image.png",
+    "Image icon: picture frame (for display settings)."
+);
+define_icon!(
+    cog,
+    "../../assets/icons/png/dark/cog.png",
+    "Cog icon: gear/settings."
+);
 
 // =============================================================================
 // HUD Indicator Icons
 // =============================================================================
 
-/// Crosshair icon: position indicator.
-pub fn crosshair<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/crosshair.svg");
-    Svg::new(Handle::from_memory(DATA))
+define_icon!(
+    crosshair,
+    "../../assets/icons/png/dark/crosshair.png",
+    "Crosshair icon: position indicator."
+);
+define_icon!(
+    magnifier,
+    "../../assets/icons/png/dark/magnifier.png",
+    "Magnifier icon: simple magnifying glass (for HUD zoom indicator)."
+);
+define_icon!(
+    video_camera,
+    "../../assets/icons/png/dark/video_camera.png",
+    "Video camera icon: camcorder without audio."
+);
+define_icon!(
+    video_camera_audio,
+    "../../assets/icons/png/dark/video_camera_audio.png",
+    "Video camera with audio icon: camcorder with sound wave."
+);
+
+// =============================================================================
+// Light Icons (White variants for dark theme UI)
+// =============================================================================
+
+/// Light icon variants for use with dark theme (white icons on dark backgrounds).
+pub mod light {
+    use super::*;
+
+    define_icon!(
+        chevron_double_right,
+        "../../assets/icons/png/light/chevron_double_right.png",
+        "Double chevron right icon (white): for dark theme UI."
+    );
+    define_icon!(
+        chevron_double_left,
+        "../../assets/icons/png/light/chevron_double_left.png",
+        "Double chevron left icon (white): for dark theme UI."
+    );
+    define_icon!(
+        pencil,
+        "../../assets/icons/png/light/pencil.png",
+        "Pencil icon (white): for dark theme UI."
+    );
 }
 
-/// Magnifier icon: simple magnifying glass (for HUD zoom indicator).
-pub fn magnifier<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/magnifier.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
+// =============================================================================
+// Overlay Icons (Light variants for dark backgrounds)
+// =============================================================================
 
-/// Video camera icon: camcorder without audio.
-pub fn video_camera<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/video_camera.svg");
-    Svg::new(Handle::from_memory(DATA))
-}
+/// Light icon variants for use on dark backgrounds (overlays, HUD).
+pub mod overlay {
+    use super::*;
 
-/// Video camera with audio icon: camcorder with sound wave.
-pub fn video_camera_audio<'a>() -> Svg<'a> {
-    static DATA: &[u8] = include_bytes!("../../assets/icons/video_camera_audio.svg");
-    Svg::new(Handle::from_memory(DATA))
+    define_icon!(
+        play,
+        "../../assets/icons/png/light/play.png",
+        "Play icon (white): for dark overlay backgrounds."
+    );
+    define_icon!(
+        pause,
+        "../../assets/icons/png/light/pause.png",
+        "Pause icon (white): for dark overlay backgrounds."
+    );
+    define_icon!(
+        loop_icon,
+        "../../assets/icons/png/light/loop.png",
+        "Loop icon (white): for dark overlay backgrounds."
+    );
+    define_icon!(
+        warning,
+        "../../assets/icons/png/light/warning.png",
+        "Warning icon (white): for dark overlay backgrounds."
+    );
+    define_icon!(
+        crosshair,
+        "../../assets/icons/png/light/crosshair.png",
+        "Crosshair icon (white): for HUD on dark backgrounds."
+    );
+    define_icon!(
+        magnifier,
+        "../../assets/icons/png/light/magnifier.png",
+        "Magnifier icon (white): for HUD on dark backgrounds."
+    );
+    define_icon!(
+        video_camera,
+        "../../assets/icons/png/light/video_camera.png",
+        "Video camera icon (white): for HUD on dark backgrounds."
+    );
+    define_icon!(
+        video_camera_audio,
+        "../../assets/icons/png/light/video_camera_audio.png",
+        "Video camera with audio icon (white): for HUD on dark backgrounds."
+    );
 }
 
 // =============================================================================
@@ -259,12 +355,12 @@ pub fn video_camera_audio<'a>() -> Svg<'a> {
 /// Creates an icon with specified dimensions.
 ///
 /// This is a convenience wrapper for setting both width and height.
-pub fn sized<'a>(icon: Svg<'a>, size: f32) -> Svg<'a> {
+pub fn sized(icon: Image<Handle>, size: f32) -> Image<Handle> {
     icon.width(Length::Fixed(size)).height(Length::Fixed(size))
 }
 
 /// Creates an icon that fills its container.
-pub fn fill<'a>(icon: Svg<'a>) -> Svg<'a> {
+pub fn fill(icon: Image<Handle>) -> Image<Handle> {
     icon.width(Length::Fill).height(Length::Fill)
 }
 
@@ -278,6 +374,7 @@ mod tests {
         let _ = play();
         let _ = pause();
         let _ = volume();
+        let _ = volume_mute();
         let _ = loop_icon();
         let _ = zoom_in();
         let _ = zoom_out();
@@ -286,6 +383,7 @@ mod tests {
         let _ = compress();
         let _ = fullscreen();
         let _ = trash();
+        let _ = pencil();
         let _ = rotate_left();
         let _ = rotate_right();
         let _ = flip_horizontal();
@@ -304,6 +402,8 @@ mod tests {
         let _ = hamburger();
         let _ = help();
         let _ = info();
+        let _ = chevron_double_right();
+        let _ = chevron_double_left();
         let _ = warning();
         let _ = checkmark();
         let _ = cross();
@@ -312,7 +412,7 @@ mod tests {
     #[test]
     fn sized_helper_works() {
         let icon = sized(play(), 32.0);
-        // Just verify it compiles and returns an Svg
+        // Just verify it compiles and returns an Image
         let _ = icon;
     }
 
@@ -320,5 +420,24 @@ mod tests {
     fn fill_helper_works() {
         let icon = fill(pause());
         let _ = icon;
+    }
+
+    #[test]
+    fn light_icons_load_successfully() {
+        let _ = light::chevron_double_right();
+        let _ = light::chevron_double_left();
+        let _ = light::pencil();
+    }
+
+    #[test]
+    fn overlay_icons_load_successfully() {
+        let _ = overlay::play();
+        let _ = overlay::pause();
+        let _ = overlay::loop_icon();
+        let _ = overlay::warning();
+        let _ = overlay::crosshair();
+        let _ = overlay::magnifier();
+        let _ = overlay::video_camera();
+        let _ = overlay::video_camera_audio();
     }
 }

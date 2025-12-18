@@ -4,12 +4,15 @@
 //! This module provides a common interface for loading, displaying, and manipulating
 //! both image and video files.
 
+pub mod deblur;
 pub mod frame_export;
 pub mod image;
 pub mod image_transform;
 pub mod metadata;
+pub mod metadata_writer;
 pub mod navigator;
 pub mod video;
+pub mod xmp;
 
 use image_rs::AnimationDecoder;
 use std::fs::File;

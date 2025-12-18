@@ -11,7 +11,8 @@ use crate::ui::design_tokens::{
     border, opacity, palette, radius, shadow, sizing, spacing, typography,
 };
 use crate::ui::icons;
-use iced::widget::{button, container, svg, text, Column, Container, Row, Text};
+use iced::widget::image::{Handle, Image};
+use iced::widget::{button, container, text, Column, Container, Row, Text};
 use iced::{alignment, Color, Element, Length, Theme};
 
 /// Toast widget configuration.
@@ -23,17 +24,22 @@ impl Toast {
         let severity = notification.severity();
         let accent_color = severity.color();
 
-        // Resolve the message text using i18n
-        // Note: For now we use simple tr() without argument interpolation.
-        // Message keys should be self-contained strings.
-        let message_text = i18n.tr(notification.message_key());
+        // Resolve the message text using i18n with optional arguments
+        let message_text = if notification.message_args().is_empty() {
+            i18n.tr(notification.message_key())
+        } else {
+            // Convert (String, String) to (&str, &str) for tr_with_args
+            let args: Vec<(&str, &str)> = notification
+                .message_args()
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            i18n.tr_with_args(notification.message_key(), &args)
+        };
 
-        // Severity icon
+        // Severity icon (PNG icons have fixed colors)
         let icon = Self::severity_icon(severity);
-        let icon_widget =
-            icons::sized(icon, sizing::ICON_MD).style(move |_theme: &Theme, _status| svg::Style {
-                color: Some(accent_color),
-            });
+        let icon_widget = icons::sized(icon, sizing::ICON_MD);
 
         // Message text
         let message_widget =
@@ -45,14 +51,10 @@ impl Toast {
 
         // Dismiss button (always visible, uses main text color for good contrast)
         let notification_id = notification.id();
-        let dismiss_button = button(icons::sized(icons::cross(), sizing::ICON_SM).style(
-            |theme: &Theme, _status| svg::Style {
-                color: Some(theme.palette().text),
-            },
-        ))
-        .on_press(Message::Dismiss(notification_id))
-        .padding(spacing::XXS)
-        .style(dismiss_button_style);
+        let dismiss_button = button(icons::sized(icons::cross(), sizing::ICON_SM))
+            .on_press(Message::Dismiss(notification_id))
+            .padding(spacing::XXS)
+            .style(dismiss_button_style);
 
         // Layout: [icon] [message] [dismiss]
         let content = Row::new()
@@ -106,7 +108,7 @@ impl Toast {
     }
 
     /// Returns the appropriate icon for the severity level.
-    fn severity_icon<'a>(severity: Severity) -> svg::Svg<'a> {
+    fn severity_icon(severity: Severity) -> Image<Handle> {
         match severity {
             Severity::Success => icons::checkmark(),
             Severity::Info => icons::info(),

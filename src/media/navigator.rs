@@ -63,6 +63,28 @@ impl MediaNavigator {
         Ok(())
     }
 
+    /// Scans a directory directly for media files and selects the first one.
+    ///
+    /// Returns `Ok(Some(path))` with the first media file path if any media is found,
+    /// or `Ok(None)` if the directory contains no supported media files.
+    /// Returns an error if the directory cannot be read.
+    pub fn scan_from_directory(
+        &mut self,
+        directory: &Path,
+        sort_order: SortOrder,
+    ) -> Result<Option<PathBuf>> {
+        self.media_list = ImageList::scan_directory_direct(directory, sort_order)?;
+
+        if let Some(first_path) = self.media_list.first() {
+            let path = first_path.to_path_buf();
+            self.current_media_path = Some(path.clone());
+            Ok(Some(path))
+        } else {
+            self.current_media_path = None;
+            Ok(None)
+        }
+    }
+
     /// Returns the path to the current media, if set.
     pub fn current_media_path(&self) -> Option<&Path> {
         self.current_media_path.as_deref()
@@ -478,5 +500,76 @@ mod tests {
     fn navigate_previous_image_returns_none_for_empty_navigator() {
         let mut nav = MediaNavigator::new();
         assert_eq!(nav.navigate_previous_image(), None);
+    }
+
+    // Tests for scan_from_directory
+    #[test]
+    fn scan_from_directory_finds_first_media() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img_a = create_test_image(temp_dir.path(), "a.jpg");
+        let _img_b = create_test_image(temp_dir.path(), "b.png");
+        let _vid = create_test_video(temp_dir.path(), "c.mp4");
+
+        let mut nav = MediaNavigator::new();
+        let result = nav
+            .scan_from_directory(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        assert_eq!(result, Some(img_a.clone()));
+        assert_eq!(nav.current_media_path(), Some(img_a.as_path()));
+        assert_eq!(nav.len(), 3);
+    }
+
+    #[test]
+    fn scan_from_directory_returns_none_for_empty_directory() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+
+        let mut nav = MediaNavigator::new();
+        let result = nav
+            .scan_from_directory(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        assert_eq!(result, None);
+        assert_eq!(nav.current_media_path(), None);
+        assert!(nav.is_empty());
+    }
+
+    #[test]
+    fn scan_from_directory_returns_none_for_no_media_files() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        // Create non-media files
+        let txt_path = temp_dir.path().join("readme.txt");
+        fs::File::create(&txt_path).expect("failed to create txt file");
+
+        let mut nav = MediaNavigator::new();
+        let result = nav
+            .scan_from_directory(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        assert_eq!(result, None);
+        assert_eq!(nav.current_media_path(), None);
+    }
+
+    #[test]
+    fn scan_from_directory_enables_navigation() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img_a = create_test_image(temp_dir.path(), "a.jpg");
+        let img_b = create_test_image(temp_dir.path(), "b.png");
+        let img_c = create_test_image(temp_dir.path(), "c.gif");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_from_directory(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // Should start at first media
+        assert_eq!(nav.current_media_path(), Some(img_a.as_path()));
+
+        // Navigate to next
+        let next = nav.navigate_next();
+        assert_eq!(next.as_deref(), Some(img_b.as_path()));
+
+        // Navigate to next again
+        let next = nav.navigate_next();
+        assert_eq!(next.as_deref(), Some(img_c.as_path()));
     }
 }
