@@ -334,12 +334,8 @@ impl App {
             }
         }
 
-        // All other screens: use viewer's current media path
-        let file_name = self.viewer.current_media_path.as_ref().and_then(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .map(String::from)
-        });
+        // All other screens: try dc:title first, then fall back to filename
+        let display_title = self.get_media_display_title();
 
         // Check for metadata editor unsaved changes
         let metadata_has_changes = self
@@ -348,16 +344,38 @@ impl App {
             .map(|editor| editor.has_changes())
             .unwrap_or(false);
 
-        match file_name {
-            Some(name) => {
+        match display_title {
+            Some(title) => {
                 if metadata_has_changes {
-                    format!("*{name} - {app_name}")
+                    format!("*{title} - {app_name}")
                 } else {
-                    format!("{name} - {app_name}")
+                    format!("{title} - {app_name}")
                 }
             }
             None => app_name,
         }
+    }
+
+    /// Gets the display title for the current media.
+    /// Prefers dc:title (Dublin Core) if available, falls back to filename.
+    fn get_media_display_title(&self) -> Option<String> {
+        // First, try to get dc:title from Dublin Core metadata
+        if let Some(media::metadata::MediaMetadata::Image(image_meta)) =
+            self.current_metadata.as_ref()
+        {
+            if let Some(ref dc_title) = image_meta.dc_title {
+                if !dc_title.is_empty() {
+                    return Some(dc_title.clone());
+                }
+            }
+        }
+
+        // Fall back to filename
+        self.viewer.current_media_path.as_ref().and_then(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(String::from)
+        })
     }
 
     fn theme(&self) -> Theme {

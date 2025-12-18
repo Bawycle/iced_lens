@@ -374,6 +374,9 @@ metadata-label-latitude = Latitudine
 metadata-label-longitude = Longitudine
 metadata-validation-date-format = Formato: AAAA:MM:GG HH:MM:SS
 metadata-validation-date-invalid = Valori di data/ora non validi
+metadata-date-placeholder = AAAA-MM-GG HH:MM:SS
+metadata-date-now = Adesso
+metadata-date-help = Accetta: AAAA-MM-GG, GG/MM/AAAA, ecc.
 metadata-validation-exposure-format = Formato: 1/250 o 0.004
 metadata-validation-aperture-format = Formato: f/2.8 o 2.8
 metadata-validation-iso-positive = Deve essere un numero intero positivo
@@ -390,6 +393,14 @@ notification-metadata-validation-error = Correggi gli errori di validazione prim
 # Divulgazione progressiva dei metadati
 metadata-add-field = Aggiungi campo metadati...
 metadata-no-fields-message = Nessun campo metadati. Usa "Aggiungi campo metadati" per aggiungere campi.
+
+# Metadati Dublin Core / XMP
+metadata-section-dublin-core = Dublin Core
+metadata-label-dc-title = Titolo
+metadata-label-dc-creator = Creatore
+metadata-label-dc-description = Descrizione
+metadata-label-dc-subject = Parole chiave
+metadata-label-dc-rights = Copyright
 
 navbar-info-button = Info
 

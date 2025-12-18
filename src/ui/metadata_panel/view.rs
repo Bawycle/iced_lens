@@ -155,9 +155,12 @@ fn build_header_buttons<'a>(
         )
     };
 
-    let close_button =
-        tooltip::Tooltip::new(close_btn, Text::new(close_tooltip), tooltip::Position::Bottom)
-            .gap(spacing::XXS);
+    let close_button = tooltip::Tooltip::new(
+        close_btn,
+        Text::new(close_tooltip),
+        tooltip::Position::Bottom,
+    )
+    .gap(spacing::XXS);
 
     buttons.push(close_button)
 }
@@ -181,17 +184,22 @@ fn build_edit_content<'a>(ctx: &PanelContext<'a>, _meta: &ImageMetadata) -> Elem
 
     let mut sections = Column::new().spacing(spacing::MD);
 
-    // Camera section (only if has visible fields)
+    // Dublin Core / XMP section first (user-facing metadata)
+    if let Some(dc_section) = build_dublin_core_section_edit(ctx.i18n, editor) {
+        sections = sections.push(dc_section);
+    }
+
+    // Camera section
     if let Some(camera_section) = build_camera_section_edit(ctx.i18n, editor) {
         sections = sections.push(camera_section);
     }
 
-    // Exposure section (only if has visible fields)
+    // Exposure section
     if let Some(exposure_section) = build_exposure_section_edit(ctx.i18n, editor) {
         sections = sections.push(exposure_section);
     }
 
-    // GPS section (only if has visible fields)
+    // GPS section
     if let Some(gps_section) = build_gps_section_edit(ctx.i18n, editor) {
         sections = sections.push(gps_section);
     }
@@ -300,13 +308,12 @@ fn build_camera_section_edit<'a>(
         has_fields = true;
     }
 
-    // Date Taken
+    // Date Taken (uses smart date picker component)
     if editor.is_field_visible(&MetadataField::DateTaken) {
-        rows = rows.push(build_edit_field_with_remove(
+        rows = rows.push(build_date_field_with_remove(
+            i18n,
             i18n.tr("metadata-label-date-taken"),
             &editor.edited.date_taken,
-            MetadataField::DateTaken,
-            Some(i18n.tr("metadata-validation-date-format")),
             editor.errors.date_taken.as_ref(),
         ));
         has_fields = true;
@@ -427,6 +434,84 @@ fn build_gps_section_edit<'a>(
     ))
 }
 
+fn build_dublin_core_section_edit<'a>(
+    i18n: &'a I18n,
+    editor: &MetadataEditorState,
+) -> Option<Element<'a, Message>> {
+    let mut rows = Column::new().spacing(spacing::XS);
+    let mut has_fields = false;
+
+    // Title
+    if editor.is_field_visible(&MetadataField::DcTitle) {
+        rows = rows.push(build_edit_field_with_remove(
+            i18n.tr("metadata-label-dc-title"),
+            &editor.edited.dc_title,
+            MetadataField::DcTitle,
+            Some("Photo Title".to_string()),
+            None,
+        ));
+        has_fields = true;
+    }
+
+    // Creator
+    if editor.is_field_visible(&MetadataField::DcCreator) {
+        rows = rows.push(build_edit_field_with_remove(
+            i18n.tr("metadata-label-dc-creator"),
+            &editor.edited.dc_creator,
+            MetadataField::DcCreator,
+            Some("John Doe".to_string()),
+            None,
+        ));
+        has_fields = true;
+    }
+
+    // Description
+    if editor.is_field_visible(&MetadataField::DcDescription) {
+        rows = rows.push(build_edit_field_with_remove(
+            i18n.tr("metadata-label-dc-description"),
+            &editor.edited.dc_description,
+            MetadataField::DcDescription,
+            Some("A beautiful sunset".to_string()),
+            None,
+        ));
+        has_fields = true;
+    }
+
+    // Subject (Keywords)
+    if editor.is_field_visible(&MetadataField::DcSubject) {
+        rows = rows.push(build_edit_field_with_remove(
+            i18n.tr("metadata-label-dc-subject"),
+            &editor.edited.dc_subject,
+            MetadataField::DcSubject,
+            Some("sunset, nature, landscape".to_string()),
+            None,
+        ));
+        has_fields = true;
+    }
+
+    // Rights (Copyright)
+    if editor.is_field_visible(&MetadataField::DcRights) {
+        rows = rows.push(build_edit_field_with_remove(
+            i18n.tr("metadata-label-dc-rights"),
+            &editor.edited.dc_rights,
+            MetadataField::DcRights,
+            Some("(c) 2024 John Doe".to_string()),
+            None,
+        ));
+        has_fields = true;
+    }
+
+    if has_fields {
+        Some(build_section(
+            icons::info(),
+            i18n.tr("metadata-section-dublin-core"),
+            rows.into(),
+        ))
+    } else {
+        None
+    }
+}
+
 /// Build an editable field with label, input, and optional error.
 fn build_edit_field<'a>(
     label: String,
@@ -503,6 +588,157 @@ fn build_edit_field_with_remove<'a>(
     col.into()
 }
 
+/// Build a smart date/time field with single input and intelligent parsing.
+///
+/// Accepts multiple date formats and converts to EXIF format (YYYY:MM:DD HH:MM:SS).
+/// Includes a "Now" button for quick current date/time input.
+fn build_date_field_with_remove<'a>(
+    i18n: &'a I18n,
+    label: String,
+    value: &str,
+    error: Option<&String>,
+) -> Element<'a, Message> {
+    let mut col = Column::new().spacing(spacing::XXS);
+
+    // Label row with remove button
+    let label_row = Row::new()
+        .spacing(spacing::XS)
+        .align_y(Vertical::Center)
+        .push(text(format!("{}:", label)).size(typography::BODY_SM))
+        .push(iced::widget::Space::new().width(Length::Fill))
+        .push(
+            button(icons::sized(icons::cross(), sizing::ICON_SM))
+                .on_press(Message::RemoveField(MetadataField::DateTaken))
+                .padding(spacing::XXS),
+        );
+    col = col.push(label_row);
+
+    // Format the display value for better readability
+    let display_value = format_date_for_display(value);
+
+    // Input row with "Now" button
+    let input_row = Row::new()
+        .spacing(spacing::XS)
+        .align_y(Vertical::Center)
+        .push(
+            text_input(&i18n.tr("metadata-date-placeholder"), &display_value)
+                .on_input(|v| {
+                    // Parse and convert to EXIF format
+                    let exif_date = parse_date_input(&v);
+                    Message::FieldChanged(MetadataField::DateTaken, exif_date)
+                })
+                .padding(spacing::XS)
+                .size(typography::BODY)
+                .width(Length::Fill),
+        )
+        .push(
+            button(text(i18n.tr("metadata-date-now")).size(typography::BODY_SM))
+                .on_press(Message::FieldChanged(
+                    MetadataField::DateTaken,
+                    get_current_datetime_exif(),
+                ))
+                .padding(spacing::XS),
+        );
+    col = col.push(input_row);
+
+    // Help text
+    col = col.push(
+        text(i18n.tr("metadata-date-help"))
+            .size(typography::CAPTION)
+            .color(palette::GRAY_400),
+    );
+
+    // Error message if present
+    if let Some(err) = error {
+        col = col.push(
+            text(err.clone())
+                .size(typography::CAPTION)
+                .color(palette::ERROR_500),
+        );
+    }
+
+    col.into()
+}
+
+/// Format a date string for display (more readable format).
+fn format_date_for_display(value: &str) -> String {
+    if value.is_empty() {
+        return String::new();
+    }
+
+    // Try to parse EXIF format and display in a more readable way
+    if let Some(dt) = parse_exif_datetime(value) {
+        return dt.format("%Y-%m-%d %H:%M:%S").to_string();
+    }
+
+    // Return as-is if can't parse
+    value.to_string()
+}
+
+/// Parse EXIF datetime format (YYYY:MM:DD HH:MM:SS).
+fn parse_exif_datetime(value: &str) -> Option<chrono::NaiveDateTime> {
+    use chrono::NaiveDateTime;
+
+    // EXIF format: "YYYY:MM:DD HH:MM:SS"
+    NaiveDateTime::parse_from_str(value, "%Y:%m:%d %H:%M:%S").ok()
+}
+
+/// Parse various date input formats and convert to EXIF format.
+fn parse_date_input(input: &str) -> String {
+    use chrono::{NaiveDate, NaiveDateTime};
+
+    let input = input.trim();
+    if input.is_empty() {
+        return String::new();
+    }
+
+    // List of formats to try (with time)
+    let datetime_formats = [
+        "%Y-%m-%d %H:%M:%S", // ISO: 2024-03-15 14:30:00
+        "%Y-%m-%d %H:%M",    // ISO without seconds: 2024-03-15 14:30
+        "%Y:%m:%d %H:%M:%S", // EXIF: 2024:03:15 14:30:00
+        "%d/%m/%Y %H:%M:%S", // European: 15/03/2024 14:30:00
+        "%d/%m/%Y %H:%M",    // European without seconds: 15/03/2024 14:30
+        "%d-%m-%Y %H:%M:%S", // European with dashes: 15-03-2024 14:30:00
+        "%d-%m-%Y %H:%M",    // European with dashes: 15-03-2024 14:30
+        "%Y/%m/%d %H:%M:%S", // Alternative: 2024/03/15 14:30:00
+        "%Y/%m/%d %H:%M",    // Alternative: 2024/03/15 14:30
+    ];
+
+    // Try datetime formats first
+    for fmt in &datetime_formats {
+        if let Ok(dt) = NaiveDateTime::parse_from_str(input, fmt) {
+            return dt.format("%Y:%m:%d %H:%M:%S").to_string();
+        }
+    }
+
+    // List of date-only formats to try
+    let date_formats = [
+        "%Y-%m-%d", // ISO: 2024-03-15
+        "%Y:%m:%d", // EXIF date only: 2024:03:15
+        "%d/%m/%Y", // European: 15/03/2024
+        "%d-%m-%Y", // European with dashes: 15-03-2024
+        "%Y/%m/%d", // Alternative: 2024/03/15
+    ];
+
+    // Try date-only formats (add midnight time)
+    for fmt in &date_formats {
+        if let Ok(d) = NaiveDate::parse_from_str(input, fmt) {
+            let dt = d.and_hms_opt(0, 0, 0).unwrap();
+            return dt.format("%Y:%m:%d %H:%M:%S").to_string();
+        }
+    }
+
+    // If nothing matches, return input as-is (will fail validation if invalid)
+    input.to_string()
+}
+
+/// Get current date/time in EXIF format.
+fn get_current_datetime_exif() -> String {
+    use chrono::Local;
+    Local::now().format("%Y:%m:%d %H:%M:%S").to_string()
+}
+
 /// Wrapper for MetadataField to implement Display for pick_list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FieldOption {
@@ -519,11 +755,19 @@ impl std::fmt::Display for FieldOption {
 /// Build the "Add field" picker dropdown.
 fn build_add_field_picker<'a>(i18n: &'a I18n, available: &[MetadataField]) -> Element<'a, Message> {
     // Create options with display labels
+    // Order is determined by MetadataField::all() (Dublin Core first, then EXIF)
     let options: Vec<FieldOption> = available
         .iter()
         .map(|&field| FieldOption {
             field,
             label: match field {
+                // Dublin Core / XMP fields (user-facing metadata)
+                MetadataField::DcTitle => "Title",
+                MetadataField::DcCreator => "Creator",
+                MetadataField::DcDescription => "Description",
+                MetadataField::DcSubject => "Keywords",
+                MetadataField::DcRights => "Copyright",
+                // EXIF fields (technical metadata)
                 MetadataField::CameraMake => "Camera make",
                 MetadataField::CameraModel => "Camera model",
                 MetadataField::DateTaken => "Date taken",
@@ -558,9 +802,20 @@ fn build_add_field_picker<'a>(i18n: &'a I18n, available: &[MetadataField]) -> El
 fn build_image_metadata_view<'a>(i18n: &'a I18n, meta: &ImageMetadata) -> Element<'a, Message> {
     let mut sections = Column::new().spacing(spacing::MD);
 
-    // File section
+    // File section (always first - basic file info)
     let file_section = build_file_section_image(i18n, meta);
     sections = sections.push(file_section);
+
+    // Dublin Core / XMP section (user-facing metadata, shown second)
+    if meta.dc_title.is_some()
+        || meta.dc_creator.is_some()
+        || meta.dc_description.is_some()
+        || meta.dc_subject.is_some()
+        || meta.dc_rights.is_some()
+    {
+        let dc_section = build_dublin_core_section_view(i18n, meta);
+        sections = sections.push(dc_section);
+    }
 
     // Camera section (if available)
     if meta.camera_make.is_some() || meta.camera_model.is_some() || meta.date_taken.is_some() {
@@ -774,6 +1029,56 @@ fn build_gps_section_view<'a>(i18n: &'a I18n, meta: &ImageMetadata) -> Element<'
     }
 
     build_section(icons::globe(), i18n.tr("metadata-section-gps"), rows.into())
+}
+
+fn build_dublin_core_section_view<'a>(
+    i18n: &'a I18n,
+    meta: &ImageMetadata,
+) -> Element<'a, Message> {
+    let mut rows = Column::new().spacing(spacing::XS);
+
+    if let Some(ref title) = meta.dc_title {
+        rows = rows.push(build_metadata_row(
+            i18n.tr("metadata-label-dc-title"),
+            title.clone(),
+        ));
+    }
+
+    if let Some(ref creator) = meta.dc_creator {
+        rows = rows.push(build_metadata_row(
+            i18n.tr("metadata-label-dc-creator"),
+            creator.clone(),
+        ));
+    }
+
+    if let Some(ref description) = meta.dc_description {
+        rows = rows.push(build_metadata_row(
+            i18n.tr("metadata-label-dc-description"),
+            description.clone(),
+        ));
+    }
+
+    if let Some(ref subject) = meta.dc_subject {
+        if !subject.is_empty() {
+            rows = rows.push(build_metadata_row(
+                i18n.tr("metadata-label-dc-subject"),
+                subject.join(", "),
+            ));
+        }
+    }
+
+    if let Some(ref rights) = meta.dc_rights {
+        rows = rows.push(build_metadata_row(
+            i18n.tr("metadata-label-dc-rights"),
+            rights.clone(),
+        ));
+    }
+
+    build_section(
+        icons::info(),
+        i18n.tr("metadata-section-dublin-core"),
+        rows.into(),
+    )
 }
 
 fn build_video_codec_section<'a>(

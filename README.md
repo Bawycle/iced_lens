@@ -37,7 +37,7 @@ IcedLens aims to provide a simple, privacy‑friendly image viewer and editor fo
 ### Viewing
 - **Images:** JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, SVG
 - **Videos:** MP4, AVI, MOV, MKV, WebM (plus animated GIF/WebP)
-- **Metadata panel:** EXIF data for images (camera, exposure, GPS), codec/bitrate info for videos
+- **Metadata panel:** EXIF data for images (camera, exposure, GPS), Dublin Core/XMP metadata (title, creator, description, keywords, copyright), codec/bitrate info for videos
 - Zoom, pan, fit-to-window, fullscreen with auto-hiding controls
 - Multi-media browsing with keyboard navigation
 - Frame-by-frame video navigation and frame capture

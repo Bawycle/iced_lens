@@ -10,32 +10,44 @@ use little_exif::metadata::Metadata;
 use little_exif::rational::uR64;
 use std::path::Path;
 
-/// Editable metadata fields for EXIF writing.
+/// Editable metadata fields for EXIF and XMP writing.
 ///
 /// All fields are strings to simplify UI binding. Validation and conversion
 /// to EXIF types happens during the write operation.
 #[derive(Debug, Clone, Default)]
 pub struct EditableMetadata {
-    // Camera info
+    // Camera info (EXIF)
     pub camera_make: String,
     pub camera_model: String,
 
-    // Date info
+    // Date info (EXIF)
     pub date_taken: String,
 
-    // Exposure info
+    // Exposure info (EXIF)
     pub exposure_time: String,
     pub aperture: String,
     pub iso: String,
     pub flash: String,
 
-    // Lens info
+    // Lens info (EXIF)
     pub focal_length: String,
     pub focal_length_35mm: String,
 
-    // GPS info
+    // GPS info (EXIF)
     pub gps_latitude: String,
     pub gps_longitude: String,
+
+    // Dublin Core / XMP metadata
+    /// dc:title - Title of the work
+    pub dc_title: String,
+    /// dc:creator - Creator/author
+    pub dc_creator: String,
+    /// dc:description - Description
+    pub dc_description: String,
+    /// dc:subject - Keywords/tags (comma-separated)
+    pub dc_subject: String,
+    /// dc:rights - Copyright/license
+    pub dc_rights: String,
 }
 
 impl EditableMetadata {
@@ -59,11 +71,20 @@ impl EditableMetadata {
                 .gps_longitude
                 .map(|v| format!("{:.6}", v))
                 .unwrap_or_default(),
+            dc_title: meta.dc_title.clone().unwrap_or_default(),
+            dc_creator: meta.dc_creator.clone().unwrap_or_default(),
+            dc_description: meta.dc_description.clone().unwrap_or_default(),
+            dc_subject: meta
+                .dc_subject
+                .as_ref()
+                .map(|v| v.join(", "))
+                .unwrap_or_default(),
+            dc_rights: meta.dc_rights.clone().unwrap_or_default(),
         }
     }
 
-    /// Returns true if any field has a non-empty value.
-    pub fn has_any_data(&self) -> bool {
+    /// Returns true if any EXIF field has a non-empty value.
+    pub fn has_any_exif_data(&self) -> bool {
         !self.camera_make.is_empty()
             || !self.camera_model.is_empty()
             || !self.date_taken.is_empty()
@@ -75,6 +96,20 @@ impl EditableMetadata {
             || !self.focal_length_35mm.is_empty()
             || !self.gps_latitude.is_empty()
             || !self.gps_longitude.is_empty()
+    }
+
+    /// Returns true if any Dublin Core / XMP field has a non-empty value.
+    pub fn has_any_xmp_data(&self) -> bool {
+        !self.dc_title.is_empty()
+            || !self.dc_creator.is_empty()
+            || !self.dc_description.is_empty()
+            || !self.dc_subject.is_empty()
+            || !self.dc_rights.is_empty()
+    }
+
+    /// Returns true if any field has a non-empty value.
+    pub fn has_any_data(&self) -> bool {
+        self.has_any_exif_data() || self.has_any_xmp_data()
     }
 }
 
@@ -96,14 +131,21 @@ impl EditableMetadata {
 pub fn write_exif<P: AsRef<Path>>(path: P, metadata: &EditableMetadata) -> Result<()> {
     let path = path.as_ref();
 
-    // Load existing metadata to preserve unmodified tags
-    let mut exif_metadata = Metadata::new_from_path(path).map_err(|e| {
-        Error::Io(format!(
-            "Failed to read existing metadata from '{}': {:?}",
-            path.display(),
-            e
-        ))
-    })?;
+    // Try to load existing metadata to preserve unmodified tags.
+    // If loading fails (e.g., malformed EXIF data), create empty metadata.
+    // This allows writing new metadata even for files with corrupted EXIF.
+    let mut exif_metadata = match Metadata::new_from_path(path) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!(
+                "[WARN] Could not read existing EXIF from '{}': {:?}. Creating new metadata.",
+                path.display(),
+                e
+            );
+            // Create empty metadata for writing
+            Metadata::new()
+        }
+    };
 
     // Set camera info
     if !metadata.camera_make.is_empty() {
@@ -175,14 +217,21 @@ pub fn write_exif<P: AsRef<Path>>(path: P, metadata: &EditableMetadata) -> Resul
         }
     }
 
-    // Write metadata back to file
+    // Write EXIF metadata back to file
     exif_metadata.write_to_file(path).map_err(|e| {
         Error::Io(format!(
-            "Failed to write metadata to '{}': {:?}",
+            "Failed to write EXIF metadata to '{}': {:?}",
             path.display(),
             e
         ))
     })?;
+
+    // Write XMP metadata (JPEG only for now)
+    if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+        if ext.eq_ignore_ascii_case("jpg") || ext.eq_ignore_ascii_case("jpeg") {
+            write_xmp_to_jpeg(path, metadata)?;
+        }
+    }
 
     Ok(())
 }
@@ -291,6 +340,202 @@ fn decimal_to_dms(decimal: f64) -> Vec<uR64> {
     ]
 }
 
+/// XMP namespace marker for JPEG APP1 segments.
+const XMP_MARKER: &[u8] = b"http://ns.adobe.com/xap/1.0/\0";
+
+/// Writes XMP Dublin Core metadata to a JPEG file.
+///
+/// This function creates an XMP packet with Dublin Core metadata and embeds it
+/// in the JPEG file's APP1 segment. If an XMP segment already exists, it is replaced.
+fn write_xmp_to_jpeg<P: AsRef<Path>>(path: P, metadata: &EditableMetadata) -> Result<()> {
+    let path = path.as_ref();
+
+    // Skip if no XMP data to write
+    if !metadata.has_any_xmp_data() {
+        return Ok(());
+    }
+
+    // Generate XMP packet
+    let xmp_data = generate_xmp_packet(metadata);
+
+    // Read the entire file
+    let file_data = std::fs::read(path)
+        .map_err(|e| Error::Io(format!("Failed to read file '{}': {}", path.display(), e)))?;
+
+    // Verify JPEG magic number
+    if file_data.len() < 2 || file_data[0] != 0xFF || file_data[1] != 0xD8 {
+        return Err(Error::Io("Not a valid JPEG file".to_string()));
+    }
+
+    // Find existing XMP segment or insertion point
+    let (xmp_start, xmp_end, insert_pos) = find_xmp_segment_or_insertion_point(&file_data)?;
+
+    // Build new XMP segment: APP1 marker + length + XMP marker + data
+    let xmp_segment = build_xmp_segment(&xmp_data)?;
+
+    // Create new file data
+    let new_file_data = if let (Some(start), Some(end)) = (xmp_start, xmp_end) {
+        // Replace existing XMP segment
+        let mut new_data = Vec::with_capacity(file_data.len() - (end - start) + xmp_segment.len());
+        new_data.extend_from_slice(&file_data[..start]);
+        new_data.extend_from_slice(&xmp_segment);
+        new_data.extend_from_slice(&file_data[end..]);
+        new_data
+    } else {
+        // Insert new XMP segment at insertion point
+        let mut new_data = Vec::with_capacity(file_data.len() + xmp_segment.len());
+        new_data.extend_from_slice(&file_data[..insert_pos]);
+        new_data.extend_from_slice(&xmp_segment);
+        new_data.extend_from_slice(&file_data[insert_pos..]);
+        new_data
+    };
+
+    // Write back to file
+    std::fs::write(path, new_file_data).map_err(|e| {
+        Error::Io(format!(
+            "Failed to write XMP to '{}': {}",
+            path.display(),
+            e
+        ))
+    })?;
+
+    Ok(())
+}
+
+/// Generates an XMP packet with Dublin Core metadata.
+fn generate_xmp_packet(metadata: &EditableMetadata) -> Vec<u8> {
+    use xmp_writer::XmpWriter;
+
+    let mut writer = XmpWriter::new();
+
+    // Set Dublin Core fields
+    if !metadata.dc_title.is_empty() {
+        writer.title([(None, metadata.dc_title.as_str())]);
+    }
+
+    if !metadata.dc_creator.is_empty() {
+        writer.creator([metadata.dc_creator.as_str()]);
+    }
+
+    if !metadata.dc_description.is_empty() {
+        writer.description([(None, metadata.dc_description.as_str())]);
+    }
+
+    if !metadata.dc_subject.is_empty() {
+        // Parse comma-separated keywords
+        let keywords: Vec<&str> = metadata
+            .dc_subject
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !keywords.is_empty() {
+            writer.subject(keywords);
+        }
+    }
+
+    if !metadata.dc_rights.is_empty() {
+        writer.rights([(None, metadata.dc_rights.as_str())]);
+    }
+
+    writer.finish(None).into_bytes()
+}
+
+/// Finds the XMP segment boundaries or the insertion point after SOI.
+///
+/// Returns (xmp_start, xmp_end, insertion_point):
+/// - If XMP exists: (Some(start), Some(end), _) where start..end is the segment range
+/// - If no XMP: (None, None, insertion_point) where insertion_point is after the first APP segment
+fn find_xmp_segment_or_insertion_point(
+    data: &[u8],
+) -> Result<(Option<usize>, Option<usize>, usize)> {
+    let mut pos = 2; // Skip SOI (0xFF 0xD8)
+    let mut first_app_end = 2; // Default to after SOI
+
+    while pos + 4 < data.len() {
+        // Check for marker
+        if data[pos] != 0xFF {
+            return Err(Error::Io("Invalid JPEG structure".to_string()));
+        }
+
+        let marker_type = data[pos + 1];
+
+        match marker_type {
+            0xD9 => break, // EOI - end of image
+            0xD8 => {
+                pos += 2;
+                continue; // Skip embedded SOI
+            }
+            0x00 => {
+                pos += 2;
+                continue; // Stuffed byte
+            }
+            _ if (0xD0..=0xD7).contains(&marker_type) => {
+                // RST markers have no length
+                pos += 2;
+                continue;
+            }
+            0xDA => break, // SOS - start of scan data, stop searching
+            _ => {
+                // Marker with length
+                if pos + 4 > data.len() {
+                    break;
+                }
+
+                let segment_len = u16::from_be_bytes([data[pos + 2], data[pos + 3]]) as usize;
+                let segment_end = pos + 2 + segment_len;
+
+                if segment_end > data.len() {
+                    break;
+                }
+
+                // Check if this is an APP1 segment with XMP marker
+                if marker_type == 0xE1 {
+                    let data_start = pos + 4;
+                    if data_start + XMP_MARKER.len() <= segment_end
+                        && &data[data_start..data_start + XMP_MARKER.len()] == XMP_MARKER
+                    {
+                        // Found XMP segment
+                        return Ok((Some(pos), Some(segment_end), pos));
+                    }
+                }
+
+                // Track end of first APP segment for insertion point
+                if (0xE0..=0xEF).contains(&marker_type) && first_app_end == 2 {
+                    first_app_end = segment_end;
+                }
+
+                pos = segment_end;
+            }
+        }
+    }
+
+    // No XMP found, return insertion point
+    Ok((None, None, first_app_end))
+}
+
+/// Builds an XMP APP1 segment for JPEG.
+fn build_xmp_segment(xmp_data: &[u8]) -> Result<Vec<u8>> {
+    // APP1 structure: FF E1 + length (2 bytes) + XMP marker + XMP data
+    // Length includes the 2 length bytes + marker + data
+    let total_len = 2 + XMP_MARKER.len() + xmp_data.len();
+
+    if total_len > 0xFFFF {
+        return Err(Error::Io(
+            "XMP data too large for JPEG APP1 segment".to_string(),
+        ));
+    }
+
+    let mut segment = Vec::with_capacity(2 + total_len);
+    segment.push(0xFF);
+    segment.push(0xE1);
+    segment.extend_from_slice(&(total_len as u16).to_be_bytes());
+    segment.extend_from_slice(XMP_MARKER);
+    segment.extend_from_slice(xmp_data);
+
+    Ok(segment)
+}
+
 /// Returns the list of file extensions that support EXIF writing.
 pub fn supported_extensions() -> &'static [&'static str] {
     &[
@@ -325,7 +570,7 @@ mod tests {
         assert!(result.is_some());
         let (num, den) = result.unwrap();
         assert_eq!(num, 1);
-        assert!(den >= 240 && den <= 260); // Allow some rounding tolerance
+        assert!((240..=260).contains(&den)); // Allow some rounding tolerance
     }
 
     #[test]

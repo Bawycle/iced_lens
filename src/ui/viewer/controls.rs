@@ -143,9 +143,7 @@ pub fn view<'a>(
         } else {
             // Normal: can toggle fullscreen
             (
-                fullscreen_button
-                    .on_press(Message::ToggleFullscreen)
-                    .into(),
+                fullscreen_button.on_press(Message::ToggleFullscreen).into(),
                 ctx.i18n.tr("viewer-fullscreen-tooltip"),
             )
         };

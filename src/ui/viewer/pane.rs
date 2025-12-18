@@ -229,13 +229,14 @@ fn view_inner<'a>(
             } else {
                 Text::new("◀").size(typography::TITLE_LG).into()
             };
-            let left_arrow = button(button_content)
-                .padding(spacing::SM)
-                .style(styles::button_overlay(
-                    arrow_text_color,
-                    arrow_bg_alpha_normal,
-                    arrow_bg_alpha_hover,
-                ));
+            let left_arrow =
+                button(button_content)
+                    .padding(spacing::SM)
+                    .style(styles::button_overlay(
+                        arrow_text_color,
+                        arrow_bg_alpha_normal,
+                        arrow_bg_alpha_hover,
+                    ));
             let left_arrow = if nav_enabled {
                 left_arrow.on_press(Message::NavigatePrevious)
             } else {
@@ -286,13 +287,14 @@ fn view_inner<'a>(
             } else {
                 Text::new("▶").size(typography::TITLE_LG).into()
             };
-            let right_arrow = button(button_content)
-                .padding(spacing::SM)
-                .style(styles::button_overlay(
-                    arrow_text_color,
-                    arrow_bg_alpha_normal,
-                    arrow_bg_alpha_hover,
-                ));
+            let right_arrow =
+                button(button_content)
+                    .padding(spacing::SM)
+                    .style(styles::button_overlay(
+                        arrow_text_color,
+                        arrow_bg_alpha_normal,
+                        arrow_bg_alpha_hover,
+                    ));
             let right_arrow = if nav_enabled {
                 right_arrow.on_press(Message::NavigateNext)
             } else {

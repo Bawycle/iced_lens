@@ -6,11 +6,12 @@
 //! and video codec details.
 
 use crate::error::{Error, Result};
+use crate::media::xmp;
 use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::Path;
 
-/// Image metadata extracted from EXIF data.
+/// Image metadata extracted from EXIF and XMP data.
 #[derive(Debug, Clone, Default)]
 pub struct ImageMetadata {
     // File info
@@ -23,17 +24,17 @@ pub struct ImageMetadata {
     /// Image format (e.g., "JPEG", "PNG")
     pub format: Option<String>,
 
-    // Camera info
+    // Camera info (EXIF)
     /// Camera manufacturer (e.g., "Canon", "Nikon")
     pub camera_make: Option<String>,
     /// Camera model (e.g., "EOS 5D Mark IV")
     pub camera_model: Option<String>,
 
-    // Date info
+    // Date info (EXIF)
     /// Date and time the photo was taken
     pub date_taken: Option<String>,
 
-    // Exposure info
+    // Exposure info (EXIF)
     /// Exposure time (e.g., "1/250 sec")
     pub exposure_time: Option<String>,
     /// Aperture f-number (e.g., "f/2.8")
@@ -43,17 +44,29 @@ pub struct ImageMetadata {
     /// Flash status (e.g., "Flash fired")
     pub flash: Option<String>,
 
-    // Lens info
+    // Lens info (EXIF)
     /// Focal length in mm (e.g., "50 mm")
     pub focal_length: Option<String>,
     /// Focal length equivalent to 35mm film
     pub focal_length_35mm: Option<String>,
 
-    // GPS info
+    // GPS info (EXIF)
     /// Latitude in decimal degrees (e.g., 48.8566)
     pub gps_latitude: Option<f64>,
     /// Longitude in decimal degrees (e.g., 2.3522)
     pub gps_longitude: Option<f64>,
+
+    // Dublin Core / XMP metadata
+    /// dc:title - Title of the work
+    pub dc_title: Option<String>,
+    /// dc:creator - Creator/author of the work
+    pub dc_creator: Option<String>,
+    /// dc:description - Description of the work
+    pub dc_description: Option<String>,
+    /// dc:subject - Keywords/tags (comma-separated when displayed)
+    pub dc_subject: Option<Vec<String>>,
+    /// dc:rights - Copyright or license information
+    pub dc_rights: Option<String>,
 }
 
 /// Extended video metadata with codec and format information.
@@ -89,7 +102,8 @@ pub struct ExtendedVideoMetadata {
 /// Unified metadata enum for both images and videos.
 #[derive(Debug, Clone)]
 pub enum MediaMetadata {
-    Image(ImageMetadata),
+    /// Image metadata (boxed to reduce enum size variance)
+    Image(Box<ImageMetadata>),
     Video(ExtendedVideoMetadata),
 }
 
@@ -216,6 +230,19 @@ pub fn extract_image_metadata<P: AsRef<Path>>(path: P) -> Result<ImageMetadata> 
 
         // GPS coordinates
         extract_gps_coordinates(&exif, &mut metadata);
+    }
+
+    // Try to extract XMP Dublin Core metadata (JPEG only for now)
+    if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+        if ext.eq_ignore_ascii_case("jpg") || ext.eq_ignore_ascii_case("jpeg") {
+            if let Some(dc) = xmp::extract_xmp_from_jpeg(path) {
+                metadata.dc_title = dc.title;
+                metadata.dc_creator = dc.creator;
+                metadata.dc_description = dc.description;
+                metadata.dc_subject = dc.subject;
+                metadata.dc_rights = dc.rights;
+            }
+        }
     }
 
     Ok(metadata)
@@ -423,7 +450,9 @@ pub fn extract_metadata<P: AsRef<Path>>(path: P) -> Option<MediaMetadata> {
         ext.as_str(),
         "jpg" | "jpeg" | "png" | "gif" | "webp" | "bmp" | "tiff" | "tif" | "heic" | "heif" | "svg"
     ) {
-        extract_image_metadata(path).ok().map(MediaMetadata::Image)
+        extract_image_metadata(path)
+            .ok()
+            .map(|m| MediaMetadata::Image(Box::new(m)))
     } else {
         None
     }
@@ -491,7 +520,7 @@ mod tests {
             height: Some(1080),
             ..Default::default()
         };
-        let media = MediaMetadata::Image(image_meta);
+        let media = MediaMetadata::Image(Box::new(image_meta));
         assert_eq!(media.dimensions(), (1920, 1080));
 
         let video_meta = ExtendedVideoMetadata {

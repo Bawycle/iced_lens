@@ -128,8 +128,7 @@ fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         button(Text::new(info_label)).style(styles::button::disabled())
     } else if ctx.info_panel_open && ctx.metadata_editor_has_changes {
         // Panel open with unsaved changes: disabled (can't close)
-        button(Text::new(info_label))
-            .style(styles::button::selected)
+        button(Text::new(info_label)).style(styles::button::selected)
     } else if ctx.info_panel_open {
         // Panel open, no unsaved changes: can close
         button(Text::new(info_label))

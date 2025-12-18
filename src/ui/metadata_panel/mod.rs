@@ -18,6 +18,7 @@ use std::path::PathBuf;
 /// Identifies which metadata field is being edited.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MetadataField {
+    // EXIF fields
     CameraMake,
     CameraModel,
     DateTaken,
@@ -29,12 +30,27 @@ pub enum MetadataField {
     FocalLength35mm,
     GpsLatitude,
     GpsLongitude,
+    // Dublin Core / XMP fields
+    DcTitle,
+    DcCreator,
+    DcDescription,
+    DcSubject,
+    DcRights,
 }
 
 impl MetadataField {
     /// Returns all field variants for iteration.
+    /// Dublin Core fields are listed first (user-facing metadata),
+    /// followed by EXIF fields (technical metadata).
     pub const fn all() -> &'static [MetadataField] {
         &[
+            // Dublin Core / XMP fields (user-facing metadata first)
+            MetadataField::DcTitle,
+            MetadataField::DcCreator,
+            MetadataField::DcDescription,
+            MetadataField::DcSubject,
+            MetadataField::DcRights,
+            // EXIF fields (technical metadata)
             MetadataField::CameraMake,
             MetadataField::CameraModel,
             MetadataField::DateTaken,
@@ -49,7 +65,10 @@ impl MetadataField {
 
     /// Returns true if this field is a GPS coordinate.
     pub const fn is_gps(&self) -> bool {
-        matches!(self, MetadataField::GpsLatitude | MetadataField::GpsLongitude)
+        matches!(
+            self,
+            MetadataField::GpsLatitude | MetadataField::GpsLongitude
+        )
     }
 
     /// Returns the paired GPS field, if this is a GPS field.

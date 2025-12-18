@@ -11,6 +11,7 @@ pub mod metadata;
 pub mod metadata_writer;
 pub mod navigator;
 pub mod video;
+pub mod xmp;
 
 use image_rs::AnimationDecoder;
 use std::fs::File;

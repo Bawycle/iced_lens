@@ -39,6 +39,9 @@ cpal = "0.16.0"
 little_exif = "0.6"
 lru = "0.16"
 webp-animation = "0.9.0"
+xmp-writer = "0.2"
+quick-xml = "0.37"
+chrono = "0.4.42"
 
 [build-dependencies]
 winresource = "0.1"
