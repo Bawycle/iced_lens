@@ -20,6 +20,22 @@ use crate::ui::viewer::component;
 use iced::{window, Task};
 use std::path::PathBuf;
 
+/// Navigation direction for unified navigation handler.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NavigationDirection {
+    Next,
+    Previous,
+}
+
+/// Navigation mode determines which media types to include.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NavigationMode {
+    /// Navigate to any media (images and videos).
+    AllMedia,
+    /// Navigate only to images (skip videos) - used by editor.
+    ImagesOnly,
+}
+
 /// Context for update operations containing mutable references to app state.
 pub struct UpdateContext<'a> {
     pub i18n: &'a mut I18n,
@@ -79,7 +95,8 @@ pub fn handle_viewer_message(
         // Exit metadata edit mode (new media loaded = new context)
         *ctx.metadata_editor_state = None;
 
-        if let Some(path) = ctx.viewer.current_media_path.as_ref() {
+        // Use media_navigator as single source of truth for current path
+        if let Some(path) = ctx.media_navigator.current_media_path() {
             // Extract metadata
             *ctx.current_metadata = media::metadata::extract_metadata(path);
 
@@ -184,8 +201,11 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
 
     // Handle Viewer → Editor transition
     if matches!(target, Screen::ImageEditor) && matches!(ctx.screen, Screen::Viewer) {
+        // Use media_navigator as single source of truth for current path
         if let (Some(image_path), Some(media_data)) = (
-            ctx.viewer.current_media_path.clone(),
+            ctx.media_navigator
+                .current_media_path()
+                .map(|p| p.to_path_buf()),
             ctx.viewer.media().cloned(),
         ) {
             // Editor only supports images in v0.2, not videos
@@ -321,9 +341,8 @@ pub fn handle_editor_message(
             // For captured frame mode: just return to viewer without reloading
             match image_source {
                 image_editor::ImageSource::File(current_media_path) => {
-                    // Set loading state directly (before render)
-                    ctx.viewer.is_loading_media = true;
-                    ctx.viewer.loading_started_at = Some(std::time::Instant::now());
+                    // Set loading state via encapsulated method
+                    ctx.viewer.start_loading();
 
                     // Reload the image in the viewer to show any saved changes
                     Task::perform(
@@ -414,64 +433,24 @@ fn handle_save_as_dialog(
     )
 }
 
-/// Handles editor navigation to next image.
+/// Handles editor navigation to next image (skips videos).
 fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
-    // Rescan directory to handle added/removed images
-    if let Some(current_path) = ctx
-        .media_navigator
-        .current_media_path()
-        .map(|p| p.to_path_buf())
-    {
-        let (config, _) = config::load();
-        let sort_order = config.display.sort_order.unwrap_or_default();
-        let _ = ctx
-            .media_navigator
-            .scan_directory(&current_path, sort_order);
-    }
-
-    // Navigate to next image in the list (skipping videos)
-    if let Some(next_path) = ctx.media_navigator.navigate_next_image() {
-        // Synchronize viewer state immediately
-        ctx.viewer.current_media_path = Some(next_path.clone());
-
-        // Load the next image and create a new ImageEditorState
-        Task::perform(
-            async move { media::load_media(&next_path) },
-            Message::ImageEditorLoaded,
-        )
-    } else {
-        Task::none()
-    }
+    handle_navigation(
+        ctx,
+        NavigationDirection::Next,
+        NavigationMode::ImagesOnly,
+        Message::ImageEditorLoaded,
+    )
 }
 
-/// Handles editor navigation to previous image.
+/// Handles editor navigation to previous image (skips videos).
 fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
-    // Rescan directory to handle added/removed images
-    if let Some(current_path) = ctx
-        .media_navigator
-        .current_media_path()
-        .map(|p| p.to_path_buf())
-    {
-        let (config, _) = config::load();
-        let sort_order = config.display.sort_order.unwrap_or_default();
-        let _ = ctx
-            .media_navigator
-            .scan_directory(&current_path, sort_order);
-    }
-
-    // Navigate to previous image in the list (skipping videos)
-    if let Some(prev_path) = ctx.media_navigator.navigate_previous_image() {
-        // Synchronize viewer state immediately
-        ctx.viewer.current_media_path = Some(prev_path.clone());
-
-        // Load the previous image and create a new ImageEditorState
-        Task::perform(
-            async move { media::load_media(&prev_path) },
-            Message::ImageEditorLoaded,
-        )
-    } else {
-        Task::none()
-    }
+    handle_navigation(
+        ctx,
+        NavigationDirection::Previous,
+        NavigationMode::ImagesOnly,
+        Message::ImageEditorLoaded,
+    )
 }
 
 /// Handles navbar component messages.
@@ -528,7 +507,8 @@ pub fn handle_metadata_panel_message(
     ctx: &mut UpdateContext<'_>,
     message: metadata_panel::Message,
 ) -> Task<Message> {
-    let current_path = ctx.viewer.current_media_path.as_ref();
+    // Use media_navigator as single source of truth for current path
+    let current_path = ctx.media_navigator.current_media_path();
     let event = metadata_panel::update_with_state(
         ctx.metadata_editor_state.as_mut(),
         message,
@@ -622,8 +602,8 @@ pub fn handle_metadata_panel_message(
                 dialog
             };
 
-            // Set initial filename from current path
-            let dialog = if let Some(path) = ctx.viewer.current_media_path.as_ref() {
+            // Set initial filename from current path (use media_navigator as source of truth)
+            let dialog = if let Some(path) = ctx.media_navigator.current_media_path() {
                 if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
                     dialog.set_file_name(filename)
                 } else {
@@ -646,11 +626,26 @@ pub fn handle_metadata_panel_message(
     }
 }
 
-/// Handles navigation to next image.
-pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
-    // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
-
-    // Rescan directory to handle added/removed images
+/// Unified navigation handler for viewer and editor.
+///
+/// This function consolidates all navigation logic (next/previous for viewer/editor)
+/// into a single implementation, eliminating code duplication.
+///
+/// # Arguments
+/// * `ctx` - Update context with mutable references to app state
+/// * `direction` - Next or Previous
+/// * `mode` - AllMedia (viewer) or ImagesOnly (editor)
+/// * `on_loaded` - Message constructor for the load result
+fn handle_navigation<F>(
+    ctx: &mut UpdateContext<'_>,
+    direction: NavigationDirection,
+    mode: NavigationMode,
+    on_loaded: F,
+) -> Task<Message>
+where
+    F: FnOnce(Result<MediaData, crate::error::Error>) -> Message + Send + 'static,
+{
+    // Rescan directory to handle added/removed media (single implementation)
     if let Some(current_path) = ctx
         .media_navigator
         .current_media_path()
@@ -663,57 +658,56 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
             .scan_directory(&current_path, sort_order);
     }
 
-    // Navigate to next image
-    if let Some(next_path) = ctx.media_navigator.navigate_next() {
+    // Navigate based on direction and mode
+    let next_path = match (direction, mode) {
+        (NavigationDirection::Next, NavigationMode::AllMedia) => {
+            ctx.media_navigator.navigate_next()
+        }
+        (NavigationDirection::Previous, NavigationMode::AllMedia) => {
+            ctx.media_navigator.navigate_previous()
+        }
+        (NavigationDirection::Next, NavigationMode::ImagesOnly) => {
+            ctx.media_navigator.navigate_next_image()
+        }
+        (NavigationDirection::Previous, NavigationMode::ImagesOnly) => {
+            ctx.media_navigator.navigate_previous_image()
+        }
+    };
+
+    if let Some(path) = next_path {
         // Synchronize viewer state from navigator
-        ctx.viewer.current_media_path = Some(next_path.clone());
+        ctx.viewer.current_media_path = Some(path.clone());
 
-        // Set loading state directly (before render)
-        ctx.viewer.is_loading_media = true;
-        ctx.viewer.loading_started_at = Some(std::time::Instant::now());
+        // Set loading state via encapsulated method
+        ctx.viewer.start_loading();
 
-        // Load the next image
-        Task::perform(async move { media::load_media(&next_path) }, |result| {
-            Message::Viewer(component::Message::MediaLoaded(result))
-        })
+        // Load the media with the provided callback
+        Task::perform(async move { media::load_media(&path) }, on_loaded)
     } else {
         Task::none()
     }
 }
 
-/// Handles navigation to previous image.
+/// Handles navigation to next media (images and videos).
+pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
+    handle_navigation(
+        ctx,
+        NavigationDirection::Next,
+        NavigationMode::AllMedia,
+        |r| Message::Viewer(component::Message::MediaLoaded(r)),
+    )
+}
+
+/// Handles navigation to previous media (images and videos).
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
-
-    // Rescan directory to handle added/removed images
-    if let Some(current_path) = ctx
-        .media_navigator
-        .current_media_path()
-        .map(|p| p.to_path_buf())
-    {
-        let (config, _) = config::load();
-        let sort_order = config.display.sort_order.unwrap_or_default();
-        let _ = ctx
-            .media_navigator
-            .scan_directory(&current_path, sort_order);
-    }
-
-    // Navigate to previous image
-    if let Some(prev_path) = ctx.media_navigator.navigate_previous() {
-        // Synchronize viewer state from navigator
-        ctx.viewer.current_media_path = Some(prev_path.clone());
-
-        // Set loading state directly (before render)
-        ctx.viewer.is_loading_media = true;
-        ctx.viewer.loading_started_at = Some(std::time::Instant::now());
-
-        // Load the previous image
-        Task::perform(async move { media::load_media(&prev_path) }, |result| {
-            Message::Viewer(component::Message::MediaLoaded(result))
-        })
-    } else {
-        Task::none()
-    }
+    handle_navigation(
+        ctx,
+        NavigationDirection::Previous,
+        NavigationMode::AllMedia,
+        |r| Message::Viewer(component::Message::MediaLoaded(r)),
+    )
 }
 
 /// Handles deletion of the current media file.
@@ -763,9 +757,8 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
                     .set_current_media_path(next_path.clone());
                 ctx.viewer.current_media_path = Some(next_path.clone());
 
-                // Set loading state
-                ctx.viewer.is_loading_media = true;
-                ctx.viewer.loading_started_at = Some(std::time::Instant::now());
+                // Set loading state via encapsulated method
+                ctx.viewer.start_loading();
 
                 Task::perform(async move { media::load_media(&next_path) }, |result| {
                     Message::Viewer(component::Message::MediaLoaded(result))
@@ -915,8 +908,9 @@ fn load_media_from_path(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<Mess
 
     // Set up viewer state
     ctx.viewer.current_media_path = Some(path.clone());
-    ctx.viewer.is_loading_media = true;
-    ctx.viewer.loading_started_at = Some(std::time::Instant::now());
+
+    // Set loading state via encapsulated method
+    ctx.viewer.start_loading();
 
     // Load the media
     Task::perform(async move { media::load_media(&path) }, |result| {

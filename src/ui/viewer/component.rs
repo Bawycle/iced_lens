@@ -375,6 +375,17 @@ impl State {
         self.keyboard_seek_step_secs = step;
     }
 
+    /// Starts loading a new media file.
+    ///
+    /// Sets loading indicators that will be cleared by the MediaLoaded message handler.
+    /// This encapsulates the loading state management that was previously scattered
+    /// across multiple app handlers.
+    pub fn start_loading(&mut self) {
+        self.is_loading_media = true;
+        self.loading_started_at = Some(std::time::Instant::now());
+        self.error = None;
+    }
+
     /// Returns an exportable frame from the video canvas, if available.
     pub fn exportable_frame(&self) -> Option<crate::media::frame_export::ExportableFrame> {
         self.video_shader.exportable_frame()
@@ -457,10 +468,8 @@ impl State {
     pub fn handle_message(&mut self, message: Message, _i18n: &I18n) -> (Effect, Task<Message>) {
         match message {
             Message::StartLoadingMedia => {
-                // Set loading state
-                self.is_loading_media = true;
-                self.loading_started_at = Some(Instant::now());
-                self.error = None;
+                // Set loading state via encapsulated method
+                self.start_loading();
                 (Effect::None, Task::none())
             }
             Message::ClearMedia => {

@@ -13,7 +13,7 @@ pub use view::{ViewContext, PANEL_WIDTH};
 
 use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Identifies which metadata field is being edited.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -125,7 +125,8 @@ pub struct PanelContext<'a> {
     pub metadata: Option<&'a MediaMetadata>,
     pub is_dark_theme: bool,
     /// Current file path (needed for save operations).
-    pub current_path: Option<&'a PathBuf>,
+    /// Uses media_navigator as single source of truth.
+    pub current_path: Option<&'a Path>,
     /// Editor state when in edit mode.
     pub editor_state: Option<&'a MetadataEditorState>,
     /// Whether the media is an image (edit supported) or video (edit not supported).
@@ -136,7 +137,7 @@ pub struct PanelContext<'a> {
 pub fn update_with_state(
     state: Option<&mut MetadataEditorState>,
     message: Message,
-    current_path: Option<&PathBuf>,
+    current_path: Option<&Path>,
 ) -> Event {
     match message {
         Message::Close => Event::Close,
@@ -150,7 +151,7 @@ pub fn update_with_state(
         }
         Message::Save => {
             if let Some(path) = current_path {
-                Event::SaveRequested(path.clone())
+                Event::SaveRequested(path.to_path_buf())
             } else {
                 Event::None
             }

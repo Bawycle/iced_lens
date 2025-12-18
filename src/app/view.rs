@@ -40,7 +40,8 @@ pub struct ViewContext<'a> {
     /// Metadata editor state when in edit mode.
     pub metadata_editor_state: Option<&'a MetadataEditorState>,
     /// Current media path for save operations.
-    pub current_media_path: Option<&'a std::path::PathBuf>,
+    /// Uses media_navigator as single source of truth.
+    pub current_media_path: Option<&'a std::path::Path>,
     /// Whether the current media is an image (for edit button enablement).
     pub is_image: bool,
     /// Notification manager for rendering toast overlays.
@@ -60,7 +61,7 @@ struct ViewerViewContext<'a> {
     navigation: NavigationInfo,
     current_metadata: Option<&'a MediaMetadata>,
     metadata_editor_state: Option<&'a MetadataEditorState>,
-    current_media_path: Option<&'a std::path::PathBuf>,
+    current_media_path: Option<&'a std::path::Path>,
     is_image: bool,
     is_dark_theme: bool,
 }

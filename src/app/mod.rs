@@ -286,9 +286,8 @@ impl App {
                 // Synchronize viewer state
                 app.viewer.current_media_path = Some(media_path.clone());
 
-                // Set loading state directly (before first render)
-                app.viewer.is_loading_media = true;
-                app.viewer.loading_started_at = Some(std::time::Instant::now());
+                // Set loading state via encapsulated method
+                app.viewer.start_loading();
 
                 // Load the media
                 let path_string = media_path.to_string_lossy().into_owned();
@@ -370,8 +369,8 @@ impl App {
             }
         }
 
-        // Fall back to filename
-        self.viewer.current_media_path.as_ref().and_then(|path| {
+        // Fall back to filename (use media_navigator as single source of truth)
+        self.media_navigator.current_media_path().and_then(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
                 .map(String::from)
@@ -484,9 +483,8 @@ impl App {
                                         .push(notifications::Notification::warning(&key));
                                 }
 
-                                // Rescan directory if saved in the same folder as viewer
+                                // Rescan directory if saved in the same folder as current media
                                 persistence::rescan_directory_if_same(
-                                    &mut self.viewer,
                                     &mut self.media_navigator,
                                     &path,
                                 );
@@ -570,7 +568,8 @@ impl App {
         use crate::media::metadata_writer;
 
         // First, copy the original file to the new location
-        if let Some(source_path) = self.viewer.current_media_path.as_ref() {
+        // Use media_navigator as single source of truth for current path
+        if let Some(source_path) = self.media_navigator.current_media_path() {
             if let Err(_e) = std::fs::copy(source_path, &path) {
                 self.notifications.push(notifications::Notification::error(
                     "notification-metadata-save-error",
@@ -675,7 +674,7 @@ impl App {
             navigation: self.media_navigator.navigation_info(),
             current_metadata: self.current_metadata.as_ref(),
             metadata_editor_state: self.metadata_editor_state.as_ref(),
-            current_media_path: self.viewer.current_media_path.as_ref(),
+            current_media_path: self.media_navigator.current_media_path(),
             is_image,
             notifications: &self.notifications,
             is_dark_theme,
@@ -1461,7 +1460,10 @@ mod tests {
         let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             sample_media_data(),
         ))));
-        app.viewer.current_media_path = Some(PathBuf::from("/path/to/image.jpg"));
+        // Set path in media_navigator (single source of truth) and viewer
+        let path = PathBuf::from("/path/to/image.jpg");
+        app.media_navigator.set_current_media_path(path.clone());
+        app.viewer.current_media_path = Some(path);
 
         let title = app.title();
 
@@ -1476,10 +1478,11 @@ mod tests {
 
         let mut app = App::default();
 
-        // Load image and set the path
+        // Load image and set the path in media_navigator (single source of truth) and viewer
         let _ = app.update(Message::Viewer(component::Message::MediaLoaded(Ok(
             MediaData::Image(img_data.clone()),
         ))));
+        app.media_navigator.set_current_media_path(img_path.clone());
         app.viewer.current_media_path = Some(img_path.clone());
 
         // Create editor state with actual PNG file

@@ -9,43 +9,6 @@
   - Possible causes: race condition on window resize, stale viewport dimensions, window manager timing
   - If reproduced: note exact steps, window size, image used, timing between actions
 
-## Modifications
-
-### Refactoring
-
-#### Event-Driven Architecture Improvements (Phase 2)
-
-The codebase has several places where actions directly mutate state across domain boundaries instead of using event-driven patterns. This creates coupling and makes the code harder to maintain.
-
-**Key issues to address:**
-
-1. **Dual source of truth for `current_media_path`**
-   - `media_navigator.current_media_path` = "what the user selected"
-   - `viewer.current_media_path` = "what is displayed"
-   - These are manually synchronized in 6+ places
-   - **Solution:** Modify `MediaLoaded` message to include the path. Let the viewer set its own `current_media_path` only on successful load. Remove direct mutations from app handlers.
-
-2. **Direct viewer state mutations from app**
-   - `viewer.is_loading_media`, `viewer.loading_started_at` set directly in navigation/delete handlers
-   - `viewer.set_zoom_step_percent()`, `viewer.set_video_autoplay()` called from settings handlers
-   - **Solution:** Use messages instead of direct setters. Viewer should handle `StartLoadingMedia` message (already exists), settings changes should emit events that viewer subscribes to.
-
-3. **Duplicate `video_autoplay` state**
-   - Exists in both `App` and `viewer.State`
-   - Manually synchronized on settings change
-   - **Solution:** Single source of truth in config, viewer reads from passed context.
-
-4. **Duplicated navigation logic**
-   - `handle_editor_navigate_next/previous` vs `handle_navigate_next/previous`
-   - Nearly identical code with subtle differences
-   - **Solution:** Unify into single navigation handler with source parameter.
-
-**Principles to follow:**
-- Each domain owns its state and updates it via messages
-- App orchestrates by handling effects and dispatching messages
-- No direct cross-domain state mutations
-- Single source of truth for each piece of data
-
 ## Planned Features
 
 ### Viewer
