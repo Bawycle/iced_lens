@@ -132,18 +132,21 @@ pub fn write_exif<P: AsRef<Path>>(path: P, metadata: &EditableMetadata) -> Resul
     let path = path.as_ref();
 
     // Try to load existing metadata to preserve unmodified tags.
-    // If loading fails (e.g., malformed EXIF data), create empty metadata.
-    // This allows writing new metadata even for files with corrupted EXIF.
-    let mut exif_metadata = match Metadata::new_from_path(path) {
-        Ok(m) => m,
+    // If loading fails (e.g., no EXIF data), we track this to avoid a crash
+    // in little_exif when writing to files without existing EXIF.
+    // See: https://github.com/TechnikTobi/little_exif/issues/XX
+    let (mut exif_metadata, has_existing_exif) = match Metadata::new_from_path(path) {
+        Ok(m) => (m, true),
         Err(e) => {
-            eprintln!(
-                "[WARN] Could not read existing EXIF from '{}': {:?}. Creating new metadata.",
-                path.display(),
-                e
-            );
-            // Create empty metadata for writing
-            Metadata::new()
+            // Only warn if user is trying to write EXIF fields
+            if metadata.has_any_exif_data() {
+                eprintln!(
+                    "[WARN] Could not read existing EXIF from '{}': {:?}. EXIF write will be skipped.",
+                    path.display(),
+                    e
+                );
+            }
+            (Metadata::new(), false)
         }
     };
 
@@ -217,16 +220,19 @@ pub fn write_exif<P: AsRef<Path>>(path: P, metadata: &EditableMetadata) -> Resul
         }
     }
 
-    // Write EXIF metadata back to file
-    exif_metadata.write_to_file(path).map_err(|e| {
-        Error::Io(format!(
-            "Failed to write EXIF metadata to '{}': {:?}",
-            path.display(),
-            e
-        ))
-    })?;
+    // Write EXIF metadata back to file only if file had existing EXIF.
+    // Workaround: little_exif panics when writing to files without EXIF data.
+    if has_existing_exif {
+        exif_metadata.write_to_file(path).map_err(|e| {
+            Error::Io(format!(
+                "Failed to write EXIF metadata to '{}': {:?}",
+                path.display(),
+                e
+            ))
+        })?;
+    }
 
-    // Write XMP metadata (JPEG only for now)
+    // Write XMP metadata (JPEG only for now) - always attempt this
     if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
         if ext.eq_ignore_ascii_case("jpg") || ext.eq_ignore_ascii_case("jpeg") {
             write_xmp_to_jpeg(path, metadata)?;
