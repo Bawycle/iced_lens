@@ -49,7 +49,8 @@ impl DeblurState {
         // 180 degrees per second = π radians per second
         // At 60 FPS, each tick adds π/60 radians
         const ROTATION_SPEED: f32 = std::f32::consts::PI / 60.0;
-        self.spinner_rotation = (self.spinner_rotation + ROTATION_SPEED) % (2.0 * std::f32::consts::PI);
+        self.spinner_rotation =
+            (self.spinner_rotation + ROTATION_SPEED) % (2.0 * std::f32::consts::PI);
     }
 
     /// Finish the deblur operation (success or failure).

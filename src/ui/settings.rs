@@ -821,7 +821,7 @@ impl State {
                     ModelStatus::Ready => ctx.i18n.tr("settings-deblur-status-ready"),
                     ModelStatus::Error(msg) => ctx
                         .i18n
-                        .tr_with_args("settings-deblur-status-error", &[("message", msg.as_str())])
+                        .tr_with_args("settings-deblur-status-error", &[("message", msg.as_str())]),
                 };
 
                 let status_style = match &self.deblur_model_status {

@@ -496,9 +496,7 @@ pub fn handle_editor_message(
             let last_dir = ctx.app_state.last_save_directory.clone();
             handle_save_as_dialog(editor_state, last_dir)
         }
-        ImageEditorEvent::DeblurRequested => {
-            handle_deblur_request(ctx)
-        }
+        ImageEditorEvent::DeblurRequested => handle_deblur_request(ctx),
         ImageEditorEvent::DeblurCancelRequested => {
             // Cancel is handled by the editor state itself (sets cancel_requested flag)
             // The actual inference task will check this flag and stop

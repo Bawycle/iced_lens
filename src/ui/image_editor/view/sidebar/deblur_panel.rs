@@ -45,12 +45,11 @@ pub fn panel<'a>(
         content = content.push(processing_text);
 
         // Show disabled apply button to indicate operation in progress
-        let apply_btn = button(
-            text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG),
-        )
-        .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(button_styles::disabled());
+        let apply_btn =
+            button(text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG))
+                .padding(spacing::SM)
+                .width(Length::Fill)
+                .style(button_styles::disabled());
         content = content.push(apply_btn);
     } else if has_deblur_applied {
         // Deblur already applied: show message and disabled button
@@ -61,12 +60,11 @@ pub fn panel<'a>(
             });
         content = content.push(already_applied_text);
 
-        let apply_btn = button(
-            text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG),
-        )
-        .padding(spacing::SM)
-        .width(Length::Fill)
-        .style(button_styles::disabled());
+        let apply_btn =
+            button(text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG))
+                .padding(spacing::SM)
+                .width(Length::Fill)
+                .style(button_styles::disabled());
         content = content.push(apply_btn);
     } else {
         // Show status-specific UI based on model status
@@ -105,7 +103,10 @@ pub fn panel<'a>(
 
                 let progress_text = text(ctx.i18n.tr_with_args(
                     "image-editor-deblur-downloading",
-                    &[("progress", format!("{}", (*progress * 100.0) as u32).as_str())],
+                    &[(
+                        "progress",
+                        format!("{}", (*progress * 100.0) as u32).as_str(),
+                    )],
                 ))
                 .size(typography::BODY_SM);
                 content = content.push(progress_text);

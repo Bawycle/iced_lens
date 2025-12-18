@@ -180,7 +180,9 @@ impl DeblurManager {
         let input_tensor = input_tensor.as_standard_layout().into_owned();
 
         // Get input name from model (NAFNet uses 'lq' for low-quality input)
-        let input_name = session.inputs.first()
+        let input_name = session
+            .inputs
+            .first()
             .map(|i| i.name.clone())
             .unwrap_or_else(|| "lq".to_string());
 
@@ -398,14 +400,15 @@ fn preprocess_image(img: &DynamicImage) -> DeblurResult<Array4<f32>> {
     let (width, height) = rgb.dimensions();
 
     // Pad image if too small for NAFNet's encoder stages
-    let (padded_rgb, padded_width, padded_height) = if width < MIN_DIMENSION || height < MIN_DIMENSION {
-        let new_width = width.max(MIN_DIMENSION);
-        let new_height = height.max(MIN_DIMENSION);
-        let padded = pad_image_reflect(&rgb, new_width, new_height);
-        (padded, new_width, new_height)
-    } else {
-        (rgb, width, height)
-    };
+    let (padded_rgb, padded_width, padded_height) =
+        if width < MIN_DIMENSION || height < MIN_DIMENSION {
+            let new_width = width.max(MIN_DIMENSION);
+            let new_height = height.max(MIN_DIMENSION);
+            let padded = pad_image_reflect(&rgb, new_width, new_height);
+            (padded, new_width, new_height)
+        } else {
+            (rgb, width, height)
+        };
 
     // Create NCHW tensor (batch=1, channels=3, height, width)
     let mut tensor = Array4::<f32>::zeros((1, 3, padded_height as usize, padded_width as usize));
@@ -422,7 +425,11 @@ fn preprocess_image(img: &DynamicImage) -> DeblurResult<Array4<f32>> {
 }
 
 /// Pads an image using edge reflection to reach target dimensions.
-fn pad_image_reflect(img: &image_rs::RgbImage, target_width: u32, target_height: u32) -> image_rs::RgbImage {
+fn pad_image_reflect(
+    img: &image_rs::RgbImage,
+    target_width: u32,
+    target_height: u32,
+) -> image_rs::RgbImage {
     let (src_width, src_height) = img.dimensions();
     let mut padded = image_rs::RgbImage::new(target_width, target_height);
 

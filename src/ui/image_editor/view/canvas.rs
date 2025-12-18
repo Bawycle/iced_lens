@@ -58,8 +58,8 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
         )
         .into_element();
 
-        let loading_text = text(ctx.i18n.tr("image-editor-deblur-processing"))
-            .size(typography::BODY_LG);
+        let loading_text =
+            text(ctx.i18n.tr("image-editor-deblur-processing")).size(typography::BODY_LG);
 
         let loading_content = Column::new()
             .spacing(spacing::SM)
@@ -67,22 +67,23 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
             .push(spinner)
             .push(loading_text);
 
-        let loading_overlay = container(loading_content)
-            .padding(spacing::MD)
-            .style(move |_theme: &Theme| container::Style {
-                background: Some(Background::Color(Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.0,
-                    a: opacity::OVERLAY_MEDIUM,
-                })),
-                border: iced::Border {
-                    radius: radius::MD.into(),
+        let loading_overlay =
+            container(loading_content)
+                .padding(spacing::MD)
+                .style(move |_theme: &Theme| container::Style {
+                    background: Some(Background::Color(Color {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: opacity::OVERLAY_MEDIUM,
+                    })),
+                    border: iced::Border {
+                        radius: radius::MD.into(),
+                        ..Default::default()
+                    },
+                    text_color: Some(theme::overlay_arrow_light_color()),
                     ..Default::default()
-                },
-                text_color: Some(theme::overlay_arrow_light_color()),
-                ..Default::default()
-            });
+                });
 
         let overlay = container(loading_overlay)
             .width(Length::Fixed(img_width as f32))
@@ -90,10 +91,7 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
             .align_x(Horizontal::Center)
             .align_y(iced::alignment::Vertical::Center);
 
-        Stack::new()
-            .push(image_widget)
-            .push(overlay)
-            .into()
+        Stack::new().push(image_widget).push(overlay).into()
     } else if model.crop_state.overlay.visible {
         Stack::new()
             .push(image_widget)

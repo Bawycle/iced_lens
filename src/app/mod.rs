@@ -638,9 +638,7 @@ impl App {
             Message::DeblurValidationCompleted { result, is_startup } => {
                 self.handle_deblur_validation_completed(result, is_startup)
             }
-            Message::DeblurApplyCompleted(result) => {
-                self.handle_deblur_apply_completed(result)
-            }
+            Message::DeblurApplyCompleted(result) => self.handle_deblur_apply_completed(result),
             Message::WindowCloseRequested(id) => {
                 // Mark app as shutting down to cancel background tasks
                 self.shutting_down = true;
@@ -667,9 +665,10 @@ impl App {
             match result {
                 Ok(deblurred_image) => {
                     editor.apply_deblur_result(*deblurred_image);
-                    self.notifications.push(notifications::Notification::success(
-                        "notification-deblur-apply-success",
-                    ));
+                    self.notifications
+                        .push(notifications::Notification::success(
+                            "notification-deblur-apply-success",
+                        ));
                 }
                 Err(e) => {
                     editor.deblur_failed();
@@ -781,11 +780,10 @@ impl App {
                 // Download failed
                 self.settings
                     .set_deblur_model_status(media::deblur::ModelStatus::Error(e.clone()));
-                self.notifications
-                    .push(
-                        notifications::Notification::error("notification-deblur-download-error")
-                            .with_arg("error", e),
-                    );
+                self.notifications.push(
+                    notifications::Notification::error("notification-deblur-download-error")
+                        .with_arg("error", e),
+                );
                 Task::none()
             }
         }
