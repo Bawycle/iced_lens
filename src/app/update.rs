@@ -12,7 +12,7 @@ use crate::media::{self, frame_export::ExportableFrame, MediaData, MediaNavigato
 use crate::ui::about::{self, Event as AboutEvent};
 use crate::ui::help::{self, Event as HelpEvent};
 use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
-use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent};
+use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent, MetadataEditorState};
 use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
@@ -36,6 +36,7 @@ pub struct UpdateContext<'a> {
     pub menu_open: &'a mut bool,
     pub info_panel_open: &'a mut bool,
     pub current_metadata: &'a mut Option<MediaMetadata>,
+    pub metadata_editor_state: &'a mut Option<MetadataEditorState>,
     pub help_state: &'a mut help::State,
     pub app_state: &'a mut super::persisted_state::AppState,
     pub notifications: &'a mut notifications::Manager,
@@ -75,6 +76,9 @@ pub fn handle_viewer_message(
 
     // Handle successful media load
     if is_successful_load {
+        // Exit metadata edit mode (new media loaded = new context)
+        *ctx.metadata_editor_state = None;
+
         if let Some(path) = ctx.viewer.current_media_path.as_ref() {
             // Extract metadata
             *ctx.current_metadata = media::metadata::extract_metadata(path);
@@ -99,7 +103,17 @@ pub fn handle_viewer_message(
             persistence::persist_preferences(ctx.preferences_context())
         }
         component::Effect::ToggleFullscreen => {
-            toggle_fullscreen(ctx.fullscreen, ctx.window_id, ctx.info_panel_open)
+            // Guard: cannot toggle fullscreen when metadata editor has unsaved changes
+            let has_unsaved_changes = ctx
+                .metadata_editor_state
+                .as_ref()
+                .map(|editor| editor.has_changes())
+                .unwrap_or(false);
+            if has_unsaved_changes {
+                Task::none()
+            } else {
+                toggle_fullscreen(ctx.fullscreen, ctx.window_id, ctx.info_panel_open)
+            }
         }
         component::Effect::ExitFullscreen => {
             update_fullscreen_mode(ctx.fullscreen, ctx.window_id, false)
@@ -136,6 +150,19 @@ pub fn handle_viewer_message(
 
 /// Handles screen transitions.
 pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task<Message> {
+    // Guard: cannot enter ImageEditor when metadata editor has unsaved changes
+    // Note: Settings/Help/About are safe to navigate to (state is preserved)
+    if matches!(ctx.screen, Screen::Viewer) && matches!(target, Screen::ImageEditor) {
+        let has_unsaved_changes = ctx
+            .metadata_editor_state
+            .as_ref()
+            .map(|editor| editor.has_changes())
+            .unwrap_or(false);
+        if has_unsaved_changes {
+            return Task::none();
+        }
+    }
+
     // Handle Settings → Viewer transition
     if matches!(target, Screen::Viewer) && matches!(ctx.screen, Screen::Settings) {
         match ctx.settings.ensure_zoom_step_committed() {
@@ -501,17 +528,128 @@ pub fn handle_metadata_panel_message(
     ctx: &mut UpdateContext<'_>,
     message: metadata_panel::Message,
 ) -> Task<Message> {
-    match metadata_panel::update(message) {
+    let current_path = ctx.viewer.current_media_path.as_ref();
+    let event = metadata_panel::update_with_state(
+        ctx.metadata_editor_state.as_mut(),
+        message,
+        current_path,
+    );
+
+    match event {
         MetadataPanelEvent::None => Task::none(),
         MetadataPanelEvent::Close => {
+            // Exit edit mode when closing panel
+            *ctx.metadata_editor_state = None;
             *ctx.info_panel_open = false;
             Task::none()
+        }
+        MetadataPanelEvent::EnterEditModeRequested => {
+            // Create editor state from current metadata
+            if let Some(MediaMetadata::Image(image_meta)) = ctx.current_metadata.as_ref() {
+                *ctx.metadata_editor_state =
+                    Some(MetadataEditorState::from_image_metadata(image_meta));
+            } else {
+                // No image metadata - create empty editor state
+                *ctx.metadata_editor_state = Some(MetadataEditorState::new_empty());
+            }
+            Task::none()
+        }
+        MetadataPanelEvent::ExitEditModeRequested => {
+            *ctx.metadata_editor_state = None;
+            Task::none()
+        }
+        MetadataPanelEvent::SaveRequested(path) => {
+            // Validate all fields before saving
+            if let Some(editor_state) = ctx.metadata_editor_state.as_mut() {
+                if !editor_state.validate_all() {
+                    // Validation failed - show error notification
+                    ctx.notifications.push(notifications::Notification::error(
+                        "notification-metadata-validation-error",
+                    ));
+                    return Task::none();
+                }
+
+                // Write metadata using little_exif
+                match crate::media::metadata_writer::write_exif(
+                    &path,
+                    editor_state.editable_metadata(),
+                ) {
+                    Ok(()) => {
+                        // Refresh metadata display
+                        *ctx.current_metadata = crate::media::metadata::extract_metadata(&path);
+
+                        // Exit edit mode
+                        *ctx.metadata_editor_state = None;
+
+                        // Show success notification
+                        ctx.notifications.push(notifications::Notification::success(
+                            "notification-metadata-save-success",
+                        ));
+                    }
+                    Err(_e) => {
+                        // Show error notification
+                        ctx.notifications.push(notifications::Notification::error(
+                            "notification-metadata-save-error",
+                        ));
+                    }
+                }
+            }
+            Task::none()
+        }
+        MetadataPanelEvent::SaveAsRequested => {
+            // Validate all fields before showing dialog
+            if let Some(editor_state) = ctx.metadata_editor_state.as_mut() {
+                if !editor_state.validate_all() {
+                    ctx.notifications.push(notifications::Notification::error(
+                        "notification-metadata-validation-error",
+                    ));
+                    return Task::none();
+                }
+            }
+
+            // Open Save As dialog
+            let dialog = rfd::AsyncFileDialog::new()
+                .set_title("Save Image As")
+                .add_filter("JPEG", &["jpg", "jpeg"])
+                .add_filter("PNG", &["png"])
+                .add_filter("WebP", &["webp"])
+                .add_filter("TIFF", &["tiff", "tif"]);
+
+            // Set initial directory from app state
+            let dialog = if let Some(dir) = ctx.app_state.last_save_directory.as_ref() {
+                dialog.set_directory(dir)
+            } else {
+                dialog
+            };
+
+            // Set initial filename from current path
+            let dialog = if let Some(path) = ctx.viewer.current_media_path.as_ref() {
+                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                    dialog.set_file_name(filename)
+                } else {
+                    dialog
+                }
+            } else {
+                dialog
+            };
+
+            Task::perform(
+                async move {
+                    dialog
+                        .save_file()
+                        .await
+                        .map(|handle| handle.path().to_path_buf())
+                },
+                Message::MetadataSaveAsDialogResult,
+            )
         }
     }
 }
 
 /// Handles navigation to next image.
 pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
+
     // Rescan directory to handle added/removed images
     if let Some(current_path) = ctx
         .media_navigator
@@ -545,6 +683,8 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
 /// Handles navigation to previous image.
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
+
     // Rescan directory to handle added/removed images
     if let Some(current_path) = ctx
         .media_navigator
@@ -605,6 +745,8 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
                 "notification-delete-success",
             ));
 
+            // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
+
             // Rescan directory after deletion
             let scan_seed = next_candidate
                 .as_ref()
@@ -631,6 +773,9 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
             } else {
                 // No more media in directory
                 ctx.viewer.current_media_path = None;
+                // Clear metadata state (no media = no metadata context)
+                *ctx.metadata_editor_state = None;
+                *ctx.current_metadata = None;
                 Task::none()
             }
         }

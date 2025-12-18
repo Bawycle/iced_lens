@@ -30,6 +30,7 @@ viewer-delete-tooltip = Aktuelles Bild löschen
 viewer-zoom-in-tooltip = Vergrößern
 viewer-zoom-out-tooltip = Verkleinern
 viewer-fullscreen-tooltip = Vollbild umschalten
+viewer-fullscreen-disabled-unsaved = Änderungen zuerst speichern oder abbrechen
 viewer-double-click = Doppelklick
 viewer-scroll-wheel = Mausrad
 viewer-click-drag = Klick + Ziehen
@@ -264,6 +265,28 @@ help-capture-step4 = Das Bild wird im Editor geöffnet — speichern Sie als PNG
 
 help-capture-formats = Unterstützte Exportformate: PNG (verlustfrei), JPEG (kleinere Dateigröße), WebP (modernes Format mit guter Kompression).
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Metadaten-Bearbeitungs-Abschnitt
+# ─────────────────────────────────────────────────────────────────────────────
+help-section-metadata = Metadaten-Bearbeitung
+help-metadata-role = Sehen und bearbeiten Sie EXIF-Metadaten in Ihren Bilddateien. Ändern Sie Kamerainformationen, Aufnahmedatum, GPS-Koordinaten und Belichtungseinstellungen.
+
+help-metadata-tool-view = Anzeigemodus
+help-metadata-tool-view-desc = Sehen Sie Dateiinformationen, Kameradetails, Belichtungseinstellungen und GPS-Koordinaten im Info-Panel.
+help-metadata-tool-edit = Bearbeitungsmodus
+help-metadata-tool-edit-desc = Klicken Sie auf Bearbeiten, um Metadatenfelder zu ändern. Änderungen werden in Echtzeit validiert.
+help-metadata-tool-save = Speicheroptionen
+help-metadata-tool-save-desc = Speichern aktualisiert die Originaldatei, Speichern unter erstellt eine Kopie mit den neuen Metadaten.
+
+help-metadata-fields-title = Bearbeitbare Felder
+help-metadata-field-camera = Kamerahersteller und Modell
+help-metadata-field-date = Aufnahmedatum (EXIF-Format)
+help-metadata-field-exposure = Belichtungszeit, Blende, ISO
+help-metadata-field-focal = Brennweite und 35mm-Äquivalent
+help-metadata-field-gps = GPS-Breiten- und Längengrad
+
+help-metadata-note = Hinweis: Metadaten-Bearbeitung ist nur für Bilder verfügbar. Video-Metadaten-Bearbeitung ist für eine zukünftige Version geplant.
+
 # About screen
 about-title = Über
 about-back-to-viewer-button = Zurück zum Viewer
@@ -312,6 +335,8 @@ notification-video-editing-unsupported = Videobearbeitung wird noch nicht unters
 
 # Metadata panel
 metadata-panel-title = Dateiinformationen
+metadata-panel-close = Panel schließen
+metadata-panel-close-disabled = Änderungen zuerst speichern oder abbrechen
 metadata-section-file = Datei
 metadata-section-camera = Kamera
 metadata-section-exposure = Belichtung
@@ -333,6 +358,39 @@ metadata-label-bitrate = Bitrate
 metadata-label-duration = Dauer
 metadata-label-fps = Bildrate
 metadata-value-unknown = Unbekannt
+
+# Metadaten-Bearbeitung
+metadata-edit-button = Bearbeiten
+metadata-edit-disabled-video = Metadaten-Bearbeitung ist für Videos nicht verfügbar
+metadata-cancel-button = Abbrechen
+metadata-save-button = Speichern
+metadata-save-as-button = Speichern unter...
+metadata-save-warning = Speichern ändert die Originaldatei
+metadata-label-make = Hersteller
+metadata-label-model = Modell
+metadata-label-focal-length-35mm = Brennweite (35mm)
+metadata-label-flash = Blitz
+metadata-label-latitude = Breitengrad
+metadata-label-longitude = Längengrad
+metadata-validation-date-format = Format: JJJJ:MM:TT HH:MM:SS
+metadata-validation-date-invalid = Ungültige Datum/Zeit-Werte
+metadata-validation-exposure-format = Format: 1/250 oder 0.004
+metadata-validation-aperture-format = Format: f/2.8 oder 2.8
+metadata-validation-iso-positive = Muss eine positive Ganzzahl sein
+metadata-validation-focal-format = Format: 50 mm oder 50
+metadata-validation-lat-range = Muss zwischen -90 und 90 liegen
+metadata-validation-lon-range = Muss zwischen -180 und 180 liegen
+metadata-validation-invalid-number = Ungültige Zahl
+
+# Metadaten-Benachrichtigungen
+notification-metadata-save-success = Metadaten erfolgreich gespeichert
+notification-metadata-save-error = Fehler beim Speichern der Metadaten
+notification-metadata-validation-error = Bitte beheben Sie die Validierungsfehler vor dem Speichern
+
+# Metadaten progressive Offenlegung
+metadata-add-field = Metadatenfeld hinzufügen...
+metadata-no-fields-message = Keine Metadatenfelder. Verwenden Sie "Metadatenfeld hinzufügen", um Felder hinzuzufügen.
+
 navbar-info-button = Info
 
 # Empty state (no media loaded)

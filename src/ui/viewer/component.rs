@@ -111,6 +111,8 @@ pub struct ViewEnv<'a> {
     /// Navigation state from the central MediaNavigator.
     /// This is the single source of truth for navigation info.
     pub navigation: NavigationInfo,
+    /// Whether metadata editor has unsaved changes (disables navigation).
+    pub metadata_editor_has_changes: bool,
 }
 
 /// Complete viewer component state.
@@ -971,7 +973,10 @@ impl State {
         let effective_fit_to_window = self.fit_to_window();
         let image = self.media.as_ref().map(|image_data| viewer::ImageContext {
             i18n: env.i18n,
-            controls_context: controls::ViewContext { i18n: env.i18n },
+            controls_context: controls::ViewContext {
+                i18n: env.i18n,
+                metadata_editor_has_changes: env.metadata_editor_has_changes,
+            },
             zoom: &self.zoom,
             effective_fit_to_window,
             pane_context: pane::ViewContext {
@@ -1027,6 +1032,7 @@ impl State {
                     .video_player
                     .as_ref()
                     .and_then(|p| p.state().error_message()),
+                metadata_editor_has_changes: env.metadata_editor_has_changes,
             },
             controls_visible: if env.is_fullscreen {
                 // In fullscreen, auto-hide controls after configured delay

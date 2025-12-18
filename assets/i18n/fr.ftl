@@ -30,6 +30,7 @@ viewer-delete-tooltip = Supprimer l'image affichée
 viewer-zoom-in-tooltip = Zoom avant
 viewer-zoom-out-tooltip = Zoom arrière
 viewer-fullscreen-tooltip = Basculer en plein écran
+viewer-fullscreen-disabled-unsaved = Enregistrez ou annulez d'abord les modifications
 viewer-double-click = Double-clic
 viewer-scroll-wheel = Molette
 viewer-click-drag = Clic + glisser
@@ -264,6 +265,28 @@ help-capture-step4 = L'image s'ouvre dans l'éditeur — enregistrez en PNG, JPE
 
 help-capture-formats = Formats d'export disponibles : PNG (sans perte), JPEG (fichier plus léger), WebP (format moderne avec bonne compression).
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Section Édition des métadonnées
+# ─────────────────────────────────────────────────────────────────────────────
+help-section-metadata = Édition des métadonnées
+help-metadata-role = Consultez et modifiez les métadonnées EXIF intégrées dans vos fichiers image. Modifiez les informations de l'appareil photo, la date de prise de vue, les coordonnées GPS et les paramètres d'exposition.
+
+help-metadata-tool-view = Mode affichage
+help-metadata-tool-view-desc = Consultez les informations du fichier, les détails de l'appareil, les paramètres d'exposition et les coordonnées GPS dans le panneau d'informations.
+help-metadata-tool-edit = Mode édition
+help-metadata-tool-edit-desc = Cliquez sur le bouton Éditer pour modifier les champs de métadonnées. Les modifications sont validées en temps réel.
+help-metadata-tool-save = Options d'enregistrement
+help-metadata-tool-save-desc = Enregistrer pour mettre à jour le fichier original, ou Enregistrer sous pour créer une copie avec les nouvelles métadonnées.
+
+help-metadata-fields-title = Champs modifiables
+help-metadata-field-camera = Marque et modèle de l'appareil
+help-metadata-field-date = Date de prise de vue (format EXIF)
+help-metadata-field-exposure = Temps d'exposition, ouverture, ISO
+help-metadata-field-focal = Focale et équivalent 35mm
+help-metadata-field-gps = Latitude et longitude GPS
+
+help-metadata-note = Note : L'édition des métadonnées n'est disponible que pour les images. L'édition des métadonnées vidéo est prévue pour une future version.
+
 # Écran À propos
 about-title = À propos
 about-back-to-viewer-button = Retour
@@ -312,6 +335,8 @@ notification-video-editing-unsupported = L'édition vidéo n'est pas encore supp
 
 # Panneau de métadonnées
 metadata-panel-title = Informations du fichier
+metadata-panel-close = Fermer le panneau
+metadata-panel-close-disabled = Enregistrez ou annulez d'abord les modifications
 metadata-section-file = Fichier
 metadata-section-camera = Appareil photo
 metadata-section-exposure = Exposition
@@ -333,6 +358,39 @@ metadata-label-bitrate = Débit
 metadata-label-duration = Durée
 metadata-label-fps = Images/seconde
 metadata-value-unknown = Inconnu
+
+# Édition des métadonnées
+metadata-edit-button = Éditer
+metadata-edit-disabled-video = L'édition des métadonnées n'est pas disponible pour les vidéos
+metadata-cancel-button = Annuler
+metadata-save-button = Enregistrer
+metadata-save-as-button = Enregistrer sous...
+metadata-save-warning = Enregistrer modifiera le fichier original
+metadata-label-make = Marque
+metadata-label-model = Modèle
+metadata-label-focal-length-35mm = Focale (35mm)
+metadata-label-flash = Flash
+metadata-label-latitude = Latitude
+metadata-label-longitude = Longitude
+metadata-validation-date-format = Format : AAAA:MM:JJ HH:MM:SS
+metadata-validation-date-invalid = Valeurs de date/heure invalides
+metadata-validation-exposure-format = Format : 1/250 ou 0.004
+metadata-validation-aperture-format = Format : f/2.8 ou 2.8
+metadata-validation-iso-positive = Doit être un entier positif
+metadata-validation-focal-format = Format : 50 mm ou 50
+metadata-validation-lat-range = Doit être entre -90 et 90
+metadata-validation-lon-range = Doit être entre -180 et 180
+metadata-validation-invalid-number = Nombre invalide
+
+# Notifications de métadonnées
+notification-metadata-save-success = Métadonnées enregistrées avec succès
+notification-metadata-save-error = Impossible d'enregistrer les métadonnées
+notification-metadata-validation-error = Veuillez corriger les erreurs de validation avant d'enregistrer
+
+# Divulgation progressive des métadonnées
+metadata-add-field = Ajouter un champ de métadonnées...
+metadata-no-fields-message = Aucun champ de métadonnées. Utilisez "Ajouter un champ de métadonnées" pour ajouter des champs.
+
 navbar-info-button = Info
 
 # Empty state (no media loaded)

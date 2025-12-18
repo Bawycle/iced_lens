@@ -167,6 +167,11 @@ define_icon!(
     "../../assets/icons/png/dark/trash.png",
     "Trash icon: garbage bin (used for delete)."
 );
+define_icon!(
+    pencil,
+    "../../assets/icons/png/dark/pencil.png",
+    "Pencil icon: for edit actions."
+);
 
 // =============================================================================
 // Transform Icons (Editor)
@@ -286,6 +291,11 @@ pub mod light {
         "../../assets/icons/png/light/chevron_double_left.png",
         "Double chevron left icon (white): for dark theme UI."
     );
+    define_icon!(
+        pencil,
+        "../../assets/icons/png/light/pencil.png",
+        "Pencil icon (white): for dark theme UI."
+    );
 }
 
 // =============================================================================
@@ -373,6 +383,7 @@ mod tests {
         let _ = compress();
         let _ = fullscreen();
         let _ = trash();
+        let _ = pencil();
         let _ = rotate_left();
         let _ = rotate_right();
         let _ = flip_horizontal();
@@ -415,6 +426,7 @@ mod tests {
     fn light_icons_load_successfully() {
         let _ = light::chevron_double_right();
         let _ = light::chevron_double_left();
+        let _ = light::pencil();
     }
 
     #[test]

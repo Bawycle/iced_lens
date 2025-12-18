@@ -30,6 +30,7 @@ viewer-delete-tooltip = Delete the current image
 viewer-zoom-in-tooltip = Zoom in
 viewer-zoom-out-tooltip = Zoom out
 viewer-fullscreen-tooltip = Toggle fullscreen
+viewer-fullscreen-disabled-unsaved = Save or cancel metadata changes first
 viewer-double-click = Double-click
 viewer-scroll-wheel = Scroll wheel
 viewer-click-drag = Click + drag
@@ -264,6 +265,28 @@ help-capture-step4 = The frame opens in the editor — save as PNG, JPEG, or Web
 
 help-capture-formats = Supported export formats: PNG (lossless), JPEG (smaller file size), WebP (modern format with good compression).
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Metadata Editing Section
+# ─────────────────────────────────────────────────────────────────────────────
+help-section-metadata = Metadata Editing
+help-metadata-role = View and edit EXIF metadata embedded in your image files. Modify camera information, date taken, GPS coordinates, and exposure settings.
+
+help-metadata-tool-view = View mode
+help-metadata-tool-view-desc = See file information, camera details, exposure settings, and GPS coordinates in the info panel.
+help-metadata-tool-edit = Edit mode
+help-metadata-tool-edit-desc = Click the Edit button to modify metadata fields. Changes are validated in real-time.
+help-metadata-tool-save = Save options
+help-metadata-tool-save-desc = Save to update the original file, or Save As to create a copy with the new metadata.
+
+help-metadata-fields-title = Editable Fields
+help-metadata-field-camera = Camera make and model
+help-metadata-field-date = Date taken (EXIF format)
+help-metadata-field-exposure = Exposure time, aperture, ISO
+help-metadata-field-focal = Focal length and 35mm equivalent
+help-metadata-field-gps = GPS latitude and longitude
+
+help-metadata-note = Note: Metadata editing is only available for images. Video metadata editing is planned for a future release.
+
 # About screen
 about-title = About
 about-back-to-viewer-button = Back to Viewer
@@ -312,6 +335,8 @@ notification-video-editing-unsupported = Video editing is not supported yet
 
 # Metadata panel
 metadata-panel-title = File Information
+metadata-panel-close = Close panel
+metadata-panel-close-disabled = Save or cancel changes first
 metadata-section-file = File
 metadata-section-camera = Camera
 metadata-section-exposure = Exposure
@@ -333,6 +358,39 @@ metadata-label-bitrate = Bit rate
 metadata-label-duration = Duration
 metadata-label-fps = Frame rate
 metadata-value-unknown = Unknown
+
+# Metadata editing
+metadata-edit-button = Edit
+metadata-edit-disabled-video = Metadata editing is not available for videos
+metadata-cancel-button = Cancel
+metadata-save-button = Save
+metadata-save-as-button = Save As...
+metadata-save-warning = Save will modify the original file
+metadata-label-make = Make
+metadata-label-model = Model
+metadata-label-focal-length-35mm = Focal length (35mm)
+metadata-label-flash = Flash
+metadata-label-latitude = Latitude
+metadata-label-longitude = Longitude
+metadata-validation-date-format = Format: YYYY:MM:DD HH:MM:SS
+metadata-validation-date-invalid = Invalid date/time values
+metadata-validation-exposure-format = Format: 1/250 or 0.004
+metadata-validation-aperture-format = Format: f/2.8 or 2.8
+metadata-validation-iso-positive = Must be a positive integer
+metadata-validation-focal-format = Format: 50 mm or 50
+metadata-validation-lat-range = Must be between -90 and 90
+metadata-validation-lon-range = Must be between -180 and 180
+metadata-validation-invalid-number = Invalid number
+
+# Metadata notifications
+notification-metadata-save-success = Metadata saved successfully
+notification-metadata-save-error = Failed to save metadata
+notification-metadata-validation-error = Please fix validation errors before saving
+
+# Metadata progressive disclosure
+metadata-add-field = Add metadata field...
+metadata-no-fields-message = No metadata fields. Use "Add metadata field" to add fields.
+
 navbar-info-button = Info
 
 # Empty state (no media loaded)

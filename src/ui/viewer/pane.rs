@@ -53,6 +53,8 @@ pub struct ViewModel<'a> {
     pub is_loading_media: bool,
     pub spinner_rotation: f32,
     pub video_error: Option<&'a str>,
+    /// Whether metadata editor has unsaved changes (disables navigation).
+    pub metadata_editor_has_changes: bool,
 }
 
 pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Message> {
@@ -204,6 +206,9 @@ fn view_inner<'a>(
 
     // Add navigation arrows if visible
 
+    // Navigation is disabled when metadata editor has unsaved changes
+    let nav_enabled = !model.metadata_editor_has_changes;
+
     if model.arrows_visible {
         if model.has_previous {
             // Show loop icon at boundaries to indicate wrap-around behavior
@@ -225,13 +230,17 @@ fn view_inner<'a>(
                 Text::new("◀").size(typography::TITLE_LG).into()
             };
             let left_arrow = button(button_content)
-                .on_press(Message::NavigatePrevious)
                 .padding(spacing::SM)
                 .style(styles::button_overlay(
                     arrow_text_color,
                     arrow_bg_alpha_normal,
                     arrow_bg_alpha_hover,
                 ));
+            let left_arrow = if nav_enabled {
+                left_arrow.on_press(Message::NavigatePrevious)
+            } else {
+                left_arrow
+            };
 
             // Create a clickable zone that contains the button
             // The zone has a minimum width but can expand to fit the button content
@@ -242,7 +251,12 @@ fn view_inner<'a>(
                 .align_y(Vertical::Center);
 
             // Wrap in mouse_area to capture clicks outside the button but within the zone
-            let left_zone_clickable = mouse_area(left_zone).on_release(Message::NavigatePrevious);
+            let left_zone_clickable = mouse_area(left_zone);
+            let left_zone_clickable = if nav_enabled {
+                left_zone_clickable.on_release(Message::NavigatePrevious)
+            } else {
+                left_zone_clickable
+            };
 
             // Outer container fills width so content has room to display fully
             stack = stack.push(
@@ -273,13 +287,17 @@ fn view_inner<'a>(
                 Text::new("▶").size(typography::TITLE_LG).into()
             };
             let right_arrow = button(button_content)
-                .on_press(Message::NavigateNext)
                 .padding(spacing::SM)
                 .style(styles::button_overlay(
                     arrow_text_color,
                     arrow_bg_alpha_normal,
                     arrow_bg_alpha_hover,
                 ));
+            let right_arrow = if nav_enabled {
+                right_arrow.on_press(Message::NavigateNext)
+            } else {
+                right_arrow
+            };
 
             // Create a clickable zone that contains the button
             // The zone has a minimum width but can expand to fit the button content
@@ -290,7 +308,12 @@ fn view_inner<'a>(
                 .align_y(Vertical::Center);
 
             // Wrap in mouse_area to capture clicks outside the button but within the zone
-            let right_zone_clickable = mouse_area(right_zone).on_release(Message::NavigateNext);
+            let right_zone_clickable = mouse_area(right_zone);
+            let right_zone_clickable = if nav_enabled {
+                right_zone_clickable.on_release(Message::NavigateNext)
+            } else {
+                right_zone_clickable
+            };
 
             // Outer container fills width so align_x positions content at right edge
             stack = stack.push(

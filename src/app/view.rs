@@ -12,7 +12,7 @@ use crate::media::navigator::NavigationInfo;
 use crate::ui::about::{self, ViewContext as AboutViewContext};
 use crate::ui::help::{self, ViewContext as HelpViewContext};
 use crate::ui::image_editor::{self, State as ImageEditorState};
-use crate::ui::metadata_panel::{self, ViewContext as MetadataPanelViewContext};
+use crate::ui::metadata_panel::{self, MetadataEditorState, PanelContext as MetadataPanelContext};
 use crate::ui::navbar::{self, ViewContext as NavbarViewContext};
 use crate::ui::notifications::{Manager as NotificationManager, Toast};
 use crate::ui::settings::{State as SettingsState, ViewContext as SettingsViewContext};
@@ -37,6 +37,12 @@ pub struct ViewContext<'a> {
     pub navigation: NavigationInfo,
     /// Current media metadata for the info panel.
     pub current_metadata: Option<&'a MediaMetadata>,
+    /// Metadata editor state when in edit mode.
+    pub metadata_editor_state: Option<&'a MetadataEditorState>,
+    /// Current media path for save operations.
+    pub current_media_path: Option<&'a std::path::PathBuf>,
+    /// Whether the current media is an image (for edit button enablement).
+    pub is_image: bool,
     /// Notification manager for rendering toast overlays.
     pub notifications: &'a NotificationManager,
     /// True if the application is using dark theme.
@@ -53,6 +59,9 @@ struct ViewerViewContext<'a> {
     info_panel_open: bool,
     navigation: NavigationInfo,
     current_metadata: Option<&'a MediaMetadata>,
+    metadata_editor_state: Option<&'a MetadataEditorState>,
+    current_media_path: Option<&'a std::path::PathBuf>,
+    is_image: bool,
     is_dark_theme: bool,
 }
 
@@ -68,6 +77,9 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
             info_panel_open: ctx.info_panel_open,
             navigation: ctx.navigation,
             current_metadata: ctx.current_metadata,
+            metadata_editor_state: ctx.metadata_editor_state,
+            current_media_path: ctx.current_media_path,
+            is_image: ctx.is_image,
             is_dark_theme: ctx.is_dark_theme,
         }),
         Screen::Settings => view_settings(ctx.settings, ctx.i18n),
@@ -101,6 +113,11 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
         .overlay_timeout_secs
         .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
 
+    let metadata_editor_has_changes = ctx
+        .metadata_editor_state
+        .map(|editor| editor.has_changes())
+        .unwrap_or(false);
+
     let viewer_content = ctx
         .viewer
         .view(component::ViewEnv {
@@ -109,16 +126,20 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
             is_fullscreen: ctx.fullscreen,
             overlay_hide_delay: std::time::Duration::from_secs(overlay_timeout_secs as u64),
             navigation: ctx.navigation,
+            metadata_editor_has_changes,
         })
         .map(Message::Viewer);
 
     // Build metadata panel if open
     let metadata_panel = if ctx.info_panel_open {
         Some(
-            metadata_panel::view(MetadataPanelViewContext {
+            metadata_panel::panel(MetadataPanelContext {
                 i18n: ctx.i18n,
                 metadata: ctx.current_metadata,
                 is_dark_theme: ctx.is_dark_theme,
+                current_path: ctx.current_media_path,
+                editor_state: ctx.metadata_editor_state,
+                is_image: ctx.is_image,
             })
             .map(Message::MetadataPanel),
         )
@@ -157,6 +178,7 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
             can_edit: has_media && !ctx.viewer.is_video(),
             info_panel_open: ctx.info_panel_open,
             has_media,
+            metadata_editor_has_changes,
         })
         .map(Message::Navbar);
 

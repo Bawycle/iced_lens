@@ -197,6 +197,16 @@ pub mod navigation {
         icons::cross()
     }
 
+    /// Edit action (e.g., edit metadata).
+    /// Returns dark icon for light theme, light icon for dark theme.
+    pub fn edit(is_dark_theme: bool) -> Image<Handle> {
+        if is_dark_theme {
+            icons::light::pencil()
+        } else {
+            icons::pencil()
+        }
+    }
+
     /// Collapse a left-side panel (chevron points left).
     /// Returns dark icon for light theme, light icon for dark theme.
     pub fn collapse_left_panel(is_dark_theme: bool) -> Image<Handle> {
@@ -359,6 +369,8 @@ mod tests {
         let _ = navigation::collapse_right_panel(true);
         let _ = navigation::expand_right_panel(false);
         let _ = navigation::expand_right_panel(true);
+        let _ = navigation::edit(false);
+        let _ = navigation::edit(true);
     }
 
     #[test]

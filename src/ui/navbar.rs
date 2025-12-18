@@ -24,6 +24,8 @@ pub struct ViewContext<'a> {
     pub info_panel_open: bool,
     /// Whether media is loaded (used to enable/disable info button).
     pub has_media: bool,
+    /// Whether metadata editor has unsaved changes (disables edit button).
+    pub metadata_editor_has_changes: bool,
 }
 
 /// Messages emitted by the navbar.
@@ -107,24 +109,35 @@ fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .padding(spacing::XS);
 
     let edit_label = ctx.i18n.tr("navbar-edit-button");
-    let edit_button = if ctx.can_edit {
+    let edit_button = if ctx.metadata_editor_has_changes {
+        // Disabled: metadata editor has unsaved changes
+        button(Text::new(edit_label)).style(styles::button::disabled())
+    } else if ctx.can_edit {
         button(Text::new(edit_label)).on_press(Message::EnterEditor)
     } else {
         button(Text::new(edit_label)).style(styles::button::disabled())
     };
 
     // Info button with toggle styling (highlighted when panel is open)
-    // Disabled when no media is loaded (no metadata to show)
+    // Disabled when:
+    // - No media is loaded (no metadata to show)
+    // - Panel is open with unsaved changes (can't close it)
     let info_label = ctx.i18n.tr("navbar-info-button");
-    let info_button = if ctx.has_media {
-        let info_button_base = button(Text::new(info_label)).on_press(Message::ToggleInfoPanel);
-        if ctx.info_panel_open {
-            info_button_base.style(styles::button::selected)
-        } else {
-            info_button_base // Default style when inactive, like Edit button
-        }
-    } else {
+    let info_button = if !ctx.has_media {
+        // No media: disabled
         button(Text::new(info_label)).style(styles::button::disabled())
+    } else if ctx.info_panel_open && ctx.metadata_editor_has_changes {
+        // Panel open with unsaved changes: disabled (can't close)
+        button(Text::new(info_label))
+            .style(styles::button::selected)
+    } else if ctx.info_panel_open {
+        // Panel open, no unsaved changes: can close
+        button(Text::new(info_label))
+            .on_press(Message::ToggleInfoPanel)
+            .style(styles::button::selected)
+    } else {
+        // Panel closed: can open
+        button(Text::new(info_label)).on_press(Message::ToggleInfoPanel)
     };
 
     let row = Row::new()
@@ -248,6 +261,7 @@ mod tests {
             can_edit: true,
             info_panel_open: false,
             has_media: true,
+            metadata_editor_has_changes: false,
         };
         let _element = view(ctx);
     }
@@ -261,6 +275,7 @@ mod tests {
             can_edit: true,
             info_panel_open: false,
             has_media: true,
+            metadata_editor_has_changes: false,
         };
         let _element = view(ctx);
     }
@@ -274,6 +289,7 @@ mod tests {
             can_edit: true,
             info_panel_open: true,
             has_media: true,
+            metadata_editor_has_changes: false,
         };
         let _element = view(ctx);
     }
@@ -287,6 +303,7 @@ mod tests {
             can_edit: false,
             info_panel_open: false,
             has_media: false,
+            metadata_editor_has_changes: false,
         };
         let _element = view(ctx);
     }

@@ -123,11 +123,10 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
 pub fn collapsed<'a>(is_dark_theme: bool) -> Element<'a, Message> {
     let toggle_button = button(action_icons::sized(
         action_icons::navigation::expand_left_panel(is_dark_theme),
-        sizing::ICON_MD,
+        sizing::ICON_SM,
     ))
     .on_press(SidebarMessage::ToggleSidebar.into())
-    .padding(spacing::SM)
-    .style(button_styles::unselected);
+    .padding(spacing::XXS);
 
     container(toggle_button)
         .width(Length::Fixed(60.0))
@@ -143,8 +142,7 @@ fn header_section<'a>(ctx: &ViewContext<'a>) -> Column<'a, Message> {
         sizing::ICON_SM,
     ))
     .on_press(SidebarMessage::ToggleSidebar.into())
-    .padding(spacing::XS)
-    .style(button_styles::unselected);
+    .padding(spacing::XXS);
 
     Column::new()
         .spacing(spacing::XS)

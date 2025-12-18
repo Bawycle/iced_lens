@@ -25,6 +25,7 @@ use crate::media::metadata::MediaMetadata;
 use crate::media::{self, MediaData, MediaNavigator};
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
+use crate::ui::metadata_panel::MetadataEditorState;
 use crate::ui::notifications;
 use crate::ui::settings::{State as SettingsState, StateConfig as SettingsConfig};
 use crate::ui::state::zoom::{MAX_ZOOM_STEP_PERCENT, MIN_ZOOM_STEP_PERCENT};
@@ -63,6 +64,8 @@ pub struct App {
     info_panel_open: bool,
     /// Current media metadata for the info panel.
     current_metadata: Option<MediaMetadata>,
+    /// State for metadata editing mode.
+    metadata_editor_state: Option<MetadataEditorState>,
     /// Help screen state (tracks expanded sections).
     help_state: help::State,
     /// Persisted application state (last save directory, etc.).
@@ -149,6 +152,7 @@ impl Default for App {
             menu_open: false,
             info_panel_open: false,
             current_metadata: None,
+            metadata_editor_state: None,
             help_state: help::State::new(),
             app_state: persisted_state::AppState::default(),
             notifications: notifications::Manager::new(),
@@ -337,8 +341,21 @@ impl App {
                 .map(String::from)
         });
 
+        // Check for metadata editor unsaved changes
+        let metadata_has_changes = self
+            .metadata_editor_state
+            .as_ref()
+            .map(|editor| editor.has_changes())
+            .unwrap_or(false);
+
         match file_name {
-            Some(name) => format!("{name} - {app_name}"),
+            Some(name) => {
+                if metadata_has_changes {
+                    format!("*{name} - {app_name}")
+                } else {
+                    format!("{name} - {app_name}")
+                }
+            }
             None => app_name,
         }
     }
@@ -385,6 +402,7 @@ impl App {
             menu_open: &mut self.menu_open,
             info_panel_open: &mut self.info_panel_open,
             current_metadata: &mut self.current_metadata,
+            metadata_editor_state: &mut self.metadata_editor_state,
             help_state: &mut self.help_state,
             app_state: &mut self.app_state,
             notifications: &mut self.notifications,
@@ -519,7 +537,68 @@ impl App {
                 update::handle_open_file_dialog_result(&mut ctx, path)
             }
             Message::FileDropped(path) => update::handle_file_dropped(&mut ctx, path),
+            Message::MetadataSaveAsDialogResult(path_opt) => {
+                if let Some(path) = path_opt {
+                    self.handle_metadata_save_as(path)
+                } else {
+                    Task::none()
+                }
+            }
         }
+    }
+
+    /// Handles the metadata Save As dialog result.
+    fn handle_metadata_save_as(&mut self, path: std::path::PathBuf) -> Task<Message> {
+        use crate::media::metadata_writer;
+
+        // First, copy the original file to the new location
+        if let Some(source_path) = self.viewer.current_media_path.as_ref() {
+            if let Err(_e) = std::fs::copy(source_path, &path) {
+                self.notifications.push(notifications::Notification::error(
+                    "notification-metadata-save-error",
+                ));
+                return Task::none();
+            }
+        } else {
+            self.notifications.push(notifications::Notification::error(
+                "notification-metadata-save-error",
+            ));
+            return Task::none();
+        }
+
+        // Then write metadata to the new file
+        if let Some(editor_state) = self.metadata_editor_state.as_ref() {
+            match metadata_writer::write_exif(&path, editor_state.editable_metadata()) {
+                Ok(()) => {
+                    // Remember the save directory
+                    self.app_state.set_last_save_directory_from_file(&path);
+                    if let Some(key) = self.app_state.save() {
+                        self.notifications
+                            .push(notifications::Notification::warning(&key));
+                    }
+
+                    // Refresh metadata display
+                    self.current_metadata = media::metadata::extract_metadata(&path);
+
+                    // Exit edit mode
+                    self.metadata_editor_state = None;
+
+                    // Show success notification
+                    self.notifications
+                        .push(notifications::Notification::success(
+                            "notification-metadata-save-success",
+                        ));
+                }
+                Err(_e) => {
+                    // Clean up: remove the copied file if write failed
+                    let _ = std::fs::remove_file(&path);
+                    self.notifications.push(notifications::Notification::error(
+                        "notification-metadata-save-error",
+                    ));
+                }
+            }
+        }
+        Task::none()
     }
 
     /// Handles async image loading result for the editor.
@@ -561,6 +640,10 @@ impl App {
 
     fn view(&self) -> Element<'_, Message> {
         let is_dark_theme = self.theme_mode.is_dark();
+        let is_image = matches!(
+            self.current_metadata,
+            Some(crate::media::metadata::MediaMetadata::Image(_))
+        );
         view::view(view::ViewContext {
             i18n: &self.i18n,
             screen: self.screen,
@@ -573,6 +656,9 @@ impl App {
             info_panel_open: self.info_panel_open,
             navigation: self.media_navigator.navigation_info(),
             current_metadata: self.current_metadata.as_ref(),
+            metadata_editor_state: self.metadata_editor_state.as_ref(),
+            current_media_path: self.viewer.current_media_path.as_ref(),
+            is_image,
             notifications: &self.notifications,
             is_dark_theme,
         })

@@ -20,7 +20,9 @@
 
 #### Metadata Sidebar
 - [ ] Allow text selection and copying in the metadata sidebar (blocked, pending native support in Iced 0.15.0)
-- [ ] Add the ability to edit and add new media metadata from the sidebar (in accordance with common standards such as Exif, Dublin Core, etc.). The help screen must be updated accordingly.
+- [x] Add the ability to edit and add new EXIF metadata for images from the sidebar (Phase 1 - images only)
+- [ ] Add video metadata editing support (Phase 2 - future work)
+- [ ] Add Dublin Core / XMP metadata support (Phase 2 - future work)
 
 ### Image editor
 - [ ] Image centering in editor canvas — currently complex to implement

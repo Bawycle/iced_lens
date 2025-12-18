@@ -49,6 +49,8 @@ pub enum Message {
     OpenFileDialogResult(Option<PathBuf>),
     /// A file was dropped on the window.
     FileDropped(PathBuf),
+    /// Result from the metadata Save As dialog.
+    MetadataSaveAsDialogResult(Option<PathBuf>),
 }
 
 /// Runtime flags passed in from the CLI or launcher to tweak startup behavior.

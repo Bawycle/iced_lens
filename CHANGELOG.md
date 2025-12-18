@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Linux: PNG icons for `.deb` package via `cargo-bundle`
 - **cargo-bundle support:** Added `[package.metadata.bundle]` configuration for creating macOS `.app` and Linux `.deb` packages with proper icons.
 - **Sidebar collapse buttons:** Both sidebars (metadata panel and image editor) now use consistent double chevron icons for expand/collapse actions, following UX best practices for panel controls.
+- **EXIF metadata editing:** The metadata sidebar now supports editing EXIF metadata for image files:
+  - Click the Edit button to enter edit mode with form fields for all editable metadata
+  - Editable fields: camera make/model, date taken, exposure time, aperture, ISO, focal length, 35mm equivalent, flash, GPS coordinates
+  - Real-time validation with error messages for invalid input formats
+  - Save to modify the original file or Save As to create a copy with new metadata
+  - Inline warning text explaining that Save modifies the original file
+  - Edit button disabled for videos with explanatory tooltip (video metadata editing planned for future release)
+  - Uses `little_exif` crate for EXIF writing (supports JPEG, PNG, WebP, TIFF, HEIF)
 
 ### Changed
 - **Image editor sidebar toggle:** Replaced hamburger menu icon (☰) with double chevron icons (`<<`/`>>`) for sidebar expand/collapse, improving visual consistency across the application.

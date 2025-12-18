@@ -30,6 +30,7 @@ viewer-delete-tooltip = Elimina l'immagine corrente
 viewer-zoom-in-tooltip = Ingrandisci
 viewer-zoom-out-tooltip = Riduci
 viewer-fullscreen-tooltip = Attiva/disattiva schermo intero
+viewer-fullscreen-disabled-unsaved = Salva o annulla prima le modifiche
 viewer-double-click = Doppio clic
 viewer-scroll-wheel = Rotella del mouse
 viewer-click-drag = Clic + trascina
@@ -264,6 +265,28 @@ help-capture-step4 = Il fotogramma si apre nell'editor — salva come PNG, JPEG 
 
 help-capture-formats = Formati di esportazione supportati: PNG (senza perdita), JPEG (dimensione file più piccola), WebP (formato moderno con buona compressione).
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Sezione modifica metadati
+# ─────────────────────────────────────────────────────────────────────────────
+help-section-metadata = Modifica metadati
+help-metadata-role = Visualizza e modifica i metadati EXIF incorporati nei tuoi file immagine. Modifica informazioni sulla fotocamera, data di acquisizione, coordinate GPS e impostazioni di esposizione.
+
+help-metadata-tool-view = Modalità visualizzazione
+help-metadata-tool-view-desc = Visualizza informazioni sul file, dettagli della fotocamera, impostazioni di esposizione e coordinate GPS nel pannello informazioni.
+help-metadata-tool-edit = Modalità modifica
+help-metadata-tool-edit-desc = Fai clic su Modifica per modificare i campi dei metadati. Le modifiche vengono validate in tempo reale.
+help-metadata-tool-save = Opzioni di salvataggio
+help-metadata-tool-save-desc = Salva aggiorna il file originale, Salva con nome crea una copia con i nuovi metadati.
+
+help-metadata-fields-title = Campi modificabili
+help-metadata-field-camera = Marca e modello della fotocamera
+help-metadata-field-date = Data di acquisizione (formato EXIF)
+help-metadata-field-exposure = Tempo di esposizione, apertura, ISO
+help-metadata-field-focal = Lunghezza focale e equivalente 35mm
+help-metadata-field-gps = Latitudine e longitudine GPS
+
+help-metadata-note = Nota: La modifica dei metadati è disponibile solo per le immagini. La modifica dei metadati video è prevista per una futura versione.
+
 # About screen
 about-title = Informazioni
 about-back-to-viewer-button = Torna al visualizzatore
@@ -312,6 +335,8 @@ notification-video-editing-unsupported = La modifica video non è ancora support
 
 # Metadata panel
 metadata-panel-title = Informazioni file
+metadata-panel-close = Chiudi pannello
+metadata-panel-close-disabled = Salva o annulla prima le modifiche
 metadata-section-file = File
 metadata-section-camera = Fotocamera
 metadata-section-exposure = Esposizione
@@ -333,6 +358,39 @@ metadata-label-bitrate = Bitrate
 metadata-label-duration = Durata
 metadata-label-fps = Fotogrammi al secondo
 metadata-value-unknown = Sconosciuto
+
+# Modifica metadati
+metadata-edit-button = Modifica
+metadata-edit-disabled-video = La modifica dei metadati non è disponibile per i video
+metadata-cancel-button = Annulla
+metadata-save-button = Salva
+metadata-save-as-button = Salva con nome...
+metadata-save-warning = Salva modificherà il file originale
+metadata-label-make = Marca
+metadata-label-model = Modello
+metadata-label-focal-length-35mm = Lunghezza focale (35mm)
+metadata-label-flash = Flash
+metadata-label-latitude = Latitudine
+metadata-label-longitude = Longitudine
+metadata-validation-date-format = Formato: AAAA:MM:GG HH:MM:SS
+metadata-validation-date-invalid = Valori di data/ora non validi
+metadata-validation-exposure-format = Formato: 1/250 o 0.004
+metadata-validation-aperture-format = Formato: f/2.8 o 2.8
+metadata-validation-iso-positive = Deve essere un numero intero positivo
+metadata-validation-focal-format = Formato: 50 mm o 50
+metadata-validation-lat-range = Deve essere tra -90 e 90
+metadata-validation-lon-range = Deve essere tra -180 e 180
+metadata-validation-invalid-number = Numero non valido
+
+# Notifiche metadati
+notification-metadata-save-success = Metadati salvati con successo
+notification-metadata-save-error = Errore nel salvataggio dei metadati
+notification-metadata-validation-error = Correggi gli errori di validazione prima di salvare
+
+# Divulgazione progressiva dei metadati
+metadata-add-field = Aggiungi campo metadati...
+metadata-no-fields-message = Nessun campo metadati. Usa "Aggiungi campo metadati" per aggiungere campi.
+
 navbar-info-button = Info
 
 # Empty state (no media loaded)
