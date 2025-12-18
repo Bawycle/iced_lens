@@ -167,7 +167,7 @@ cat >"$DESKTOP_FILE" <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=Iced Lens
-Comment=Image and video viewer built with Iced
+Comment=Privacy-first media viewer and editor with AI deblurring
 Exec=iced_lens %F
 Icon=iced_lens
 Categories=Graphics;Viewer;Video;AudioVideo;
