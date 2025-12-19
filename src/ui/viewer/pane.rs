@@ -244,10 +244,10 @@ fn view_inner<'a>(
             };
 
             // Create a clickable zone that contains the button
-            // The zone has a minimum width but can expand to fit the button content
+            // Fixed height prevents the zone from spanning the entire viewport
             let left_zone = Container::new(left_arrow)
-                .height(Length::Fill)
-                .padding(spacing::MD)
+                .height(Length::Fixed(150.0))
+                .padding(spacing::LG)
                 .align_x(Horizontal::Left)
                 .align_y(Vertical::Center);
 
@@ -259,12 +259,13 @@ fn view_inner<'a>(
                 left_zone_clickable
             };
 
-            // Outer container fills width so content has room to display fully
+            // Outer container centers the clickable zone vertically
             stack = stack.push(
                 Container::new(left_zone_clickable)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .align_x(Horizontal::Left),
+                    .align_x(Horizontal::Left)
+                    .align_y(Vertical::Center),
             );
         }
 
@@ -302,10 +303,10 @@ fn view_inner<'a>(
             };
 
             // Create a clickable zone that contains the button
-            // The zone has a minimum width but can expand to fit the button content
+            // Fixed height prevents the zone from spanning the entire viewport
             let right_zone = Container::new(right_arrow)
-                .height(Length::Fill)
-                .padding(spacing::MD)
+                .height(Length::Fixed(150.0))
+                .padding(spacing::LG)
                 .align_x(Horizontal::Right)
                 .align_y(Vertical::Center);
 
@@ -317,12 +318,13 @@ fn view_inner<'a>(
                 right_zone_clickable
             };
 
-            // Outer container fills width so align_x positions content at right edge
+            // Outer container centers the clickable zone vertically
             stack = stack.push(
                 Container::new(right_zone_clickable)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .align_x(Horizontal::Right),
+                    .align_x(Horizontal::Right)
+                    .align_y(Vertical::Center),
             );
         }
     }
