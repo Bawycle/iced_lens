@@ -98,6 +98,11 @@ impl State {
     }
 
     pub(crate) fn display_image(&self) -> &ImageData {
+        // For resize tool, always show the original image on canvas
+        // (preview is shown as thumbnail in sidebar to avoid zoom confusion)
+        if self.active_tool == Some(EditorTool::Resize) {
+            return &self.current_image;
+        }
         self.preview_image.as_ref().unwrap_or(&self.current_image)
     }
 }

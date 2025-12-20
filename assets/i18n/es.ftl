@@ -89,6 +89,7 @@ image-editor-resize-height-label = Alto (px)
 image-editor-resize-lock-aspect = Bloquear relación de aspecto
 image-editor-resize-presets-label = Ajustes predefinidos
 image-editor-resize-apply = Aplicar redimensionamiento
+image-editor-resize-preview-label = Vista previa
 image-editor-light-section-title = Ajustes de luz
 image-editor-light-brightness-label = Brillo
 image-editor-light-contrast-label = Contraste

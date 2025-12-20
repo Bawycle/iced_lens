@@ -175,6 +175,16 @@ impl State {
     pub fn set_export_format(&mut self, format: ExportFormat) {
         self.export_format = format;
     }
+
+    /// Get the resize thumbnail preview (for sidebar display).
+    pub fn resize_thumbnail(&self) -> Option<&ImageData> {
+        // Only return thumbnail when resize tool is active
+        if self.active_tool == Some(EditorTool::Resize) {
+            self.preview_image.as_ref()
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]

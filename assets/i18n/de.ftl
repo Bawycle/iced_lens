@@ -89,6 +89,7 @@ image-editor-resize-height-label = Höhe (px)
 image-editor-resize-lock-aspect = Seitenverhältnis sperren
 image-editor-resize-presets-label = Voreinstellungen
 image-editor-resize-apply = Größenänderung anwenden
+image-editor-resize-preview-label = Vorschau
 image-editor-light-section-title = Lichtanpassungen
 image-editor-light-brightness-label = Helligkeit
 image-editor-light-contrast-label = Kontrast
