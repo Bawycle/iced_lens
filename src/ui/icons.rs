@@ -227,6 +227,16 @@ define_icon!(
     "../../assets/icons/png/dark/chevron_double_left.png",
     "Double chevron left icon: two chevrons pointing left (<<), used for sidebar expand."
 );
+define_icon!(
+    chevron_right,
+    "../../assets/icons/png/dark/chevron_right.png",
+    "Single chevron right icon: chevron pointing right (>), used for navigation next."
+);
+define_icon!(
+    chevron_left,
+    "../../assets/icons/png/dark/chevron_left.png",
+    "Single chevron left icon: chevron pointing left (<), used for navigation previous."
+);
 
 // =============================================================================
 // Settings Section Icons
@@ -292,6 +302,16 @@ pub mod light {
         "Double chevron left icon (white): for dark theme UI."
     );
     define_icon!(
+        chevron_right,
+        "../../assets/icons/png/light/chevron_right.png",
+        "Single chevron right icon (white): for dark theme UI."
+    );
+    define_icon!(
+        chevron_left,
+        "../../assets/icons/png/light/chevron_left.png",
+        "Single chevron left icon (white): for dark theme UI."
+    );
+    define_icon!(
         pencil,
         "../../assets/icons/png/light/pencil.png",
         "Pencil icon (white): for dark theme UI."
@@ -345,6 +365,16 @@ pub mod overlay {
         video_camera_audio,
         "../../assets/icons/png/light/video_camera_audio.png",
         "Video camera with audio icon (white): for HUD on dark backgrounds."
+    );
+    define_icon!(
+        chevron_right,
+        "../../assets/icons/png/light/chevron_right.png",
+        "Single chevron right icon (white): for navigation next on dark backgrounds."
+    );
+    define_icon!(
+        chevron_left,
+        "../../assets/icons/png/light/chevron_left.png",
+        "Single chevron left icon (white): for navigation previous on dark backgrounds."
     );
 }
 
@@ -404,6 +434,8 @@ mod tests {
         let _ = info();
         let _ = chevron_double_right();
         let _ = chevron_double_left();
+        let _ = chevron_right();
+        let _ = chevron_left();
         let _ = warning();
         let _ = checkmark();
         let _ = cross();
@@ -426,6 +458,8 @@ mod tests {
     fn light_icons_load_successfully() {
         let _ = light::chevron_double_right();
         let _ = light::chevron_double_left();
+        let _ = light::chevron_right();
+        let _ = light::chevron_left();
         let _ = light::pencil();
     }
 
@@ -439,5 +473,7 @@ mod tests {
         let _ = overlay::magnifier();
         let _ = overlay::video_camera();
         let _ = overlay::video_camera_audio();
+        let _ = overlay::chevron_right();
+        let _ = overlay::chevron_left();
     }
 }
