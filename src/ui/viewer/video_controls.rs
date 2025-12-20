@@ -145,9 +145,9 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     let button_height = sizing::BUTTON_HEIGHT;
 
     let play_pause_svg = if state.is_playing {
-        icons::sized(icons::pause(), icon_size)
+        icons::sized(action_icons::video::toolbar::pause(), icon_size)
     } else {
-        icons::sized(icons::play(), icon_size)
+        icons::sized(action_icons::video::toolbar::play(), icon_size)
     };
 
     let play_pause_tooltip = if state.is_playing {
@@ -194,9 +194,9 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
 
     // Volume button with tooltip - shows mute icon when muted
     let volume_icon = if state.muted || state.volume == 0.0 {
-        icons::sized(icons::volume_mute(), icon_size)
+        icons::sized(action_icons::video::toolbar::volume_muted(), icon_size)
     } else {
-        icons::sized(icons::volume(), icon_size)
+        icons::sized(action_icons::video::toolbar::volume(), icon_size)
     };
     let volume_tooltip = if state.muted {
         ctx.i18n.tr("video-unmute-tooltip")
@@ -231,11 +231,14 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     .step(0.01);
 
     // More button (overflow menu toggle)
-    let more_button_base = button(icons::sized(icons::ellipsis_horizontal(), icon_size))
-        .on_press(Message::ToggleOverflowMenu)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height));
+    let more_button_base = button(icons::sized(
+        action_icons::video::toolbar::more_options(),
+        icon_size,
+    ))
+    .on_press(Message::ToggleOverflowMenu)
+    .padding(spacing::XS)
+    .width(Length::Shrink)
+    .height(Length::Fixed(button_height));
 
     let more_button_content: Element<'_, Message> = if state.overflow_menu_open {
         more_button_base.style(styles::button::selected).into()
@@ -252,11 +255,14 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
 
     // Loop button with tooltip
     let loop_tooltip = ctx.i18n.tr("video-loop-tooltip");
-    let loop_button_base = button(icons::sized(icons::loop_icon(), icon_size))
-        .on_press(Message::ToggleLoop)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height));
+    let loop_button_base = button(icons::sized(
+        action_icons::video::toolbar::toggle_loop(),
+        icon_size,
+    ))
+    .on_press(Message::ToggleLoop)
+    .padding(spacing::XS)
+    .width(Length::Shrink)
+    .height(Length::Fixed(button_height));
 
     // Apply active style when loop is enabled (highlighted like mute button)
     let loop_button_content: Element<'_, Message> = if state.loop_enabled {
@@ -317,19 +323,25 @@ fn build_overflow_menu<'a>(
     // Speed down button (disabled at minimum speed)
     let at_min_speed = state.playback_speed <= config::MIN_PLAYBACK_SPEED;
     let speed_down_content: Element<'_, Message> = if at_min_speed {
-        button(icons::sized(action_icons::video::speed_down(), icon_size))
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .style(styles::button::disabled())
-            .into()
+        button(icons::sized(
+            action_icons::video::toolbar::speed_down(),
+            icon_size,
+        ))
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .style(styles::button::disabled())
+        .into()
     } else {
-        button(icons::sized(action_icons::video::speed_down(), icon_size))
-            .on_press(Message::DecreasePlaybackSpeed)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .into()
+        button(icons::sized(
+            action_icons::video::toolbar::speed_down(),
+            icon_size,
+        ))
+        .on_press(Message::DecreasePlaybackSpeed)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .into()
     };
     let speed_down_button = tooltip(
         speed_down_content,
@@ -346,19 +358,25 @@ fn build_overflow_menu<'a>(
     // Speed up button (disabled at maximum speed)
     let at_max_speed = state.playback_speed >= config::MAX_PLAYBACK_SPEED;
     let speed_up_content: Element<'_, Message> = if at_max_speed {
-        button(icons::sized(action_icons::video::speed_up(), icon_size))
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .style(styles::button::disabled())
-            .into()
+        button(icons::sized(
+            action_icons::video::toolbar::speed_up(),
+            icon_size,
+        ))
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .style(styles::button::disabled())
+        .into()
     } else {
-        button(icons::sized(action_icons::video::speed_up(), icon_size))
-            .on_press(Message::IncreasePlaybackSpeed)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .into()
+        button(icons::sized(
+            action_icons::video::toolbar::speed_up(),
+            icon_size,
+        ))
+        .on_press(Message::IncreasePlaybackSpeed)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .into()
     };
     let speed_up_button = tooltip(
         speed_up_content,
@@ -369,19 +387,25 @@ fn build_overflow_menu<'a>(
 
     // Step backward button (only enabled when paused AND in stepping mode)
     let step_back_content: Element<'_, Message> = if !state.is_playing && state.can_step_backward {
-        button(icons::sized(icons::triangle_bar_left(), icon_size))
-            .on_press(Message::StepBackward)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .into()
+        button(icons::sized(
+            action_icons::video::toolbar::step_backward(),
+            icon_size,
+        ))
+        .on_press(Message::StepBackward)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .into()
     } else {
-        button(icons::sized(icons::triangle_bar_left(), icon_size))
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .style(styles::button::disabled())
-            .into()
+        button(icons::sized(
+            action_icons::video::toolbar::step_backward(),
+            icon_size,
+        ))
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .style(styles::button::disabled())
+        .into()
     };
     let step_back_button = tooltip(
         step_back_content,
@@ -392,19 +416,25 @@ fn build_overflow_menu<'a>(
 
     // Step forward button (only enabled when paused AND not at end of video)
     let step_forward_content: Element<'_, Message> = if state.can_step_forward {
-        button(icons::sized(icons::triangle_bar_right(), icon_size))
-            .on_press(Message::StepForward)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .into()
+        button(icons::sized(
+            action_icons::video::toolbar::step_forward(),
+            icon_size,
+        ))
+        .on_press(Message::StepForward)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .into()
     } else {
-        button(icons::sized(icons::triangle_bar_right(), icon_size))
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .style(styles::button::disabled())
-            .into()
+        button(icons::sized(
+            action_icons::video::toolbar::step_forward(),
+            icon_size,
+        ))
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .style(styles::button::disabled())
+        .into()
     };
     let step_forward_button = tooltip(
         step_forward_content,
@@ -414,12 +444,15 @@ fn build_overflow_menu<'a>(
     .gap(4);
 
     // Capture frame button
-    let capture_content: Element<'_, Message> = button(icons::sized(icons::camera(), icon_size))
-        .on_press(Message::CaptureFrame)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .into();
+    let capture_content: Element<'_, Message> = button(icons::sized(
+        action_icons::video::toolbar::capture_frame(),
+        icon_size,
+    ))
+    .on_press(Message::CaptureFrame)
+    .padding(spacing::XS)
+    .width(Length::Shrink)
+    .height(Length::Fixed(button_height))
+    .into();
     let capture_button = tooltip(
         capture_content,
         Text::new(ctx.i18n.tr("video-capture-tooltip")),
