@@ -35,6 +35,7 @@
 //! The underlying visual icon can change without affecting call sites.
 
 use super::icons;
+use crate::config::BackgroundTheme;
 use iced::widget::image::{Handle, Image};
 
 // =============================================================================
@@ -246,6 +247,39 @@ pub mod navigation {
             icons::chevron_double_left()
         }
     }
+
+    /// Navigate to previous media.
+    /// Returns appropriate icon based on background theme:
+    /// - Dark background: light icon for visibility
+    /// - Light/Checkerboard: dark icon for visibility
+    pub fn previous(background: BackgroundTheme) -> Image<Handle> {
+        match background {
+            BackgroundTheme::Dark => icons::overlay::chevron_left(),
+            BackgroundTheme::Light | BackgroundTheme::Checkerboard => icons::chevron_left(),
+        }
+    }
+
+    /// Navigate to next media.
+    /// Returns appropriate icon based on background theme:
+    /// - Dark background: light icon for visibility
+    /// - Light/Checkerboard: dark icon for visibility
+    pub fn next(background: BackgroundTheme) -> Image<Handle> {
+        match background {
+            BackgroundTheme::Dark => icons::overlay::chevron_right(),
+            BackgroundTheme::Light | BackgroundTheme::Checkerboard => icons::chevron_right(),
+        }
+    }
+
+    /// Loop indicator for wrap-around navigation at boundaries.
+    /// Returns appropriate icon based on background theme:
+    /// - Dark background: light icon for visibility
+    /// - Light/Checkerboard: dark icon for visibility
+    pub fn loop_indicator(background: BackgroundTheme) -> Image<Handle> {
+        match background {
+            BackgroundTheme::Dark => icons::overlay::loop_icon(),
+            BackgroundTheme::Light | BackgroundTheme::Checkerboard => icons::loop_icon(),
+        }
+    }
 }
 
 // =============================================================================
@@ -371,6 +405,16 @@ mod tests {
         let _ = navigation::expand_right_panel(true);
         let _ = navigation::edit(false);
         let _ = navigation::edit(true);
+        // Test media navigation icons with all background themes
+        let _ = navigation::previous(BackgroundTheme::Light);
+        let _ = navigation::previous(BackgroundTheme::Dark);
+        let _ = navigation::previous(BackgroundTheme::Checkerboard);
+        let _ = navigation::next(BackgroundTheme::Light);
+        let _ = navigation::next(BackgroundTheme::Dark);
+        let _ = navigation::next(BackgroundTheme::Checkerboard);
+        let _ = navigation::loop_indicator(BackgroundTheme::Light);
+        let _ = navigation::loop_indicator(BackgroundTheme::Dark);
+        let _ = navigation::loop_indicator(BackgroundTheme::Checkerboard);
     }
 
     #[test]

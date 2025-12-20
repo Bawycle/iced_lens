@@ -24,7 +24,8 @@ const REPOSITORY_URL: &str = "https://codeberg.org/Bawycle/iced_lens";
 const ISSUES_URL: &str = "https://codeberg.org/Bawycle/iced_lens/issues";
 
 /// Dependencies list URL (Cargo.toml).
-const DEPENDENCIES_URL: &str = "https://codeberg.org/Bawycle/iced_lens/src/branch/master/Cargo.toml";
+const DEPENDENCIES_URL: &str =
+    "https://codeberg.org/Bawycle/iced_lens/src/branch/master/Cargo.toml";
 
 /// Third-party licenses file URL.
 const THIRD_PARTY_LICENSES_URL: &str =
