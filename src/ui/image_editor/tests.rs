@@ -262,7 +262,7 @@ fn crop_handle_detection_with_extended_hit_area() {
     state.crop_state.overlay.drag_state = CropDragState::None;
 
     // Click 15 pixels away from TopLeft handle (within extended hit area)
-    // With HANDLE_SIZE = 20, this should still be detected
+    // With CROP_HANDLE_HIT_SIZE = 44 (radius 22), this should still be detected
     state.handle_crop_overlay_mouse_down(65.0, 65.0);
     assert!(
         matches!(

@@ -129,6 +129,12 @@ pub mod sizing {
     // Component widths
     pub const SIDEBAR_WIDTH: f32 = 290.0;
     pub const TOAST_WIDTH: f32 = 320.0;
+
+    // Crop overlay handles
+    /// Visual size of crop handles (rendered size)
+    pub const CROP_HANDLE_SIZE: f32 = 16.0;
+    /// Hit area for crop handles - WCAG 2.5.5 compliant (44x44 minimum)
+    pub const CROP_HANDLE_HIT_SIZE: f32 = 44.0;
 }
 
 // ============================================================================

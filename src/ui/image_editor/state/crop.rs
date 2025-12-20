@@ -2,6 +2,7 @@
 //! Crop tool state and helpers.
 
 use crate::media::{image_transform, ImageData};
+use crate::ui::design_tokens::sizing;
 use crate::ui::image_editor::{CanvasMessage, Event, State, Transformation};
 use iced::Rectangle;
 
@@ -366,7 +367,8 @@ impl State {
     }
 
     fn get_handle_at_position(&self, x: f32, y: f32) -> Option<HandlePosition> {
-        const HANDLE_SIZE: f32 = 20.0; // Handle click area size (extended for better grabbability)
+        // Half the hit area size (distance from center to edge)
+        let handle_hit_radius = sizing::CROP_HANDLE_HIT_SIZE / 2.0;
 
         let rect_x = self.crop_state.x as f32;
         let rect_y = self.crop_state.y as f32;
@@ -399,7 +401,7 @@ impl State {
 
         // Check each handle
         for (handle, hx, hy) in handles {
-            if (x - hx).abs() <= HANDLE_SIZE && (y - hy).abs() <= HANDLE_SIZE {
+            if (x - hx).abs() <= handle_hit_radius && (y - hy).abs() <= handle_hit_radius {
                 return Some(handle);
             }
         }
