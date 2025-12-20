@@ -24,12 +24,12 @@ pub fn panel<'a>(
         .push(text(ctx.i18n.tr("image-editor-resize-section-title")).size(typography::BODY))
         .push(text(ctx.i18n.tr("image-editor-resize-scale-label")).size(typography::BODY_SM))
         .push(
-            slider(10.0..=200.0, resize.scale_percent, |percent| {
+            slider(10.0..=200.0, resize.scale.value(), |percent| {
                 Message::Sidebar(SidebarMessage::ScaleChanged(percent))
             })
             .step(1.0),
         )
-        .push(text(format!("{:.0}%", resize.scale_percent)).size(typography::BODY_SM));
+        .push(text(format!("{:.0}%", resize.scale.value())).size(typography::BODY_SM));
 
     let mut presets = Row::new().spacing(spacing::XS);
     for preset in [50.0, 75.0, 150.0, 200.0] {

@@ -37,7 +37,7 @@ fn new_editor_state_initializes_resize_state() {
 
     assert_eq!(state.resize_state.width, 4);
     assert_eq!(state.resize_state.height, 3);
-    assert_eq!(state.resize_state.scale_percent, 100.0);
+    assert_eq!(state.resize_state.scale.value(), 100.0);
     assert!(state.resize_state.lock_aspect);
     assert_eq!(state.resize_state.original_aspect, 4.0 / 3.0);
 }

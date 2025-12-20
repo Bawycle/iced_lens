@@ -4,10 +4,62 @@
 use crate::media::{image_transform, ImageData};
 use crate::ui::image_editor::{State, Transformation};
 
+/// Minimum resize scale percentage.
+const MIN_RESIZE_SCALE: f32 = 10.0;
+/// Maximum resize scale percentage.
+const MAX_RESIZE_SCALE: f32 = 200.0;
+/// Default resize scale percentage.
+const DEFAULT_RESIZE_SCALE: f32 = 100.0;
+
+/// Resize scale percentage, guaranteed to be within valid range (10%–200%).
+///
+/// This type ensures that resize scale values are always valid, eliminating
+/// the need for manual clamping at usage sites.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ResizeScale(f32);
+
+impl ResizeScale {
+    /// Creates a new resize scale, clamping the value to the valid range.
+    pub fn new(percent: f32) -> Self {
+        Self(percent.clamp(MIN_RESIZE_SCALE, MAX_RESIZE_SCALE))
+    }
+
+    /// Returns the raw percentage value.
+    pub fn value(self) -> f32 {
+        self.0
+    }
+
+    /// Returns the scale as a multiplier (e.g., 100% → 1.0).
+    pub fn as_factor(self) -> f32 {
+        self.0 / 100.0
+    }
+
+    /// Returns whether the scale is at the minimum value.
+    pub fn is_min(self) -> bool {
+        self.0 <= MIN_RESIZE_SCALE
+    }
+
+    /// Returns whether the scale is at the maximum value.
+    pub fn is_max(self) -> bool {
+        self.0 >= MAX_RESIZE_SCALE
+    }
+
+    /// Returns whether the scale represents 100% (no resize).
+    pub fn is_original(self) -> bool {
+        (self.0 - DEFAULT_RESIZE_SCALE).abs() < f32::EPSILON
+    }
+}
+
+impl Default for ResizeScale {
+    fn default() -> Self {
+        Self(DEFAULT_RESIZE_SCALE)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResizeState {
-    /// Scale percentage (10-200%)
-    pub scale_percent: f32,
+    /// Scale percentage (10-200%), guaranteed to be valid by the type.
+    pub scale: ResizeScale,
     /// Target width in pixels
     pub width: u32,
     /// Target height in pixels
@@ -35,7 +87,7 @@ impl ResizeState {
         };
 
         Self {
-            scale_percent: 100.0,
+            scale: ResizeScale::default(),
             width,
             height,
             lock_aspect: true,
@@ -56,7 +108,7 @@ impl ResizeState {
         self.height = image.height;
         self.width_input = image.width.to_string();
         self.height_input = image.height.to_string();
-        self.scale_percent = 100.0;
+        self.scale = ResizeScale::default();
         self.original_aspect = if image.height == 0 {
             1.0
         } else {
@@ -108,10 +160,10 @@ impl State {
     }
 
     fn set_resize_percent(&mut self, percent: f32) {
-        let clamped = percent.clamp(10.0, 200.0);
-        self.resize_state.scale_percent = clamped;
-        let width = (self.base_width() * clamped / 100.0).round().max(1.0) as u32;
-        let height = (self.base_height() * clamped / 100.0).round().max(1.0) as u32;
+        let scale = ResizeScale::new(percent);
+        self.resize_state.scale = scale;
+        let width = (self.base_width() * scale.as_factor()).round().max(1.0) as u32;
+        let height = (self.base_height() * scale.as_factor()).round().max(1.0) as u32;
 
         if self.resize_state.lock_aspect {
             self.set_width_preserving_aspect(width);
@@ -192,11 +244,12 @@ impl State {
             return;
         }
         let percent = (self.resize_state.width as f32 / base_width) * 100.0;
-        let clamped = percent.clamp(10.0, 200.0);
-        if (clamped - percent).abs() > f32::EPSILON {
-            self.set_resize_percent(clamped);
+        let scale = ResizeScale::new(percent);
+        // If clamping changed the value, recalculate dimensions
+        if (scale.value() - percent).abs() > f32::EPSILON {
+            self.set_resize_percent(scale.value());
         } else {
-            self.resize_state.scale_percent = clamped;
+            self.resize_state.scale = scale;
             self.update_resize_preview();
         }
     }

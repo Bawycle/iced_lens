@@ -100,8 +100,8 @@ pub enum AudioDecoderCommand {
     /// Stop decoding and clean up.
     Stop,
 
-    /// Set volume (0.0 to 1.0).
-    SetVolume(f32),
+    /// Set volume (guaranteed to be within 0.0–1.0 by Volume type).
+    SetVolume(super::Volume),
 
     /// Set mute state.
     SetMuted(bool),
@@ -320,13 +320,18 @@ impl AudioDecoder {
                 Ok(AudioDecoderCommand::Stop) => {
                     break;
                 }
-                Ok(AudioDecoderCommand::SetVolume(vol)) => {
-                    _volume = vol.clamp(0.0, 1.0);
+                Ok(AudioDecoderCommand::SetVolume(volume)) => {
+                    // Volume type guarantees valid range, no clamp needed
+                    _volume = volume.value();
                 }
                 Ok(AudioDecoderCommand::SetMuted(mute)) => {
                     _muted = mute;
                 }
-                Ok(AudioDecoderCommand::SetPlaybackSpeed { speed, instant, reference_pts }) => {
+                Ok(AudioDecoderCommand::SetPlaybackSpeed {
+                    speed,
+                    instant,
+                    reference_pts,
+                }) => {
                     // PlaybackSpeed newtype guarantees valid range
                     playback_speed = speed.value();
                     // Use shared reference point for timing synchronization
@@ -488,6 +493,7 @@ impl AudioDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::video_player::Volume;
 
     #[test]
     fn decoded_audio_calculates_sample_count() {
@@ -580,10 +586,10 @@ mod tests {
         let stop = AudioDecoderCommand::Stop;
         assert!(matches!(stop.clone(), AudioDecoderCommand::Stop));
 
-        let volume = AudioDecoderCommand::SetVolume(0.75);
+        let volume = AudioDecoderCommand::SetVolume(Volume::new(0.75));
         assert!(matches!(
             volume.clone(),
-            AudioDecoderCommand::SetVolume(v) if (v - 0.75).abs() < 0.001
+            AudioDecoderCommand::SetVolume(v) if (v.value() - 0.75).abs() < 0.001
         ));
 
         let muted = AudioDecoderCommand::SetMuted(true);

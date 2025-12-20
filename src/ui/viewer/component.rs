@@ -5,12 +5,12 @@ use crate::error::Error;
 use crate::i18n::fluent::I18n;
 use crate::media::navigator::NavigationInfo;
 use crate::media::MediaData;
-use crate::ui::state::{DragState, ViewportState, ZoomState};
+use crate::ui::state::{DragState, ViewportState, ZoomState, ZoomStep};
 use crate::ui::viewer::{
     self, controls, pane, state as geometry, video_controls, HudIconKind, HudLine,
 };
 use crate::ui::widgets::VideoShader;
-use crate::video_player::{subscription::PlaybackMessage, SharedLufsCache, VideoPlayer};
+use crate::video_player::{subscription::PlaybackMessage, SharedLufsCache, VideoPlayer, Volume};
 use iced::widget::scrollable::{AbsoluteOffset, RelativeOffset};
 use iced::widget::{operation, Id};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
@@ -259,11 +259,11 @@ impl State {
     }
 
     pub fn zoom_step_percent(&self) -> f32 {
-        self.zoom.zoom_step_percent
+        self.zoom.zoom_step.value()
     }
 
     pub fn set_zoom_step_percent(&mut self, value: f32) {
-        self.zoom.zoom_step_percent = value;
+        self.zoom.zoom_step = ZoomStep::new(value);
     }
 
     /// Returns the effective fit-to-window setting.
@@ -762,12 +762,11 @@ impl State {
                         }
                     }
                     VM::SetVolume(volume) => {
-                        // Clamp volume to valid range
-                        self.video_volume =
-                            volume.clamp(crate::config::MIN_VOLUME, crate::config::MAX_VOLUME);
+                        // Volume type guarantees valid range, no clamp needed
+                        self.video_volume = volume.value();
                         // Apply to audio output
                         if let Some(player) = &self.video_player {
-                            player.set_volume(self.video_volume);
+                            player.set_volume(volume);
                         }
                         return (Effect::PersistPreferences, Task::none());
                     }
@@ -865,7 +864,7 @@ impl State {
                             player.set_command_sender(command_sender);
 
                             // Apply current volume, mute, and loop state
-                            player.set_volume(self.video_volume);
+                            player.set_volume(Volume::new(self.video_volume));
                             player.set_muted(self.video_muted);
                             player.set_loop(self.video_loop);
 
@@ -1216,7 +1215,7 @@ impl State {
             }
             ZoomIn => {
                 self.zoom
-                    .apply_manual_zoom(self.zoom.zoom_percent + self.zoom.zoom_step_percent);
+                    .apply_manual_zoom(self.zoom.zoom_percent + self.zoom.zoom_step.value());
                 // Also disable video fit-to-window when zooming on a video
                 if self.is_video() {
                     self.video_fit_to_window = false;
@@ -1225,7 +1224,7 @@ impl State {
             }
             ZoomOut => {
                 self.zoom
-                    .apply_manual_zoom(self.zoom.zoom_percent - self.zoom.zoom_step_percent);
+                    .apply_manual_zoom(self.zoom.zoom_percent - self.zoom.zoom_step.value());
                 // Also disable video fit-to-window when zooming on a video
                 if self.is_video() {
                     self.video_fit_to_window = false;
@@ -1419,8 +1418,7 @@ impl State {
                 } => {
                     // ArrowUp: Increase volume (only during video playback)
                     if self.has_active_video_session() {
-                        let new_volume = (self.video_volume + crate::config::VOLUME_STEP)
-                            .min(crate::config::MAX_VOLUME);
+                        let new_volume = Volume::new(self.video_volume).increase();
                         self.handle_message(
                             Message::VideoControls(video_controls::Message::SetVolume(new_volume)),
                             &I18n::default(),
@@ -1435,8 +1433,7 @@ impl State {
                 } => {
                     // ArrowDown: Decrease volume (only during video playback)
                     if self.has_active_video_session() {
-                        let new_volume = (self.video_volume - crate::config::VOLUME_STEP)
-                            .max(crate::config::MIN_VOLUME);
+                        let new_volume = Volume::new(self.video_volume).decrease();
                         self.handle_message(
                             Message::VideoControls(video_controls::Message::SetVolume(new_volume)),
                             &I18n::default(),
@@ -1682,7 +1679,7 @@ impl State {
             return false;
         }
 
-        let new_zoom = self.zoom.zoom_percent + steps * self.zoom.zoom_step_percent;
+        let new_zoom = self.zoom.zoom_percent + steps * self.zoom.zoom_step.value();
         self.zoom.apply_manual_zoom(new_zoom);
 
         // Also disable video fit-to-window when zooming on a video

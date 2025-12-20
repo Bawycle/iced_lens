@@ -540,10 +540,10 @@ impl VideoPlayer {
         self.sync_clock.current_time_secs()
     }
 
-    /// Sets the audio volume (0.0 to 1.0).
+    /// Sets the audio volume.
     ///
     /// Volume is sent to the audio decoder via the command sender.
-    pub fn set_volume(&self, volume: f32) {
+    pub fn set_volume(&self, volume: super::Volume) {
         if let Some(sender) = &self.command_sender {
             let _ = sender.set_volume(volume);
         }
