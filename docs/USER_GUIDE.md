@@ -14,8 +14,7 @@ Complete documentation for IcedLens features, configuration, and usage.
 8. [Configuration](#configuration)
 9. [Internationalization](#internationalization)
 10. [Download & Installation](#download--installation)
-11. [Windows Installer](#windows-installer)
-12. [FAQ](#faq)
+11. [FAQ](#faq)
 
 ---
 
@@ -295,88 +294,14 @@ Translation files use `.ftl` extension. See `assets/i18n/` for examples.
 
 ## Download & Installation
 
-### Pre-built Binaries (Linux only)
+Download the latest release from [Releases](https://codeberg.org/Bawycle/iced_lens/releases):
 
-AppImage binaries are available for Linux x86_64:
+| Platform | Format | Instructions |
+|----------|--------|--------------|
+| **Linux x86_64** | AppImage | `chmod +x iced_lens-*.AppImage && ./iced_lens-*.AppImage` |
+| **Windows x86_64** | Installer | Run `IcedLens-*-setup.exe` and follow the wizard |
 
-1. Download the latest `.AppImage` from [Releases](https://codeberg.org/Bawycle/iced_lens/releases)
-2. Make it executable: `chmod +x iced_lens-*.AppImage`
-3. Run: `./iced_lens-*.AppImage`
-
-### Windows
-
-See the [Windows Installer](#windows-installer) section below.
-
-### Build from Source
-
-See the [Installation](#installation) section above.
-
-> **Note:** macOS binaries are not currently provided. macOS users must build from source.
-
----
-
-## Windows Installer
-
-IcedLens provides an Inno Setup script to create a Windows installer.
-
-### Prerequisites
-
-#### 1. MSVC Build Tools
-
-Install Visual Studio Build Tools with "Desktop development with C++".
-
-#### 2. FFmpeg via vcpkg
-
-```powershell
-git clone https://github.com/microsoft/vcpkg
-cd vcpkg
-.\bootstrap-vcpkg.bat
-.\vcpkg install ffmpeg:x64-windows
-
-# Set environment variables
-$env:VCPKG_ROOT = "C:\vcpkg"
-setx VCPKG_ROOT "C:\vcpkg"
-```
-
-#### 3. LLVM/Clang
-
-Download and install the latest LLVM release from [llvm/llvm-project](https://github.com/llvm/llvm-project/releases).
-
-```powershell
-# Set environment variables
-$env:PATH = "C:\Program Files\LLVM\bin;$env:PATH"
-$env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
-setx LIBCLANG_PATH "C:\Program Files\LLVM\bin"
-```
-
-#### 4. Inno Setup
-
-Download and install Inno Setup 6+ from [jrsoftware.org](https://jrsoftware.org/isdown.php).
-
-### Building the Installer
-
-```powershell
-.\scripts\build-windows-installer.ps1
-```
-
-> **Note:** If you get an execution policy error, run this command first (once per user):
-> ```powershell
-> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-> ```
-
-### Output
-
-The installer is created at:
-- `target\release\IcedLens-{version}-x86_64-setup.exe`
-- `target\release\IcedLens-{version}-x86_64-setup.exe.sha256`
-
-### Installer Features
-
-- Start Menu shortcuts
-- Optional desktop shortcut
-- Optional file associations (images and videos)
-- Per-user installation (no admin required)
-- Clean uninstallation
+> **macOS:** No pre-built binaries are provided. To build from source or create distribution packages, see [CONTRIBUTING.md](../CONTRIBUTING.md#distribution-packaging).
 
 ---
 
@@ -386,7 +311,7 @@ The installer is created at:
 A: File-level copyleft offers balanced reciprocity without full project copyleft.
 
 **Q: Does it work on Windows/macOS?**
-A: Windows is supported with an Inno Setup installer script (see [Windows Installer](#windows-installer)). macOS has not been tested—you must build from source.
+A: Windows is fully supported with a pre-built installer. macOS has not been tested—see [CONTRIBUTING.md](../CONTRIBUTING.md) to build from source.
 
 **Q: Can I edit videos?**
 A: Not yet. Video playback and frame capture are supported, but editing is images only.

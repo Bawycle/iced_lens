@@ -23,7 +23,7 @@ Built with the [Iced](https://iced.rs/) GUI toolkit.
 
 **Linux (AppImage):** Download from [Releases](https://codeberg.org/Bawycle/iced_lens/releases), make executable, run.
 
-**Windows:** Build from source, then use the Inno Setup script in `scripts/` to create an installer. See [User Guide](docs/USER_GUIDE.md#windows-installer).
+**Windows:** Download the installer from [Releases](https://codeberg.org/Bawycle/iced_lens/releases) and run the setup wizard.
 
 **Build from source:**
 

@@ -12,10 +12,11 @@ Thank you for your interest in contributing to IcedLens! We welcome contribution
 6. [Code Contributions](#code-contributions)
 7. [Development Workflow](#development-workflow)
 8. [Pull Request Process](#pull-request-process)
-9. [Project Structure](#project-structure)
-10. [Event-Driven Architecture](#event-driven-architecture)
-11. [Style Architecture](#style-architecture)
-12. [Notification System](#notification-system)
+9. [Distribution Packaging](#distribution-packaging)
+10. [Project Structure](#project-structure)
+11. [Event-Driven Architecture](#event-driven-architecture)
+12. [Style Architecture](#style-architecture)
+13. [Notification System](#notification-system)
 
 ## Code of Conduct
 
@@ -328,6 +329,101 @@ Follow conventional commits format for clarity:
 - [ ] CHANGELOG.md updated (for notable changes)
 - [ ] Commit messages follow conventional commits format
 - [ ] PR description is clear and complete
+
+## Distribution Packaging
+
+IcedLens provides pre-built binaries for Linux (AppImage) and Windows (Inno Setup installer).
+
+### Linux AppImage
+
+The AppImage bundles all dependencies (FFmpeg, GTK, audio libraries) for portable distribution.
+
+#### Prerequisites
+
+- [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy) with GTK plugin
+- FFmpeg development headers (`libavcodec-dev`, `libavformat-dev`, etc.)
+- ALSA development headers (`libasound2-dev`)
+
+#### Building
+
+```bash
+# Basic usage
+scripts/build-appimage.sh
+
+# With custom linuxdeploy path
+LINUXDEPLOY_BIN=/path/to/linuxdeploy scripts/build-appimage.sh
+
+# Cross-compile for specific target
+scripts/build-appimage.sh --target x86_64-unknown-linux-gnu
+```
+
+#### Output
+
+- `target/release/iced_lens-{version}-{arch}.AppImage`
+- `target/release/iced_lens-{version}-{arch}.AppImage.sha256`
+
+#### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `LINUXDEPLOY_BIN` | Path to linuxdeploy binary |
+| `LINUXDEPLOY_PLUGIN_GTK` | Path to GTK plugin (auto-detected) |
+| `APPIMAGE_OUTPUT_DIR` | Output directory (default: `target/release`) |
+| `APPIMAGE_BUNDLE_GTK` | Set to `0` to skip GTK bundling |
+
+### Windows Installer (Inno Setup)
+
+Creates a standard Windows installer with Start Menu shortcuts and optional file associations.
+
+#### Prerequisites
+
+1. **MSVC Build Tools**: Visual Studio with "Desktop development with C++"
+
+2. **FFmpeg via vcpkg**:
+   ```powershell
+   git clone https://github.com/microsoft/vcpkg
+   cd vcpkg
+   .\bootstrap-vcpkg.bat
+   .\vcpkg install ffmpeg:x64-windows
+
+   # Set environment variables
+   $env:VCPKG_ROOT = "C:\path\to\vcpkg"
+   setx VCPKG_ROOT "C:\path\to\vcpkg"
+   ```
+
+3. **LLVM/Clang**: Download from [llvm/llvm-project releases](https://github.com/llvm/llvm-project/releases)
+   ```powershell
+   $env:PATH = "C:\Program Files\LLVM\bin;$env:PATH"
+   $env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
+   setx LIBCLANG_PATH "C:\Program Files\LLVM\bin"
+   ```
+
+4. **Inno Setup 6+**: Download from [jrsoftware.org](https://jrsoftware.org/isdown.php)
+
+#### Building
+
+```powershell
+.\scripts\build-windows-installer.ps1
+```
+
+> **Note:** If you get an execution policy error:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+
+#### Output
+
+- `target\release\IcedLens-{version}-x86_64-setup.exe`
+- `target\release\IcedLens-{version}-x86_64-setup.exe.sha256`
+
+#### Installer Features
+
+- Start Menu shortcuts
+- Optional desktop shortcut
+- Optional file associations (images and videos)
+- Per-user installation (no admin required)
+- Clean uninstallation
+- FFmpeg DLLs auto-detected from vcpkg or PATH
 
 ## Project Structure
 
