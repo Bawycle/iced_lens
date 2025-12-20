@@ -1,24 +1,26 @@
 # UI Icons
 
-This directory contains the UI icons used throughout the IcedLens application.
+This directory contains the SVG source files for UI icons used throughout the IcedLens application.
 
 ## Directory Structure
 
 ```
 icons/
-├── source/           # SVG source files (not embedded in binary)
-│   └── *.svg
-└── png/
-    ├── dark/         # Dark icons for light backgrounds
-    │   └── *.png
-    └── light/        # Light icons for dark backgrounds (overlays, HUD)
-        └── *.png
+└── source/           # SVG source files
+    └── *.svg
 ```
+
+PNG icons are **generated at build time** from these SVG sources via `build.rs`.
+The generated PNGs are placed in `OUT_DIR/icons/` and embedded via `include_bytes!`.
 
 ## Icon Variants
 
-- **dark/**: Standard dark icons used on light backgrounds (default UI)
-- **light/**: Light (white) icons used on dark backgrounds (video overlays, HUD indicators)
+Two variants are generated for each icon:
+
+- **dark/**: Dark icons (black) for light backgrounds (default UI)
+- **light/**: Light icons (white) for dark backgrounds (video overlays, HUD indicators)
+
+Light variants are only generated for icons that need them (defined in `build.rs::needs_light_variant()`).
 
 ## Naming Convention
 
@@ -29,16 +31,24 @@ Icons use generic visual names describing the icon's appearance, not the action 
 
 ## Adding New Icons
 
-1. Create the SVG source in `source/` (32x32 recommended)
-2. Generate PNG versions:
-   ```bash
-   # Dark variant (for light backgrounds)
-   rsvg-convert -w 32 -h 32 source/icon.svg -o png/dark/icon.png
+1. Create the SVG source in `source/` with:
+   - ViewBox: `0 0 32 32`
+   - Fill color: `white` (will be inverted for dark variant)
 
-   # Light variant (for dark backgrounds) - if needed
-   rsvg-convert -w 32 -h 32 source/icon.svg | convert - -negate png/light/icon.png
+2. Add the icon definition in `src/ui/icons.rs`:
+   ```rust
+   define_icon!(icon_name, dark, "icon_name.png", "Description.");
    ```
-3. Add the icon definition in `src/ui/icons.rs`
+
+3. If the icon needs a light variant (for overlays/dark backgrounds):
+   - Add it to `build.rs::needs_light_variant()`
+   - Add the light variant definition in `src/ui/icons.rs`:
+     ```rust
+     // In the light or overlay module
+     define_icon!(icon_name, light, "icon_name.png", "Description (white).");
+     ```
+
+4. Run `cargo build` - the icon will be generated automatically.
 
 ## Application Icon
 
