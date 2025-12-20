@@ -838,6 +838,22 @@ impl State {
                     VM::ToggleOverflowMenu => {
                         self.overflow_menu_open = !self.overflow_menu_open;
                     }
+                    VM::IncreasePlaybackSpeed => {
+                        if let Some(player) = &mut self.video_player {
+                            player.increase_playback_speed();
+                            // Apply effective mute: user mute OR speed auto-mute
+                            let effective_muted = self.video_muted || player.is_speed_auto_muted();
+                            player.set_muted(effective_muted);
+                        }
+                    }
+                    VM::DecreasePlaybackSpeed => {
+                        if let Some(player) = &mut self.video_player {
+                            player.decrease_playback_speed();
+                            // Apply effective mute: user mute OR speed auto-mute
+                            let effective_muted = self.video_muted || player.is_speed_auto_muted();
+                            player.set_muted(effective_muted);
+                        }
+                    }
                 }
                 (Effect::None, Task::none())
             }
@@ -1091,29 +1107,47 @@ impl State {
                         loop_enabled,
                         can_step_backward,
                         can_step_forward,
+                        playback_speed,
+                        speed_auto_muted,
                     ) = if let Some(player) = &self.video_player {
                         let state = player.state();
                         let can_step_back = player.can_step_backward();
                         let can_step_fwd = player.can_step_forward();
+                        let speed = player.playback_speed();
+                        let auto_muted = player.is_speed_auto_muted();
                         match state {
-                            crate::video_player::PlaybackState::Playing { position_secs } => {
-                                (true, *position_secs, self.video_loop, false, false)
-                            }
+                            crate::video_player::PlaybackState::Playing { position_secs } => (
+                                true,
+                                *position_secs,
+                                self.video_loop,
+                                false,
+                                false,
+                                speed,
+                                auto_muted,
+                            ),
                             crate::video_player::PlaybackState::Paused { position_secs } => (
                                 false,
                                 *position_secs,
                                 self.video_loop,
                                 can_step_back,
                                 can_step_fwd,
+                                speed,
+                                auto_muted,
                             ),
-                            crate::video_player::PlaybackState::Buffering { position_secs } => {
-                                (true, *position_secs, self.video_loop, false, false)
-                            }
-                            _ => (false, 0.0, self.video_loop, false, false),
+                            crate::video_player::PlaybackState::Buffering { position_secs } => (
+                                true,
+                                *position_secs,
+                                self.video_loop,
+                                false,
+                                false,
+                                speed,
+                                auto_muted,
+                            ),
+                            _ => (false, 0.0, self.video_loop, false, false, 1.0, false),
                         }
                     } else {
                         // No player yet - show initial state (paused at 0)
-                        (false, 0.0, false, false, false)
+                        (false, 0.0, false, false, false, 1.0, false)
                     };
 
                     Some(video_controls::PlaybackState {
@@ -1127,6 +1161,8 @@ impl State {
                         overflow_menu_open: self.overflow_menu_open,
                         can_step_backward,
                         can_step_forward,
+                        playback_speed,
+                        speed_auto_muted,
                     })
                 } else {
                     None
@@ -1478,6 +1514,42 @@ impl State {
                     if self.video_player.is_some() {
                         self.handle_message(
                             Message::VideoControls(video_controls::Message::StepForward),
+                            &I18n::default(),
+                        )
+                    } else {
+                        (Effect::None, Task::none())
+                    }
+                }
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(ref c),
+                    modifiers,
+                    ..
+                } if (c.as_str() == "j" || c.as_str() == "J")
+                    && !modifiers.command()
+                    && !modifiers.alt() =>
+                {
+                    // J key: Decrease playback speed (YouTube/VLC style)
+                    if self.video_player.is_some() {
+                        self.handle_message(
+                            Message::VideoControls(video_controls::Message::DecreasePlaybackSpeed),
+                            &I18n::default(),
+                        )
+                    } else {
+                        (Effect::None, Task::none())
+                    }
+                }
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(ref c),
+                    modifiers,
+                    ..
+                } if (c.as_str() == "l" || c.as_str() == "L")
+                    && !modifiers.command()
+                    && !modifiers.alt() =>
+                {
+                    // L key: Increase playback speed (YouTube/VLC style)
+                    if self.video_player.is_some() {
+                        self.handle_message(
+                            Message::VideoControls(video_controls::Message::IncreasePlaybackSpeed),
                             &I18n::default(),
                         )
                     } else {

@@ -4,9 +4,10 @@
 //! Provides a toolbar with play/pause, timeline scrubber, time display,
 //! volume controls, and loop toggle specifically for video playback.
 
+use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{sizing, spacing};
-use crate::ui::{icons, styles};
+use crate::ui::{action_icons, icons, styles};
 use iced::widget::{
     button, column, container, row, slider, text, tooltip, Column, Row, Space, Text,
 };
@@ -54,6 +55,12 @@ pub enum Message {
 
     /// Toggle the overflow menu (advanced controls).
     ToggleOverflowMenu,
+
+    /// Increase playback speed to next preset.
+    IncreasePlaybackSpeed,
+
+    /// Decrease playback speed to previous preset.
+    DecreasePlaybackSpeed,
 }
 
 /// View context for rendering video controls.
@@ -96,6 +103,12 @@ pub struct PlaybackState {
     /// Can step forward (paused and not at end of video)?
     /// When false, the step forward button is disabled.
     pub can_step_forward: bool,
+
+    /// Current playback speed (1.0 = normal).
+    pub playback_speed: f64,
+
+    /// Whether audio is auto-muted due to high speed (>2x).
+    pub speed_auto_muted: bool,
 }
 
 impl Default for PlaybackState {
@@ -111,6 +124,8 @@ impl Default for PlaybackState {
             overflow_menu_open: false,
             can_step_backward: false,
             can_step_forward: false,
+            playback_speed: 1.0,
+            speed_auto_muted: false,
         }
     }
 }
@@ -296,6 +311,59 @@ fn build_overflow_menu<'a>(
     icon_size: f32,
     button_height: f32,
 ) -> Element<'a, Message> {
+    // Speed down button (disabled at minimum speed)
+    let at_min_speed = state.playback_speed <= config::MIN_PLAYBACK_SPEED;
+    let speed_down_content: Element<'_, Message> = if at_min_speed {
+        button(icons::sized(action_icons::video::speed_down(), icon_size))
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .style(styles::button::disabled())
+            .into()
+    } else {
+        button(icons::sized(action_icons::video::speed_down(), icon_size))
+            .on_press(Message::DecreasePlaybackSpeed)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .into()
+    };
+    let speed_down_button = tooltip(
+        speed_down_content,
+        Text::new(ctx.i18n.tr("video-speed-down-tooltip")),
+        tooltip::Position::Top,
+    )
+    .gap(4);
+
+    // Speed label (text showing current speed)
+    let speed_label = text(format_playback_speed(state.playback_speed))
+        .size(sizing::ICON_SM)
+        .width(Length::Shrink);
+
+    // Speed up button (disabled at maximum speed)
+    let at_max_speed = state.playback_speed >= config::MAX_PLAYBACK_SPEED;
+    let speed_up_content: Element<'_, Message> = if at_max_speed {
+        button(icons::sized(action_icons::video::speed_up(), icon_size))
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .style(styles::button::disabled())
+            .into()
+    } else {
+        button(icons::sized(action_icons::video::speed_up(), icon_size))
+            .on_press(Message::IncreasePlaybackSpeed)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .into()
+    };
+    let speed_up_button = tooltip(
+        speed_up_content,
+        Text::new(ctx.i18n.tr("video-speed-up-tooltip")),
+        tooltip::Position::Top,
+    )
+    .gap(4);
+
     // Step backward button (only enabled when paused AND in stepping mode)
     let step_back_content: Element<'_, Message> = if !state.is_playing && state.can_step_backward {
         button(icons::sized(icons::triangle_bar_left(), icon_size))
@@ -357,8 +425,12 @@ fn build_overflow_menu<'a>(
     .gap(4);
 
     // Overflow menu container - align to the right
+    // Layout: [Speed Down] [1x] [Speed Up] | [Step Back] [Step Fwd] [Capture]
     let menu_content: Row<'a, Message> = row![
         Space::new().width(Length::Fill),
+        speed_down_button,
+        speed_label,
+        speed_up_button,
         step_back_button,
         step_forward_button,
         capture_button,
@@ -382,6 +454,12 @@ fn format_time(seconds: f64) -> String {
     } else {
         format!("{:02}:{:02}", minutes, secs)
     }
+}
+
+/// Formats playback speed for display.
+/// Always shows 2 decimal places for consistent UI width.
+fn format_playback_speed(speed: f64) -> String {
+    format!("{:.2}x", speed)
 }
 
 #[cfg(test)]
@@ -462,6 +540,8 @@ mod tests {
             overflow_menu_open: false,
             can_step_backward: false,
             can_step_forward: false,
+            playback_speed: 1.0,
+            speed_auto_muted: false,
         };
 
         // Position is in seconds
@@ -484,6 +564,8 @@ mod tests {
             overflow_menu_open: false,
             can_step_backward: false,
             can_step_forward: false,
+            playback_speed: 1.0,
+            speed_auto_muted: false,
         };
 
         // When duration is zero, position is still valid
@@ -508,6 +590,8 @@ mod tests {
             overflow_menu_open: false,
             can_step_backward: false,
             can_step_forward: false,
+            playback_speed: 1.0,
+            speed_auto_muted: false,
         };
 
         // When seek_preview_position is set, it should be used instead of playback position
@@ -515,5 +599,32 @@ mod tests {
 
         // Should use preview position (90s) not playback position (30s)
         assert_eq!(position, 90.0);
+    }
+
+    #[test]
+    fn format_playback_speed_always_two_decimals() {
+        // Integer values show .00
+        assert_eq!(format_playback_speed(1.0), "1.00x");
+        assert_eq!(format_playback_speed(2.0), "2.00x");
+        assert_eq!(format_playback_speed(4.0), "4.00x");
+        assert_eq!(format_playback_speed(8.0), "8.00x");
+
+        // One decimal values show trailing 0
+        assert_eq!(format_playback_speed(0.1), "0.10x");
+        assert_eq!(format_playback_speed(0.5), "0.50x");
+        assert_eq!(format_playback_speed(1.5), "1.50x");
+
+        // Two decimal values shown as-is
+        assert_eq!(format_playback_speed(0.15), "0.15x");
+        assert_eq!(format_playback_speed(0.25), "0.25x");
+        assert_eq!(format_playback_speed(0.33), "0.33x");
+        assert_eq!(format_playback_speed(1.25), "1.25x");
+    }
+
+    #[test]
+    fn playback_state_default_speed() {
+        let state = PlaybackState::default();
+        assert_eq!(state.playback_speed, 1.0);
+        assert!(!state.speed_auto_muted);
     }
 }

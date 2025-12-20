@@ -29,10 +29,19 @@
 - [ ] Allow text selection and copying in the help screen (blocked, pending native support in Iced 0.15.0)
 
 ### Video Player
-- [ ] Add new controls to the video player to allow changing the playback speed of the video.
+- [x] Add new controls to the video player to allow changing the playback speed of the video.
 
 ### Video Editor
 - [ ] Create a simple video editor allowing users to trim videos by removing segments. The editor should let users play the video, seek to any position, step forward/backward frame by frame, and change the playback speed.
+
+## Code Quality / Refactoring
+
+- [ ] **Newtype pattern audit**: Review codebase for values that should use newtypes for type-safety
+  - Example: `PlaybackSpeed` newtype ensures valid range (0.1x - 8.0x) at the type level
+  - Candidates to audit: zoom levels, volume, positions, durations, percentages
+  - Benefits: compile-time guarantees, single source of truth, self-documenting code
+  - Pattern: `struct Foo(f64)` with `new()` that validates/clamps and `value()` accessor
+  - **Location check**: Domain types should live in their domain module (e.g., `PlaybackSpeed` in `video_player/`), not in config. Config holds constants, not types.
 
 ## Notes
 

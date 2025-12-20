@@ -90,6 +90,16 @@ pub mod video {
     pub fn more_options() -> Image<Handle> {
         icons::ellipsis_horizontal()
     }
+
+    /// Decrease playback speed.
+    pub fn speed_down() -> Image<Handle> {
+        icons::triangle_minus()
+    }
+
+    /// Increase playback speed.
+    pub fn speed_up() -> Image<Handle> {
+        icons::triangle_plus()
+    }
 }
 
 // =============================================================================
@@ -366,6 +376,8 @@ mod tests {
         let _ = video::volume();
         let _ = video::volume_muted();
         let _ = video::more_options();
+        let _ = video::speed_down();
+        let _ = video::speed_up();
     }
 
     #[test]

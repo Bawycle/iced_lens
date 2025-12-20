@@ -105,6 +105,18 @@ pub enum AudioDecoderCommand {
 
     /// Set mute state.
     SetMuted(bool),
+
+    /// Set playback speed.
+    /// Affects audio buffer timing.
+    /// - `speed`: Validated playback speed (guaranteed within valid range)
+    /// - `instant`: Wall clock reference for timing synchronization
+    /// - `reference_pts`: Video position (in seconds) at the moment of speed change.
+    ///   Used as the timing reference to stay in sync with video.
+    SetPlaybackSpeed {
+        speed: super::PlaybackSpeed,
+        instant: std::time::Instant,
+        reference_pts: f64,
+    },
 }
 
 /// Async audio decoder that extracts and decodes audio from video files.
@@ -257,6 +269,7 @@ impl AudioDecoder {
         let mut is_playing = false;
         let mut _volume = 1.0f32;
         let mut _muted = false;
+        let mut playback_speed: f64 = 1.0;
 
         // Frame pacing state (similar to video decoder)
         let mut playback_start_time: Option<std::time::Instant> = None;
@@ -312,6 +325,14 @@ impl AudioDecoder {
                 }
                 Ok(AudioDecoderCommand::SetMuted(mute)) => {
                     _muted = mute;
+                }
+                Ok(AudioDecoderCommand::SetPlaybackSpeed { speed, instant, reference_pts }) => {
+                    // PlaybackSpeed newtype guarantees valid range
+                    playback_speed = speed.value();
+                    // Use shared reference point for timing synchronization
+                    // Same reference_pts as video decoder for perfect A/V sync
+                    playback_start_time = Some(instant);
+                    first_pts = Some(reference_pts);
                 }
                 Err(mpsc::error::TryRecvError::Disconnected) => {
                     break;
@@ -392,7 +413,11 @@ impl AudioDecoder {
 
                         if let Some(first) = first_pts {
                             // Calculate when this audio should be queued
-                            let frame_delay = pts_secs - first - AUDIO_LOOKAHEAD_SECS;
+                            // First, calculate relative time adjusted for playback speed
+                            // Then subtract the lookahead (fixed buffer time in real-world seconds)
+                            let frame_delay =
+                                (pts_secs - first) / playback_speed - AUDIO_LOOKAHEAD_SECS;
+
                             if frame_delay > 0.0 {
                                 let target_time =
                                     start_time + std::time::Duration::from_secs_f64(frame_delay);

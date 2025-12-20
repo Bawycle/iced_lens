@@ -114,6 +114,7 @@ impl WebpAnimDecoder {
         let mut playback_start_time: Option<std::time::Instant> = None;
         let loop_enabled = true; // WebP animations typically loop
         let mut decode_single_frame = false;
+        let mut playback_speed: f64 = 1.0;
 
         // Main loop: process commands and send frames
         loop {
@@ -173,6 +174,15 @@ impl WebpAnimDecoder {
                 Ok(DecoderCommand::Stop) => {
                     break;
                 }
+                Ok(DecoderCommand::SetPlaybackSpeed { speed, instant, reference_pts: _ }) => {
+                    // PlaybackSpeed newtype guarantees valid range
+                    playback_speed = speed.value();
+                    // Reset timing references for smooth speed transition
+                    // WebP animations don't have audio, so reference_pts is unused
+                    if is_playing {
+                        playback_start_time = Some(instant);
+                    }
+                }
                 Err(mpsc::error::TryRecvError::Disconnected) => {
                     break;
                 }
@@ -211,8 +221,10 @@ impl WebpAnimDecoder {
                 .sum();
 
             // Frame pacing: wait until the frame should be displayed
+            // Divide by playback_speed: at 2x speed, delay is halved
             if let Some(start_time) = playback_start_time {
-                let target_time = start_time + std::time::Duration::from_secs_f64(pts_secs);
+                let adjusted_pts = pts_secs / playback_speed;
+                let target_time = start_time + std::time::Duration::from_secs_f64(adjusted_pts);
                 let now = std::time::Instant::now();
 
                 if target_time > now && is_playing {

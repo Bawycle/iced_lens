@@ -102,6 +102,16 @@ define_icon!(
     "../../assets/icons/png/dark/ellipsis_horizontal.png",
     "Horizontal ellipsis: three dots in a row."
 );
+define_icon!(
+    triangle_minus,
+    "../../assets/icons/png/dark/triangle_minus.png",
+    "Triangle pointing right with a minus sign on the left."
+);
+define_icon!(
+    triangle_plus,
+    "../../assets/icons/png/dark/triangle_plus.png",
+    "Triangle pointing right with a plus sign on the left."
+);
 
 // =============================================================================
 // Status & Feedback Icons
@@ -315,6 +325,16 @@ pub mod light {
         pencil,
         "../../assets/icons/png/light/pencil.png",
         "Pencil icon (white): for dark theme UI."
+    );
+    define_icon!(
+        triangle_minus,
+        "../../assets/icons/png/light/triangle_minus.png",
+        "Triangle with minus (white): for dark theme UI."
+    );
+    define_icon!(
+        triangle_plus,
+        "../../assets/icons/png/light/triangle_plus.png",
+        "Triangle with plus (white): for dark theme UI."
     );
 }
 

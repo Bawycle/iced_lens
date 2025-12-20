@@ -374,6 +374,14 @@ fn build_video_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(build_shortcut_row(
             ".",
             ctx.i18n.tr("help-video-key-step-forward"),
+        ))
+        .push(build_shortcut_row(
+            "J",
+            ctx.i18n.tr("help-video-key-speed-down"),
+        ))
+        .push(build_shortcut_row(
+            "L",
+            ctx.i18n.tr("help-video-key-speed-up"),
         ));
 
     Column::new()
@@ -499,6 +507,19 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             ctx.i18n.tr("help-editor-key-cancel"),
         ));
 
+    // Mouse controls
+    let mouse_title = build_subsection_title(ctx.i18n.tr("help-editor-mouse-title"));
+    let mouse_content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_mouse_row(
+            ctx.i18n.tr("viewer-scroll-wheel"),
+            ctx.i18n.tr("help-editor-mouse-wheel"),
+        ))
+        .push(build_mouse_row(
+            ctx.i18n.tr("viewer-click-drag"),
+            ctx.i18n.tr("help-editor-mouse-drag"),
+        ));
+
     Column::new()
         .spacing(spacing::SM)
         .push(role)
@@ -517,6 +538,8 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(save_content)
         .push(shortcuts_title)
         .push(shortcuts_content)
+        .push(mouse_title)
+        .push(mouse_content)
         .into()
 }
 

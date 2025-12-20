@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Video playback speed:** control video speed from 0.1x to 8x using `J`/`L` keys or overflow menu buttons.
 - **Image editor zoom:** use mouse wheel to zoom in/out while editing, matching the viewer behavior.
 - **Image editor pan:** grab-and-drag to navigate when zoomed, like in the viewer.
 - **Resize preview:** thumbnail preview in the sidebar shows the result before applying.

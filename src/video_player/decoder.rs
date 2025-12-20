@@ -58,6 +58,18 @@ pub enum DecoderCommand {
 
     /// Stop decoding and clean up resources.
     Stop,
+
+    /// Set playback speed.
+    /// Affects frame pacing timing.
+    /// - `speed`: Validated playback speed (guaranteed within valid range)
+    /// - `instant`: Wall clock reference for timing synchronization
+    /// - `reference_pts`: Video position (in seconds) at the moment of speed change.
+    ///   Both video and audio decoders use this as their timing reference.
+    SetPlaybackSpeed {
+        speed: super::PlaybackSpeed,
+        instant: std::time::Instant,
+        reference_pts: f64,
+    },
 }
 
 /// Events sent from the decoder to the UI.
@@ -227,6 +239,9 @@ impl AsyncDecoder {
         // When set, decoder skips frames until reaching this target
         let mut seek_target_secs: Option<f64> = None;
 
+        // Playback speed (1.0 = normal, 0.25 = quarter speed, 2.0 = double speed)
+        let mut playback_speed: f64 = 1.0;
+
         // Frame cache for optimized seeking
         let mut frame_cache = FrameCache::new(cache_config);
 
@@ -350,6 +365,16 @@ impl AsyncDecoder {
                 Ok(DecoderCommand::Stop) => {
                     break;
                 }
+                Ok(DecoderCommand::SetPlaybackSpeed { speed, instant, reference_pts }) => {
+                    // PlaybackSpeed newtype guarantees valid range
+                    playback_speed = speed.value();
+                    // Use shared reference point for timing synchronization
+                    // Both video and audio decoders use the same reference_pts
+                    if is_playing {
+                        playback_start_time = Some(instant);
+                        first_pts = Some(reference_pts);
+                    }
+                }
                 Err(mpsc::error::TryRecvError::Disconnected) => {
                     // Command channel closed
                     break;
@@ -442,7 +467,8 @@ impl AsyncDecoder {
                                     first_pts = Some(pts_secs);
                                 }
                                 if let Some(first) = first_pts {
-                                    let frame_delay = pts_secs - first;
+                                    // Divide by playback_speed: at 2x speed, delay is halved
+                                    let frame_delay = (pts_secs - first) / playback_speed;
                                     let target_time = start_time
                                         + std::time::Duration::from_secs_f64(frame_delay);
                                     let now = std::time::Instant::now();
@@ -548,7 +574,8 @@ impl AsyncDecoder {
 
                             if let Some(first) = first_pts {
                                 // Calculate when this frame should be displayed relative to playback start
-                                let frame_delay = pts_secs - first;
+                                // Divide by playback_speed: at 2x speed, delay is halved
+                                let frame_delay = (pts_secs - first) / playback_speed;
                                 let target_time =
                                     start_time + std::time::Duration::from_secs_f64(frame_delay);
                                 let now = std::time::Instant::now();
