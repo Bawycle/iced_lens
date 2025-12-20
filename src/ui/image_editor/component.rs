@@ -48,6 +48,8 @@ impl State {
             preview_image: None,
             viewport: crate::ui::state::ViewportState::default(),
             export_format: ExportFormat::Png,
+            zoom: crate::ui::state::ZoomState::default(),
+            cursor_position: None,
         })
     }
 
@@ -85,6 +87,8 @@ impl State {
             preview_image: None,
             viewport: crate::ui::state::ViewportState::default(),
             export_format: ExportFormat::Png,
+            zoom: crate::ui::state::ZoomState::default(),
+            cursor_position: None,
         })
     }
 

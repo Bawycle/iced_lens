@@ -116,6 +116,10 @@ impl State {
                 self.crop_state.overlay.drag_state = CropDragState::None;
                 Event::None
             }
+            // Cursor events are handled in routing.rs before reaching here
+            CanvasMessage::CursorMoved { .. } | CanvasMessage::CursorLeft => {
+                unreachable!("Cursor events should be handled in routing.rs")
+            }
         }
     }
 

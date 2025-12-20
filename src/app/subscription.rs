@@ -38,7 +38,34 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                 }));
             }
 
-            // In editor screen, route keyboard events to editor
+            // Route mouse wheel scroll to editor for zoom (always, to override scrollable)
+            if matches!(
+                event,
+                event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
+            ) {
+                return Some(Message::ImageEditor(
+                    crate::ui::image_editor::Message::RawEvent {
+                        window: window_id,
+                        event: event.clone(),
+                    },
+                ));
+            }
+
+            // Route mouse cursor events to editor for zoom cursor tracking
+            if matches!(
+                event,
+                event::Event::Mouse(iced::mouse::Event::CursorMoved { .. })
+                    | event::Event::Mouse(iced::mouse::Event::CursorLeft)
+            ) {
+                return Some(Message::ImageEditor(
+                    crate::ui::image_editor::Message::RawEvent {
+                        window: window_id,
+                        event: event.clone(),
+                    },
+                ));
+            }
+
+            // Route keyboard events to editor
             if let event::Event::Keyboard(..) = &event {
                 match status {
                     event::Status::Ignored => Some(Message::ImageEditor(

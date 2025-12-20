@@ -7,7 +7,7 @@
 
 use crate::media::frame_export::ExportFormat;
 use crate::media::ImageData;
-use crate::ui::state::ViewportState;
+use crate::ui::state::{ViewportState, ZoomState};
 
 mod component;
 mod messages;
@@ -78,6 +78,10 @@ pub struct State {
     pub viewport: ViewportState,
     /// Export format for Save As (used when editing captured frames).
     export_format: ExportFormat,
+    /// Zoom state for the editor canvas
+    pub zoom: ZoomState,
+    /// Current cursor position (for zoom-on-scroll detection)
+    cursor_position: Option<iced::Point>,
 }
 
 impl std::fmt::Debug for State {

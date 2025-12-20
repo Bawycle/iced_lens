@@ -57,9 +57,21 @@ pub enum SidebarMessage {
 /// Canvas overlay interaction messages.
 #[derive(Debug, Clone)]
 pub enum CanvasMessage {
-    CropOverlayMouseDown { x: f32, y: f32 },
-    CropOverlayMouseMove { x: f32, y: f32 },
+    CropOverlayMouseDown {
+        x: f32,
+        y: f32,
+    },
+    CropOverlayMouseMove {
+        x: f32,
+        y: f32,
+    },
     CropOverlayMouseUp,
+    /// Cursor moved over the canvas area
+    CursorMoved {
+        position: iced::Point,
+    },
+    /// Cursor left the canvas area
+    CursorLeft,
 }
 
 /// Messages emitted directly by the editor widgets.

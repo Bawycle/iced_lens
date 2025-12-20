@@ -22,8 +22,8 @@ pub struct CanvasModel<'a> {
     pub crop_state: &'a CropState,
     pub resize_state: &'a ResizeState,
     pub deblur_state: &'a DeblurState,
-    pub image_width: f32,
-    pub image_height: f32,
+    /// Zoom scale factor (1.0 = 100%)
+    pub zoom_scale: f32,
 }
 
 impl<'a> CanvasModel<'a> {
@@ -34,8 +34,7 @@ impl<'a> CanvasModel<'a> {
             crop_state: &state.crop_state,
             resize_state: &state.resize_state,
             deblur_state: &state.deblur_state,
-            image_width: display_image.width as f32,
-            image_height: display_image.height as f32,
+            zoom_scale: state.zoom.zoom_percent / 100.0,
         }
     }
 }
@@ -45,10 +44,14 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
     let img_width = current_display.width;
     let img_height = current_display.height;
 
-    // Render image at natural size (will be centered by center() widget)
+    // Apply zoom scale to image dimensions
+    let scaled_width = (img_width as f32 * model.zoom_scale).round();
+    let scaled_height = (img_height as f32 * model.zoom_scale).round();
+
+    // Render image at zoomed size
     let image_widget = image(current_display.handle.clone())
-        .width(Length::Fixed(img_width as f32))
-        .height(Length::Fixed(img_height as f32));
+        .width(Length::Fixed(scaled_width))
+        .height(Length::Fixed(scaled_height));
 
     let image_with_overlay: Element<'a, Message> = if model.deblur_state.is_processing {
         // Deblur processing overlay: animated spinner with text (consistent with media loading)
@@ -86,8 +89,8 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
                 });
 
         let overlay = container(loading_overlay)
-            .width(Length::Fixed(img_width as f32))
-            .height(Length::Fixed(img_height as f32))
+            .width(Length::Fixed(scaled_width))
+            .height(Length::Fixed(scaled_height))
             .align_x(Horizontal::Center)
             .align_y(iced::alignment::Vertical::Center);
 
@@ -129,11 +132,8 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
     let background_theme = ctx.background_theme;
 
     // Wrap image in scrollable canvas (centered for small, scrollable for large)
-    let scrollable = scrollable_canvas::scrollable_canvas(
-        image_with_overlay,
-        model.image_width,
-        model.image_height,
-    );
+    let scrollable =
+        scrollable_canvas::scrollable_canvas(image_with_overlay, scaled_width, scaled_height);
 
     let build_image_surface = || {
         container(scrollable)
