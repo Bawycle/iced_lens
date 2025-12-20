@@ -3,11 +3,7 @@
 > This file tracks planned work for the next release. It lives only in the `dev` branch and is not included in releases.
 
 ## Bugs to Fix
-- [ ] **[Intermittent]** Image horizontal offset after exiting fullscreen
-  - Observed: vertical image with fit-to-window, enter fullscreen, exit fullscreen → image shifted horizontally
-  - Not reliably reproducible (happened once, couldn't reproduce after restart)
-  - Possible causes: race condition on window resize, stale viewport dimensions, window manager timing
-  - If reproduced: note exact steps, window size, image used, timing between actions
+
 
 ## Planned Features
 
@@ -28,13 +24,31 @@
 ### Help
 - [ ] Allow text selection and copying in the help screen (blocked, pending native support in Iced 0.15.0)
 
-### Video Player
-- [x] Add new controls to the video player to allow changing the playback speed of the video.
-
 ### Video Editor
 - [ ] Create a simple video editor allowing users to trim videos by removing segments. The editor should let users play the video, seek to any position, step forward/backward frame by frame, and change the playback speed.
 
+## UI / Design Experiments
+
+- [ ] **Test light icons in toolbars**: Try using light theme icons in toolbar buttons instead of dark icons
+  - Create a test branch to evaluate visual impact
+  - Compare readability and contrast on both light and dark themes
+
 ## Code Quality / Refactoring
+
+- [ ] **Generate PNG icons at build time**: Remove stored PNGs from repo, generate from SVGs during compilation
+  - **Goal**: Reduce repository size, SVGs become single source of truth
+  - **Approach**: Use `build.rs` with `resvg` (already a dependency, see `src/icon.rs`)
+  - **Steps**:
+    1. Create `build.rs` that reads SVGs from `assets/icons/source/`
+    2. Render to PNGs using `resvg` + `tiny_skia` (32x32)
+    3. For light theme: invert colors using `image` crate
+    4. Save to `OUT_DIR` (e.g., `$OUT_DIR/icons/dark/`, `$OUT_DIR/icons/light/`)
+    5. Update `src/ui/icons.rs`: use `include_bytes!(concat!(env!("OUT_DIR"), "/icons/..."))`
+    6. Remove `assets/icons/png/` from repository
+    7. Update `.gitignore` if needed and 'CONTRIBUTING.md'
+  - **Reproducibility**: Fix `resvg` version, use deterministic PNG options (no metadata)
+  - **Impact**: +10-15s first build (resvg compilation), then fast (incremental)
+  - **Files to modify**: `build.rs` (new), `src/ui/icons.rs`, `Cargo.toml` (build-dependencies)
 
 - [ ] **Newtype pattern audit**: Review codebase for values that should use newtypes for type-safety
   - Example: `PlaybackSpeed` newtype ensures valid range (0.1x - 8.0x) at the type level
