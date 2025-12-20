@@ -23,6 +23,13 @@ const REPOSITORY_URL: &str = "https://codeberg.org/Bawycle/iced_lens";
 /// Issues URL.
 const ISSUES_URL: &str = "https://codeberg.org/Bawycle/iced_lens/issues";
 
+/// Dependencies list URL (Cargo.toml).
+const DEPENDENCIES_URL: &str = "https://codeberg.org/Bawycle/iced_lens/src/branch/master/Cargo.toml";
+
+/// Third-party licenses file URL.
+const THIRD_PARTY_LICENSES_URL: &str =
+    "https://codeberg.org/Bawycle/iced_lens/src/branch/master/THIRD_PARTY_LICENSES.md";
+
 /// Contextual data needed to render the about screen.
 pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
@@ -62,6 +69,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     let license_section = build_license_section(&ctx);
     let icon_license_section = build_icon_license_section(&ctx);
     let credits_section = build_credits_section(&ctx);
+    let third_party_section = build_third_party_section(&ctx);
     let links_section = build_links_section(&ctx);
 
     let content = Column::new()
@@ -75,6 +83,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
         .push(license_section)
         .push(icon_license_section)
         .push(credits_section)
+        .push(third_party_section)
         .push(links_section);
 
     scrollable(content).into()
@@ -145,11 +154,34 @@ fn build_credits_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .spacing(spacing::XS)
         .push(build_credit_item(ctx.i18n.tr("about-credits-iced")))
         .push(build_credit_item(ctx.i18n.tr("about-credits-ffmpeg")))
-        .push(build_credit_item(ctx.i18n.tr("about-credits-fluent")));
+        .push(build_credit_item(ctx.i18n.tr("about-credits-onnx")))
+        .push(build_credit_item(ctx.i18n.tr("about-credits-fluent")))
+        .push(build_link_item(
+            &ctx.i18n.tr("about-credits-full-list"),
+            DEPENDENCIES_URL,
+        ));
 
     build_section(
         icons::cog(),
         ctx.i18n.tr("about-section-credits"),
+        content.into(),
+    )
+}
+
+/// Build the third-party licenses section.
+fn build_third_party_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let content = Column::new()
+        .spacing(spacing::XS)
+        .push(build_credit_item(ctx.i18n.tr("about-third-party-ffmpeg")))
+        .push(build_credit_item(ctx.i18n.tr("about-third-party-onnx")))
+        .push(build_link_item(
+            &ctx.i18n.tr("about-third-party-details"),
+            THIRD_PARTY_LICENSES_URL,
+        ));
+
+    build_section(
+        icons::globe(),
+        ctx.i18n.tr("about-section-third-party"),
         content.into(),
     )
 }

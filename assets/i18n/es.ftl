@@ -307,7 +307,14 @@ about-icon-license-summary = Todos los iconos (logotipo de la aplicación e icon
 about-section-credits = Créditos
 about-credits-iced = Construido con el kit de herramientas GUI Iced
 about-credits-ffmpeg = Reproducción de vídeo con FFmpeg
+about-credits-onnx = Desenfoque IA con ONNX Runtime
 about-credits-fluent = Internacionalización por Project Fluent
+about-credits-full-list = Ver la lista completa de dependencias
+
+about-section-third-party = Licencias de terceros
+about-third-party-ffmpeg = FFmpeg está licenciado bajo LGPL 2.1+
+about-third-party-onnx = ONNX Runtime y DirectML están licenciados bajo MIT
+about-third-party-details = Ver THIRD_PARTY_LICENSES.md para más detalles
 
 about-section-links = Enlaces
 about-link-repository = Código fuente
