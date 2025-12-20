@@ -41,12 +41,25 @@ use std::sync::OnceLock;
 
 /// Macro to define an icon function with a cached handle.
 /// The handle is created once on first access and reused thereafter.
+///
+/// Icons are generated from SVG sources at build time and placed in OUT_DIR.
 macro_rules! define_icon {
-    ($name:ident, $path:literal, $doc:literal) => {
+    ($name:ident, dark, $filename:literal, $doc:literal) => {
         #[doc = $doc]
         pub fn $name() -> Image<Handle> {
             static HANDLE: OnceLock<Handle> = OnceLock::new();
-            static DATA: &[u8] = include_bytes!($path);
+            static DATA: &[u8] =
+                include_bytes!(concat!(env!("OUT_DIR"), "/icons/dark/", $filename));
+            let handle = HANDLE.get_or_init(|| Handle::from_bytes(DATA));
+            Image::new(handle.clone())
+        }
+    };
+    ($name:ident, light, $filename:literal, $doc:literal) => {
+        #[doc = $doc]
+        pub fn $name() -> Image<Handle> {
+            static HANDLE: OnceLock<Handle> = OnceLock::new();
+            static DATA: &[u8] =
+                include_bytes!(concat!(env!("OUT_DIR"), "/icons/light/", $filename));
             let handle = HANDLE.get_or_init(|| Handle::from_bytes(DATA));
             Image::new(handle.clone())
         }
@@ -59,57 +72,63 @@ macro_rules! define_icon {
 
 define_icon!(
     play,
-    "../../assets/icons/png/dark/play.png",
+    dark,
+    "play.png",
     "Play icon: triangle pointing right."
 );
-define_icon!(
-    pause,
-    "../../assets/icons/png/dark/pause.png",
-    "Pause icon: two vertical bars."
-);
+define_icon!(pause, dark, "pause.png", "Pause icon: two vertical bars.");
 define_icon!(
     volume,
-    "../../assets/icons/png/dark/volume.png",
+    dark,
+    "volume.png",
     "Volume icon: speaker with sound waves."
 );
 define_icon!(
     volume_mute,
-    "../../assets/icons/png/dark/volume_mute.png",
+    dark,
+    "volume_mute.png",
     "Volume mute icon: speaker with X (crossed out)."
 );
 define_icon!(
     loop_icon,
-    "../../assets/icons/png/dark/loop.png",
+    dark,
+    "loop.png",
     "Loop icon: circular arrows indicating repeat."
 );
 define_icon!(
     camera,
-    "../../assets/icons/png/dark/camera.png",
+    dark,
+    "camera.png",
     "Camera icon: for frame capture/screenshot."
 );
 define_icon!(
     triangle_bar_right,
-    "../../assets/icons/png/dark/triangle_bar_right.png",
+    dark,
+    "triangle_bar_right.png",
     "Triangle with bar on right: play/skip next shape."
 );
 define_icon!(
     triangle_bar_left,
-    "../../assets/icons/png/dark/triangle_bar_left.png",
+    dark,
+    "triangle_bar_left.png",
     "Triangle with bar on left: skip previous shape."
 );
 define_icon!(
     ellipsis_horizontal,
-    "../../assets/icons/png/dark/ellipsis_horizontal.png",
+    dark,
+    "ellipsis_horizontal.png",
     "Horizontal ellipsis: three dots in a row."
 );
 define_icon!(
     triangle_minus,
-    "../../assets/icons/png/dark/triangle_minus.png",
+    dark,
+    "triangle_minus.png",
     "Triangle pointing right with a minus sign on the left."
 );
 define_icon!(
     triangle_plus,
-    "../../assets/icons/png/dark/triangle_plus.png",
+    dark,
+    "triangle_plus.png",
     "Triangle pointing right with a plus sign on the left."
 );
 
@@ -119,19 +138,17 @@ define_icon!(
 
 define_icon!(
     warning,
-    "../../assets/icons/png/dark/warning.png",
+    dark,
+    "warning.png",
     "Warning icon: triangle with exclamation mark."
 );
 define_icon!(
     checkmark,
-    "../../assets/icons/png/dark/checkmark.png",
+    dark,
+    "checkmark.png",
     "Checkmark icon: check/tick mark for success."
 );
-define_icon!(
-    cross,
-    "../../assets/icons/png/dark/cross.png",
-    "Cross icon: X mark shape."
-);
+define_icon!(cross, dark, "cross.png", "Cross icon: X mark shape.");
 
 // =============================================================================
 // Zoom & View Icons
@@ -139,32 +156,38 @@ define_icon!(
 
 define_icon!(
     zoom_in,
-    "../../assets/icons/png/dark/zoom_in.png",
+    dark,
+    "zoom_in.png",
     "Zoom in icon: magnifying glass with plus."
 );
 define_icon!(
     zoom_out,
-    "../../assets/icons/png/dark/zoom_out.png",
+    dark,
+    "zoom_out.png",
     "Zoom out icon: magnifying glass with minus."
 );
 define_icon!(
     refresh,
-    "../../assets/icons/png/dark/refresh.png",
+    dark,
+    "refresh.png",
     "Refresh icon: circular arrow (used for reset zoom)."
 );
 define_icon!(
     expand,
-    "../../assets/icons/png/dark/expand.png",
+    dark,
+    "expand.png",
     "Expand icon: arrows pointing outward (fit-to-window off)."
 );
 define_icon!(
     compress,
-    "../../assets/icons/png/dark/compress.png",
+    dark,
+    "compress.png",
     "Compress icon: arrows pointing inward (fit-to-window on)."
 );
 define_icon!(
     fullscreen,
-    "../../assets/icons/png/dark/fullscreen.png",
+    dark,
+    "fullscreen.png",
     "Fullscreen icon: four corners expanding."
 );
 
@@ -174,14 +197,11 @@ define_icon!(
 
 define_icon!(
     trash,
-    "../../assets/icons/png/dark/trash.png",
+    dark,
+    "trash.png",
     "Trash icon: garbage bin (used for delete)."
 );
-define_icon!(
-    pencil,
-    "../../assets/icons/png/dark/pencil.png",
-    "Pencil icon: for edit actions."
-);
+define_icon!(pencil, dark, "pencil.png", "Pencil icon: for edit actions.");
 
 // =============================================================================
 // Transform Icons (Editor)
@@ -189,22 +209,26 @@ define_icon!(
 
 define_icon!(
     rotate_left,
-    "../../assets/icons/png/dark/rotate_left.png",
+    dark,
+    "rotate_left.png",
     "Rotate left icon: counter-clockwise arrow."
 );
 define_icon!(
     rotate_right,
-    "../../assets/icons/png/dark/rotate_right.png",
+    dark,
+    "rotate_right.png",
     "Rotate right icon: clockwise arrow."
 );
 define_icon!(
     flip_horizontal,
-    "../../assets/icons/png/dark/flip_horizontal.png",
+    dark,
+    "flip_horizontal.png",
     "Flip horizontal icon: mirror left-right."
 );
 define_icon!(
     flip_vertical,
-    "../../assets/icons/png/dark/flip_vertical.png",
+    dark,
+    "flip_vertical.png",
     "Flip vertical icon: mirror top-bottom."
 );
 
@@ -214,37 +238,39 @@ define_icon!(
 
 define_icon!(
     hamburger,
-    "../../assets/icons/png/dark/hamburger.png",
+    dark,
+    "hamburger.png",
     "Hamburger menu icon: three horizontal lines."
 );
 define_icon!(
     help,
-    "../../assets/icons/png/dark/help.png",
+    dark,
+    "help.png",
     "Help icon: question mark in circle."
 );
-define_icon!(
-    info,
-    "../../assets/icons/png/dark/info.png",
-    "Info icon: letter 'i' in circle."
-);
+define_icon!(info, dark, "info.png", "Info icon: letter 'i' in circle.");
 define_icon!(
     chevron_double_right,
-    "../../assets/icons/png/dark/chevron_double_right.png",
+    dark,
+    "chevron_double_right.png",
     "Double chevron right icon: two chevrons pointing right (>>), used for sidebar collapse."
 );
 define_icon!(
     chevron_double_left,
-    "../../assets/icons/png/dark/chevron_double_left.png",
+    dark,
+    "chevron_double_left.png",
     "Double chevron left icon: two chevrons pointing left (<<), used for sidebar expand."
 );
 define_icon!(
     chevron_right,
-    "../../assets/icons/png/dark/chevron_right.png",
+    dark,
+    "chevron_right.png",
     "Single chevron right icon: chevron pointing right (>), used for navigation next."
 );
 define_icon!(
     chevron_left,
-    "../../assets/icons/png/dark/chevron_left.png",
+    dark,
+    "chevron_left.png",
     "Single chevron left icon: chevron pointing left (<), used for navigation previous."
 );
 
@@ -254,19 +280,17 @@ define_icon!(
 
 define_icon!(
     globe,
-    "../../assets/icons/png/dark/globe.png",
+    dark,
+    "globe.png",
     "Globe icon: world/international (for general settings)."
 );
 define_icon!(
     image,
-    "../../assets/icons/png/dark/image.png",
+    dark,
+    "image.png",
     "Image icon: picture frame (for display settings)."
 );
-define_icon!(
-    cog,
-    "../../assets/icons/png/dark/cog.png",
-    "Cog icon: gear/settings."
-);
+define_icon!(cog, dark, "cog.png", "Cog icon: gear/settings.");
 
 // =============================================================================
 // HUD Indicator Icons
@@ -274,22 +298,26 @@ define_icon!(
 
 define_icon!(
     crosshair,
-    "../../assets/icons/png/dark/crosshair.png",
+    dark,
+    "crosshair.png",
     "Crosshair icon: position indicator."
 );
 define_icon!(
     magnifier,
-    "../../assets/icons/png/dark/magnifier.png",
+    dark,
+    "magnifier.png",
     "Magnifier icon: simple magnifying glass (for HUD zoom indicator)."
 );
 define_icon!(
     video_camera,
-    "../../assets/icons/png/dark/video_camera.png",
+    dark,
+    "video_camera.png",
     "Video camera icon: camcorder without audio."
 );
 define_icon!(
     video_camera_audio,
-    "../../assets/icons/png/dark/video_camera_audio.png",
+    dark,
+    "video_camera_audio.png",
     "Video camera with audio icon: camcorder with sound wave."
 );
 
@@ -303,37 +331,44 @@ pub mod light {
 
     define_icon!(
         chevron_double_right,
-        "../../assets/icons/png/light/chevron_double_right.png",
+        light,
+        "chevron_double_right.png",
         "Double chevron right icon (white): for dark theme UI."
     );
     define_icon!(
         chevron_double_left,
-        "../../assets/icons/png/light/chevron_double_left.png",
+        light,
+        "chevron_double_left.png",
         "Double chevron left icon (white): for dark theme UI."
     );
     define_icon!(
         chevron_right,
-        "../../assets/icons/png/light/chevron_right.png",
+        light,
+        "chevron_right.png",
         "Single chevron right icon (white): for dark theme UI."
     );
     define_icon!(
         chevron_left,
-        "../../assets/icons/png/light/chevron_left.png",
+        light,
+        "chevron_left.png",
         "Single chevron left icon (white): for dark theme UI."
     );
     define_icon!(
         pencil,
-        "../../assets/icons/png/light/pencil.png",
+        light,
+        "pencil.png",
         "Pencil icon (white): for dark theme UI."
     );
     define_icon!(
         triangle_minus,
-        "../../assets/icons/png/light/triangle_minus.png",
+        light,
+        "triangle_minus.png",
         "Triangle with minus (white): for dark theme UI."
     );
     define_icon!(
         triangle_plus,
-        "../../assets/icons/png/light/triangle_plus.png",
+        light,
+        "triangle_plus.png",
         "Triangle with plus (white): for dark theme UI."
     );
 }
@@ -348,52 +383,62 @@ pub mod overlay {
 
     define_icon!(
         play,
-        "../../assets/icons/png/light/play.png",
+        light,
+        "play.png",
         "Play icon (white): for dark overlay backgrounds."
     );
     define_icon!(
         pause,
-        "../../assets/icons/png/light/pause.png",
+        light,
+        "pause.png",
         "Pause icon (white): for dark overlay backgrounds."
     );
     define_icon!(
         loop_icon,
-        "../../assets/icons/png/light/loop.png",
+        light,
+        "loop.png",
         "Loop icon (white): for dark overlay backgrounds."
     );
     define_icon!(
         warning,
-        "../../assets/icons/png/light/warning.png",
+        light,
+        "warning.png",
         "Warning icon (white): for dark overlay backgrounds."
     );
     define_icon!(
         crosshair,
-        "../../assets/icons/png/light/crosshair.png",
+        light,
+        "crosshair.png",
         "Crosshair icon (white): for HUD on dark backgrounds."
     );
     define_icon!(
         magnifier,
-        "../../assets/icons/png/light/magnifier.png",
+        light,
+        "magnifier.png",
         "Magnifier icon (white): for HUD on dark backgrounds."
     );
     define_icon!(
         video_camera,
-        "../../assets/icons/png/light/video_camera.png",
+        light,
+        "video_camera.png",
         "Video camera icon (white): for HUD on dark backgrounds."
     );
     define_icon!(
         video_camera_audio,
-        "../../assets/icons/png/light/video_camera_audio.png",
+        light,
+        "video_camera_audio.png",
         "Video camera with audio icon (white): for HUD on dark backgrounds."
     );
     define_icon!(
         chevron_right,
-        "../../assets/icons/png/light/chevron_right.png",
+        light,
+        "chevron_right.png",
         "Single chevron right icon (white): for navigation next on dark backgrounds."
     );
     define_icon!(
         chevron_left,
-        "../../assets/icons/png/light/chevron_left.png",
+        light,
+        "chevron_left.png",
         "Single chevron left icon (white): for navigation previous on dark backgrounds."
     );
 }

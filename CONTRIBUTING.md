@@ -534,10 +534,7 @@ iced_lens/
 │   ├── branding/               # Application icon (SVG, PNG, ICO, ICNS)
 │   ├── i18n/                   # Translation files (.ftl)
 │   └── icons/                  # UI icons
-│       ├── source/             # SVG sources (not embedded)
-│       └── png/
-│           ├── dark/           # Dark icons (for light backgrounds)
-│           └── light/          # Light icons (for dark backgrounds)
+│       └── source/             # SVG sources (PNGs generated at build time)
 ├── tests/                      # Integration tests
 ├── benches/                    # Performance benchmarks
 ├── CONTRIBUTING.md             # This file
@@ -760,9 +757,9 @@ let padding = spacing::MD; // 16px
 
 #### 2. Icons (`src/ui/icons.rs`)
 
-PNG icons named by their **visual appearance**, not their function. Two variants exist:
-- **`icons::*`** - Dark icons from `assets/icons/png/dark/` (for light backgrounds)
-- **`icons::overlay::*`** - Light icons from `assets/icons/png/light/` (for dark backgrounds)
+PNG icons named by their **visual appearance**, not their function. Icons are **generated at build time** from SVG sources via `build.rs`. Two variants exist:
+- **`icons::*`** - Dark icons (black on transparent) for light backgrounds
+- **`icons::overlay::*`** - Light icons (white on transparent) for dark backgrounds
 
 | Icon | Visual Description |
 |------|-------------------|
@@ -774,10 +771,17 @@ PNG icons named by their **visual appearance**, not their function. Two variants
 **Naming rule:** Describe what you see, not what it does.
 
 **Adding a new icon:**
-1. Create SVG in `assets/icons/source/`
-2. Generate PNG: `rsvg-convert -w 32 -h 32 source/icon.svg -o png/dark/icon.png`
-3. If needed for overlays: `rsvg-convert ... | convert - -negate png/light/icon.png`
-4. Add to `src/ui/icons.rs` using the `define_icon!` macro
+1. Create SVG in `assets/icons/source/` with `fill="white"` and `viewBox="0 0 32 32"`
+2. Add to `src/ui/icons.rs` using the `define_icon!` macro:
+   ```rust
+   define_icon!(icon_name, dark, "icon_name.png", "Description.");
+   ```
+3. If needed for overlays, add to `build.rs::needs_light_variant()` and define in `icons.rs`:
+   ```rust
+   // In overlay module
+   define_icon!(icon_name, light, "icon_name.png", "Description (white).");
+   ```
+4. Run `cargo build` - PNGs are generated automatically
 
 #### 3. Action Icons (`src/ui/action_icons.rs`)
 
