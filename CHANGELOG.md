@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Image editor zoom:** use mouse wheel to zoom in/out while editing, matching the viewer behavior.
+- **Image editor pan:** grab-and-drag to navigate when zoomed, like in the viewer.
+- **Resize preview:** thumbnail preview in the sidebar shows the result before applying.
+
+### Changed
+- Crop handles are now larger for better accessibility (WCAG 2.5.5 compliant).
+- Images are now centered in the editor canvas when smaller than the viewport.
+
 ### Fixed
 - Navigation overlay buttons no longer display rendering artifacts on Windows.
 - Window title now consistently shows metadata title (dc:title) across viewer and image editor.
+- Resize tool now allows free dimension input when aspect ratio is unlocked.
 
 ## [0.4.1] - 2025-12-19
 

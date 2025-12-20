@@ -48,6 +48,9 @@ impl State {
             preview_image: None,
             viewport: crate::ui::state::ViewportState::default(),
             export_format: ExportFormat::Png,
+            zoom: crate::ui::state::ZoomState::default(),
+            cursor_position: None,
+            drag: crate::ui::state::DragState::default(),
         })
     }
 
@@ -85,6 +88,9 @@ impl State {
             preview_image: None,
             viewport: crate::ui::state::ViewportState::default(),
             export_format: ExportFormat::Png,
+            zoom: crate::ui::state::ZoomState::default(),
+            cursor_position: None,
+            drag: crate::ui::state::DragState::default(),
         })
     }
 
@@ -94,6 +100,11 @@ impl State {
     }
 
     pub(crate) fn display_image(&self) -> &ImageData {
+        // For resize tool, always show the original image on canvas
+        // (preview is shown as thumbnail in sidebar to avoid zoom confusion)
+        if self.active_tool == Some(EditorTool::Resize) {
+            return &self.current_image;
+        }
         self.preview_image.as_ref().unwrap_or(&self.current_image)
     }
 }

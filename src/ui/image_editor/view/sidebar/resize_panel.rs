@@ -1,16 +1,24 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize tool panel for the editor sidebar.
 
+use crate::media::ImageData;
 use crate::ui::design_tokens::{spacing, typography};
 use crate::ui::styles;
-use iced::widget::{button, checkbox, container, slider, text, text_input, Column, Row};
+use iced::widget::{button, checkbox, container, image, slider, text, text_input, Column, Row};
 use iced::{Element, Length};
 
 use super::super::ViewContext;
 use crate::ui::image_editor::state::ResizeState;
 use crate::ui::image_editor::{Message, SidebarMessage};
 
-pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+/// Maximum size for the thumbnail preview in the sidebar.
+const THUMBNAIL_MAX_SIZE: f32 = 150.0;
+
+pub fn panel<'a>(
+    resize: &'a ResizeState,
+    thumbnail: Option<&'a ImageData>,
+    ctx: &ViewContext<'a>,
+) -> Element<'a, Message> {
     let scale_section = Column::new()
         .spacing(spacing::XXS)
         .push(text(ctx.i18n.tr("image-editor-resize-section-title")).size(typography::BODY))
@@ -81,20 +89,63 @@ pub fn panel<'a>(resize: &'a ResizeState, ctx: &ViewContext<'a>) -> Element<'a, 
             .width(Length::Fill)
             .on_press(SidebarMessage::ApplyResize.into());
 
-    container(
-        Column::new()
-            .spacing(spacing::SM)
-            .push(scale_section)
-            .push(presets_section)
+    // Build content with controls first, preview at the bottom
+    // This prevents layout shift when user types in input fields
+    let mut content = Column::new()
+        .spacing(spacing::SM)
+        .push(scale_section)
+        .push(presets_section)
+        .push(text(ctx.i18n.tr("image-editor-resize-dimensions-label")).size(typography::BODY_SM))
+        .push(dimensions_row)
+        .push(lock_checkbox)
+        .push(apply_btn);
+
+    // Preview section at the bottom - only shown when there are changes
+    // Being at the bottom means it won't shift the controls above when it appears
+    if let Some(img) = thumbnail {
+        let (display_width, display_height) = calculate_thumbnail_size(img.width, img.height);
+
+        let preview_image = image(img.handle.clone())
+            .width(Length::Fixed(display_width))
+            .height(Length::Fixed(display_height));
+
+        let preview_section = Column::new()
+            .spacing(spacing::XXS)
+            .align_x(iced::Alignment::Center)
+            .push(text(ctx.i18n.tr("image-editor-resize-preview-label")).size(typography::BODY_SM))
             .push(
-                text(ctx.i18n.tr("image-editor-resize-dimensions-label")).size(typography::BODY_SM),
+                container(preview_image)
+                    .width(Length::Fill)
+                    .center_x(Length::Fill),
             )
-            .push(dimensions_row)
-            .push(lock_checkbox)
-            .push(apply_btn),
-    )
-    .padding(spacing::SM)
-    .width(Length::Fill)
-    .style(styles::editor::settings_panel)
-    .into()
+            .push(
+                text(format!("{}×{} px", img.width, img.height))
+                    .size(typography::BODY_SM)
+                    .center(),
+            );
+
+        content = content.push(preview_section);
+    }
+
+    container(content)
+        .padding(spacing::SM)
+        .width(Length::Fill)
+        .style(styles::editor::settings_panel)
+        .into()
+}
+
+/// Calculate thumbnail display size while preserving aspect ratio.
+fn calculate_thumbnail_size(width: u32, height: u32) -> (f32, f32) {
+    let w = width as f32;
+    let h = height as f32;
+
+    if w <= THUMBNAIL_MAX_SIZE && h <= THUMBNAIL_MAX_SIZE {
+        (w, h)
+    } else if w > h {
+        let scale = THUMBNAIL_MAX_SIZE / w;
+        (THUMBNAIL_MAX_SIZE, h * scale)
+    } else {
+        let scale = THUMBNAIL_MAX_SIZE / h;
+        (w * scale, THUMBNAIL_MAX_SIZE)
+    }
 }

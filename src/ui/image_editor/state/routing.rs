@@ -4,7 +4,8 @@
 use crate::ui::image_editor::{
     CanvasMessage, EditorTool, Event, ImageSource, SidebarMessage, State, ToolbarMessage,
 };
-use iced::{self, keyboard};
+use iced::widget::scrollable::AbsoluteOffset;
+use iced::{self, keyboard, mouse, Point};
 
 impl State {
     pub(crate) fn handle_toolbar_message(&mut self, message: ToolbarMessage) -> Event {
@@ -159,7 +160,17 @@ impl State {
     }
 
     pub(crate) fn handle_canvas_message(&mut self, message: CanvasMessage) -> Event {
-        self.handle_crop_canvas_message(message)
+        match message {
+            CanvasMessage::CursorMoved { position } => {
+                self.cursor_position = Some(position);
+                Event::None
+            }
+            CanvasMessage::CursorLeft => {
+                self.cursor_position = None;
+                Event::None
+            }
+            _ => self.handle_crop_canvas_message(message),
+        }
     }
 
     pub(crate) fn handle_raw_event(&mut self, event: iced::Event) -> Event {
@@ -204,7 +215,163 @@ impl State {
                     _ => Event::None,
                 }
             }
+            iced::Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
+                self.handle_wheel_zoom(delta);
+                Event::None
+            }
+            iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                if let Some(position) = self.cursor_position {
+                    self.handle_mouse_button_pressed(position);
+                }
+                Event::None
+            }
+            iced::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                self.handle_mouse_button_released();
+                Event::None
+            }
+            iced::Event::Mouse(mouse::Event::CursorMoved { position }) => {
+                self.cursor_position = Some(position);
+                if self.drag.is_dragging {
+                    return self.handle_cursor_moved_during_drag(position);
+                }
+                Event::None
+            }
+            iced::Event::Mouse(mouse::Event::CursorLeft) => {
+                self.cursor_position = None;
+                self.drag.stop();
+                Event::None
+            }
             _ => Event::None,
         }
+    }
+
+    /// Handles wheel scroll for zooming when cursor is over the canvas.
+    fn handle_wheel_zoom(&mut self, delta: mouse::ScrollDelta) {
+        // Only zoom if cursor is over the canvas area
+        if !self.is_cursor_over_canvas() {
+            return;
+        }
+
+        let steps = scroll_steps(&delta);
+        if steps.abs() < f32::EPSILON {
+            return;
+        }
+
+        let new_zoom = self.zoom.zoom_percent + steps * self.zoom.zoom_step_percent;
+        self.zoom.apply_manual_zoom(new_zoom);
+    }
+
+    /// Checks if the cursor is currently positioned over the canvas area.
+    fn is_cursor_over_canvas(&self) -> bool {
+        let cursor = match self.cursor_position {
+            Some(pos) => pos,
+            None => return false,
+        };
+
+        let bounds = match self.viewport.bounds {
+            Some(bounds) => bounds,
+            None => return false,
+        };
+
+        // Check if cursor is within the canvas viewport bounds
+        cursor.x >= bounds.x
+            && cursor.x <= bounds.x + bounds.width
+            && cursor.y >= bounds.y
+            && cursor.y <= bounds.y + bounds.height
+    }
+
+    /// Handles mouse button press for starting pan drag.
+    fn handle_mouse_button_pressed(&mut self, position: Point) {
+        // Don't start pan if not over canvas
+        if !self.is_cursor_over_canvas() {
+            return;
+        }
+
+        // Don't start pan if crop tool is active and interacting with overlay
+        if self.active_tool == Some(EditorTool::Crop) && self.crop_state.overlay.visible {
+            // Crop overlay handles its own mouse events
+            return;
+        }
+
+        // Start drag for panning
+        self.drag.start(position, self.viewport.offset);
+    }
+
+    /// Handles mouse button release to stop pan drag.
+    fn handle_mouse_button_released(&mut self) {
+        self.drag.stop();
+    }
+
+    /// Updates the viewport when dragging to pan the image.
+    fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Event {
+        let proposed_offset = match self.drag.calculate_offset(position) {
+            Some(offset) => offset,
+            None => return Event::None,
+        };
+
+        // Get viewport and scaled image size to clamp offset
+        let viewport_bounds = match self.viewport.bounds {
+            Some(bounds) => bounds,
+            None => {
+                self.viewport.offset = proposed_offset;
+                return Event::None;
+            }
+        };
+
+        let zoom_scale = self.zoom.zoom_percent / 100.0;
+        let scaled_width = self.current_image.width as f32 * zoom_scale;
+        let scaled_height = self.current_image.height as f32 * zoom_scale;
+
+        // Calculate maximum offsets (how far we can scroll)
+        let max_offset_x = (scaled_width - viewport_bounds.width).max(0.0);
+        let max_offset_y = (scaled_height - viewport_bounds.height).max(0.0);
+
+        // Clamp offset to valid range
+        let clamped_offset = AbsoluteOffset {
+            x: if max_offset_x > 0.0 {
+                proposed_offset.x.clamp(0.0, max_offset_x)
+            } else {
+                0.0
+            },
+            y: if max_offset_y > 0.0 {
+                proposed_offset.y.clamp(0.0, max_offset_y)
+            } else {
+                0.0
+            },
+        };
+
+        self.viewport.offset = clamped_offset;
+
+        // Calculate relative offset for scroll
+        let relative_x = if max_offset_x > 0.0 {
+            clamped_offset.x / max_offset_x
+        } else {
+            0.0
+        };
+
+        let relative_y = if max_offset_y > 0.0 {
+            clamped_offset.y / max_offset_y
+        } else {
+            0.0
+        };
+
+        Event::ScrollTo {
+            x: relative_x,
+            y: relative_y,
+        }
+    }
+
+    /// Check if dragging is active (for cursor display).
+    pub fn is_dragging(&self) -> bool {
+        self.drag.is_dragging
+    }
+}
+
+/// Normalizes mouse wheel units (lines vs. pixels) into abstract step values
+/// so zooming feels consistent across platforms.
+fn scroll_steps(delta: &mouse::ScrollDelta) -> f32 {
+    match delta {
+        mouse::ScrollDelta::Lines { y, .. } => *y,
+        mouse::ScrollDelta::Pixels { y, .. } => *y / 120.0,
     }
 }

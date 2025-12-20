@@ -130,12 +130,14 @@ impl State {
         if let Some(width) = parse_dimension_input(&value) {
             if self.resize_state.lock_aspect {
                 self.set_width_preserving_aspect(width);
+                self.update_scale_percent_from_width();
             } else {
+                // When aspect is unlocked, allow any value without clamping
                 let width = width.max(1);
                 self.resize_state.width = width;
                 self.resize_state.width_input = width.to_string();
+                self.update_resize_preview();
             }
-            self.update_scale_percent_from_width();
         }
     }
 
@@ -146,11 +148,12 @@ impl State {
                 self.set_height_preserving_aspect(height);
                 self.update_scale_percent_from_width();
             } else {
+                // When aspect is unlocked, allow any value without clamping
                 let height = height.max(1);
                 self.resize_state.height = height;
                 self.resize_state.height_input = height.to_string();
+                self.update_resize_preview();
             }
-            self.update_resize_preview();
         }
     }
 
