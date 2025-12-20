@@ -406,6 +406,10 @@ async fn run_playback_loop(
                                     DecoderCommand::StepBackward => {
                                         // No audio action needed for backward stepping
                                     }
+                                    DecoderCommand::SetPlaybackSpeed { .. } => {
+                                        // Clear audio buffer to prevent desync from old-speed samples
+                                        let _ = audio_out.clear_buffer();
+                                    }
                                 }
                             }
 
@@ -420,6 +424,13 @@ async fn run_playback_loop(
                                     DecoderCommand::Stop => Some(AudioDecoderCommand::Stop),
                                     DecoderCommand::StepFrame => None, // No audio sync for frame stepping
                                     DecoderCommand::StepBackward => None, // No audio sync for backward stepping
+                                    DecoderCommand::SetPlaybackSpeed { speed, instant, reference_pts } => {
+                                        Some(AudioDecoderCommand::SetPlaybackSpeed {
+                                            speed: *speed,
+                                            instant: *instant,
+                                            reference_pts: *reference_pts,
+                                        })
+                                    }
                                 };
                                 if let Some(cmd) = audio_cmd {
                                     let _ = audio_dec.send_command(cmd);
@@ -467,6 +478,10 @@ async fn run_playback_loop(
                                 }
                                 AudioDecoderCommand::SetMuted(muted) => {
                                     let _ = audio_out.set_muted(muted);
+                                }
+                                AudioDecoderCommand::SetPlaybackSpeed { .. } => {
+                                    // Playback speed is handled in the audio decoder loop
+                                    // (affects frame pacing, not audio output directly)
                                 }
                             }
                         }

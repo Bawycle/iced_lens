@@ -9,6 +9,7 @@ pub mod audio_output;
 mod decoder;
 pub mod frame_cache;
 pub mod normalization;
+mod playback_speed;
 mod state;
 pub mod subscription;
 pub mod sync;
@@ -21,6 +22,7 @@ pub use normalization::{
     create_lufs_cache, LufsAnalyzer, LufsCache, NormalizationSettings, SharedLufsCache,
     DEFAULT_TARGET_LUFS,
 };
+pub use playback_speed::PlaybackSpeed;
 pub use state::{PlaybackState, VideoPlayer};
 pub use subscription::{video_playback, DecoderCommandSender, PlaybackMessage, VideoPlaybackId};
 pub use sync::{calculate_sync_action, SharedSyncClock, SyncAction, SyncClock};

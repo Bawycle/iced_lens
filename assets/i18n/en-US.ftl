@@ -122,6 +122,8 @@ video-capture-tooltip = Capture current frame
 video-step-forward-tooltip = Step forward one frame (.)
 video-step-backward-tooltip = Step backward one frame (,)
 video-more-tooltip = More options
+video-speed-down-tooltip = Decrease speed (J)
+video-speed-up-tooltip = Increase speed (L)
 settings-audio-normalization-label = Audio volume normalization
 settings-audio-normalization-enabled = Enabled
 settings-audio-normalization-disabled = Disabled
@@ -212,6 +214,8 @@ help-video-key-seek = Seek backward/forward (during playback)
 help-video-key-volume = Increase/decrease volume
 help-video-key-step-back = Step backward one frame (when paused)
 help-video-key-step-forward = Step forward one frame (when paused)
+help-video-key-speed-down = Decrease playback speed
+help-video-key-speed-up = Increase playback speed
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Image Editor Section
@@ -253,6 +257,10 @@ help-editor-key-save = Save current changes
 help-editor-key-undo = Undo last change
 help-editor-key-redo = Redo undone change
 help-editor-key-cancel = Cancel all changes and exit
+
+help-editor-mouse-title = Mouse Controls
+help-editor-mouse-wheel = Zoom in or out of the image
+help-editor-mouse-drag = Pan the image when zoomed in
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Frame Capture Section

@@ -122,6 +122,8 @@ video-capture-tooltip = Capturer l'image actuelle
 video-step-forward-tooltip = Avancer d'une image (.)
 video-step-backward-tooltip = Reculer d'une image (,)
 video-more-tooltip = Plus d'options
+video-speed-down-tooltip = Réduire la vitesse (J)
+video-speed-up-tooltip = Augmenter la vitesse (L)
 settings-audio-normalization-label = Normalisation du volume audio
 settings-audio-normalization-enabled = Activée
 settings-audio-normalization-disabled = Désactivée
@@ -212,6 +214,8 @@ help-video-key-seek = Avancer/reculer dans la vidéo (pendant la lecture)
 help-video-key-volume = Augmenter/diminuer le volume
 help-video-key-step-back = Reculer d'une image (en pause)
 help-video-key-step-forward = Avancer d'une image (en pause)
+help-video-key-speed-down = Réduire la vitesse de lecture
+help-video-key-speed-up = Augmenter la vitesse de lecture
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Section Éditeur d'images
@@ -253,6 +257,10 @@ help-editor-key-save = Enregistrer les modifications
 help-editor-key-undo = Annuler la dernière modification
 help-editor-key-redo = Rétablir la modification annulée
 help-editor-key-cancel = Annuler toutes les modifications et quitter
+
+help-editor-mouse-title = Contrôles souris
+help-editor-mouse-wheel = Zoomer ou dézoomer l'image
+help-editor-mouse-drag = Déplacer l'image lorsque zoomée
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Section Capture d'image vidéo

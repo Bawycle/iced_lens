@@ -111,6 +111,8 @@ iced_lens --lang fr image.png
 | `←` / `→` | Navigate media / seek video |
 | `Space` | Play/pause video |
 | `M` | Toggle mute |
+| `J` | Decrease playback speed |
+| `L` | Increase playback speed |
 
 ### Editor Mode
 
@@ -182,6 +184,11 @@ All editing is **non-destructive**. Changes are only applied when you save.
 ### Undo/Redo
 
 Full transformation history. Each tool application creates a history entry.
+
+### Mouse Controls
+
+- **Scroll wheel:** Zoom in/out of the image
+- **Click + drag:** Pan when zoomed in
 
 ---
 

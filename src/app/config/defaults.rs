@@ -10,6 +10,7 @@
 //! - **Overlay**: Fullscreen overlay auto-hide timeout
 //! - **Volume**: Audio playback volume settings
 //! - **Frame Cache**: Video frame caching for seek performance
+//! - **Playback Speed**: Video playback speed control
 
 // ==========================================================================
 // Zoom Defaults
@@ -110,6 +111,29 @@ pub const DEFAULT_DEBLUR_MODEL_URL: &str =
     "https://huggingface.co/opencv/deblurring_nafnet/resolve/main/deblurring_nafnet_2025may.onnx";
 
 // ==========================================================================
+// Playback Speed Defaults
+// ==========================================================================
+
+/// Default playback speed (1.0 = normal speed).
+pub const DEFAULT_PLAYBACK_SPEED: f64 = 1.0;
+
+/// Minimum playback speed (0.1x = ten times slower).
+pub const MIN_PLAYBACK_SPEED: f64 = 0.1;
+
+/// Maximum playback speed (8x = eight times faster).
+pub const MAX_PLAYBACK_SPEED: f64 = 8.0;
+
+/// Playback speed presets for the speed control buttons.
+/// Ordered from slowest to fastest. Users cycle through these with J and L keys.
+pub const PLAYBACK_SPEED_PRESETS: &[f64] = &[
+    0.1, 0.15, 0.2, 0.25, 0.33, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 4.0, 8.0,
+];
+
+/// Speed threshold above which audio is automatically muted.
+/// At speeds > 2x, audio becomes distorted and unintelligible.
+pub const PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD: f64 = 2.0;
+
+// ==========================================================================
 // Compile-time Validation
 // ==========================================================================
 
@@ -146,4 +170,42 @@ const _: () = {
     assert!(MAX_KEYBOARD_SEEK_STEP_SECS >= MIN_KEYBOARD_SEEK_STEP_SECS);
     assert!(DEFAULT_KEYBOARD_SEEK_STEP_SECS >= MIN_KEYBOARD_SEEK_STEP_SECS);
     assert!(DEFAULT_KEYBOARD_SEEK_STEP_SECS <= MAX_KEYBOARD_SEEK_STEP_SECS);
+
+    // Playback speed validation
+    assert!(MIN_PLAYBACK_SPEED > 0.0);
+    assert!(MAX_PLAYBACK_SPEED > MIN_PLAYBACK_SPEED);
+    assert!(DEFAULT_PLAYBACK_SPEED >= MIN_PLAYBACK_SPEED);
+    assert!(DEFAULT_PLAYBACK_SPEED <= MAX_PLAYBACK_SPEED);
+    assert!(PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD > 1.0);
+    assert!(PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD <= MAX_PLAYBACK_SPEED);
+
+    // Ensure presets array is not empty
+    assert!(!PLAYBACK_SPEED_PRESETS.is_empty());
+
+    // Validate presets are in ascending order and within bounds
+    let mut i = 0;
+    while i < PLAYBACK_SPEED_PRESETS.len() {
+        // Each preset must be within valid range
+        assert!(PLAYBACK_SPEED_PRESETS[i] >= MIN_PLAYBACK_SPEED);
+        assert!(PLAYBACK_SPEED_PRESETS[i] <= MAX_PLAYBACK_SPEED);
+
+        // Presets must be in ascending order (for cycling to work correctly)
+        if i > 0 {
+            assert!(PLAYBACK_SPEED_PRESETS[i] > PLAYBACK_SPEED_PRESETS[i - 1]);
+        }
+        i += 1;
+    }
+
+    // Ensure default speed (1.0) is in the presets
+    let mut found_default = false;
+    let mut j = 0;
+    while j < PLAYBACK_SPEED_PRESETS.len() {
+        // Use integer comparison to avoid floating point issues
+        // 1.0 * 100 = 100, comparing integers
+        if (PLAYBACK_SPEED_PRESETS[j] * 100.0) as i32 == (DEFAULT_PLAYBACK_SPEED * 100.0) as i32 {
+            found_default = true;
+        }
+        j += 1;
+    }
+    assert!(found_default);
 };

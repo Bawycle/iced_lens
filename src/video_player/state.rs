@@ -154,6 +154,14 @@ pub struct VideoPlayer {
     /// Whether we've reached the end of the video stream.
     /// Set to true when EndOfStream is received, reset to false on seek/play.
     at_end_of_stream: bool,
+
+    /// Current playback speed (guaranteed within valid range).
+    /// Reset to 1.0 when loading a new video (not persisted).
+    playback_speed: super::PlaybackSpeed,
+
+    /// Whether audio is auto-muted due to high playback speed.
+    /// Separate from user mute to restore audio when speed decreases.
+    speed_auto_muted: bool,
 }
 
 impl VideoPlayer {
@@ -170,6 +178,8 @@ impl VideoPlayer {
             sync_clock: Arc::new(SyncClock::new()),
             history_position: 0,
             at_end_of_stream: false,
+            playback_speed: super::PlaybackSpeed::default(),
+            speed_auto_muted: false,
         })
     }
 
@@ -546,6 +556,55 @@ impl VideoPlayer {
         if let Some(sender) = &self.command_sender {
             let _ = sender.set_muted(muted);
         }
+    }
+
+    /// Returns the current playback speed value.
+    pub fn playback_speed(&self) -> f64 {
+        self.playback_speed.value()
+    }
+
+    /// Returns true if audio is auto-muted due to high playback speed.
+    pub fn is_speed_auto_muted(&self) -> bool {
+        self.speed_auto_muted
+    }
+
+    /// Sets the playback speed.
+    ///
+    /// Sends SetPlaybackSpeed command to both video and audio decoders.
+    /// Auto-mutes audio when speed > 2.0x (audio becomes unintelligible).
+    fn set_playback_speed(&mut self, speed: super::PlaybackSpeed) {
+        self.playback_speed = speed;
+        self.speed_auto_muted = speed.should_auto_mute();
+
+        // Get current position as reference point for both decoders
+        let reference_pts = self.state.position().unwrap_or(0.0);
+
+        // Send command to decoders with synchronized timestamp and position
+        // Both video and audio decoders will use the same reference_pts for timing
+        if let Some(sender) = &self.command_sender {
+            let instant = std::time::Instant::now();
+            let _ = sender.send(DecoderCommand::SetPlaybackSpeed {
+                speed,
+                instant,
+                reference_pts,
+            });
+        }
+    }
+
+    /// Increases playback speed to the next preset.
+    /// Returns the new speed value.
+    pub fn increase_playback_speed(&mut self) -> f64 {
+        let new_speed = self.playback_speed.increase();
+        self.set_playback_speed(new_speed);
+        new_speed.value()
+    }
+
+    /// Decreases playback speed to the previous preset.
+    /// Returns the new speed value.
+    pub fn decrease_playback_speed(&mut self) -> f64 {
+        let new_speed = self.playback_speed.decrease();
+        self.set_playback_speed(new_speed);
+        new_speed.value()
     }
 
     /// Returns true if audio is available for this video.

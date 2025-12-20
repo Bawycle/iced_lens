@@ -122,6 +122,8 @@ video-capture-tooltip = Aktuelles Bild aufnehmen
 video-step-forward-tooltip = Ein Bild vorwärts (.)
 video-step-backward-tooltip = Ein Bild rückwärts (,)
 video-more-tooltip = Weitere Optionen
+video-speed-down-tooltip = Geschwindigkeit verringern (J)
+video-speed-up-tooltip = Geschwindigkeit erhöhen (L)
 settings-audio-normalization-label = Audio-Lautstärkenormalisierung
 settings-audio-normalization-enabled = Aktiviert
 settings-audio-normalization-disabled = Deaktiviert
@@ -212,6 +214,8 @@ help-video-key-seek = Rückwärts/Vorwärts suchen (während der Wiedergabe)
 help-video-key-volume = Lautstärke erhöhen/verringern
 help-video-key-step-back = Ein Bild zurück (wenn pausiert)
 help-video-key-step-forward = Ein Bild vor (wenn pausiert)
+help-video-key-speed-down = Wiedergabegeschwindigkeit verringern
+help-video-key-speed-up = Wiedergabegeschwindigkeit erhöhen
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Image Editor Section
@@ -253,6 +257,10 @@ help-editor-key-save = Aktuelle Änderungen speichern
 help-editor-key-undo = Letzte Änderung rückgängig machen
 help-editor-key-redo = Rückgängig gemachte Änderung wiederholen
 help-editor-key-cancel = Alle Änderungen abbrechen und beenden
+
+help-editor-mouse-title = Maussteuerung
+help-editor-mouse-wheel = Bild vergrößern oder verkleinern
+help-editor-mouse-drag = Bild verschieben wenn vergrößert
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Frame Capture Section
