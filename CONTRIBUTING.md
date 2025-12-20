@@ -258,6 +258,64 @@ All code should include appropriate tests:
 - Use proper error handling (avoid `unwrap()` on user-provided data)
 - Run `cargo audit` to check for vulnerable dependencies
 
+#### Newtype Pattern for Bounded Values
+
+IcedLens uses the **newtype pattern** for values that have valid ranges, ensuring type-safe validation at compile time.
+
+**When to use:**
+- Values that cross module boundaries (risk of misuse)
+- Multiple values of the same primitive type coexist (risk of confusion)
+- Valid range isn't obvious (e.g., 0.0–1.0 vs 0–100)
+- Value is frequently manipulated (not just stored)
+
+**Pattern:**
+```rust
+/// Volume level, guaranteed to be within 0.0–1.0.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Volume(f32);
+
+impl Volume {
+    /// Creates a new volume, clamping to valid range.
+    pub fn new(value: f32) -> Self {
+        Self(value.clamp(0.0, 1.0))
+    }
+
+    /// Returns the raw value.
+    pub fn value(self) -> f32 {
+        self.0
+    }
+
+    /// Domain-specific helpers
+    pub fn is_muted(self) -> bool {
+        self.0 < 0.001
+    }
+}
+
+impl Default for Volume {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
+```
+
+**Benefits:**
+- **Compile-time safety**: Impossible to pass out-of-range values
+- **Self-documenting**: Type name explains what the value represents
+- **Single source of truth**: Validation logic in one place
+- **Eliminates `.clamp()` calls**: Type guarantees validity
+
+**Existing newtypes:**
+| Type | Range | Location |
+|------|-------|----------|
+| `Volume` | 0.0–1.0 | `video_player/volume.rs` |
+| `PlaybackSpeed` | 0.1–8.0 | `video_player/playback_speed.rs` |
+| `ZoomPercent` | 10%–800% | `ui/state/zoom.rs` |
+| `ZoomStep` | 1%–200% | `ui/state/zoom.rs` |
+| `ResizeScale` | 10%–200% | `ui/image_editor/state/resize.rs` |
+| `AdjustmentPercent` | -100–+100 | `ui/image_editor/state/adjustment.rs` |
+
+**Location rule:** Domain types live in their domain module (not in `config/`). Constants stay in `config/defaults.rs`, types go where they're used.
+
 ### Development Workflow
 
 ```bash

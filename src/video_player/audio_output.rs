@@ -34,8 +34,8 @@ pub enum AudioOutputCommand {
     /// Used during seek to discard old audio without interrupting playback.
     ClearBuffer,
 
-    /// Set volume (0.0 to 1.0).
-    SetVolume(f32),
+    /// Set volume (guaranteed to be within 0.0–1.0 by Volume type).
+    SetVolume(super::Volume),
 
     /// Set mute state.
     SetMuted(bool),
@@ -181,8 +181,9 @@ impl AudioOutput {
                             buf.clear();
                         }
                     }
-                    AudioOutputCommand::SetVolume(vol) => {
-                        shared_for_task.set_volume(vol.clamp(0.0, 1.0));
+                    AudioOutputCommand::SetVolume(volume) => {
+                        // Volume type guarantees valid range, no clamp needed
+                        shared_for_task.set_volume(volume.value());
                     }
                     AudioOutputCommand::SetMuted(muted) => {
                         shared_for_task.set_muted(muted);
@@ -320,8 +321,8 @@ impl AudioOutput {
         self.send_command(AudioOutputCommand::ClearBuffer)
     }
 
-    /// Sets the volume (0.0 to 1.0).
-    pub fn set_volume(&self, volume: f32) -> Result<()> {
+    /// Sets the volume.
+    pub fn set_volume(&self, volume: super::Volume) -> Result<()> {
         self.send_command(AudioOutputCommand::SetVolume(volume))
     }
 
@@ -354,6 +355,7 @@ impl AudioOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::video_player::Volume;
 
     #[test]
     fn shared_state_volume_operations() {
@@ -393,7 +395,7 @@ mod tests {
 
     #[test]
     fn audio_output_command_debug() {
-        let cmd = AudioOutputCommand::SetVolume(0.5);
+        let cmd = AudioOutputCommand::SetVolume(Volume::new(0.5));
         let debug_str = format!("{:?}", cmd);
         assert!(debug_str.contains("SetVolume"));
     }

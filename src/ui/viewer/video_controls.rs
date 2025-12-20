@@ -8,6 +8,7 @@ use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{sizing, spacing};
 use crate::ui::{action_icons, icons, styles};
+use crate::video_player::Volume;
 use iced::widget::{
     button, column, container, row, slider, text, tooltip, Column, Row, Space, Text,
 };
@@ -35,8 +36,8 @@ pub enum Message {
     /// Used by keyboard shortcuts (e.g., arrow keys for ±5s).
     SeekRelative(f64),
 
-    /// Adjust volume (0.0 to 1.0).
-    SetVolume(f32),
+    /// Adjust volume (guaranteed to be within 0.0–1.0 by Volume type).
+    SetVolume(Volume),
 
     /// Toggle mute state.
     ToggleMute,
@@ -223,9 +224,11 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     .gap(4);
 
     // Volume slider (only shown when not muted)
-    let volume_slider = slider(0.0..=1.0, state.volume, Message::SetVolume)
-        .width(Length::Fixed(80.0))
-        .step(0.01);
+    let volume_slider = slider(0.0..=1.0, state.volume, |v| {
+        Message::SetVolume(Volume::new(v))
+    })
+    .width(Length::Fixed(80.0))
+    .step(0.01);
 
     // More button (overflow menu toggle)
     let more_button_base = button(icons::sized(icons::ellipsis_horizontal(), icon_size))

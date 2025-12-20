@@ -365,7 +365,11 @@ impl AsyncDecoder {
                 Ok(DecoderCommand::Stop) => {
                     break;
                 }
-                Ok(DecoderCommand::SetPlaybackSpeed { speed, instant, reference_pts }) => {
+                Ok(DecoderCommand::SetPlaybackSpeed {
+                    speed,
+                    instant,
+                    reference_pts,
+                }) => {
                     // PlaybackSpeed newtype guarantees valid range
                     playback_speed = speed.value();
                     // Use shared reference point for timing synchronization

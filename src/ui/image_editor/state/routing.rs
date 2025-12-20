@@ -257,7 +257,7 @@ impl State {
             return;
         }
 
-        let new_zoom = self.zoom.zoom_percent + steps * self.zoom.zoom_step_percent;
+        let new_zoom = self.zoom.zoom_percent + steps * self.zoom.zoom_step.value();
         self.zoom.apply_manual_zoom(new_zoom);
     }
 

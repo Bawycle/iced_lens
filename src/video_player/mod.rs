@@ -14,6 +14,7 @@ mod state;
 pub mod subscription;
 pub mod sync;
 pub mod time_units;
+mod volume;
 mod webp_decoder;
 
 pub use decoder::{AsyncDecoder, DecodedFrame, DecoderCommand, DecoderEvent};
@@ -26,6 +27,7 @@ pub use playback_speed::PlaybackSpeed;
 pub use state::{PlaybackState, VideoPlayer};
 pub use subscription::{video_playback, DecoderCommandSender, PlaybackMessage, VideoPlaybackId};
 pub use sync::{calculate_sync_action, SharedSyncClock, SyncAction, SyncClock};
+pub use volume::Volume;
 pub use webp_decoder::{WebpAnimDecoder, WebpMetadata};
 
 use crate::error::Result;

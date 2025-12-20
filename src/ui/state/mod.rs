@@ -11,4 +11,4 @@ pub mod zoom;
 // Re-export commonly used types for convenience
 pub use drag::DragState;
 pub use viewport::ViewportState;
-pub use zoom::ZoomState;
+pub use zoom::{ZoomPercent, ZoomState, ZoomStep};

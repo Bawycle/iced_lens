@@ -1039,7 +1039,7 @@ mod tests {
         assert!(zoom.fit_to_window);
         assert_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert_eq!(zoom.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));
-        assert_eq!(zoom.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
+        assert_eq!(zoom.zoom_step.value(), DEFAULT_ZOOM_STEP_PERCENT);
         assert_eq!(
             app.settings.background_theme(),
             config::BackgroundTheme::default()

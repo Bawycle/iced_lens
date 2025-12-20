@@ -174,7 +174,11 @@ impl WebpAnimDecoder {
                 Ok(DecoderCommand::Stop) => {
                     break;
                 }
-                Ok(DecoderCommand::SetPlaybackSpeed { speed, instant, reference_pts: _ }) => {
+                Ok(DecoderCommand::SetPlaybackSpeed {
+                    speed,
+                    instant,
+                    reference_pts: _,
+                }) => {
                     // PlaybackSpeed newtype guarantees valid range
                     playback_speed = speed.value();
                     // Reset timing references for smooth speed transition

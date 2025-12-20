@@ -50,13 +50,6 @@
   - **Impact**: +10-15s first build (resvg compilation), then fast (incremental)
   - **Files to modify**: `build.rs` (new), `src/ui/icons.rs`, `Cargo.toml` (build-dependencies)
 
-- [ ] **Newtype pattern audit**: Review codebase for values that should use newtypes for type-safety
-  - Example: `PlaybackSpeed` newtype ensures valid range (0.1x - 8.0x) at the type level
-  - Candidates to audit: zoom levels, volume, positions, durations, percentages
-  - Benefits: compile-time guarantees, single source of truth, self-documenting code
-  - Pattern: `struct Foo(f64)` with `new()` that validates/clamps and `value()` accessor
-  - **Location check**: Domain types should live in their domain module (e.g., `PlaybackSpeed` in `video_player/`), not in config. Config holds constants, not types.
-
 ## Notes
 
 - Test videos can be generated with `scripts/generate-test-videos.sh`

@@ -56,8 +56,8 @@ impl DecoderCommandSender {
             .map_err(|_| "Video decoder not running".to_string())
     }
 
-    /// Sets the audio volume (0.0 to 1.0).
-    pub fn set_volume(&self, volume: f32) -> Result<(), String> {
+    /// Sets the audio volume.
+    pub fn set_volume(&self, volume: super::Volume) -> Result<(), String> {
         if let Some(ref audio_tx) = self.audio_tx {
             audio_tx
                 .send(AudioDecoderCommand::SetVolume(volume))
