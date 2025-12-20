@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
+
+// Hide console window on Windows release builds
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use iced_lens::app::{self, Flags};
 
 /// Application run mode derived from CLI arguments.

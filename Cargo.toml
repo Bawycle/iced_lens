@@ -68,28 +68,3 @@ harness = false # Let Criterion manage the main function
 [[bench]]
 name = "media_navigation"
 harness = false
-
-# Configuration for cargo-bundle (macOS .app and Linux .deb packaging)
-# Install: cargo install cargo-bundle
-# Usage: cargo bundle --release
-[package.metadata.bundle]
-name = "IcedLens"
-identifier = "iced_lens"
-icon = [
-    "assets/branding/iced_lens.icns",
-    "assets/branding/iced_lens-16.png",
-    "assets/branding/iced_lens-32.png",
-    "assets/branding/iced_lens-48.png",
-    "assets/branding/iced_lens-64.png",
-    "assets/branding/iced_lens-128.png",
-    "assets/branding/iced_lens-256.png",
-    "assets/branding/iced_lens-512.png",
-]
-category = "public.app-category.photography"
-short_description = "Privacy-first media viewer and editor"
-long_description = """
-IcedLens is a privacy-first media viewer and editor with AI-powered
-deblurring. Built with the Iced GUI toolkit, it processes everything
-locally with no cloud, no tracking. Supports images, videos, and
-metadata editing.
-"""

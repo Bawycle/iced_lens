@@ -23,6 +23,8 @@ Built with the [Iced](https://iced.rs/) GUI toolkit.
 
 **Linux (AppImage):** Download from [Releases](https://codeberg.org/Bawycle/iced_lens/releases), make executable, run.
 
+**Windows:** Build from source, then use the Inno Setup script in `scripts/` to create an installer. See [User Guide](docs/USER_GUIDE.md#windows-installer).
+
 **Build from source:**
 
 ```bash
@@ -32,7 +34,7 @@ cargo build --release
 ./target/release/iced_lens /path/to/image.jpg
 ```
 
-**Build requirements:** Rust 1.92+, FFmpeg dev libraries, Clang. See [User Guide](docs/USER_GUIDE.md#requirements) for platform-specific details. macOS/Windows: untested, no binaries provided.
+**Build requirements:** Rust 1.92+, FFmpeg dev libraries, Clang. See [User Guide](docs/USER_GUIDE.md#requirements) for platform-specific details. macOS: untested, no binaries provided.
 
 ## Features
 
