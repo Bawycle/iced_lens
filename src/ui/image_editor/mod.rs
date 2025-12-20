@@ -7,7 +7,7 @@
 
 use crate::media::frame_export::ExportFormat;
 use crate::media::ImageData;
-use crate::ui::state::{ViewportState, ZoomState};
+use crate::ui::state::{DragState, ViewportState, ZoomState};
 
 mod component;
 mod messages;
@@ -82,6 +82,8 @@ pub struct State {
     pub zoom: ZoomState,
     /// Current cursor position (for zoom-on-scroll detection)
     cursor_position: Option<iced::Point>,
+    /// Drag state for pan navigation
+    drag: DragState,
 }
 
 impl std::fmt::Debug for State {

@@ -51,11 +51,17 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                 ));
             }
 
-            // Route mouse cursor events to editor for zoom cursor tracking
+            // Route mouse events to editor for cursor tracking and pan
             if matches!(
                 event,
                 event::Event::Mouse(iced::mouse::Event::CursorMoved { .. })
                     | event::Event::Mouse(iced::mouse::Event::CursorLeft)
+                    | event::Event::Mouse(iced::mouse::Event::ButtonPressed(
+                        iced::mouse::Button::Left
+                    ))
+                    | event::Event::Mouse(iced::mouse::Event::ButtonReleased(
+                        iced::mouse::Button::Left
+                    ))
             ) {
                 return Some(Message::ImageEditor(
                     crate::ui::image_editor::Message::RawEvent {

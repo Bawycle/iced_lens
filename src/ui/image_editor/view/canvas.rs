@@ -8,7 +8,10 @@ use crate::ui::design_tokens::{opacity, radius, spacing, typography};
 use crate::ui::theme;
 use crate::ui::widgets::AnimatedSpinner;
 use iced::alignment::Horizontal;
-use iced::widget::{container, image, responsive, text, Canvas, Column, Container, Stack};
+use iced::mouse;
+use iced::widget::{
+    container, image, mouse_area, responsive, text, Canvas, Column, Container, Stack,
+};
 use iced::{Background, Color, Element, Length, Padding, Size, Theme};
 
 use super::super::{
@@ -24,6 +27,10 @@ pub struct CanvasModel<'a> {
     pub deblur_state: &'a DeblurState,
     /// Zoom scale factor (1.0 = 100%)
     pub zoom_scale: f32,
+    /// Whether the user is currently dragging to pan
+    pub is_dragging: bool,
+    /// Whether crop tool is active (disables pan cursor)
+    pub crop_active: bool,
 }
 
 impl<'a> CanvasModel<'a> {
@@ -35,6 +42,8 @@ impl<'a> CanvasModel<'a> {
             resize_state: &state.resize_state,
             deblur_state: &state.deblur_state,
             zoom_scale: state.zoom.zoom_percent / 100.0,
+            is_dragging: state.is_dragging(),
+            crop_active: state.crop_state.overlay.visible,
         }
     }
 }
@@ -77,6 +86,10 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
     let resize_original_height = model.resize_state.overlay.original_height;
     let resize_width = model.resize_state.width;
     let resize_height = model.resize_state.height;
+
+    // Capture drag state for cursor interaction
+    let is_dragging = model.is_dragging;
+    let crop_active = model.crop_active;
 
     // Use responsive to get available size for centering
     let canvas_content = responsive(move |available_size: Size| {
@@ -172,9 +185,22 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
         scrollable_canvas::scrollable_canvas(centered_content.into(), scaled_width, scaled_height)
     });
 
+    // Determine cursor interaction for pan
+    // Show grab cursor when not in crop mode (crop has its own cursor handling)
+    let cursor_interaction = if crop_active {
+        mouse::Interaction::default()
+    } else if is_dragging {
+        mouse::Interaction::Grabbing
+    } else {
+        mouse::Interaction::Grab
+    };
+
+    // Wrap canvas in mouse_area for cursor feedback
+    let canvas_with_cursor = mouse_area(canvas_content).interaction(cursor_interaction);
+
     // Apply background
     let build_surface = || {
-        container(canvas_content)
+        container(canvas_with_cursor)
             .width(Length::Fill)
             .height(Length::Fill)
     };

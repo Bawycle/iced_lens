@@ -502,6 +502,14 @@ pub fn handle_editor_message(
             // The actual inference task will check this flag and stop
             Task::none()
         }
+        ImageEditorEvent::ScrollTo { x, y } => {
+            use iced::widget::scrollable::RelativeOffset;
+            use iced::widget::{operation, Id};
+            operation::snap_to(
+                Id::new("image-editor-canvas-scrollable"),
+                RelativeOffset { x, y },
+            )
+        }
     }
 }
 

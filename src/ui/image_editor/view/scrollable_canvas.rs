@@ -6,7 +6,8 @@ use iced::Element;
 
 use super::centered_scrollable;
 
-const EDITOR_CANVAS_SCROLLABLE_ID: &str = "image-editor-canvas-scrollable";
+/// Scrollable ID for the editor canvas (used for snap_to operations).
+pub const EDITOR_CANVAS_SCROLLABLE_ID: &str = "image-editor-canvas-scrollable";
 
 /// Creates a scrollable canvas for the editor.
 ///

@@ -133,4 +133,11 @@ pub enum Event {
     DeblurRequested,
     /// Request to cancel ongoing deblur operation
     DeblurCancelRequested,
+    /// Request to scroll the canvas to a relative position (for pan)
+    ScrollTo {
+        /// Relative X offset (0.0 to 1.0)
+        x: f32,
+        /// Relative Y offset (0.0 to 1.0)
+        y: f32,
+    },
 }
