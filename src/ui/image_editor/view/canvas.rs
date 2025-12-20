@@ -8,8 +8,8 @@ use crate::ui::design_tokens::{opacity, radius, spacing, typography};
 use crate::ui::theme;
 use crate::ui::widgets::AnimatedSpinner;
 use iced::alignment::Horizontal;
-use iced::widget::{container, image, text, Canvas, Column, Stack};
-use iced::{Background, Color, Element, Length, Theme};
+use iced::widget::{container, image, responsive, text, Canvas, Column, Container, Stack};
+use iced::{Background, Color, Element, Length, Padding, Size, Theme};
 
 use super::super::{
     overlay::{CropOverlayRenderer, ResizeOverlayRenderer},
@@ -39,110 +39,148 @@ impl<'a> CanvasModel<'a> {
     }
 }
 
+/// Calculate padding to center content within available space.
+fn calculate_centering_padding(content_size: Size, available: Size) -> Padding {
+    let horizontal = ((available.width - content_size.width) / 2.0).max(0.0);
+    let vertical = ((available.height - content_size.height) / 2.0).max(0.0);
+
+    Padding {
+        top: vertical,
+        right: horizontal,
+        bottom: vertical,
+        left: horizontal,
+    }
+}
+
 pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let current_display = model.display_image;
-    let img_width = current_display.width;
-    let img_height = current_display.height;
-
-    // Apply zoom scale to image dimensions
-    let scaled_width = (img_width as f32 * model.zoom_scale).round();
-    let scaled_height = (img_height as f32 * model.zoom_scale).round();
-
-    // Render image at zoomed size
-    let image_widget = image(current_display.handle.clone())
-        .width(Length::Fixed(scaled_width))
-        .height(Length::Fixed(scaled_height));
-
-    let image_with_overlay: Element<'a, Message> = if model.deblur_state.is_processing {
-        // Deblur processing overlay: animated spinner with text (consistent with media loading)
-        let spinner = AnimatedSpinner::new(
-            theme::overlay_arrow_light_color(),
-            model.deblur_state.spinner_rotation,
-        )
-        .into_element();
-
-        let loading_text =
-            text(ctx.i18n.tr("image-editor-deblur-processing")).size(typography::BODY_LG);
-
-        let loading_content = Column::new()
-            .spacing(spacing::SM)
-            .align_x(Horizontal::Center)
-            .push(spinner)
-            .push(loading_text);
-
-        let loading_overlay =
-            container(loading_content)
-                .padding(spacing::MD)
-                .style(move |_theme: &Theme| container::Style {
-                    background: Some(Background::Color(Color {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: opacity::OVERLAY_MEDIUM,
-                    })),
-                    border: iced::Border {
-                        radius: radius::MD.into(),
-                        ..Default::default()
-                    },
-                    text_color: Some(theme::overlay_arrow_light_color()),
-                    ..Default::default()
-                });
-
-        let overlay = container(loading_overlay)
-            .width(Length::Fixed(scaled_width))
-            .height(Length::Fixed(scaled_height))
-            .align_x(Horizontal::Center)
-            .align_y(iced::alignment::Vertical::Center);
-
-        Stack::new().push(image_widget).push(overlay).into()
-    } else if model.crop_state.overlay.visible {
-        Stack::new()
-            .push(image_widget)
-            .push(
-                Canvas::new(CropOverlayRenderer {
-                    crop_x: model.crop_state.x,
-                    crop_y: model.crop_state.y,
-                    crop_width: model.crop_state.width,
-                    crop_height: model.crop_state.height,
-                    img_width,
-                    img_height,
-                })
-                .width(Length::Fill)
-                .height(Length::Fill),
-            )
-            .into()
-    } else if model.resize_state.overlay.visible {
-        Stack::new()
-            .push(image_widget)
-            .push(
-                Canvas::new(ResizeOverlayRenderer {
-                    original_width: model.resize_state.overlay.original_width,
-                    original_height: model.resize_state.overlay.original_height,
-                    new_width: model.resize_state.width,
-                    new_height: model.resize_state.height,
-                })
-                .width(Length::Fill)
-                .height(Length::Fill),
-            )
-            .into()
-    } else {
-        image_widget.into()
-    };
-
     let background_theme = ctx.background_theme;
 
-    // Wrap image in scrollable canvas (centered for small, scrollable for large)
-    let scrollable =
-        scrollable_canvas::scrollable_canvas(image_with_overlay, scaled_width, scaled_height);
+    // Clone/copy values needed inside responsive closure
+    let image_handle = model.display_image.handle.clone();
+    let img_width = model.display_image.width;
+    let img_height = model.display_image.height;
+    let zoom_scale = model.zoom_scale;
 
-    let build_image_surface = || {
-        container(scrollable)
+    // Capture overlay state
+    let deblur_processing = model.deblur_state.is_processing;
+    let spinner_rotation = model.deblur_state.spinner_rotation;
+    let deblur_text = ctx.i18n.tr("image-editor-deblur-processing").to_string();
+
+    let crop_visible = model.crop_state.overlay.visible;
+    let crop_x = model.crop_state.x;
+    let crop_y = model.crop_state.y;
+    let crop_width = model.crop_state.width;
+    let crop_height = model.crop_state.height;
+
+    let resize_visible = model.resize_state.overlay.visible;
+    let resize_original_width = model.resize_state.overlay.original_width;
+    let resize_original_height = model.resize_state.overlay.original_height;
+    let resize_width = model.resize_state.width;
+    let resize_height = model.resize_state.height;
+
+    // Use responsive to get available size for centering
+    let canvas_content = responsive(move |available_size: Size| {
+        // Apply zoom scale to image dimensions
+        let scaled_width = (img_width as f32 * zoom_scale).round();
+        let scaled_height = (img_height as f32 * zoom_scale).round();
+        let scaled_size = Size::new(scaled_width, scaled_height);
+
+        // Calculate centering padding
+        let centering_padding = calculate_centering_padding(scaled_size, available_size);
+
+        // Render image at zoomed size
+        let image_widget = image(image_handle.clone())
+            .width(Length::Fixed(scaled_width))
+            .height(Length::Fixed(scaled_height));
+
+        let image_with_overlay: Element<'_, Message> = if deblur_processing {
+            // Deblur processing overlay
+            let spinner =
+                AnimatedSpinner::new(theme::overlay_arrow_light_color(), spinner_rotation)
+                    .into_element();
+
+            let loading_text = text(deblur_text.clone()).size(typography::BODY_LG);
+
+            let loading_content = Column::new()
+                .spacing(spacing::SM)
+                .align_x(Horizontal::Center)
+                .push(spinner)
+                .push(loading_text);
+
+            let loading_overlay =
+                container(loading_content)
+                    .padding(spacing::MD)
+                    .style(move |_theme: &Theme| container::Style {
+                        background: Some(Background::Color(Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: opacity::OVERLAY_MEDIUM,
+                        })),
+                        border: iced::Border {
+                            radius: radius::MD.into(),
+                            ..Default::default()
+                        },
+                        text_color: Some(theme::overlay_arrow_light_color()),
+                        ..Default::default()
+                    });
+
+            let overlay = container(loading_overlay)
+                .width(Length::Fixed(scaled_width))
+                .height(Length::Fixed(scaled_height))
+                .align_x(Horizontal::Center)
+                .align_y(iced::alignment::Vertical::Center);
+
+            Stack::new().push(image_widget).push(overlay).into()
+        } else if crop_visible {
+            Stack::new()
+                .push(image_widget)
+                .push(
+                    Canvas::new(CropOverlayRenderer {
+                        crop_x,
+                        crop_y,
+                        crop_width,
+                        crop_height,
+                        img_width,
+                        img_height,
+                    })
+                    .width(Length::Fill)
+                    .height(Length::Fill),
+                )
+                .into()
+        } else if resize_visible {
+            Stack::new()
+                .push(image_widget)
+                .push(
+                    Canvas::new(ResizeOverlayRenderer {
+                        original_width: resize_original_width,
+                        original_height: resize_original_height,
+                        new_width: resize_width,
+                        new_height: resize_height,
+                    })
+                    .width(Length::Fill)
+                    .height(Length::Fill),
+                )
+                .into()
+        } else {
+            image_widget.into()
+        };
+
+        // Wrap in container with centering padding, then in scrollable
+        let centered_content = Container::new(image_with_overlay).padding(centering_padding);
+
+        scrollable_canvas::scrollable_canvas(centered_content.into(), scaled_width, scaled_height)
+    });
+
+    // Apply background
+    let build_surface = || {
+        container(canvas_content)
             .width(Length::Fill)
             .height(Length::Fill)
     };
 
     if theme::is_checkerboard(background_theme) {
-        checkerboard::wrap(build_image_surface())
+        checkerboard::wrap(build_surface())
     } else {
         let bg_color = match background_theme {
             BackgroundTheme::Light => theme::viewer_light_surface_color(),
@@ -150,7 +188,7 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
             BackgroundTheme::Checkerboard => unreachable!(),
         };
 
-        build_image_surface()
+        build_surface()
             .style(theme::editor_canvas_style(bg_color))
             .into()
     }

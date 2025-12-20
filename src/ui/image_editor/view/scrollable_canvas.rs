@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Scrollable canvas widget for editor using custom centered widget.
+//! Scrollable canvas widget for editor.
 
 use crate::ui::image_editor::Message;
 use iced::Element;
@@ -8,9 +8,9 @@ use super::centered_scrollable;
 
 const EDITOR_CANVAS_SCROLLABLE_ID: &str = "image-editor-canvas-scrollable";
 
-/// Creates a scrollable canvas for the editor with automatic centering.
+/// Creates a scrollable canvas for the editor.
 ///
-/// Uses a custom widget that centers small images and adds scrollbars for large images.
+/// Wheel events are blocked to allow zoom via mouse wheel.
 pub fn scrollable_canvas<'a>(
     image_content: Element<'a, Message>,
     image_width: f32,
