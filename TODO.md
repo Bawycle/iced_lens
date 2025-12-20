@@ -16,13 +16,7 @@
 
 #### Metadata Sidebar
 - [ ] Allow text selection and copying in the metadata sidebar (blocked, pending native support in Iced 0.15.0)
-- [x] Add the ability to edit and add new EXIF metadata for images from the sidebar (Phase 1 - images only)
 - [ ] Add video metadata editing support (Phase 2 - future work)
-- [x] Add Dublin Core / XMP metadata support for images (Title, Creator, Description, Keywords, Copyright)
-
-### Image editor
-- [ ] Image centering in editor canvas — currently complex to implement
-- [x] Add an image deblurring tool based on the NAFNet AI model (implemented in v0.4.0)
 
 ### Help
 - [ ] Allow text selection and copying in the help screen (blocked, pending native support in Iced 0.15.0)
