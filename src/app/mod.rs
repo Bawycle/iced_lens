@@ -367,45 +367,9 @@ impl App {
     fn title(&self) -> String {
         let app_name = self.i18n.tr("window-title");
 
-        // Special handling for image editor screen
-        if self.screen == Screen::ImageEditor {
-            if let Some(editor) = &self.image_editor {
-                // Captured frame: show "New Image" without asterisk
-                // (it's a new document, not a modified existing file)
-                if editor.is_captured_frame() {
-                    let new_image = self.i18n.tr("new-image-title");
-                    return format!("{new_image} - {app_name}");
-                }
-
-                // Existing file: show filename with asterisk if unsaved changes
-                if let Some(path) = editor.image_path() {
-                    let file_name = path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("Unknown");
-
-                    return if editor.has_unsaved_changes() {
-                        format!("*{file_name} - {app_name}")
-                    } else {
-                        format!("{file_name} - {app_name}")
-                    };
-                }
-            }
-        }
-
-        // All other screens: try dc:title first, then fall back to filename
-        let display_title = self.get_media_display_title();
-
-        // Check for metadata editor unsaved changes
-        let metadata_has_changes = self
-            .metadata_editor_state
-            .as_ref()
-            .map(|editor| editor.has_changes())
-            .unwrap_or(false);
-
-        match display_title {
+        match self.get_display_title() {
             Some(title) => {
-                if metadata_has_changes {
+                if self.has_any_unsaved_changes() {
                     format!("*{title} - {app_name}")
                 } else {
                     format!("{title} - {app_name}")
@@ -415,10 +379,19 @@ impl App {
         }
     }
 
-    /// Gets the display title for the current media.
-    /// Prefers dc:title (Dublin Core) if available, falls back to filename.
-    fn get_media_display_title(&self) -> Option<String> {
-        // First, try to get dc:title from Dublin Core metadata
+    /// Gets the display title for the current context.
+    ///
+    /// Priority order:
+    /// 1. Captured frame → "New Image" (i18n)
+    /// 2. Dublin Core title (dc:title) from metadata
+    /// 3. Filename from media navigator
+    fn get_display_title(&self) -> Option<String> {
+        // Captured frame: use localized "New Image" title
+        if self.is_editing_captured_frame() {
+            return Some(self.i18n.tr("new-image-title"));
+        }
+
+        // Try dc:title from Dublin Core metadata
         if let Some(media::metadata::MediaMetadata::Image(image_meta)) =
             self.current_metadata.as_ref()
         {
@@ -429,12 +402,51 @@ impl App {
             }
         }
 
-        // Fall back to filename (use media_navigator as single source of truth)
+        // Fall back to filename (media_navigator as single source of truth)
         self.media_navigator.current_media_path().and_then(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
                 .map(String::from)
         })
+    }
+
+    /// Checks if currently editing a captured video frame (no source file).
+    fn is_editing_captured_frame(&self) -> bool {
+        self.image_editor
+            .as_ref()
+            .map(|e| e.is_captured_frame())
+            .unwrap_or(false)
+    }
+
+    /// Checks if any domain has unsaved changes.
+    ///
+    /// Aggregates unsaved state from:
+    /// - Image editor (transformations)
+    /// - Metadata editor (metadata changes)
+    ///
+    /// Note: Captured frames never show the unsaved indicator since they
+    /// are conceptually new documents, not modified existing files.
+    fn has_any_unsaved_changes(&self) -> bool {
+        // Captured frames don't show unsaved indicator
+        if self.is_editing_captured_frame() {
+            return false;
+        }
+
+        // Check image editor
+        let image_editor_changes = self
+            .image_editor
+            .as_ref()
+            .map(|e| e.has_unsaved_changes())
+            .unwrap_or(false);
+
+        // Check metadata editor
+        let metadata_editor_changes = self
+            .metadata_editor_state
+            .as_ref()
+            .map(|e| e.has_changes())
+            .unwrap_or(false);
+
+        image_editor_changes || metadata_editor_changes
     }
 
     fn theme(&self) -> Theme {
