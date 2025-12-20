@@ -152,6 +152,7 @@ fn save_png(pixmap: &tiny_skia::Pixmap, path: &Path) {
 /// Determines if an icon needs a light (white) variant.
 ///
 /// Light variants are used for:
+/// - Toolbar buttons (white icons on dark button backgrounds)
 /// - Dark theme UI elements
 /// - Overlays on dark backgrounds (video HUD, notifications)
 fn needs_light_variant(name: &str) -> bool {
@@ -166,10 +167,26 @@ fn needs_light_variant(name: &str) -> bool {
             | "pencil"
             | "triangle_minus"
             | "triangle_plus"
-            // Video overlay
+            // Video toolbar
             | "play"
             | "pause"
             | "loop"
+            | "volume"
+            | "volume_mute"
+            | "triangle_bar_left"
+            | "triangle_bar_right"
+            | "camera"
+            | "ellipsis_horizontal"
+            // Navbar
+            | "hamburger"
+            // Viewer toolbar
+            | "zoom_in"
+            | "zoom_out"
+            | "refresh"
+            | "compress"
+            | "expand"
+            | "fullscreen"
+            | "trash"
             // HUD indicators
             | "crosshair"
             | "magnifier"
@@ -177,5 +194,6 @@ fn needs_light_variant(name: &str) -> bool {
             | "video_camera_audio"
             // Notifications
             | "warning"
+            | "checkmark"
     )
 }

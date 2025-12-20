@@ -322,10 +322,13 @@ define_icon!(
 );
 
 // =============================================================================
-// Light Icons (White variants for dark theme UI)
+// Light Icons (White variants for toolbars and dark theme UI)
 // =============================================================================
 
-/// Light icon variants for use with dark theme (white icons on dark backgrounds).
+/// Light icon variants (white) for toolbar buttons and dark theme UI.
+///
+/// These icons provide better contrast on dark button backgrounds.
+/// Access via [`action_icons`](super::action_icons) for semantic usage.
 pub mod light {
     use super::*;
 
@@ -370,6 +373,117 @@ pub mod light {
         light,
         "triangle_plus.png",
         "Triangle with plus (white): for dark theme UI."
+    );
+
+    // Navbar icons
+    define_icon!(
+        hamburger,
+        light,
+        "hamburger.png",
+        "Hamburger menu icon (white): for navbar."
+    );
+
+    // Video toolbar icons
+    define_icon!(play, light, "play.png", "Play icon (white): for toolbar.");
+    define_icon!(
+        pause,
+        light,
+        "pause.png",
+        "Pause icon (white): for toolbar."
+    );
+    define_icon!(
+        loop_icon,
+        light,
+        "loop.png",
+        "Loop icon (white): for toolbar."
+    );
+    define_icon!(
+        volume,
+        light,
+        "volume.png",
+        "Volume icon (white): for toolbar."
+    );
+    define_icon!(
+        volume_mute,
+        light,
+        "volume_mute.png",
+        "Volume mute icon (white): for toolbar."
+    );
+    define_icon!(
+        triangle_bar_left,
+        light,
+        "triangle_bar_left.png",
+        "Step backward icon (white): for toolbar."
+    );
+    define_icon!(
+        triangle_bar_right,
+        light,
+        "triangle_bar_right.png",
+        "Step forward icon (white): for toolbar."
+    );
+    define_icon!(
+        camera,
+        light,
+        "camera.png",
+        "Camera icon (white): for toolbar."
+    );
+    define_icon!(
+        ellipsis_horizontal,
+        light,
+        "ellipsis_horizontal.png",
+        "More options icon (white): for toolbar."
+    );
+
+    // Viewer toolbar icons
+    define_icon!(
+        zoom_in,
+        light,
+        "zoom_in.png",
+        "Zoom in icon (white): for toolbar."
+    );
+    define_icon!(
+        zoom_out,
+        light,
+        "zoom_out.png",
+        "Zoom out icon (white): for toolbar."
+    );
+    define_icon!(
+        refresh,
+        light,
+        "refresh.png",
+        "Refresh/reset icon (white): for toolbar."
+    );
+    define_icon!(
+        compress,
+        light,
+        "compress.png",
+        "Fit to window icon (white): for toolbar."
+    );
+    define_icon!(
+        expand,
+        light,
+        "expand.png",
+        "Expand icon (white): for toolbar."
+    );
+    define_icon!(
+        fullscreen,
+        light,
+        "fullscreen.png",
+        "Fullscreen icon (white): for toolbar."
+    );
+    define_icon!(
+        trash,
+        light,
+        "trash.png",
+        "Delete icon (white): for toolbar."
+    );
+
+    // Notification icons
+    define_icon!(
+        checkmark,
+        light,
+        "checkmark.png",
+        "Checkmark icon (white): for notifications."
     );
 }
 
@@ -521,11 +635,36 @@ mod tests {
 
     #[test]
     fn light_icons_load_successfully() {
+        // Navigation
         let _ = light::chevron_double_right();
         let _ = light::chevron_double_left();
         let _ = light::chevron_right();
         let _ = light::chevron_left();
         let _ = light::pencil();
+        let _ = light::triangle_minus();
+        let _ = light::triangle_plus();
+        // Navbar
+        let _ = light::hamburger();
+        // Video toolbar
+        let _ = light::play();
+        let _ = light::pause();
+        let _ = light::loop_icon();
+        let _ = light::volume();
+        let _ = light::volume_mute();
+        let _ = light::triangle_bar_left();
+        let _ = light::triangle_bar_right();
+        let _ = light::camera();
+        let _ = light::ellipsis_horizontal();
+        // Viewer toolbar
+        let _ = light::zoom_in();
+        let _ = light::zoom_out();
+        let _ = light::refresh();
+        let _ = light::compress();
+        let _ = light::expand();
+        let _ = light::fullscreen();
+        let _ = light::trash();
+        // Notifications
+        let _ = light::checkmark();
     }
 
     #[test]

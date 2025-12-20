@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Crop handles are now larger for better accessibility (WCAG 2.5.5 compliant).
 - Images are now centered in the editor canvas when smaller than the viewport.
+- Toolbar buttons now use light (white) icons for better contrast on dark button backgrounds.
 
 ### Fixed
 - Navigation overlay buttons no longer display rendering artifacts on Windows.

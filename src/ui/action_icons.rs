@@ -13,20 +13,36 @@
 //! ├─────────────────────────────────────────┤
 //! │         action_icons (this module)      │  ← Semantic → Visual mapping
 //! ├─────────────────────────────────────────┤
-//! │         icons (visual primitives)       │  ← Raw SVG assets
+//! │         icons (visual primitives)       │  ← Raw PNG assets
 //! └─────────────────────────────────────────┘
 //! ```
+//!
+//! # Module Structure
+//!
+//! Each domain module provides dark icons by default (for help screens, sidebars).
+//! Toolbar sub-modules provide light icons for button backgrounds:
+//!
+//! - **`video::*`** - Dark icons for video playback actions
+//! - **`video::toolbar::*`** - Light icons for video toolbar buttons
+//! - **`viewer::*`** - Dark icons for viewer actions
+//! - **`viewer::toolbar::*`** - Light icons for viewer toolbar buttons
+//! - **`editor::*`** - Dark icons for image editor actions
+//! - **`navigation::*`** - Navigation icons (light for buttons, theme-aware for panels)
+//! - **`notification::*`** - Icons for toast notifications
+//! - **`sections::*`** - Icons for help screen section headers
 //!
 //! # Usage
 //!
 //! ```ignore
 //! use crate::ui::action_icons;
 //!
-//! // In UI components
-//! let btn = button(action_icons::video::capture_frame());
+//! // In toolbar buttons (light icons for dark button backgrounds)
+//! let btn = button(action_icons::video::toolbar::play());
+//! let btn = button(action_icons::viewer::toolbar::zoom_in());
 //!
-//! // In help screen
+//! // In help screen or sidebars (dark icons)
 //! let icon = action_icons::editor::rotate_left();
+//! let icon = action_icons::video::capture_frame();
 //! ```
 //!
 //! # Naming Convention
@@ -99,6 +115,66 @@ pub mod video {
     /// Increase playback speed.
     pub fn speed_up() -> Image<Handle> {
         icons::triangle_plus()
+    }
+
+    /// Light icon variants for toolbar buttons.
+    pub mod toolbar {
+        use super::*;
+
+        /// Play video (light icon for toolbar).
+        pub fn play() -> Image<Handle> {
+            icons::light::play()
+        }
+
+        /// Pause video (light icon for toolbar).
+        pub fn pause() -> Image<Handle> {
+            icons::light::pause()
+        }
+
+        /// Step forward one frame (light icon for toolbar).
+        pub fn step_forward() -> Image<Handle> {
+            icons::light::triangle_bar_right()
+        }
+
+        /// Step backward one frame (light icon for toolbar).
+        pub fn step_backward() -> Image<Handle> {
+            icons::light::triangle_bar_left()
+        }
+
+        /// Capture current frame (light icon for toolbar).
+        pub fn capture_frame() -> Image<Handle> {
+            icons::light::camera()
+        }
+
+        /// Toggle loop playback (light icon for toolbar).
+        pub fn toggle_loop() -> Image<Handle> {
+            icons::light::loop_icon()
+        }
+
+        /// Volume control (light icon for toolbar).
+        pub fn volume() -> Image<Handle> {
+            icons::light::volume()
+        }
+
+        /// Volume muted (light icon for toolbar).
+        pub fn volume_muted() -> Image<Handle> {
+            icons::light::volume_mute()
+        }
+
+        /// More options (light icon for toolbar).
+        pub fn more_options() -> Image<Handle> {
+            icons::light::ellipsis_horizontal()
+        }
+
+        /// Decrease playback speed (light icon for toolbar).
+        pub fn speed_down() -> Image<Handle> {
+            icons::light::triangle_minus()
+        }
+
+        /// Increase playback speed (light icon for toolbar).
+        pub fn speed_up() -> Image<Handle> {
+            icons::light::triangle_plus()
+        }
     }
 }
 
@@ -173,6 +249,46 @@ pub mod viewer {
     pub fn delete() -> Image<Handle> {
         icons::trash()
     }
+
+    /// Light icon variants for toolbar buttons.
+    pub mod toolbar {
+        use super::*;
+
+        /// Zoom in (light icon for toolbar).
+        pub fn zoom_in() -> Image<Handle> {
+            icons::light::zoom_in()
+        }
+
+        /// Zoom out (light icon for toolbar).
+        pub fn zoom_out() -> Image<Handle> {
+            icons::light::zoom_out()
+        }
+
+        /// Reset zoom (light icon for toolbar).
+        pub fn zoom_reset() -> Image<Handle> {
+            icons::light::refresh()
+        }
+
+        /// Fit to window (light icon for toolbar).
+        pub fn fit_to_window() -> Image<Handle> {
+            icons::light::compress()
+        }
+
+        /// Expand (light icon for toolbar).
+        pub fn expand() -> Image<Handle> {
+            icons::light::expand()
+        }
+
+        /// Fullscreen (light icon for toolbar).
+        pub fn fullscreen() -> Image<Handle> {
+            icons::light::fullscreen()
+        }
+
+        /// Delete (light icon for toolbar).
+        pub fn delete() -> Image<Handle> {
+            icons::light::trash()
+        }
+    }
 }
 
 // =============================================================================
@@ -183,9 +299,9 @@ pub mod viewer {
 pub mod navigation {
     use super::*;
 
-    /// Open hamburger menu.
+    /// Open hamburger menu (light icon for navbar button).
     pub fn menu() -> Image<Handle> {
-        icons::hamburger()
+        icons::light::hamburger()
     }
 
     /// Open settings.
@@ -443,5 +559,31 @@ mod tests {
         let _ = sections::video();
         let _ = sections::capture();
         let _ = sections::editor();
+    }
+
+    #[test]
+    fn video_toolbar_icons_load() {
+        let _ = video::toolbar::play();
+        let _ = video::toolbar::pause();
+        let _ = video::toolbar::step_forward();
+        let _ = video::toolbar::step_backward();
+        let _ = video::toolbar::capture_frame();
+        let _ = video::toolbar::toggle_loop();
+        let _ = video::toolbar::volume();
+        let _ = video::toolbar::volume_muted();
+        let _ = video::toolbar::more_options();
+        let _ = video::toolbar::speed_down();
+        let _ = video::toolbar::speed_up();
+    }
+
+    #[test]
+    fn viewer_toolbar_icons_load() {
+        let _ = viewer::toolbar::zoom_in();
+        let _ = viewer::toolbar::zoom_out();
+        let _ = viewer::toolbar::zoom_reset();
+        let _ = viewer::toolbar::fit_to_window();
+        let _ = viewer::toolbar::expand();
+        let _ = viewer::toolbar::fullscreen();
+        let _ = viewer::toolbar::delete();
     }
 }
