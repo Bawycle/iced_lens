@@ -55,6 +55,52 @@
 
 ## Code Quality / Refactoring
 
+### Newtype Pattern for Bounded Config Values
+- [ ] Refactor bounded configuration values to use the Newtype pattern for compile-time safety
+
+**Rationale:**
+- Currently, bounded values use `clamp()` at multiple points (config loading, settings state)
+- No compile-time guarantee that values are within valid range
+- Risk of mixing up different `u32` values (e.g., `frame_cache_mb` vs `max_skip_attempts`)
+
+**Values to refactor:**
+
+| Current | Newtype | Range |
+|---------|---------|-------|
+| `max_skip_attempts: u32` | `MaxSkipAttempts` | 1-20 |
+| `frame_cache_mb: u32` | `FrameCacheMb` | MIN-MAX |
+| `frame_history_mb: u32` | `FrameHistoryMb` | MIN-MAX |
+| `overlay_timeout_secs: u32` | `OverlayTimeoutSecs` | MIN-MAX |
+| `keyboard_seek_step_secs: f64` | `KeyboardSeekStep` | MIN-MAX |
+| `zoom_step_percent: f32` | `ZoomStepPercent` | MIN-MAX |
+
+**Implementation approach:**
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct MaxSkipAttempts(u32);
+
+impl MaxSkipAttempts {
+    pub const MIN: u32 = 1;
+    pub const MAX: u32 = 20;
+    pub const DEFAULT: Self = Self(5);
+
+    pub fn new(value: u32) -> Self {
+        Self(value.clamp(Self::MIN, Self::MAX))
+    }
+
+    pub fn get(self) -> u32 {
+        self.0
+    }
+}
+```
+
+**Benefits:**
+- Invariant enforced by type system
+- Single source of truth for validation
+- Self-documenting code
+- Prevents accidental value mix-ups
+
 ## Notes
 
 - Test videos can be generated with `scripts/generate-test-videos.sh`
