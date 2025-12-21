@@ -118,9 +118,9 @@ impl State {
         }
     }
 
-    /// Returns the subscriptions needed for the editor (spinner animation during deblur).
+    /// Returns the subscriptions needed for the editor (spinner animation during AI processing).
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        if self.deblur_state.is_processing {
+        if self.deblur_state.is_processing || self.resize_state.is_upscale_processing {
             // Animate spinner at 60 FPS while processing
             iced::time::every(std::time::Duration::from_millis(16)).map(|_| Message::SpinnerTick)
         } else {

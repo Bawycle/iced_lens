@@ -221,9 +221,9 @@ impl Default for FullscreenConfig {
 
 /// AI/Machine Learning settings.
 ///
-/// Note: The `enable_deblur` state is stored in persistent application state,
-/// not in configuration, as it's managed by the application (download/validation)
-/// rather than being a user preference.
+/// Note: The `enable_deblur` and `enable_upscale` states are stored in persistent
+/// application state, not in configuration, as they are managed by the application
+/// (download/validation) rather than being user preferences.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AiConfig {
     /// URL for downloading the NAFNet ONNX model.
@@ -232,12 +232,20 @@ pub struct AiConfig {
         skip_serializing_if = "Option::is_none"
     )]
     pub deblur_model_url: Option<String>,
+
+    /// URL for downloading the Real-ESRGAN ONNX model.
+    #[serde(
+        default = "default_upscale_model_url",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub upscale_model_url: Option<String>,
 }
 
 impl Default for AiConfig {
     fn default() -> Self {
         Self {
             deblur_model_url: default_deblur_model_url(),
+            upscale_model_url: default_upscale_model_url(),
         }
     }
 }
@@ -385,6 +393,10 @@ fn default_overlay_timeout_secs() -> Option<u32> {
 
 fn default_deblur_model_url() -> Option<String> {
     Some(DEFAULT_DEBLUR_MODEL_URL.to_string())
+}
+
+fn default_upscale_model_url() -> Option<String> {
+    Some(DEFAULT_UPSCALE_MODEL_URL.to_string())
 }
 
 fn deserialize_theme_mode<'de, D>(deserializer: D) -> std::result::Result<ThemeMode, D::Error>

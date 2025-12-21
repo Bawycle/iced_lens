@@ -28,9 +28,15 @@ pub enum SidebarMessage {
     ScaleChanged(f32),
     WidthInputChanged(String),
     HeightInputChanged(String),
+    /// Width input submitted (Enter key or focus lost)
+    WidthInputSubmitted,
+    /// Height input submitted (Enter key or focus lost)
+    HeightInputSubmitted,
     ToggleLockAspect,
     ApplyResizePreset(f32),
     ApplyResize,
+    /// Toggle AI upscaling for resize enlargements
+    ToggleAiUpscale,
     /// Brightness slider changed (live preview)
     BrightnessChanged(i32),
     /// Contrast slider changed (live preview)
@@ -133,6 +139,13 @@ pub enum Event {
     DeblurRequested,
     /// Request to cancel ongoing deblur operation
     DeblurCancelRequested,
+    /// Request to resize the image (scale > 100%, may use AI upscaling if available)
+    UpscaleResizeRequested {
+        /// Target width in pixels.
+        width: u32,
+        /// Target height in pixels.
+        height: u32,
+    },
     /// Request to scroll the canvas to a relative position (for pan)
     ScrollTo {
         /// Relative X offset (0.0 to 1.0)

@@ -90,6 +90,12 @@ image-editor-resize-lock-aspect = Bloquear relación de aspecto
 image-editor-resize-presets-label = Ajustes predefinidos
 image-editor-resize-apply = Aplicar redimensionamiento
 image-editor-resize-preview-label = Vista previa
+image-editor-resize-ai-upscale = Escalado IA (Real-ESRGAN)
+image-editor-resize-ai-model-not-downloaded = Modelo IA no descargado
+image-editor-resize-ai-model-downloading = Descargando modelo IA
+image-editor-resize-ai-model-validating = Validando modelo IA
+image-editor-resize-ai-model-error = Error del modelo IA
+image-editor-resize-ai-enlargement-only = El upscaling IA solo se aplica a ampliaciones
 image-editor-light-section-title = Ajustes de luz
 image-editor-light-brightness-label = Brillo
 image-editor-light-contrast-label = Contraste
@@ -238,10 +244,11 @@ help-editor-crop-usage = Arrastre los manipuladores para ajustar la selección, 
 
 help-editor-resize-title = Redimensionar
 help-editor-resize-desc = Cambie las dimensiones de la imagen para hacerla más grande o más pequeña.
-help-editor-resize-scale = Escalar por porcentaje (ej. 50% para reducir a la mitad el tamaño)
+help-editor-resize-scale = Escalar por porcentaje (10% a 400%)
 help-editor-resize-dimensions = Ingrese ancho y alto exactos en píxeles
 help-editor-resize-lock = Bloquear relación de aspecto para mantener las proporciones
-help-editor-resize-presets = Use ajustes predefinidos para tamaños comunes (HD, Full HD, 4K...)
+help-editor-resize-presets = Use preajustes para escalar rápidamente (25%, 50%, 200%, etc.)
+help-editor-resize-ai-upscale = Ampliación IA: Use Real-ESRGAN para ampliaciones más nítidas (activar en Configuración)
 
 help-editor-light-title = Luz
 help-editor-light-desc = Ajuste finamente el brillo y el contraste de su imagen.
@@ -449,12 +456,28 @@ settings-deblur-status-not-downloaded = Modelo no descargado
 settings-deblur-enabled = Habilitado
 settings-deblur-disabled = Deshabilitado
 
+# Configuración de escalado IA
+settings-enable-upscale-label = Escalado IA
+settings-enable-upscale-hint = Habilitar el escalado de imágenes con IA usando el modelo Real-ESRGAN 4x (~64 MB de descarga).
+settings-upscale-model-url-label = URL del modelo
+settings-upscale-model-url-placeholder = https://huggingface.co/...
+settings-upscale-model-url-hint = URL para descargar el modelo Real-ESRGAN ONNX.
+settings-upscale-status-label = Estado del modelo
+settings-upscale-status-downloading = Descargando modelo ({ $progress }%)...
+settings-upscale-status-validating = Validando modelo...
+settings-upscale-status-ready = Modelo listo
+settings-upscale-status-error = Error: { $message }
+settings-upscale-status-not-downloaded = Modelo no descargado
+settings-upscale-enabled = Habilitado
+settings-upscale-disabled = Deshabilitado
+
 # Herramienta de desenfoque del editor
 image-editor-tool-deblur = Desenfoque IA
 image-editor-deblur-lossless-warning = Para mejor calidad, exportar como WebP sin pérdida o PNG.
 image-editor-deblur-apply = Aplicar desenfoque
 image-editor-deblur-processing = Procesando
 image-editor-deblur-cancel = Cancelar
+image-editor-upscale-processing = Escalado IA en proceso...
 image-editor-deblur-model-not-ready = Habilita primero el desenfoque IA en Configuración
 image-editor-deblur-validating = Validando modelo, por favor espera...
 image-editor-deblur-downloading = Descargando modelo ({ $progress }%)...
@@ -476,3 +499,10 @@ notification-deblur-validation-error = Error en la validación del modelo: { $er
 notification-deblur-ready = El desenfoque IA está listo para usar
 notification-deblur-apply-success = Imagen desenfocada exitosamente
 notification-deblur-apply-error = Error al desenfocar: { $error }
+
+# Notificaciones de escalado IA
+notification-upscale-ready = El escalado IA está listo para usar
+notification-upscale-download-error = Error al descargar el modelo de escalado: { $error }
+notification-upscale-validation-error = Error en la validación del modelo: { $error }
+notification-upscale-resize-success = Imagen redimensionada con escalado IA
+notification-upscale-resize-error = Error en el escalado IA: { $error }

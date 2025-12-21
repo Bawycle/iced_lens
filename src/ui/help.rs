@@ -460,7 +460,8 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(build_bullet(ctx.i18n.tr("help-editor-resize-scale")))
         .push(build_bullet(ctx.i18n.tr("help-editor-resize-dimensions")))
         .push(build_bullet(ctx.i18n.tr("help-editor-resize-lock")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-resize-presets")));
+        .push(build_bullet(ctx.i18n.tr("help-editor-resize-presets")))
+        .push(build_bullet(ctx.i18n.tr("help-editor-resize-ai-upscale")));
 
     // Light tool (brightness/contrast)
     let light_title = build_tool_title(ctx.i18n.tr("help-editor-light-title"));

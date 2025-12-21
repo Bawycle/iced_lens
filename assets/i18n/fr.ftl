@@ -90,6 +90,12 @@ image-editor-resize-lock-aspect = Conserver les proportions
 image-editor-resize-presets-label = Préréglages
 image-editor-resize-apply = Appliquer le redimensionnement
 image-editor-resize-preview-label = Aperçu
+image-editor-resize-ai-upscale = Upscaling IA (Real-ESRGAN)
+image-editor-resize-ai-model-not-downloaded = Modèle IA non téléchargé
+image-editor-resize-ai-model-downloading = Téléchargement du modèle IA
+image-editor-resize-ai-model-validating = Validation du modèle IA
+image-editor-resize-ai-model-error = Erreur du modèle IA
+image-editor-resize-ai-enlargement-only = L'upscaling IA ne s'applique qu'aux agrandissements
 image-editor-light-section-title = Ajustements de lumière
 image-editor-light-brightness-label = Luminosité
 image-editor-light-contrast-label = Contraste
@@ -238,10 +244,11 @@ help-editor-crop-usage = Faites glisser les poignées pour ajuster la sélection
 
 help-editor-resize-title = Redimensionnement
 help-editor-resize-desc = Modifiez les dimensions de l'image pour l'agrandir ou la réduire.
-help-editor-resize-scale = Échelle en pourcentage (ex. 50% pour réduire de moitié)
+help-editor-resize-scale = Échelle en pourcentage (10% à 400%)
 help-editor-resize-dimensions = Entrez la largeur et la hauteur exactes en pixels
 help-editor-resize-lock = Verrouillez le ratio pour conserver les proportions
-help-editor-resize-presets = Utilisez les préréglages pour les tailles courantes (HD, Full HD, 4K...)
+help-editor-resize-presets = Utilisez les préréglages pour un redimensionnement rapide (25%, 50%, 200%, etc.)
+help-editor-resize-ai-upscale = Upscaling IA : Utilisez Real-ESRGAN pour des agrandissements plus nets (activer dans Paramètres)
 
 help-editor-light-title = Lumière
 help-editor-light-desc = Ajustez la luminosité et le contraste de votre image.
@@ -449,12 +456,28 @@ settings-deblur-status-not-downloaded = Modèle non téléchargé
 settings-deblur-enabled = Activé
 settings-deblur-disabled = Désactivé
 
+# Paramètres upscale IA
+settings-enable-upscale-label = Agrandissement IA
+settings-enable-upscale-hint = Activer l'agrandissement d'images par IA avec le modèle Real-ESRGAN 4x (~64 Mo à télécharger).
+settings-upscale-model-url-label = URL du modèle
+settings-upscale-model-url-placeholder = https://huggingface.co/...
+settings-upscale-model-url-hint = URL pour télécharger le modèle Real-ESRGAN ONNX.
+settings-upscale-status-label = État du modèle
+settings-upscale-status-downloading = Téléchargement du modèle ({ $progress }%)...
+settings-upscale-status-validating = Validation du modèle...
+settings-upscale-status-ready = Modèle prêt
+settings-upscale-status-error = Erreur : { $message }
+settings-upscale-status-not-downloaded = Modèle non téléchargé
+settings-upscale-enabled = Activé
+settings-upscale-disabled = Désactivé
+
 # Outil défloutage de l'éditeur
 image-editor-tool-deblur = Défloutage IA
 image-editor-deblur-lossless-warning = Pour une meilleure qualité, exportez en WebP sans perte ou PNG.
 image-editor-deblur-apply = Appliquer le défloutage
 image-editor-deblur-processing = Traitement en cours
 image-editor-deblur-cancel = Annuler
+image-editor-upscale-processing = Agrandissement IA en cours...
 image-editor-deblur-model-not-ready = Activez d'abord le défloutage IA dans les paramètres
 image-editor-deblur-validating = Validation du modèle en cours...
 image-editor-deblur-downloading = Téléchargement du modèle ({ $progress }%)...
@@ -476,3 +499,10 @@ notification-deblur-validation-error = Échec de la validation du modèle : { $e
 notification-deblur-ready = Le défloutage IA est prêt à l'emploi
 notification-deblur-apply-success = Image défloutée avec succès
 notification-deblur-apply-error = Échec du défloutage : { $error }
+
+# Notifications upscale IA
+notification-upscale-ready = L'agrandissement IA est prêt à l'emploi
+notification-upscale-download-error = Échec du téléchargement du modèle upscale : { $error }
+notification-upscale-validation-error = Échec de la validation du modèle : { $error }
+notification-upscale-resize-success = Image redimensionnée avec l'agrandissement IA
+notification-upscale-resize-error = Échec de l'agrandissement IA : { $error }

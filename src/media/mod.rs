@@ -11,6 +11,7 @@ pub mod image_transform;
 pub mod metadata;
 pub mod metadata_writer;
 pub mod navigator;
+pub mod upscale;
 pub mod video;
 pub mod xmp;
 
@@ -21,6 +22,7 @@ use std::path::Path;
 
 // Re-export commonly used types
 pub use image::{load_image, ImageData, SUPPORTED_EXTENSIONS as IMAGE_EXTENSIONS};
+pub use image_transform::ResizeScale;
 pub use navigator::{ImageNavigator, MediaNavigator};
 
 /// Represents different types of media formats

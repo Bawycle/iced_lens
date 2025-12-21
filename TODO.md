@@ -14,19 +14,7 @@
 - [ ] Allow text selection and copying in the metadata sidebar (blocked, pending native support in Iced 0.15.0)
 - [ ] Add video metadata editing support (Phase 2 - future work)
 
-### Image Editor
-- [ ] AI-powered image upscaling using Real-ESRGAN when enlarging images (scale > 100%)
-  - Optional feature like deblur: enable in Settings → AI / Machine Learning
-  - Model downloaded on first use (~64 MB for x4plus)
-  - Reuse existing ONNX infrastructure (ort, download with checksum verification)
-  - Fixed scale factors (x2, x4) → combine with classic resize for intermediate values
-
 ### Video Player
-- [ ] Allow volume amplification above 100% (like VLC)
-  - Extend `Volume` newtype max from 1.0 to ~1.5 or 2.0
-  - Audio samples are already multiplied in `audio_output.rs`, just needs higher factor
-  - Clipping is acceptable (no hardware risk, just distortion)
-  - UI: visually distinguish the > 100% zone on the slider
 
 ### Help
 - [ ] Allow text selection and copying in the help screen (blocked, pending native support in Iced 0.15.0)

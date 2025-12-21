@@ -307,11 +307,11 @@ impl Default for Volume {
 **Existing newtypes:**
 | Type | Range | Location |
 |------|-------|----------|
-| `Volume` | 0.0–1.0 | `video_player/volume.rs` |
+| `Volume` | 0.0–1.5 | `video_player/volume.rs` |
 | `PlaybackSpeed` | 0.1–8.0 | `video_player/playback_speed.rs` |
 | `ZoomPercent` | 10%–800% | `ui/state/zoom.rs` |
 | `ZoomStep` | 1%–200% | `ui/state/zoom.rs` |
-| `ResizeScale` | 10%–200% | `ui/image_editor/state/resize.rs` |
+| `ResizeScale` | 10%–400% | `media/image_transform.rs` |
 | `AdjustmentPercent` | -100–+100 | `ui/image_editor/state/adjustment.rs` |
 
 **Location rule:** Domain types live in their domain module (not in `config/`). Constants stay in `config/defaults.rs`, types go where they're used.

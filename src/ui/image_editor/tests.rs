@@ -110,9 +110,12 @@ fn resize_preview_updates_when_width_changes() {
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
     )));
+    // Type the new value
     state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
         "50".to_string(),
     )));
+    // Submit to trigger calculation and preview update
+    state.update(Message::Sidebar(SidebarMessage::WidthInputSubmitted));
 
     // Preview should exist with new dimensions
     assert!(
@@ -163,6 +166,7 @@ fn resize_preview_clears_when_dimensions_match_original() {
     state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
         "50".to_string(),
     )));
+    state.update(Message::Sidebar(SidebarMessage::WidthInputSubmitted));
     assert!(
         state.preview_image.is_some(),
         "Preview should exist after resize"
@@ -172,6 +176,7 @@ fn resize_preview_clears_when_dimensions_match_original() {
     state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
         "100".to_string(),
     )));
+    state.update(Message::Sidebar(SidebarMessage::WidthInputSubmitted));
 
     // Preview should be cleared when dimensions match original
     assert!(
@@ -195,6 +200,7 @@ fn resize_preview_updates_when_height_changes() {
     state.update(Message::Sidebar(SidebarMessage::HeightInputChanged(
         "75".to_string(),
     )));
+    state.update(Message::Sidebar(SidebarMessage::HeightInputSubmitted));
 
     assert!(
         state.preview_image.is_some(),

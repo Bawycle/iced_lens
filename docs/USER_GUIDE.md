@@ -172,9 +172,10 @@ All editing is **non-destructive**. Changes are only applied when you save.
 
 ### Resize
 
-- Slider: 10–200% of original size
+- Slider: 10–400% of original size
 - Width/height inputs with optional aspect lock
 - Live preview updates as you adjust
+- **AI Upscaling:** For enlargements (>100%), optional Real-ESRGAN 4x upscaling produces sharper results than traditional interpolation. Enable in Settings → AI / Machine Learning.
 
 ### Light
 

@@ -5,6 +5,7 @@ use crate::config::BackgroundTheme;
 use crate::error::{Error, Result};
 use crate::media::deblur::ModelStatus;
 use crate::media::frame_export::{ExportFormat, ExportableFrame};
+use crate::media::upscale::UpscaleModelStatus;
 use crate::media::ImageData;
 use iced::{Element, Rectangle};
 use image_rs;
@@ -20,6 +21,10 @@ pub struct ViewContext<'a> {
     pub is_dark_theme: bool,
     /// Current status of the AI deblur model.
     pub deblur_model_status: &'a ModelStatus,
+    /// Current status of the AI upscale model.
+    pub upscale_model_status: &'a UpscaleModelStatus,
+    /// Whether AI upscaling is enabled for resize operations > 100%.
+    pub enable_upscale: bool,
 }
 
 impl State {

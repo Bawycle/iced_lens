@@ -27,7 +27,11 @@ impl State {
                     self.preview_image = None;
                     match tool {
                         EditorTool::Crop => self.teardown_crop_tool(),
-                        EditorTool::Resize => self.hide_resize_overlay(),
+                        EditorTool::Resize => {
+                            // Commit any pending input before closing tool
+                            self.commit_dirty_resize_input();
+                            self.hide_resize_overlay();
+                        }
                         EditorTool::Adjust => self.teardown_adjustment_tool(),
                         EditorTool::Deblur => self.teardown_deblur_tool(),
                         EditorTool::Rotate => {}
@@ -38,6 +42,8 @@ impl State {
                         self.hide_crop_overlay();
                     }
                     if self.active_tool == Some(EditorTool::Resize) {
+                        // Commit any pending input before switching tools
+                        self.commit_dirty_resize_input();
                         self.hide_resize_overlay();
                     }
                     if self.active_tool == Some(EditorTool::Adjust) {
@@ -90,6 +96,10 @@ impl State {
                 Event::None
             }
             SidebarMessage::ScaleChanged(percent) => {
+                // Commit any pending input first, then apply scale
+                // Note: scale will override the dimensions, but we commit first
+                // so the dirty flag is cleared properly
+                self.commit_dirty_resize_input();
                 self.sidebar_scale_changed(percent);
                 Event::None
             }
@@ -101,16 +111,48 @@ impl State {
                 self.sidebar_height_input_changed(value);
                 Event::None
             }
+            SidebarMessage::WidthInputSubmitted => {
+                self.sidebar_width_input_submitted();
+                Event::None
+            }
+            SidebarMessage::HeightInputSubmitted => {
+                self.sidebar_height_input_submitted();
+                Event::None
+            }
             SidebarMessage::ToggleLockAspect => {
+                // Commit any pending input before changing lock state
+                self.commit_dirty_resize_input();
                 self.sidebar_toggle_lock();
                 Event::None
             }
             SidebarMessage::ApplyResizePreset(percent) => {
+                // Commit any pending input first, then apply preset
+                self.commit_dirty_resize_input();
                 self.sidebar_scale_changed(percent);
                 Event::None
             }
             SidebarMessage::ApplyResize => {
-                self.sidebar_apply_resize();
+                // Commit any pending input before applying
+                self.commit_dirty_resize_input();
+
+                // Check if this is an enlargement (scale > 100%) with AI upscale enabled
+                // If so, emit event to let app decide whether to use AI upscaling
+                if self.is_resize_enlargement()
+                    && self.has_pending_resize()
+                    && self.resize_state.use_ai_upscale
+                {
+                    let (width, height) = self.pending_resize_dimensions();
+                    // Mark as processing (app will clear this when upscaling completes or falls back)
+                    self.resize_state.is_upscale_processing = true;
+                    Event::UpscaleResizeRequested { width, height }
+                } else {
+                    // For reductions, same size, or when AI upscale is disabled
+                    self.sidebar_apply_resize();
+                    Event::None
+                }
+            }
+            SidebarMessage::ToggleAiUpscale => {
+                self.resize_state.use_ai_upscale = !self.resize_state.use_ai_upscale;
                 Event::None
             }
             SidebarMessage::BrightnessChanged(value) => {

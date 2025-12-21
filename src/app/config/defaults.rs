@@ -111,6 +111,28 @@ pub const DEFAULT_DEBLUR_MODEL_URL: &str =
     "https://huggingface.co/opencv/deblurring_nafnet/resolve/main/deblurring_nafnet_2025may.onnx";
 
 // ==========================================================================
+// AI/Upscale Defaults
+// ==========================================================================
+
+/// Default URL for downloading the Real-ESRGAN x4 ONNX upscaling model.
+/// Uses the CountFloyd/deepfake model which supports dynamic input sizes.
+pub const DEFAULT_UPSCALE_MODEL_URL: &str =
+    "https://huggingface.co/CountFloyd/deepfake/resolve/main/real_esrgan_x4.onnx";
+
+// ==========================================================================
+// Resize Scale Defaults (Image Editor)
+// ==========================================================================
+
+/// Default resize scale percentage.
+pub const DEFAULT_RESIZE_SCALE_PERCENT: f32 = 100.0;
+
+/// Minimum resize scale percentage.
+pub const MIN_RESIZE_SCALE_PERCENT: f32 = 10.0;
+
+/// Maximum resize scale percentage (400% = 4x, optimal for Real-ESRGAN AI upscaling).
+pub const MAX_RESIZE_SCALE_PERCENT: f32 = 400.0;
+
+// ==========================================================================
 // Playback Speed Defaults
 // ==========================================================================
 
@@ -208,4 +230,10 @@ const _: () = {
         j += 1;
     }
     assert!(found_default);
+
+    // Resize scale validation
+    assert!(MIN_RESIZE_SCALE_PERCENT > 0.0);
+    assert!(MAX_RESIZE_SCALE_PERCENT > MIN_RESIZE_SCALE_PERCENT);
+    assert!(DEFAULT_RESIZE_SCALE_PERCENT >= MIN_RESIZE_SCALE_PERCENT);
+    assert!(DEFAULT_RESIZE_SCALE_PERCENT <= MAX_RESIZE_SCALE_PERCENT);
 };

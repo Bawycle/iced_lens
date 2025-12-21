@@ -31,6 +31,8 @@ pub struct CanvasModel<'a> {
     pub is_dragging: bool,
     /// Whether crop tool is active (disables pan cursor)
     pub crop_active: bool,
+    /// Whether AI upscale processing is in progress
+    pub upscale_processing: bool,
 }
 
 impl<'a> CanvasModel<'a> {
@@ -44,6 +46,7 @@ impl<'a> CanvasModel<'a> {
             zoom_scale: state.zoom.zoom_percent / 100.0,
             is_dragging: state.is_dragging(),
             crop_active: state.crop_state.overlay.visible,
+            upscale_processing: state.resize_state.is_upscale_processing,
         }
     }
 }
@@ -72,8 +75,16 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
 
     // Capture overlay state
     let deblur_processing = model.deblur_state.is_processing;
+    let upscale_processing = model.upscale_processing;
     let spinner_rotation = model.deblur_state.spinner_rotation;
-    let deblur_text = ctx.i18n.tr("image-editor-deblur-processing").to_string();
+    let processing_text = if deblur_processing {
+        ctx.i18n.tr("image-editor-deblur-processing").to_string()
+    } else if upscale_processing {
+        ctx.i18n.tr("image-editor-upscale-processing").to_string()
+    } else {
+        String::new()
+    };
+    let is_processing = deblur_processing || upscale_processing;
 
     let crop_visible = model.crop_state.overlay.visible;
     let crop_x = model.crop_state.x;
@@ -106,13 +117,13 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
             .width(Length::Fixed(scaled_width))
             .height(Length::Fixed(scaled_height));
 
-        let image_with_overlay: Element<'_, Message> = if deblur_processing {
-            // Deblur processing overlay
+        let image_with_overlay: Element<'_, Message> = if is_processing {
+            // Processing overlay (deblur or upscale)
             let spinner =
                 AnimatedSpinner::new(theme::overlay_arrow_light_color(), spinner_rotation)
                     .into_element();
 
-            let loading_text = text(deblur_text.clone()).size(typography::BODY_LG);
+            let loading_text = text(processing_text.clone()).size(typography::BODY_LG);
 
             let loading_content = Column::new()
                 .spacing(spacing::SM)
