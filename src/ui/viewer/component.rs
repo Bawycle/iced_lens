@@ -4,13 +4,15 @@
 use crate::error::Error;
 use crate::i18n::fluent::I18n;
 use crate::media::navigator::NavigationInfo;
-use crate::media::MediaData;
+use crate::media::{MaxSkipAttempts, MediaData};
 use crate::ui::state::{DragState, ViewportState, ZoomState, ZoomStep};
 use crate::ui::viewer::{
     self, controls, pane, state as geometry, video_controls, HudIconKind, HudLine,
 };
 use crate::ui::widgets::VideoShader;
-use crate::video_player::{subscription::PlaybackMessage, SharedLufsCache, VideoPlayer, Volume};
+use crate::video_player::{
+    subscription::PlaybackMessage, KeyboardSeekStep, SharedLufsCache, VideoPlayer, Volume,
+};
 use iced::widget::scrollable::{AbsoluteOffset, RelativeOffset};
 use iced::widget::{operation, Id};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
@@ -192,7 +194,7 @@ pub struct State {
     /// Origin of the current media load request (for auto-skip behavior).
     pub load_origin: LoadOrigin,
     /// Maximum number of consecutive corrupted files to skip during navigation.
-    pub max_skip_attempts: u32,
+    pub max_skip_attempts: MaxSkipAttempts,
 
     // Video playback state
     video_player: Option<VideoPlayer>,
@@ -226,12 +228,12 @@ pub struct State {
     /// Last time a keyboard seek was triggered (for debouncing).
     last_keyboard_seek: Option<Instant>,
 
-    /// Keyboard seek step in seconds (arrow keys during video playback).
-    keyboard_seek_step_secs: f64,
+    /// Keyboard seek step (arrow keys during video playback).
+    keyboard_seek_step: KeyboardSeekStep,
 }
 
 // Manual Default impl required: video_fit_to_window defaults to true (not false),
-// and video_volume/keyboard_seek_step_secs use config constants instead of 0.0.
+// and video_volume/keyboard_seek_step use config constants instead of 0.0.
 #[allow(clippy::derivable_impls)]
 impl Default for State {
     fn default() -> Self {
@@ -253,7 +255,7 @@ impl Default for State {
             loading_started_at: None,
             spinner_rotation: 0.0,
             load_origin: LoadOrigin::DirectOpen,
-            max_skip_attempts: crate::config::DEFAULT_MAX_SKIP_ATTEMPTS,
+            max_skip_attempts: MaxSkipAttempts::default(),
             video_player: None,
             video_shader: VideoShader::new(),
             current_video_path: None,
@@ -266,7 +268,7 @@ impl Default for State {
             video_loop: false,
             overflow_menu_open: false,
             last_keyboard_seek: None,
-            keyboard_seek_step_secs: crate::config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
+            keyboard_seek_step: KeyboardSeekStep::default(),
         }
     }
 }
@@ -444,13 +446,13 @@ impl State {
         self.video_loop
     }
 
-    /// Sets the keyboard seek step in seconds.
-    pub fn set_keyboard_seek_step_secs(&mut self, step: f64) {
-        self.keyboard_seek_step_secs = step;
+    /// Sets the keyboard seek step.
+    pub fn set_keyboard_seek_step(&mut self, step: KeyboardSeekStep) {
+        self.keyboard_seek_step = step;
     }
 
     /// Sets the maximum number of skip attempts for auto-skip.
-    pub fn set_max_skip_attempts(&mut self, max_attempts: u32) {
+    pub fn set_max_skip_attempts(&mut self, max_attempts: MaxSkipAttempts) {
         self.max_skip_attempts = max_attempts;
     }
 
@@ -706,7 +708,7 @@ impl State {
                                 skipped_files.push(failed_filename);
                                 let new_attempts = skip_attempts + 1;
 
-                                if new_attempts <= self.max_skip_attempts {
+                                if new_attempts <= self.max_skip_attempts.value() {
                                     // Auto-skip: retry navigation in the same direction
                                     // Keep current_media_path so handle_retry_navigation knows
                                     // which file failed and can advance past it
@@ -1577,7 +1579,7 @@ impl State {
                     // ArrowRight: Seek forward if video is playing, otherwise navigate to next media
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
-                        let step = self.keyboard_seek_step_secs;
+                        let step = self.keyboard_seek_step.value();
                         self.handle_message(
                             Message::VideoControls(video_controls::Message::SeekRelative(step)),
                             &I18n::default(),
@@ -1593,7 +1595,7 @@ impl State {
                     // ArrowLeft: Seek backward if video is playing, otherwise navigate to previous media
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
-                        let step = self.keyboard_seek_step_secs;
+                        let step = self.keyboard_seek_step.value();
                         self.handle_message(
                             Message::VideoControls(video_controls::Message::SeekRelative(-step)),
                             &I18n::default(),
@@ -2077,7 +2079,10 @@ mod tests {
         let media = MediaData::Video(video_data);
         let indicator = format_media_indicator(&i18n, &media);
 
-        assert!(indicator.is_none(), "should not show indicator for video with audio");
+        assert!(
+            indicator.is_none(),
+            "should not show indicator for video with audio"
+        );
     }
 
     #[test]
@@ -2330,7 +2335,7 @@ mod tests {
 
         // Check that arrows would be hidden after delay (using default 3s)
         let timer = state.last_overlay_interaction.unwrap();
-        let default_delay = Duration::from_secs(crate::config::DEFAULT_OVERLAY_TIMEOUT_SECS as u64);
+        let default_delay = crate::ui::state::OverlayTimeout::default().as_duration();
 
         // Simulate 2 seconds elapsed (arrows still visible)
         sleep(Duration::from_millis(2000));

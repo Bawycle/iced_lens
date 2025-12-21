@@ -283,7 +283,6 @@ impl Default for MediaNavigator {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

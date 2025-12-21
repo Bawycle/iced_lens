@@ -104,7 +104,10 @@ pub fn view<'a>(
     } else {
         fit_button.into()
     };
-    let fit_toggle = tip(fit_button_content, ctx.i18n.tr("viewer-fit-to-window-toggle"));
+    let fit_toggle = tip(
+        fit_button_content,
+        ctx.i18n.tr("viewer-fit-to-window-toggle"),
+    );
 
     // Fullscreen button - disabled when metadata editor has unsaved changes
     let fullscreen_button = button(icons::fill(action_icons::viewer::toolbar::fullscreen()))

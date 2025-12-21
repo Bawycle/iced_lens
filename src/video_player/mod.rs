@@ -8,8 +8,11 @@ pub mod audio;
 pub mod audio_output;
 mod decoder;
 pub mod frame_cache;
+mod frame_cache_size;
+mod frame_history_size;
 pub mod normalization;
 mod playback_speed;
+mod seek_step;
 mod state;
 pub mod subscription;
 pub mod sync;
@@ -19,11 +22,14 @@ mod webp_decoder;
 
 pub use decoder::{AsyncDecoder, DecodedFrame, DecoderCommand, DecoderEvent};
 pub use frame_cache::{CacheConfig, CacheStats, FrameCache};
+pub use frame_cache_size::FrameCacheMb;
+pub use frame_history_size::FrameHistoryMb;
 pub use normalization::{
     create_lufs_cache, LufsAnalyzer, LufsCache, NormalizationSettings, SharedLufsCache,
     DEFAULT_TARGET_LUFS,
 };
 pub use playback_speed::PlaybackSpeed;
+pub use seek_step::KeyboardSeekStep;
 pub use state::{PlaybackState, VideoPlayer};
 pub use subscription::{video_playback, DecoderCommandSender, PlaybackMessage, VideoPlaybackId};
 pub use sync::{calculate_sync_action, SharedSyncClock, SyncAction, SyncClock};

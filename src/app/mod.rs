@@ -22,7 +22,7 @@ pub use message::{Flags, Message};
 pub use screen::Screen;
 
 use crate::media::metadata::MediaMetadata;
-use crate::media::{self, MediaData, MediaNavigator};
+use crate::media::{self, MaxSkipAttempts, MediaData, MediaNavigator};
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
 use crate::ui::metadata_panel::MetadataEditorState;
@@ -57,9 +57,9 @@ pub struct App {
     /// Shared cache for LUFS measurements to avoid re-analyzing files.
     lufs_cache: SharedLufsCache,
     /// Frame cache size in MB for video seek optimization.
-    frame_cache_mb: u32,
+    frame_cache_mb: crate::video_player::FrameCacheMb,
     /// Frame history size in MB for backward frame stepping.
-    frame_history_mb: u32,
+    frame_history_mb: crate::video_player::FrameHistoryMb,
     /// Whether the hamburger menu is open.
     menu_open: bool,
     /// Whether the info panel is open.
@@ -154,8 +154,8 @@ impl Default for App {
             video_autoplay: false,
             audio_normalization: true, // Enabled by default - normalizes audio volume between media files
             lufs_cache: create_lufs_cache(),
-            frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
-            frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
+            frame_cache_mb: crate::video_player::FrameCacheMb::default(),
+            frame_history_mb: crate::video_player::FrameHistoryMb::default(),
             menu_open: false,
             info_panel_open: false,
             current_metadata: None,
@@ -205,14 +205,18 @@ impl App {
             .video
             .keyboard_seek_step_secs
             .unwrap_or(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS);
-        let frame_cache_mb = config
-            .video
-            .frame_cache_mb
-            .unwrap_or(config::DEFAULT_FRAME_CACHE_MB);
-        let frame_history_mb = config
-            .video
-            .frame_history_mb
-            .unwrap_or(config::DEFAULT_FRAME_HISTORY_MB);
+        let frame_cache_mb = crate::video_player::FrameCacheMb::new(
+            config
+                .video
+                .frame_cache_mb
+                .unwrap_or(config::DEFAULT_FRAME_CACHE_MB),
+        );
+        let frame_history_mb = crate::video_player::FrameHistoryMb::new(
+            config
+                .video
+                .frame_history_mb
+                .unwrap_or(config::DEFAULT_FRAME_HISTORY_MB),
+        );
         app.frame_cache_mb = frame_cache_mb;
         app.frame_history_mb = frame_history_mb;
         // Load application state (last save directory, deblur enabled, etc.)
@@ -267,8 +271,8 @@ impl App {
             theme_mode: config.general.theme_mode,
             video_autoplay,
             audio_normalization,
-            frame_cache_mb,
-            frame_history_mb,
+            frame_cache_mb: frame_cache_mb.value(),
+            frame_history_mb: frame_history_mb.value(),
             keyboard_seek_step_secs,
             max_skip_attempts,
             enable_deblur,
@@ -282,7 +286,9 @@ impl App {
         app.audio_normalization = audio_normalization;
         app.viewer.set_video_autoplay(video_autoplay);
         app.viewer
-            .set_keyboard_seek_step_secs(keyboard_seek_step_secs);
+            .set_keyboard_seek_step(crate::video_player::KeyboardSeekStep::new(
+                keyboard_seek_step_secs,
+            ));
 
         // Apply video playback preferences from config
         if let Some(volume) = config.video.volume {
@@ -297,7 +303,8 @@ impl App {
 
         // Apply display preferences from config
         if let Some(max_skip) = config.display.max_skip_attempts {
-            app.viewer.set_max_skip_attempts(max_skip);
+            app.viewer
+                .set_max_skip_attempts(MaxSkipAttempts::new(max_skip));
         }
 
         // Show warnings for config/state loading issues
@@ -531,7 +538,7 @@ impl App {
             &self.viewer,
             Some(self.lufs_cache.clone()),
             self.audio_normalization,
-            self.frame_cache_mb,
+            self.frame_cache_mb.value(),
             self.settings.frame_history_mb(),
         );
 
@@ -1153,7 +1160,7 @@ impl App {
                         let new_attempts = skip_attempts + 1;
                         let max_attempts = self.viewer.max_skip_attempts;
 
-                        if new_attempts <= max_attempts {
+                        if new_attempts <= max_attempts.value() {
                             // Use peek_nth_*_image with skip_count to find the next file
                             // without modifying navigator state. State is only updated
                             // via confirm_navigation after successful load.
@@ -1713,8 +1720,8 @@ mod tests {
                 theme_mode: crate::ui::theming::ThemeMode::System,
                 video_autoplay: false,
                 audio_normalization: true,
-                frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
-                frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
+                frame_cache_mb: crate::video_player::FrameCacheMb::default().value(),
+                frame_history_mb: crate::video_player::FrameHistoryMb::default().value(),
                 keyboard_seek_step_secs: config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
                 notifications: &mut notifs,
             });

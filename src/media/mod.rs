@@ -11,6 +11,7 @@ pub mod image_transform;
 pub mod metadata;
 pub mod metadata_writer;
 pub mod navigator;
+pub mod skip_attempts;
 pub mod upscale;
 pub mod video;
 pub mod xmp;
@@ -24,6 +25,7 @@ use std::path::Path;
 pub use image::{load_image, ImageData, SUPPORTED_EXTENSIONS as IMAGE_EXTENSIONS};
 pub use image_transform::ResizeScale;
 pub use navigator::MediaNavigator;
+pub use skip_attempts::MaxSkipAttempts;
 
 /// Represents different types of media formats
 #[derive(Debug, Clone, PartialEq, Eq)]

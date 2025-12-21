@@ -387,7 +387,10 @@ fn build_overflow_menu<'a>(
         .style(styles::button::disabled())
         .into()
     };
-    let step_back_button = tip(step_back_content, ctx.i18n.tr("video-step-backward-tooltip"));
+    let step_back_button = tip(
+        step_back_content,
+        ctx.i18n.tr("video-step-backward-tooltip"),
+    );
 
     // Step forward button (only enabled when paused AND not at end of video)
     let step_forward_content: Element<'_, Message> = if state.can_step_forward {
@@ -411,7 +414,10 @@ fn build_overflow_menu<'a>(
         .style(styles::button::disabled())
         .into()
     };
-    let step_forward_button = tip(step_forward_content, ctx.i18n.tr("video-step-forward-tooltip"));
+    let step_forward_button = tip(
+        step_forward_content,
+        ctx.i18n.tr("video-step-forward-tooltip"),
+    );
 
     // Capture frame button
     let capture_content: Element<'_, Message> = button(icons::sized(

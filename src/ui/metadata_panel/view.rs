@@ -11,8 +11,8 @@ use crate::ui::action_icons;
 use crate::ui::design_tokens::{palette, radius, sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::styles::button as button_styles;
-use iced::widget::image::{Handle, Image};
 use crate::ui::styles::tooltip as styled_tooltip;
+use iced::widget::image::{Handle, Image};
 use iced::widget::{
     button, container, pick_list, rule, scrollable, text, text_input, Column, Row, Text,
 };
