@@ -51,14 +51,14 @@ pub const MAX_OVERLAY_TIMEOUT_SECS: u32 = 30;
 // Volume Defaults
 // ==========================================================================
 
-/// Default video playback volume (0.0 to 1.0).
+/// Default video playback volume (0.0 to 1.5, where 1.0 = 100%).
 pub const DEFAULT_VOLUME: f32 = 0.8;
 
 /// Minimum volume level.
 pub const MIN_VOLUME: f32 = 0.0;
 
-/// Maximum volume level.
-pub const MAX_VOLUME: f32 = 1.0;
+/// Maximum volume level (1.5 = 150% amplification).
+pub const MAX_VOLUME: f32 = 1.5;
 
 /// Volume adjustment step per key press (5%).
 pub const VOLUME_STEP: f32 = 0.05;

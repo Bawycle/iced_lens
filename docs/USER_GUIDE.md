@@ -109,6 +109,7 @@ iced_lens --lang fr image.png
 | `F11` | Toggle fullscreen |
 | `Esc` | Exit fullscreen |
 | `←` / `→` | Navigate media / seek video |
+| `↑` / `↓` | Increase / decrease volume |
 | `Space` | Play/pause video |
 | `M` | Toggle mute |
 | `J` | Decrease playback speed |
@@ -259,7 +260,7 @@ Configuration is stored in a platform-appropriate directory:
 |----------|---------|
 | General | Language, theme mode (System/Light/Dark) |
 | Display | Background theme, sort order, zoom step |
-| Video | Autoplay, volume, audio normalization, frame cache size |
+| Video | Autoplay, volume (0–150% with perceptual scaling), audio normalization, frame cache size |
 | Fullscreen | Overlay timeout |
 | AI | Enable deblur, model URL |
 

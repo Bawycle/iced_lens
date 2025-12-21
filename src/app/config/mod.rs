@@ -707,7 +707,7 @@ mod tests {
     fn volume_constants_are_valid() {
         assert_eq!(DEFAULT_VOLUME, 0.8);
         assert_eq!(MIN_VOLUME, 0.0);
-        assert_eq!(MAX_VOLUME, 1.0);
+        assert_eq!(MAX_VOLUME, 1.5); // 150% amplification
         let step = VOLUME_STEP;
         let default = DEFAULT_VOLUME;
         let min = MIN_VOLUME;

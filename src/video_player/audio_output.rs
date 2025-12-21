@@ -34,7 +34,11 @@ pub enum AudioOutputCommand {
     /// Used during seek to discard old audio without interrupting playback.
     ClearBuffer,
 
-    /// Set volume (guaranteed to be within 0.0–1.0 by Volume type).
+    /// Set volume (0.0–1.5, perceptually scaled).
+    /// A quadratic curve is applied: actual = slider², so:
+    /// - 50% slider → 25% actual (-12 dB)
+    /// - 100% slider → 100% actual (0 dB)
+    /// - 150% slider → 225% actual (+7 dB)
     SetVolume(super::Volume),
 
     /// Set mute state.
@@ -266,9 +270,22 @@ impl AudioOutput {
                         }
                     };
 
+                    // Apply perceptual volume curve (quadratic) for natural-feeling control.
+                    // Human hearing is logarithmic, so a linear slider feels wrong.
+                    // Squaring the volume makes the slider perceptually linear:
+                    // - 50% slider → 25% actual (-12 dB, sounds like "half")
+                    // - 100% slider → 100% actual (0 dB, unchanged)
+                    // - 150% slider → 225% actual (+7 dB, clearly louder)
+                    let perceptual_volume = volume * volume;
+
                     for (i, sample) in data.iter_mut().enumerate() {
                         if i < buf.len() {
-                            *sample = T::from_sample(buf[i] * volume);
+                            // Apply volume and clamp to safe range.
+                            // Clamping to slightly below 1.0 prevents i16 overflow
+                            // (dasp's from_sample overflows at exactly 1.0 for i16).
+                            // Values > 1.0 represent amplification and will be clipped.
+                            let amplified = (buf[i] * perceptual_volume).clamp(-1.0, 0.999_999_9);
+                            *sample = T::from_sample(amplified);
                         } else {
                             *sample = T::from_sample(0.0f32);
                         }

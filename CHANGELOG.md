@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Volume amplification:** volume slider now goes up to 150% for louder playback on quiet videos, with percentage display (like VLC). Uses perceptual scaling (quadratic curve) so the slider feels linear to the ear.
 - **Video playback speed:** control video speed from 0.1x to 8x using `J`/`L` keys or overflow menu buttons.
 - **Image editor zoom:** use mouse wheel to zoom in/out while editing, matching the viewer behavior.
 - **Image editor pan:** grab-and-drag to navigate when zoomed, like in the viewer.

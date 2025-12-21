@@ -2,12 +2,13 @@
 //! Volume domain type for audio playback.
 //!
 //! This module provides a type-safe wrapper for volume values,
-//! ensuring they are always within the valid range (0.0–1.0).
+//! ensuring they are always within the valid range (0.0–1.5, where 1.0 = 100%).
 
 use crate::config::{DEFAULT_VOLUME, MAX_VOLUME, MIN_VOLUME, VOLUME_STEP};
 
-/// Volume level, guaranteed to be within valid range (0.0–1.0).
+/// Volume level, guaranteed to be within valid range (0.0–1.5).
 ///
+/// Values above 1.0 represent amplification (up to 150%).
 /// This newtype enforces validity at the type level, making it impossible
 /// to create an invalid volume value.
 ///
@@ -20,8 +21,8 @@ use crate::config::{DEFAULT_VOLUME, MAX_VOLUME, MIN_VOLUME, VOLUME_STEP};
 /// assert_eq!(vol.value(), 0.5);
 ///
 /// // Values outside range are clamped
-/// let too_loud = Volume::new(1.5);
-/// assert_eq!(too_loud.value(), 1.0);
+/// let too_loud = Volume::new(2.0);
+/// assert_eq!(too_loud.value(), 1.5); // Clamped to max (150%)
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Volume(f32);

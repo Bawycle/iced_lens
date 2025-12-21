@@ -39,7 +39,7 @@ cargo build --release
 ## Features
 
 ### Viewing
-Images (JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, SVG) and videos (MP4, AVI, MOV, MKV, WebM) with zoom, pan, fullscreen, frame-by-frame navigation, and playback speed control (0.1x–8x).
+Images (JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, SVG) and videos (MP4, AVI, MOV, MKV, WebM) with zoom, pan, fullscreen, frame-by-frame navigation, playback speed control (0.1x–8x), and volume amplification up to 150%.
 
 ### Editing
 Rotate, crop, resize, brightness/contrast — all with live preview and undo/redo. Save or Save As when ready.

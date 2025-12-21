@@ -81,7 +81,7 @@ pub struct PlaybackState {
     /// Total duration in seconds.
     pub duration_secs: f64,
 
-    /// Current volume (0.0 to 1.0).
+    /// Current volume (0.0 to 1.5, where 1.0 = 100%).
     pub volume: f32,
 
     /// Is audio muted?
@@ -223,12 +223,16 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     )
     .gap(4);
 
-    // Volume slider (only shown when not muted)
-    let volume_slider = slider(0.0..=1.0, state.volume, |v| {
+    // Volume slider with percentage display
+    let volume_slider = slider(0.0..=config::MAX_VOLUME, state.volume, |v| {
         Message::SetVolume(Volume::new(v))
     })
     .width(Length::Fixed(80.0))
     .step(0.01);
+
+    let volume_percent = text(format_volume_percent(state.volume))
+        .size(sizing::ICON_SM)
+        .width(Length::Fixed(40.0)); // Fixed width prevents layout shift
 
     // More button (overflow menu toggle)
     let more_button_base = button(icons::sized(
@@ -285,6 +289,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         time_display,
         volume_button_tooltip,
         volume_slider,
+        volume_percent,
         loop_button,
         more_button,
     ]
@@ -498,6 +503,12 @@ fn format_playback_speed(speed: f64) -> String {
     format!("{:.2}x", speed)
 }
 
+/// Formats volume as percentage for display.
+/// Rounds to integer for cleaner UI (e.g., "75%" not "75.00%").
+fn format_volume_percent(volume: f32) -> String {
+    format!("{}%", (volume * 100.0).round() as u32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -662,5 +673,19 @@ mod tests {
         let state = PlaybackState::default();
         assert_eq!(state.playback_speed, 1.0);
         assert!(!state.speed_auto_muted);
+    }
+
+    #[test]
+    fn format_volume_percent_rounds_to_integer() {
+        // Standard values
+        assert_eq!(format_volume_percent(0.0), "0%");
+        assert_eq!(format_volume_percent(0.5), "50%");
+        assert_eq!(format_volume_percent(1.0), "100%");
+        assert_eq!(format_volume_percent(1.5), "150%");
+
+        // Fractional values round correctly
+        assert_eq!(format_volume_percent(0.754), "75%");
+        assert_eq!(format_volume_percent(0.756), "76%");
+        assert_eq!(format_volume_percent(1.25), "125%");
     }
 }
