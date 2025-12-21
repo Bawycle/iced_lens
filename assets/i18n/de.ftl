@@ -326,7 +326,7 @@ about-icon-license-summary = Alle Icons (Anwendungslogo und UI-Icons) dürfen nu
 about-section-credits = Danksagungen
 about-credits-iced = Erstellt mit dem Iced GUI-Toolkit
 about-credits-ffmpeg = Videowiedergabe mit FFmpeg
-about-credits-onnx = KI-Entschärfung mit ONNX Runtime
+about-credits-onnx = KI-Funktionen mit ONNX Runtime (NAFNet, Real-ESRGAN)
 about-credits-fluent = Internationalisierung durch Project Fluent
 about-credits-full-list = Vollständige Abhängigkeitsliste anzeigen
 

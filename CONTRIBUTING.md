@@ -221,7 +221,9 @@ Code contributions should follow the project's development practices and quality
 
 ### Code Quality Standards
 
-IcedLens follows strict quality standards to maintain code quality and reliability:
+IcedLens follows quality standards to maintain code quality and reliability.
+
+> **Note:** There is no automated CI/CD pipeline. Contributors are expected to run all quality checks locally before submitting PRs: `cargo test`, `cargo clippy`, `cargo fmt`, and `cargo audit`.
 
 #### Test-Driven Development (TDD)
 
@@ -256,7 +258,29 @@ All code should include appropriate tests:
 - Follow secure coding practices
 - Validate all user inputs (file paths, zoom values, etc.)
 - Use proper error handling (avoid `unwrap()` on user-provided data)
+- Never log or display full file paths (may contain usernames or sensitive info)
+- Sanitize paths before display to prevent path traversal information leaks
 - Run `cargo audit` to check for vulnerable dependencies
+- Report security vulnerabilities privately via [SECURITY.md](SECURITY.md)
+
+#### Accessibility
+
+IcedLens aims to be usable by everyone. When contributing UI changes:
+
+- Ensure sufficient color contrast (WCAG 2.1 AA minimum: 4.5:1 for text, 3:1 for UI)
+- Provide keyboard navigation for all interactive elements
+- Make click targets at least 44×44 pixels (WCAG 2.5.5)
+- Use semantic widget roles where Iced supports them
+- Test both light and dark themes for visibility
+- Avoid conveying information through color alone
+
+#### Performance
+
+- Avoid blocking the main thread—use `Task` for I/O and heavy computation
+- Profile before optimizing (`cargo bench`, `perf`, `flamegraph`)
+- Prefer streaming/chunked processing over loading entire files in memory
+- Pool or cache large allocations (see `FrameCache`, `FrameHistory`)
+- Consider memory impact on low-end systems (aim for <500 MB typical usage)
 
 #### Newtype Pattern for Bounded Values
 
@@ -355,6 +379,27 @@ git commit -m "feat: Add descriptive commit message"
 # Push to your fork
 git push origin feature/your-feature-name
 ```
+
+### Branching Strategy
+
+IcedLens uses a simple two-branch workflow:
+
+| Branch | Purpose |
+|--------|---------|
+| `master` | Stable releases only. PRs target this branch. |
+| `dev` | Active development. Feature branches merge here first. |
+
+**Workflow:**
+1. Create feature branches from `dev`: `git checkout -b feature/my-feature dev`
+2. Develop and test locally
+3. Merge into `dev` for integration testing
+4. When ready for release, `dev` is merged into `master`
+
+**Naming conventions:**
+- `feature/description` - New functionality
+- `fix/description` - Bug fixes
+- `refactor/description` - Code restructuring
+- `docs/description` - Documentation only
 
 ### Commit Message Guidelines
 

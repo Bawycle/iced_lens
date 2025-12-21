@@ -326,7 +326,7 @@ about-icon-license-summary = All icons (application logo and UI icons) may only 
 about-section-credits = Credits
 about-credits-iced = Built with the Iced GUI toolkit
 about-credits-ffmpeg = Video playback powered by FFmpeg
-about-credits-onnx = AI deblurring powered by ONNX Runtime
+about-credits-onnx = AI features powered by ONNX Runtime (NAFNet, Real-ESRGAN)
 about-credits-fluent = Internationalization by Project Fluent
 about-credits-full-list = See the full list of dependencies
 

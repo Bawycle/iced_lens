@@ -10,11 +10,12 @@ Complete documentation for IcedLens features, configuration, and usage.
 4. [Navigation & Viewing](#navigation--viewing)
 5. [Editing Tools](#editing-tools)
 6. [AI Deblur](#ai-deblur)
-7. [Metadata Editing](#metadata-editing)
-8. [Configuration](#configuration)
-9. [Internationalization](#internationalization)
-10. [Download & Installation](#download--installation)
-11. [FAQ](#faq)
+7. [AI Upscaling](#ai-upscaling)
+8. [Metadata Editing](#metadata-editing)
+9. [Configuration](#configuration)
+10. [Internationalization](#internationalization)
+11. [Download & Installation](#download--installation)
+12. [FAQ](#faq)
 
 ---
 
@@ -114,6 +115,8 @@ iced_lens --lang fr image.png
 | `M` | Toggle mute |
 | `J` | Decrease playback speed |
 | `L` | Increase playback speed |
+| `,` | Step back one frame (while paused) |
+| `.` | Step forward one frame (while paused) |
 
 ### Editor Mode
 
@@ -223,6 +226,36 @@ Experimental feature using the NAFNet neural network to sharpen blurry images.
 
 ---
 
+## AI Upscaling
+
+Enhance image enlargements using the Real-ESRGAN neural network for sharper results than traditional interpolation.
+
+### Setup
+
+1. Go to Settings → AI / Machine Learning
+2. Enable "AI Upscaling"
+3. Wait for model download (~64 MB from Hugging Face)
+4. Model is validated automatically
+
+### Usage
+
+1. Open an image in the editor
+2. Select the Resize tool
+3. Set scale above 100% (enlargement)
+4. Check "Use AI upscaling (Real-ESRGAN)"
+5. Click Apply
+6. Wait for processing (spinner overlay)
+7. Save when satisfied
+
+### Notes
+
+- Only applies to enlargements (>100%), not reductions
+- Uses Real-ESRGAN 4x model for high-quality upscaling
+- Model integrity verified with BLAKE3 checksum
+- Processing runs on CPU
+
+---
+
 ## Metadata Editing
 
 ### Supported Fields
@@ -264,7 +297,7 @@ Configuration is stored in a platform-appropriate directory:
 | Display | Background theme, sort order, zoom step, auto-skip limit (1–20) |
 | Video | Autoplay, volume (0–150% with perceptual scaling), audio normalization, frame cache size |
 | Fullscreen | Overlay timeout |
-| AI | Enable deblur, model URL |
+| AI | Enable deblur, enable upscaling, model URLs |
 
 ### Reset Configuration
 

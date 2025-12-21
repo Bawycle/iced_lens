@@ -1,6 +1,6 @@
 # IcedLens
 
-Privacy-first media viewer and editor with AI deblurring.
+Privacy-first media viewer and editor with AI enhancement.
 
 [![Release](https://img.shields.io/badge/release-v0.4.1-blue)](https://codeberg.org/Bawycle/iced_lens/releases)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
@@ -45,8 +45,10 @@ Images (JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, SVG) and videos (MP4, AVI, MOV, MK
 ### Editing
 Rotate, crop, resize, brightness/contrast — all with live preview and undo/redo. Save or Save As when ready.
 
-### AI Deblur (Experimental)
-Enable in Settings → AI / Machine Learning. Downloads a ~92 MB ONNX model on first use. Works with any image size.
+### AI Features (Experimental)
+Enable in Settings → AI / Machine Learning. Models download from Hugging Face on first use.
+- **Deblur**: Sharpen blurry images with NAFNet (~92 MB model)
+- **Upscaling**: Enlarge images up to 4x with Real-ESRGAN (~64 MB model)
 
 ### Metadata
 View and edit EXIF (camera, exposure, GPS) and Dublin Core/XMP (title, creator, copyright) metadata.
@@ -59,7 +61,7 @@ View and edit EXIF (camera, exposure, GPS) and Dublin Core/XMP (title, creator, 
 
 ## Security
 
-Local-first: images are processed locally. The AI Deblur feature downloads a model from Hugging Face (BLAKE3 checksum verified). No other network activity. Report vulnerabilities via [SECURITY.md](SECURITY.md).
+Local-first: images are processed locally. AI features download models from Hugging Face on first use (~92 MB for deblur, ~64 MB for upscaling), each verified with BLAKE3 checksum. No other network activity. Report vulnerabilities via [SECURITY.md](SECURITY.md).
 
 ## License
 
@@ -74,7 +76,8 @@ IcedLens is built on the shoulders of great open-source projects:
 - [FFmpeg](https://ffmpeg.org/) — Video decoding via [ffmpeg-next](https://crates.io/crates/ffmpeg-next)
 - [image-rs](https://github.com/image-rs/image) — Image decoding and processing
 - [ONNX Runtime](https://onnxruntime.ai/) — AI inference via [ort](https://crates.io/crates/ort)
-- [OpenCV](https://opencv.org/) — NAFNet model training
+- [NAFNet](https://github.com/megvii-research/NAFNet) — AI deblurring model
+- [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) — AI upscaling model
 - [Fluent](https://projectfluent.org/) — Localization system
 
 ...and many other excellent crates from the Rust ecosystem. See [Cargo.toml](Cargo.toml) for the full list.

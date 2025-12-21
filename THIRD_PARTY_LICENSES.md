@@ -79,7 +79,7 @@ SOFTWARE.
 **Source Code:** https://github.com/microsoft/onnxruntime
 
 ONNX Runtime is a cross-platform inference engine for machine learning models.
-IcedLens uses ONNX Runtime for AI-powered image deblurring.
+IcedLens uses ONNX Runtime for AI-powered image enhancement (deblurring and upscaling).
 
 ```
 MIT License
@@ -104,6 +104,36 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+---
+
+## NAFNet
+
+**License:** MIT License
+**Copyright:** 2022 megvii-model
+**Website:** https://github.com/megvii-research/NAFNet
+
+NAFNet (Nonlinear Activation Free Network) is a neural network architecture for
+image restoration. IcedLens downloads and uses the NAFNet ONNX model for
+AI-powered image deblurring.
+
+The full license text is available at:
+https://github.com/megvii-research/NAFNet/blob/main/LICENSE
+
+---
+
+## Real-ESRGAN
+
+**License:** BSD 3-Clause License
+**Copyright:** 2021 Xintao Wang
+**Website:** https://github.com/xinntao/Real-ESRGAN
+
+Real-ESRGAN is a practical image restoration algorithm for general image/video
+enhancement. IcedLens downloads and uses the Real-ESRGAN ONNX model for
+AI-powered image upscaling.
+
+The full license text is available at:
+https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE
 
 ---
 

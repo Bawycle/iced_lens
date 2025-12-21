@@ -326,7 +326,7 @@ about-icon-license-summary = Toutes les icônes (logo et icônes d'interface) ne
 about-section-credits = Crédits
 about-credits-iced = Développé avec la bibliothèque Iced
 about-credits-ffmpeg = Lecture vidéo propulsée par FFmpeg
-about-credits-onnx = Défloutage IA propulsé par ONNX Runtime
+about-credits-onnx = Fonctions IA propulsées par ONNX Runtime (NAFNet, Real-ESRGAN)
 about-credits-fluent = Internationalisation par Project Fluent
 about-credits-full-list = Voir la liste complète des dépendances
 
