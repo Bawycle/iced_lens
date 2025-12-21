@@ -90,6 +90,12 @@ image-editor-resize-lock-aspect = Lock aspect ratio
 image-editor-resize-presets-label = Presets
 image-editor-resize-apply = Apply resize
 image-editor-resize-preview-label = Preview
+image-editor-resize-ai-upscale = Use AI upscaling (Real-ESRGAN)
+image-editor-resize-ai-model-not-downloaded = AI model not downloaded yet
+image-editor-resize-ai-model-downloading = Downloading AI model
+image-editor-resize-ai-model-validating = Validating AI model
+image-editor-resize-ai-model-error = AI model error
+image-editor-resize-ai-enlargement-only = AI upscaling only applies to enlargements
 image-editor-light-section-title = Light Adjustments
 image-editor-light-brightness-label = Brightness
 image-editor-light-contrast-label = Contrast
@@ -238,10 +244,11 @@ help-editor-crop-usage = Drag the handles to adjust the selection, then click "A
 
 help-editor-resize-title = Resize
 help-editor-resize-desc = Change the image dimensions to make it larger or smaller.
-help-editor-resize-scale = Scale by percentage (e.g., 50% to halve the size)
+help-editor-resize-scale = Scale by percentage (10% to 400%)
 help-editor-resize-dimensions = Enter exact width and height in pixels
 help-editor-resize-lock = Lock aspect ratio to maintain proportions
-help-editor-resize-presets = Use presets for common sizes (HD, Full HD, 4K...)
+help-editor-resize-presets = Use presets for quick scaling (25%, 50%, 200%, etc.)
+help-editor-resize-ai-upscale = AI Upscaling: Use Real-ESRGAN for sharper enlargements (enable in Settings)
 
 help-editor-light-title = Light
 help-editor-light-desc = Fine-tune the brightness and contrast of your image.
@@ -449,12 +456,28 @@ settings-deblur-status-not-downloaded = Model not downloaded
 settings-deblur-enabled = Enabled
 settings-deblur-disabled = Disabled
 
+# AI Upscale Settings
+settings-enable-upscale-label = AI Upscaling
+settings-enable-upscale-hint = Enable AI-powered image upscaling using Real-ESRGAN 4x model (~64 MB download).
+settings-upscale-model-url-label = Model URL
+settings-upscale-model-url-placeholder = https://huggingface.co/...
+settings-upscale-model-url-hint = URL to download the Real-ESRGAN ONNX model from.
+settings-upscale-status-label = Model Status
+settings-upscale-status-downloading = Downloading model ({ $progress }%)...
+settings-upscale-status-validating = Validating model...
+settings-upscale-status-ready = Model ready
+settings-upscale-status-error = Error: { $message }
+settings-upscale-status-not-downloaded = Model not downloaded
+settings-upscale-enabled = Enabled
+settings-upscale-disabled = Disabled
+
 # AI Editor tool
 image-editor-tool-deblur = AI Deblur
 image-editor-deblur-lossless-warning = For best quality, export as WebP lossless or PNG.
 image-editor-deblur-apply = Apply Deblur
 image-editor-deblur-processing = Processing
 image-editor-deblur-cancel = Cancel
+image-editor-upscale-processing = AI Upscaling...
 image-editor-deblur-model-not-ready = Enable AI deblur in Settings first
 image-editor-deblur-validating = Validating model, please wait...
 image-editor-deblur-downloading = Downloading model ({ $progress }%)...
@@ -476,3 +499,10 @@ notification-deblur-validation-error = Model validation failed: { $error }
 notification-deblur-ready = AI Deblur is ready to use
 notification-deblur-apply-success = Image deblurred successfully
 notification-deblur-apply-error = Deblurring failed: { $error }
+
+# AI Upscale Notifications
+notification-upscale-ready = AI Upscaling is ready to use
+notification-upscale-download-error = Failed to download upscale model: { $error }
+notification-upscale-validation-error = Model validation failed: { $error }
+notification-upscale-resize-success = Image resized with AI upscaling
+notification-upscale-resize-error = AI upscaling failed: { $error }

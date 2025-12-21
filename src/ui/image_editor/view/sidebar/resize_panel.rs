@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize tool panel for the editor sidebar.
 
+use crate::app::config::{MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT};
+use crate::media::upscale::UpscaleModelStatus;
 use crate::media::ImageData;
 use crate::ui::design_tokens::{spacing, typography};
 use crate::ui::styles;
-use iced::widget::{button, checkbox, container, image, slider, text, text_input, Column, Row};
+use iced::widget::{
+    button, checkbox, container, image, slider, text, text_input, tooltip, Column, Row,
+};
 use iced::{Element, Length};
 
 use super::super::ViewContext;
@@ -17,6 +21,8 @@ const THUMBNAIL_MAX_SIZE: f32 = 150.0;
 pub fn panel<'a>(
     resize: &'a ResizeState,
     thumbnail: Option<&'a ImageData>,
+    upscale_model_status: &'a UpscaleModelStatus,
+    enable_upscale: bool,
     ctx: &ViewContext<'a>,
 ) -> Element<'a, Message> {
     let scale_section = Column::new()
@@ -24,32 +30,42 @@ pub fn panel<'a>(
         .push(text(ctx.i18n.tr("image-editor-resize-section-title")).size(typography::BODY))
         .push(text(ctx.i18n.tr("image-editor-resize-scale-label")).size(typography::BODY_SM))
         .push(
-            slider(10.0..=200.0, resize.scale.value(), |percent| {
-                Message::Sidebar(SidebarMessage::ScaleChanged(percent))
-            })
+            slider(
+                MIN_RESIZE_SCALE_PERCENT..=MAX_RESIZE_SCALE_PERCENT,
+                resize.scale.value(),
+                |percent| Message::Sidebar(SidebarMessage::ScaleChanged(percent)),
+            )
             .step(1.0),
         )
         .push(text(format!("{:.0}%", resize.scale.value())).size(typography::BODY_SM));
 
-    let mut presets = Row::new().spacing(spacing::XS);
-    for preset in [50.0, 75.0, 150.0, 200.0] {
-        let label = format!("{preset:.0}%");
-        presets = presets.push(
-            button(text(label))
-                .on_press(SidebarMessage::ApplyResizePreset(preset).into())
-                .padding([spacing::XXS, spacing::XS]),
-        );
-    }
+    // Presets: reduction presets on first row, enlargement presets on second row
+    // Both rows have 4 buttons for uniform width
+    let reduction_presets = Row::new()
+        .spacing(spacing::XS)
+        .push(preset_button(25.0))
+        .push(preset_button(50.0))
+        .push(preset_button(75.0))
+        .push(preset_button(100.0));
+
+    let enlargement_presets = Row::new()
+        .spacing(spacing::XS)
+        .push(preset_button(150.0))
+        .push(preset_button(200.0))
+        .push(preset_button(300.0))
+        .push(preset_button(400.0));
 
     let presets_section = Column::new()
         .spacing(spacing::XXS)
         .push(text(ctx.i18n.tr("image-editor-resize-presets-label")).size(typography::BODY_SM))
-        .push(presets);
+        .push(reduction_presets)
+        .push(enlargement_presets);
 
     let width_placeholder = ctx.i18n.tr("image-editor-resize-width-label");
     let width_label = text(width_placeholder.clone()).size(typography::BODY_SM);
     let width_input = text_input(width_placeholder.as_str(), &resize.width_input)
         .on_input(|value| Message::Sidebar(SidebarMessage::WidthInputChanged(value)))
+        .on_submit(Message::Sidebar(SidebarMessage::WidthInputSubmitted))
         .padding(spacing::XXS)
         .size(typography::BODY)
         .width(Length::Fill);
@@ -58,6 +74,7 @@ pub fn panel<'a>(
     let height_label = text(height_placeholder.clone()).size(typography::BODY_SM);
     let height_input = text_input(height_placeholder.as_str(), &resize.height_input)
         .on_input(|value| Message::Sidebar(SidebarMessage::HeightInputChanged(value)))
+        .on_submit(Message::Sidebar(SidebarMessage::HeightInputSubmitted))
         .padding(spacing::XXS)
         .size(typography::BODY)
         .width(Length::Fill);
@@ -83,12 +100,6 @@ pub fn panel<'a>(
         .label(ctx.i18n.tr("image-editor-resize-lock-aspect"))
         .on_toggle(|_| Message::Sidebar(SidebarMessage::ToggleLockAspect));
 
-    let apply_btn =
-        button(text(ctx.i18n.tr("image-editor-resize-apply")).size(typography::BODY_LG))
-            .padding(spacing::SM)
-            .width(Length::Fill)
-            .on_press(SidebarMessage::ApplyResize.into());
-
     // Build content with controls first, preview at the bottom
     // This prevents layout shift when user types in input fields
     let mut content = Column::new()
@@ -97,17 +108,97 @@ pub fn panel<'a>(
         .push(presets_section)
         .push(text(ctx.i18n.tr("image-editor-resize-dimensions-label")).size(typography::BODY_SM))
         .push(dimensions_row)
-        .push(lock_checkbox)
-        .push(apply_btn);
+        .push(lock_checkbox);
+
+    // Show AI upscale checkbox when the feature is enabled globally.
+    // Disable (not hide) when conditions aren't met to prevent layout shift.
+    // Use tooltip to explain why it's disabled (no layout shift).
+    if enable_upscale {
+        let is_enlargement = resize.scale.value() > 100.0;
+        let model_ready = matches!(upscale_model_status, UpscaleModelStatus::Ready);
+        let can_use_ai_upscale = is_enlargement && model_ready;
+
+        let ai_upscale_checkbox = checkbox(resize.use_ai_upscale && can_use_ai_upscale)
+            .label(ctx.i18n.tr("image-editor-resize-ai-upscale"));
+
+        // Enable the checkbox only if enlarging AND model is ready
+        let ai_upscale_checkbox = if can_use_ai_upscale {
+            ai_upscale_checkbox.on_toggle(|_| Message::Sidebar(SidebarMessage::ToggleAiUpscale))
+        } else {
+            ai_upscale_checkbox
+        };
+
+        // Determine tooltip text when disabled
+        let tooltip_text: Option<String> = if !is_enlargement {
+            Some(ctx.i18n.tr("image-editor-resize-ai-enlargement-only"))
+        } else {
+            match upscale_model_status {
+                UpscaleModelStatus::NotDownloaded => {
+                    Some(ctx.i18n.tr("image-editor-resize-ai-model-not-downloaded"))
+                }
+                UpscaleModelStatus::Downloading { progress } => {
+                    let percent = (*progress * 100.0) as u32;
+                    Some(format!(
+                        "{} ({}%)",
+                        ctx.i18n.tr("image-editor-resize-ai-model-downloading"),
+                        percent
+                    ))
+                }
+                UpscaleModelStatus::Validating => {
+                    Some(ctx.i18n.tr("image-editor-resize-ai-model-validating"))
+                }
+                UpscaleModelStatus::Error(msg) => Some(format!(
+                    "{}: {}",
+                    ctx.i18n.tr("image-editor-resize-ai-model-error"),
+                    msg
+                )),
+                UpscaleModelStatus::Ready => None,
+            }
+        };
+
+        // Wrap in tooltip when disabled, otherwise just show the checkbox
+        if let Some(hint) = tooltip_text {
+            content = content.push(
+                tooltip(
+                    ai_upscale_checkbox,
+                    text(hint).size(typography::BODY_SM),
+                    tooltip::Position::Top,
+                )
+                .gap(spacing::XXS),
+            );
+        } else {
+            content = content.push(ai_upscale_checkbox);
+        }
+    }
+
+    let apply_btn = {
+        let btn = button(text(ctx.i18n.tr("image-editor-resize-apply")).size(typography::BODY_LG))
+            .padding(spacing::SM)
+            .width(Length::Fill);
+
+        // Only enable the button if there are pending changes to apply
+        if resize.has_pending_changes() {
+            btn.on_press(SidebarMessage::ApplyResize.into())
+        } else {
+            btn
+        }
+    };
+
+    content = content.push(apply_btn);
 
     // Preview section at the bottom - only shown when there are changes
     // Being at the bottom means it won't shift the controls above when it appears
+    // Note: thumbnail is a small preview for performance; display target dimensions from resize state
     if let Some(img) = thumbnail {
         let (display_width, display_height) = calculate_thumbnail_size(img.width, img.height);
 
         let preview_image = image(img.handle.clone())
             .width(Length::Fixed(display_width))
             .height(Length::Fixed(display_height));
+
+        // Show target dimensions from resize state, not thumbnail dimensions
+        let target_width = resize.width;
+        let target_height = resize.height;
 
         let preview_section = Column::new()
             .spacing(spacing::XXS)
@@ -119,7 +210,7 @@ pub fn panel<'a>(
                     .center_x(Length::Fill),
             )
             .push(
-                text(format!("{}×{} px", img.width, img.height))
+                text(format!("{}×{} px", target_width, target_height))
                     .size(typography::BODY_SM)
                     .center(),
             );
@@ -132,6 +223,16 @@ pub fn panel<'a>(
         .width(Length::Fill)
         .style(styles::editor::settings_panel)
         .into()
+}
+
+/// Creates a preset button for a given scale percentage.
+/// Uses `Length::Fill` to ensure uniform width within each row.
+fn preset_button(percent: f32) -> iced::widget::Button<'static, Message> {
+    let label = format!("{:.0}%", percent);
+    button(text(label).center())
+        .on_press(SidebarMessage::ApplyResizePreset(percent).into())
+        .padding([spacing::XXS, spacing::XS])
+        .width(Length::Fill)
 }
 
 /// Calculate thumbnail display size while preserving aspect ratio.

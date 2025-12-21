@@ -1,59 +1,16 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize tool state and helpers.
 
-use crate::media::{image_transform, ImageData};
+use crate::media::{image_transform, ImageData, ResizeScale};
 use crate::ui::image_editor::{State, Transformation};
 
-/// Minimum resize scale percentage.
-const MIN_RESIZE_SCALE: f32 = 10.0;
-/// Maximum resize scale percentage.
-const MAX_RESIZE_SCALE: f32 = 200.0;
-/// Default resize scale percentage.
-const DEFAULT_RESIZE_SCALE: f32 = 100.0;
-
-/// Resize scale percentage, guaranteed to be within valid range (10%–200%).
-///
-/// This type ensures that resize scale values are always valid, eliminating
-/// the need for manual clamping at usage sites.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ResizeScale(f32);
-
-impl ResizeScale {
-    /// Creates a new resize scale, clamping the value to the valid range.
-    pub fn new(percent: f32) -> Self {
-        Self(percent.clamp(MIN_RESIZE_SCALE, MAX_RESIZE_SCALE))
-    }
-
-    /// Returns the raw percentage value.
-    pub fn value(self) -> f32 {
-        self.0
-    }
-
-    /// Returns the scale as a multiplier (e.g., 100% → 1.0).
-    pub fn as_factor(self) -> f32 {
-        self.0 / 100.0
-    }
-
-    /// Returns whether the scale is at the minimum value.
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_RESIZE_SCALE
-    }
-
-    /// Returns whether the scale is at the maximum value.
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_RESIZE_SCALE
-    }
-
-    /// Returns whether the scale represents 100% (no resize).
-    pub fn is_original(self) -> bool {
-        (self.0 - DEFAULT_RESIZE_SCALE).abs() < f32::EPSILON
-    }
-}
-
-impl Default for ResizeScale {
-    fn default() -> Self {
-        Self(DEFAULT_RESIZE_SCALE)
-    }
+/// Tracks which dimension input field has uncommitted changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DirtyField {
+    #[default]
+    None,
+    Width,
+    Height,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -74,6 +31,14 @@ pub struct ResizeState {
     pub height_input: String,
     /// Visual overlay showing original size markers
     pub overlay: ResizeOverlay,
+    /// Whether AI upscale processing is in progress
+    pub is_upscale_processing: bool,
+    /// Whether to use AI upscaling for enlargements (scale > 100%).
+    /// This is a per-operation setting, not persisted between sessions.
+    pub use_ai_upscale: bool,
+    /// Tracks which input field has uncommitted changes (dirty flag pattern).
+    /// Used to commit pending edits before other actions.
+    pub dirty_field: DirtyField,
 }
 
 impl ResizeState {
@@ -99,7 +64,18 @@ impl ResizeState {
                 original_width: width,
                 original_height: height,
             },
+            is_upscale_processing: false,
+            // Default to true; will be effective only if model is ready
+            use_ai_upscale: true,
+            dirty_field: DirtyField::None,
         }
+    }
+
+    /// Returns true if the target dimensions differ from the current working image.
+    /// The overlay stores the current image dimensions (updated after each resize).
+    /// Used to determine whether the "Apply" button should be enabled.
+    pub fn has_pending_changes(&self) -> bool {
+        self.width != self.overlay.original_width || self.height != self.overlay.original_height
     }
 
     /// Syncs derived fields with the provided image dimensions.
@@ -159,6 +135,61 @@ impl State {
         self.apply_resize_dimensions();
     }
 
+    /// Returns the target dimensions for the pending resize operation.
+    pub fn pending_resize_dimensions(&self) -> (u32, u32) {
+        (
+            self.resize_state.width.max(1),
+            self.resize_state.height.max(1),
+        )
+    }
+
+    /// Returns true if the pending resize operation is an enlargement (scale > 100%).
+    pub fn is_resize_enlargement(&self) -> bool {
+        let (target_width, target_height) = self.pending_resize_dimensions();
+        target_width > self.current_image.width || target_height > self.current_image.height
+    }
+
+    /// Returns true if the pending resize dimensions differ from current image.
+    pub fn has_pending_resize(&self) -> bool {
+        let (target_width, target_height) = self.pending_resize_dimensions();
+        target_width != self.current_image.width || target_height != self.current_image.height
+    }
+
+    /// Applies the result of an AI upscale resize operation.
+    /// This is called when the async AI upscaling task completes.
+    pub fn apply_upscale_resize_result(&mut self, result: image_rs::DynamicImage) {
+        // Clear processing state
+        self.resize_state.is_upscale_processing = false;
+
+        // Record the transformation for undo/redo
+        self.record_transformation(Transformation::Resize {
+            width: result.width(),
+            height: result.height(),
+        });
+
+        // Update the working image
+        self.working_image = result;
+
+        // Update the display image
+        if let Ok(image_data) = image_transform::dynamic_to_image_data(&self.working_image) {
+            self.current_image = image_data;
+            self.sync_resize_state_dimensions();
+        }
+
+        // Clear any preview
+        self.preview_image = None;
+
+        // Update overlay with new dimensions
+        self.resize_state
+            .overlay
+            .set_original_dimensions(self.current_image.width, self.current_image.height);
+    }
+
+    /// Clears the upscale processing state (called on error or fallback).
+    pub fn clear_upscale_processing(&mut self) {
+        self.resize_state.is_upscale_processing = false;
+    }
+
     fn set_resize_percent(&mut self, percent: f32) {
         let scale = ResizeScale::new(percent);
         self.resize_state.scale = scale;
@@ -178,35 +209,79 @@ impl State {
     }
 
     fn handle_width_input_change(&mut self, value: String) {
-        self.resize_state.width_input = value.clone();
-        if let Some(width) = parse_dimension_input(&value) {
-            if self.resize_state.lock_aspect {
-                self.set_width_preserving_aspect(width);
-                self.update_scale_percent_from_width();
-            } else {
-                // When aspect is unlocked, allow any value without clamping
-                let width = width.max(1);
-                self.resize_state.width = width;
-                self.resize_state.width_input = width.to_string();
-                self.update_resize_preview();
-            }
-        }
+        // Store the raw input value and mark as dirty
+        // Calculation happens on submit, blur (via commit_dirty), or other actions
+        self.resize_state.width_input = value;
+        self.resize_state.dirty_field = DirtyField::Width;
     }
 
     fn handle_height_input_change(&mut self, value: String) {
-        self.resize_state.height_input = value.clone();
-        if let Some(height) = parse_dimension_input(&value) {
+        // Store the raw input value and mark as dirty
+        // Calculation happens on submit, blur (via commit_dirty), or other actions
+        self.resize_state.height_input = value;
+        self.resize_state.dirty_field = DirtyField::Height;
+    }
+
+    /// Commits any pending (dirty) input field changes.
+    /// Call this before any action that depends on dimension values.
+    pub(crate) fn commit_dirty_resize_input(&mut self) {
+        match self.resize_state.dirty_field {
+            DirtyField::Width => self.commit_width_input(),
+            DirtyField::Height => self.commit_height_input(),
+            DirtyField::None => {}
+        }
+    }
+
+    fn commit_width_input(&mut self) {
+        self.resize_state.dirty_field = DirtyField::None;
+
+        if let Some(width) = parse_dimension_input(&self.resize_state.width_input) {
+            let width = width.max(1);
+            self.resize_state.width = width;
+            self.resize_state.width_input = width.to_string();
+
             if self.resize_state.lock_aspect {
-                self.set_height_preserving_aspect(height);
-                self.update_scale_percent_from_width();
-            } else {
-                // When aspect is unlocked, allow any value without clamping
-                let height = height.max(1);
+                let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
+                let height = (width as f32 / aspect).round().max(1.0) as u32;
                 self.resize_state.height = height;
                 self.resize_state.height_input = height.to_string();
-                self.update_resize_preview();
             }
+            self.update_scale_percent_from_width();
+            self.update_resize_preview();
+        } else {
+            // Invalid input: restore from current width value
+            self.resize_state.width_input = self.resize_state.width.to_string();
         }
+    }
+
+    fn commit_height_input(&mut self) {
+        self.resize_state.dirty_field = DirtyField::None;
+
+        if let Some(height) = parse_dimension_input(&self.resize_state.height_input) {
+            let height = height.max(1);
+            self.resize_state.height = height;
+            self.resize_state.height_input = height.to_string();
+
+            if self.resize_state.lock_aspect {
+                let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
+                let width = (height as f32 * aspect).round().max(1.0) as u32;
+                self.resize_state.width = width;
+                self.resize_state.width_input = width.to_string();
+            }
+            self.update_scale_percent_from_width();
+            self.update_resize_preview();
+        } else {
+            // Invalid input: restore from current height value
+            self.resize_state.height_input = self.resize_state.height.to_string();
+        }
+    }
+
+    pub(crate) fn sidebar_width_input_submitted(&mut self) {
+        self.commit_width_input();
+    }
+
+    pub(crate) fn sidebar_height_input_submitted(&mut self) {
+        self.commit_height_input();
     }
 
     fn toggle_resize_lock(&mut self) {
@@ -228,16 +303,6 @@ impl State {
         self.resize_state.height_input = height.to_string();
     }
 
-    fn set_height_preserving_aspect(&mut self, height: u32) {
-        let height = height.max(1);
-        let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
-        let width = (height as f32 * aspect).round().max(1.0) as u32;
-        self.resize_state.height = height;
-        self.resize_state.width = width.max(1);
-        self.resize_state.width_input = self.resize_state.width.to_string();
-        self.resize_state.height_input = height.to_string();
-    }
-
     fn update_scale_percent_from_width(&mut self) {
         let base_width = self.base_width();
         if base_width <= 0.0 {
@@ -255,6 +320,7 @@ impl State {
     }
 
     fn apply_resize_dimensions(&mut self) {
+        // Note: commit_dirty_resize_input is called before this method in routing
         let target_width = self.resize_state.width.max(1);
         let target_height = self.resize_state.height.max(1);
         if target_width == self.current_image.width && target_height == self.current_image.height {
@@ -282,13 +348,39 @@ impl State {
             return;
         }
 
+        // Generate a small thumbnail for sidebar preview instead of full-size image.
+        // This dramatically improves performance for large images.
+        // The thumbnail preserves the target aspect ratio.
+        let (thumb_width, thumb_height) =
+            calculate_preview_thumbnail_size(target_width, target_height);
+
         let preview_dynamic =
-            image_transform::resize(&self.working_image, target_width, target_height);
+            image_transform::resize(&self.working_image, thumb_width, thumb_height);
         if let Ok(image_data) = image_transform::dynamic_to_image_data(&preview_dynamic) {
             self.preview_image = Some(image_data);
         } else {
             self.preview_image = None;
         }
+    }
+}
+
+/// Maximum size for the resize preview thumbnail.
+/// Kept small for performance during slider interaction.
+const PREVIEW_THUMBNAIL_MAX_SIZE: u32 = 300;
+
+/// Calculate thumbnail dimensions for the resize preview.
+/// Scales down to fit within max size while preserving aspect ratio.
+fn calculate_preview_thumbnail_size(target_width: u32, target_height: u32) -> (u32, u32) {
+    let max_dim = target_width.max(target_height);
+    if max_dim <= PREVIEW_THUMBNAIL_MAX_SIZE {
+        // Already small enough
+        (target_width, target_height)
+    } else {
+        // Scale down to fit within max size
+        let scale = PREVIEW_THUMBNAIL_MAX_SIZE as f32 / max_dim as f32;
+        let thumb_width = (target_width as f32 * scale).round().max(1.0) as u32;
+        let thumb_height = (target_height as f32 * scale).round().max(1.0) as u32;
+        (thumb_width, thumb_height)
     }
 }
 

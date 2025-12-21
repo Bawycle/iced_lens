@@ -12,6 +12,7 @@ Privacy-first media viewer and editor with AI deblurring.
 ## Why IcedLens?
 
 - **AI Deblur** — Sharpen blurry photos using NAFNet neural network (experimental)
+- **AI Upscaling** — Enlarge images up to 4x with Real-ESRGAN for sharper results
 - **Metadata editing** — Edit EXIF and Dublin Core/XMP metadata directly
 - **Privacy-first** — No telemetry, no cloud, fully local (except optional AI model download)
 - **Live i18n** — Switch languages at runtime without restart

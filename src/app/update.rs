@@ -431,6 +431,108 @@ pub fn handle_settings_message(
         SettingsEvent::DeblurModelUrlChanged(_) => {
             persistence::persist_preferences(ctx.preferences_context())
         }
+        // AI Upscale settings events
+        SettingsEvent::RequestEnableUpscale => {
+            use iced::futures::channel::{mpsc, oneshot};
+            use iced::futures::stream;
+            use iced::futures::StreamExt;
+
+            // Start the download/validation process
+            ctx.settings.set_upscale_model_status(
+                crate::media::upscale::UpscaleModelStatus::Downloading { progress: 0.0 },
+            );
+
+            let url = ctx.settings.upscale_model_url().to_string();
+
+            // Channels for progress and result
+            let (progress_tx, progress_rx) = mpsc::channel::<f32>(100);
+            let (result_tx, result_rx) = oneshot::channel::<Result<u64, String>>();
+
+            // Spawn the download task
+            let url_clone = url.clone();
+            tokio::spawn(async move {
+                let mut progress_tx = progress_tx;
+                let download_result =
+                    crate::media::upscale::download_model(&url_clone, |progress| {
+                        let _ = progress_tx.try_send(progress);
+                    })
+                    .await;
+
+                let _ = result_tx.send(download_result.map_err(|e| e.to_string()));
+            });
+
+            // State for the stream
+            enum UpscaleDownloadPhase {
+                ReceivingProgress {
+                    progress_rx: mpsc::Receiver<f32>,
+                    result_rx: oneshot::Receiver<Result<u64, String>>,
+                },
+                WaitingForResult {
+                    result_rx: oneshot::Receiver<Result<u64, String>>,
+                },
+                Completed,
+            }
+
+            let download_stream = stream::unfold(
+                UpscaleDownloadPhase::ReceivingProgress {
+                    progress_rx,
+                    result_rx,
+                },
+                |phase| async move {
+                    match phase {
+                        UpscaleDownloadPhase::ReceivingProgress {
+                            mut progress_rx,
+                            result_rx,
+                        } => match progress_rx.next().await {
+                            Some(progress) => Some((
+                                Message::UpscaleDownloadProgress(progress),
+                                UpscaleDownloadPhase::ReceivingProgress {
+                                    progress_rx,
+                                    result_rx,
+                                },
+                            )),
+                            None => Some((
+                                Message::UpscaleDownloadProgress(1.0),
+                                UpscaleDownloadPhase::WaitingForResult { result_rx },
+                            )),
+                        },
+                        UpscaleDownloadPhase::WaitingForResult { result_rx } => {
+                            match result_rx.await {
+                                Ok(Ok(_bytes)) => Some((
+                                    Message::UpscaleDownloadCompleted(Ok(())),
+                                    UpscaleDownloadPhase::Completed,
+                                )),
+                                Ok(Err(e)) => Some((
+                                    Message::UpscaleDownloadCompleted(Err(e)),
+                                    UpscaleDownloadPhase::Completed,
+                                )),
+                                Err(_) => Some((
+                                    Message::UpscaleDownloadCompleted(Err(
+                                        "Download task cancelled".to_string(),
+                                    )),
+                                    UpscaleDownloadPhase::Completed,
+                                )),
+                            }
+                        }
+                        UpscaleDownloadPhase::Completed => None,
+                    }
+                },
+            );
+
+            Task::stream(download_stream)
+        }
+        SettingsEvent::DisableUpscale => {
+            ctx.app_state.enable_upscale = false;
+            if let Some(key) = ctx.app_state.save() {
+                ctx.notifications
+                    .push(notifications::Notification::warning(&key));
+            }
+            let _ = std::fs::remove_file(crate::media::upscale::get_model_path());
+            Task::none()
+        }
+        SettingsEvent::UpscaleModelUrlChanged(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
     }
 }
 
@@ -502,6 +604,9 @@ pub fn handle_editor_message(
             // The actual inference task will check this flag and stop
             Task::none()
         }
+        ImageEditorEvent::UpscaleResizeRequested { width, height } => {
+            handle_upscale_resize_request(ctx, width, height)
+        }
         ImageEditorEvent::ScrollTo { x, y } => {
             use iced::widget::scrollable::RelativeOffset;
             use iced::widget::{operation, Id};
@@ -538,6 +643,54 @@ fn handle_deblur_request(ctx: &mut UpdateContext<'_>) -> Task<Message> {
             Err(e) => Message::DeblurApplyCompleted(Err(e.to_string())),
         },
     )
+}
+
+/// Handles resize request that may use AI upscaling.
+/// - If AI upscaling is enabled and model is ready: run async AI inference
+/// - Otherwise: fall back to standard Lanczos resize
+fn handle_upscale_resize_request(
+    ctx: &mut UpdateContext<'_>,
+    target_width: u32,
+    target_height: u32,
+) -> Task<Message> {
+    let Some(editor_state) = ctx.image_editor.as_mut() else {
+        return Task::none();
+    };
+
+    // Check if AI upscaling should be used
+    let use_ai_upscale = ctx.app_state.enable_upscale
+        && matches!(
+            ctx.settings.upscale_model_status(),
+            media::upscale::UpscaleModelStatus::Ready
+        );
+
+    if use_ai_upscale {
+        // Get the current working image from the editor
+        let working_image = editor_state.working_image().clone();
+
+        // Run the AI upscale + Lanczos resize in a blocking task
+        Task::perform(
+            async move {
+                tokio::task::spawn_blocking(move || {
+                    let mut manager = media::upscale::UpscaleManager::new();
+                    manager.load_session(None)?;
+                    manager.upscale_to_size(&working_image, target_width, target_height)
+                })
+                .await
+                .map_err(|e| media::upscale::UpscaleError::InferenceFailed(e.to_string()))?
+            },
+            |result: media::upscale::UpscaleResult<image_rs::DynamicImage>| match result {
+                Ok(upscaled) => Message::UpscaleResizeCompleted(Ok(Box::new(upscaled))),
+                Err(e) => Message::UpscaleResizeCompleted(Err(e.to_string())),
+            },
+        )
+    } else {
+        // Fall back to standard Lanczos resize (sync)
+        // Clear the processing state that was set by the event emission
+        editor_state.clear_upscale_processing();
+        editor_state.sidebar_apply_resize();
+        Task::none()
+    }
 }
 
 /// Handles Save As dialog request.

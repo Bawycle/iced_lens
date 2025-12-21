@@ -13,16 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Image editor zoom:** use mouse wheel to zoom in/out while editing, matching the viewer behavior.
 - **Image editor pan:** grab-and-drag to navigate when zoomed, like in the viewer.
 - **Resize preview:** thumbnail preview in the sidebar shows the result before applying.
+- **AI upscaling:** optional Real-ESRGAN 4x upscaling for image enlargements. Enable in Settings → AI / Machine Learning. Produces sharper results than traditional interpolation for scales above 100%.
 
 ### Changed
 - Crop handles are now larger for better accessibility (WCAG 2.5.5 compliant).
 - Images are now centered in the editor canvas when smaller than the viewport.
 - Toolbar buttons now use light (white) icons for better contrast on dark button backgrounds.
+- Resize scale maximum increased from 200% to 400% to match Real-ESRGAN 4x native capability.
+- Resize preset buttons now have uniform width for better visual consistency.
 
 ### Fixed
 - Navigation overlay buttons no longer display rendering artifacts on Windows.
 - Window title now consistently shows metadata title (dc:title) across viewer and image editor.
 - Resize tool now allows free dimension input when aspect ratio is unlocked.
+- Resize slider no longer causes lag with large images (preview now uses optimized thumbnail generation).
 
 ## [0.4.1] - 2025-12-19
 

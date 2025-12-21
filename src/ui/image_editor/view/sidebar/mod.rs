@@ -8,6 +8,7 @@ pub mod resize_panel;
 
 use crate::media::deblur::ModelStatus;
 use crate::media::frame_export::ExportFormat;
+use crate::media::upscale::UpscaleModelStatus;
 use crate::media::ImageData;
 use crate::ui::action_icons;
 use crate::ui::design_tokens::{sizing, spacing, typography};
@@ -42,6 +43,10 @@ pub struct SidebarModel<'a> {
     pub has_deblur_applied: bool,
     /// Thumbnail preview for resize tool (shown in sidebar).
     pub resize_thumbnail: Option<&'a ImageData>,
+    /// Current status of the AI upscale model.
+    pub upscale_model_status: &'a UpscaleModelStatus,
+    /// Whether AI upscaling is enabled globally in settings.
+    pub enable_upscale: bool,
 }
 
 impl<'a> SidebarModel<'a> {
@@ -60,6 +65,8 @@ impl<'a> SidebarModel<'a> {
             deblur_model_status: ctx.deblur_model_status,
             has_deblur_applied: state.has_deblur_applied(),
             resize_thumbnail: state.resize_thumbnail(),
+            upscale_model_status: ctx.upscale_model_status,
+            enable_upscale: ctx.enable_upscale,
         }
     }
 }
@@ -98,6 +105,8 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
         scrollable_section = scrollable_section.push(resize_panel::panel(
             model.resize_state,
             model.resize_thumbnail,
+            model.upscale_model_status,
+            model.enable_upscale,
             ctx,
         ));
     }

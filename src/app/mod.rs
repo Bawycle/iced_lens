@@ -216,7 +216,7 @@ impl App {
         let (app_state, state_warning) = persisted_state::AppState::load();
         app.app_state = app_state.clone();
 
-        // AI settings (enable_deblur comes from persisted state, not config)
+        // AI settings (enable flags come from persisted state, not config)
         let enable_deblur = app_state.enable_deblur;
         let deblur_model_url = config
             .ai
@@ -224,14 +224,32 @@ impl App {
             .clone()
             .unwrap_or_else(|| config::DEFAULT_DEBLUR_MODEL_URL.to_string());
 
+        let enable_upscale = app_state.enable_upscale;
+        let upscale_model_url = config
+            .ai
+            .upscale_model_url
+            .clone()
+            .unwrap_or_else(|| config::DEFAULT_UPSCALE_MODEL_URL.to_string());
+
         // Check if the deblur model needs validation at startup
         // If enable_deblur is true and model exists, we need to validate it before making it available
-        let (deblur_model_status, needs_startup_validation) =
+        let (deblur_model_status, needs_deblur_startup_validation) =
             if enable_deblur && media::deblur::is_model_downloaded() {
                 // Model exists but needs validation - set to Validating, not Ready
                 (crate::media::deblur::ModelStatus::Validating, true)
             } else {
                 (crate::media::deblur::ModelStatus::NotDownloaded, false)
+            };
+
+        // Check if the upscale model needs validation at startup
+        let (upscale_model_status, needs_upscale_startup_validation) =
+            if enable_upscale && media::upscale::is_model_downloaded() {
+                (crate::media::upscale::UpscaleModelStatus::Validating, true)
+            } else {
+                (
+                    crate::media::upscale::UpscaleModelStatus::NotDownloaded,
+                    false,
+                )
             };
 
         app.settings = SettingsState::new(SettingsConfig {
@@ -248,6 +266,9 @@ impl App {
             enable_deblur,
             deblur_model_url,
             deblur_model_status,
+            enable_upscale,
+            upscale_model_url,
+            upscale_model_status,
         });
         app.video_autoplay = video_autoplay;
         app.audio_normalization = audio_normalization;
@@ -330,7 +351,7 @@ impl App {
 
         // If deblur was enabled and model exists, start validation in background
         // Use spawn_blocking to avoid blocking the tokio runtime during CPU-intensive ONNX inference
-        let validation_task = if needs_startup_validation {
+        let deblur_validation_task = if needs_deblur_startup_validation {
             let cancel_token = app.cancellation_token.clone();
             Task::perform(
                 async move {
@@ -358,8 +379,37 @@ impl App {
             Task::none()
         };
 
+        // If upscale was enabled and model exists, start validation in background
+        let upscale_validation_task = if needs_upscale_startup_validation {
+            let cancel_token = app.cancellation_token.clone();
+            Task::perform(
+                async move {
+                    tokio::task::spawn_blocking(move || {
+                        let mut manager = media::upscale::UpscaleManager::new();
+                        manager.load_session(Some(&cancel_token))?;
+                        media::upscale::validate_model(&mut manager, Some(&cancel_token))?;
+                        Ok::<(), media::upscale::UpscaleError>(())
+                    })
+                    .await
+                    .map_err(|e| media::upscale::UpscaleError::InferenceFailed(e.to_string()))?
+                },
+                |result: media::upscale::UpscaleResult<()>| match result {
+                    Ok(()) => Message::UpscaleValidationCompleted {
+                        result: Ok(()),
+                        is_startup: true,
+                    },
+                    Err(e) => Message::UpscaleValidationCompleted {
+                        result: Err(e.to_string()),
+                        is_startup: true,
+                    },
+                },
+            )
+        } else {
+            Task::none()
+        };
+
         // Combine tasks
-        let combined_task = Task::batch([task, validation_task]);
+        let combined_task = Task::batch([task, deblur_validation_task, upscale_validation_task]);
 
         (app, combined_task)
     }
@@ -651,6 +701,19 @@ impl App {
                 self.handle_deblur_validation_completed(result, is_startup)
             }
             Message::DeblurApplyCompleted(result) => self.handle_deblur_apply_completed(result),
+            Message::UpscaleDownloadProgress(progress) => {
+                self.settings.set_upscale_model_status(
+                    media::upscale::UpscaleModelStatus::Downloading { progress },
+                );
+                Task::none()
+            }
+            Message::UpscaleDownloadCompleted(result) => {
+                self.handle_upscale_download_completed(result)
+            }
+            Message::UpscaleValidationCompleted { result, is_startup } => {
+                self.handle_upscale_validation_completed(result, is_startup)
+            }
+            Message::UpscaleResizeCompleted(result) => self.handle_upscale_resize_completed(result),
             Message::WindowCloseRequested(id) => {
                 // Mark app as shutting down to cancel background tasks
                 self.shutting_down = true;
@@ -686,6 +749,39 @@ impl App {
                     editor.deblur_failed();
                     self.notifications.push(
                         notifications::Notification::error("notification-deblur-apply-error")
+                            .with_arg("error", e),
+                    );
+                }
+            }
+        }
+        Task::none()
+    }
+
+    /// Handles the result of applying AI upscale resize to an image.
+    fn handle_upscale_resize_completed(
+        &mut self,
+        result: Result<Box<image_rs::DynamicImage>, String>,
+    ) -> Task<Message> {
+        // Ignore results if shutting down
+        if self.shutting_down {
+            return Task::none();
+        }
+
+        if let Some(editor) = self.image_editor.as_mut() {
+            match result {
+                Ok(upscaled_image) => {
+                    // apply_upscale_resize_result clears the processing state
+                    editor.apply_upscale_resize_result(*upscaled_image);
+                    self.notifications
+                        .push(notifications::Notification::success(
+                            "notification-upscale-resize-success",
+                        ));
+                }
+                Err(e) => {
+                    // Clear processing state on error
+                    editor.clear_upscale_processing();
+                    self.notifications.push(
+                        notifications::Notification::error("notification-upscale-resize-error")
                             .with_arg("error", e),
                     );
                 }
@@ -856,6 +952,108 @@ impl App {
         Task::none()
     }
 
+    /// Handles the result of upscale model download.
+    fn handle_upscale_download_completed(&mut self, result: Result<(), String>) -> Task<Message> {
+        // Don't start validation if shutting down
+        if self.shutting_down {
+            return Task::none();
+        }
+
+        match result {
+            Ok(()) => {
+                // Download succeeded - start validation
+                self.settings
+                    .set_upscale_model_status(media::upscale::UpscaleModelStatus::Validating);
+
+                // Start validation task using spawn_blocking for CPU-intensive ONNX inference
+                let cancel_token = self.cancellation_token.clone();
+                Task::perform(
+                    async move {
+                        tokio::task::spawn_blocking(move || {
+                            let mut manager = media::upscale::UpscaleManager::new();
+                            manager.load_session(Some(&cancel_token))?;
+                            media::upscale::validate_model(&mut manager, Some(&cancel_token))?;
+                            Ok::<(), media::upscale::UpscaleError>(())
+                        })
+                        .await
+                        .map_err(|e| media::upscale::UpscaleError::InferenceFailed(e.to_string()))?
+                    },
+                    |result: media::upscale::UpscaleResult<()>| match result {
+                        Ok(()) => Message::UpscaleValidationCompleted {
+                            result: Ok(()),
+                            is_startup: false,
+                        },
+                        Err(e) => Message::UpscaleValidationCompleted {
+                            result: Err(e.to_string()),
+                            is_startup: false,
+                        },
+                    },
+                )
+            }
+            Err(e) => {
+                // Download failed
+                self.settings
+                    .set_upscale_model_status(media::upscale::UpscaleModelStatus::Error(e.clone()));
+                self.notifications.push(
+                    notifications::Notification::error("notification-upscale-download-error")
+                        .with_arg("error", e),
+                );
+                Task::none()
+            }
+        }
+    }
+
+    /// Handles the result of upscale model validation.
+    fn handle_upscale_validation_completed(
+        &mut self,
+        result: Result<(), String>,
+        is_startup: bool,
+    ) -> Task<Message> {
+        // Ignore validation results if the app is shutting down
+        if self.shutting_down {
+            return Task::none();
+        }
+
+        match result {
+            Ok(()) => {
+                // Validation succeeded - enable upscale and persist state
+                self.settings
+                    .set_upscale_model_status(media::upscale::UpscaleModelStatus::Ready);
+                self.settings.set_enable_upscale(true);
+                self.app_state.enable_upscale = true;
+                if let Some(key) = self.app_state.save() {
+                    self.notifications
+                        .push(notifications::Notification::warning(&key));
+                }
+                // Only show success notification for user-initiated activation, not startup
+                if !is_startup {
+                    self.notifications
+                        .push(notifications::Notification::success(
+                            "notification-upscale-ready",
+                        ));
+                }
+            }
+            Err(e) => {
+                // Validation failed - reset enable_upscale, delete the model and show error
+                self.settings
+                    .set_upscale_model_status(media::upscale::UpscaleModelStatus::Error(e.clone()));
+                self.settings.set_enable_upscale(false);
+                self.app_state.enable_upscale = false;
+                if let Some(key) = self.app_state.save() {
+                    self.notifications
+                        .push(notifications::Notification::warning(&key));
+                }
+                // Delete the invalid model file
+                let _ = std::fs::remove_file(media::upscale::get_model_path());
+                self.notifications.push(
+                    notifications::Notification::error("notification-upscale-validation-error")
+                        .with_arg("error", e),
+                );
+            }
+        }
+        Task::none()
+    }
+
     /// Handles async image loading result for the editor.
     fn handle_image_editor_loaded(
         &mut self,
@@ -918,6 +1116,8 @@ impl App {
             notifications: &self.notifications,
             is_dark_theme,
             deblur_model_status: self.settings.deblur_model_status(),
+            upscale_model_status: self.settings.upscale_model_status(),
+            enable_upscale: self.app_state.enable_upscale,
         })
     }
 }
