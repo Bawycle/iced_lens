@@ -64,6 +64,8 @@ settings-sort-order-label = Image navigation sort order
 settings-sort-alphabetical = Alphabetical
 settings-sort-modified = Modified date
 settings-sort-created = Created date
+settings-max-skip-attempts-label = Auto-skip corrupted files
+settings-max-skip-attempts-hint = Maximum consecutive corrupted files to skip during navigation.
 settings-overlay-timeout-label = Fullscreen overlay auto-hide delay
 settings-overlay-timeout-hint = Time before controls disappear when in fullscreen mode.
 seconds = seconds
@@ -441,6 +443,8 @@ notification-load-error-io = Could not open file. Check that it exists and you h
 notification-load-error-svg = Could not render SVG. The file may be malformed.
 notification-load-error-video = Could not play video. The format may be unsupported.
 notification-load-error-timeout = Loading timed out. The file may be too large or the system is busy.
+notification-skipped-corrupted-files = Skipped: { $files }
+notification-skipped-and-others = +{ $count } more
 
 # AI Settings
 settings-enable-deblur-label = AI Deblurring

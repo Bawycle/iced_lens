@@ -64,6 +64,8 @@ settings-sort-order-label = Sortierreihenfolge für Bildnavigation
 settings-sort-alphabetical = Alphabetisch
 settings-sort-modified = Änderungsdatum
 settings-sort-created = Erstellungsdatum
+settings-max-skip-attempts-label = Beschädigte Dateien überspringen
+settings-max-skip-attempts-hint = Maximale Anzahl beschädigter Dateien, die bei der Navigation übersprungen werden.
 settings-overlay-timeout-label = Verzögerung für automatisches Ausblenden im Vollbildmodus
 settings-overlay-timeout-hint = Zeit bis zum Verschwinden der Steuerelemente im Vollbildmodus.
 seconds = Sekunden
@@ -441,6 +443,8 @@ notification-load-error-io = Datei konnte nicht geöffnet werden. Prüfen Sie, o
 notification-load-error-svg = SVG konnte nicht gerendert werden. Die Datei ist möglicherweise fehlerhaft.
 notification-load-error-video = Video konnte nicht abgespielt werden. Das Format wird möglicherweise nicht unterstützt.
 notification-load-error-timeout = Laden hat zu lange gedauert. Die Datei ist möglicherweise zu groß oder das System ist ausgelastet.
+notification-skipped-corrupted-files = Übersprungen: { $files }
+notification-skipped-and-others = +{ $count } weitere
 
 # KI-Einstellungen
 settings-enable-deblur-label = KI-Entunschärfung

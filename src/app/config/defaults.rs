@@ -133,6 +133,21 @@ pub const MIN_RESIZE_SCALE_PERCENT: f32 = 10.0;
 pub const MAX_RESIZE_SCALE_PERCENT: f32 = 400.0;
 
 // ==========================================================================
+// Navigation Auto-Skip Defaults
+// ==========================================================================
+
+/// Default maximum number of consecutive corrupted files to skip during navigation.
+/// When navigating (next/prev), if media fails to load, auto-skip to next.
+/// Stops after this many consecutive failures to prevent infinite loops.
+pub const DEFAULT_MAX_SKIP_ATTEMPTS: u32 = 5;
+
+/// Minimum max skip attempts (1 = skip at least once before stopping).
+pub const MIN_MAX_SKIP_ATTEMPTS: u32 = 1;
+
+/// Maximum max skip attempts (prevent excessive loops).
+pub const MAX_MAX_SKIP_ATTEMPTS: u32 = 20;
+
+// ==========================================================================
 // Playback Speed Defaults
 // ==========================================================================
 
@@ -236,4 +251,10 @@ const _: () = {
     assert!(MAX_RESIZE_SCALE_PERCENT > MIN_RESIZE_SCALE_PERCENT);
     assert!(DEFAULT_RESIZE_SCALE_PERCENT >= MIN_RESIZE_SCALE_PERCENT);
     assert!(DEFAULT_RESIZE_SCALE_PERCENT <= MAX_RESIZE_SCALE_PERCENT);
+
+    // Navigation auto-skip validation
+    assert!(MIN_MAX_SKIP_ATTEMPTS >= 1);
+    assert!(MAX_MAX_SKIP_ATTEMPTS >= MIN_MAX_SKIP_ATTEMPTS);
+    assert!(DEFAULT_MAX_SKIP_ATTEMPTS >= MIN_MAX_SKIP_ATTEMPTS);
+    assert!(DEFAULT_MAX_SKIP_ATTEMPTS <= MAX_MAX_SKIP_ATTEMPTS);
 };

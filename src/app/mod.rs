@@ -255,6 +255,10 @@ impl App {
                 )
             };
 
+        let max_skip_attempts = config
+            .display
+            .max_skip_attempts
+            .unwrap_or(config::DEFAULT_MAX_SKIP_ATTEMPTS);
         app.settings = SettingsState::new(SettingsConfig {
             zoom_step_percent: app.viewer.zoom_step_percent(),
             background_theme: theme,
@@ -266,6 +270,7 @@ impl App {
             frame_cache_mb,
             frame_history_mb,
             keyboard_seek_step_secs,
+            max_skip_attempts,
             enable_deblur,
             deblur_model_url,
             deblur_model_status,
@@ -288,6 +293,11 @@ impl App {
         }
         if let Some(loop_enabled) = config.video.loop_enabled {
             app.viewer.set_video_loop(loop_enabled);
+        }
+
+        // Apply display preferences from config
+        if let Some(max_skip) = config.display.max_skip_attempts {
+            app.viewer.set_max_skip_attempts(max_skip);
         }
 
         // Show warnings for config/state loading issues
@@ -1073,36 +1083,146 @@ impl App {
         &mut self,
         result: Result<MediaData, crate::error::Error>,
     ) -> Task<Message> {
+        use crate::ui::viewer::{LoadOrigin, NavigationDirection};
+
         match result {
             Ok(media_data) => {
                 // Editor only supports images - videos are skipped during navigation
                 let MediaData::Image(image_data) = media_data else {
-                    // Should not happen: navigate_*_image() only returns images
+                    // Should not happen: peek_*_image() only returns images
                     return Task::none();
                 };
 
+                // Get the tentative path from viewer and confirm navigation
+                let Some(path) = self.viewer.current_media_path.clone() else {
+                    return Task::none();
+                };
+
+                // Confirm navigation in MediaNavigator (pessimistic update)
+                self.media_navigator.confirm_navigation(&path);
+
+                // Check if we skipped any files during navigation
+                let load_origin = std::mem::take(&mut self.viewer.load_origin);
+                if let LoadOrigin::Navigation { skipped_files, .. } = load_origin {
+                    if !skipped_files.is_empty() {
+                        let files_text =
+                            update::format_skipped_files_message(&self.i18n, &skipped_files);
+                        self.notifications.push(
+                            notifications::Notification::warning(
+                                "notification-skipped-corrupted-files",
+                            )
+                            .with_arg("files", files_text)
+                            .auto_dismiss(std::time::Duration::from_secs(8)),
+                        );
+                    }
+                }
+
                 // Create a new ImageEditorState with the loaded image
-                if let Some(current_media_path) = self.media_navigator.current_media_path() {
-                    let path = current_media_path.to_path_buf();
-                    match image_editor::State::new(path, image_data) {
-                        Ok(new_editor_state) => {
-                            self.image_editor = Some(new_editor_state);
+                match image_editor::State::new(path, image_data) {
+                    Ok(new_editor_state) => {
+                        self.image_editor = Some(new_editor_state);
+                    }
+                    Err(_) => {
+                        self.notifications.push(notifications::Notification::error(
+                            "notification-editor-create-error",
+                        ));
+                    }
+                }
+                Task::none()
+            }
+            Err(_) => {
+                // Get the failed filename from viewer's tentative path
+                let failed_filename = self
+                    .viewer
+                    .current_media_path
+                    .as_ref()
+                    .and_then(|p| p.file_name())
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+
+                // Handle based on load origin
+                let load_origin = std::mem::take(&mut self.viewer.load_origin);
+                match load_origin {
+                    LoadOrigin::Navigation {
+                        direction,
+                        skip_attempts,
+                        mut skipped_files,
+                    } => {
+                        // Add failed file to the list
+                        skipped_files.push(failed_filename);
+                        let new_attempts = skip_attempts + 1;
+                        let max_attempts = self.viewer.max_skip_attempts;
+
+                        if new_attempts <= max_attempts {
+                            // Use peek_nth_*_image with skip_count to find the next file
+                            // without modifying navigator state. State is only updated
+                            // via confirm_navigation after successful load.
+                            let next_path = match direction {
+                                NavigationDirection::Next => self
+                                    .media_navigator
+                                    .peek_nth_next_image(new_attempts as usize),
+                                NavigationDirection::Previous => self
+                                    .media_navigator
+                                    .peek_nth_previous_image(new_attempts as usize),
+                            };
+
+                            if let Some(path) = next_path {
+                                // Set tentative path for next retry
+                                self.viewer.current_media_path = Some(path.clone());
+
+                                // Auto-skip: retry navigation in the same direction
+                                self.viewer.set_load_origin(LoadOrigin::Navigation {
+                                    direction,
+                                    skip_attempts: new_attempts,
+                                    skipped_files,
+                                });
+
+                                Task::perform(
+                                    async move { media::load_media(&path) },
+                                    Message::ImageEditorLoaded,
+                                )
+                            } else {
+                                // No more images to navigate to
+                                let files_text = update::format_skipped_files_message(
+                                    &self.i18n,
+                                    &skipped_files,
+                                );
+                                self.notifications.push(
+                                    notifications::Notification::warning(
+                                        "notification-skipped-corrupted-files",
+                                    )
+                                    .with_arg("files", files_text)
+                                    .auto_dismiss(std::time::Duration::from_secs(8)),
+                                );
+                                Task::none()
+                            }
+                        } else {
+                            // Max attempts reached: show grouped notification
+                            let files_text =
+                                update::format_skipped_files_message(&self.i18n, &skipped_files);
+                            self.notifications.push(
+                                notifications::Notification::warning(
+                                    "notification-skipped-corrupted-files",
+                                )
+                                .with_arg("files", files_text)
+                                .auto_dismiss(std::time::Duration::from_secs(8)),
+                            );
+                            Task::none()
                         }
-                        Err(_) => {
-                            self.notifications.push(notifications::Notification::error(
-                                "notification-editor-create-error",
-                            ));
-                        }
+                    }
+                    LoadOrigin::DirectOpen => {
+                        // This case should not happen in the editor since all loads
+                        // come from navigation. Kept as defensive fallback.
+                        #[cfg(debug_assertions)]
+                        eprintln!("[WARN] Unexpected DirectOpen in image editor error handler");
+                        self.notifications.push(notifications::Notification::error(
+                            "notification-load-error",
+                        ));
+                        Task::none()
                     }
                 }
             }
-            Err(_) => {
-                self.notifications.push(notifications::Notification::error(
-                    "notification-editor-load-error",
-                ));
-            }
         }
-        Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {

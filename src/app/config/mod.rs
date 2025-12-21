@@ -124,6 +124,14 @@ pub struct DisplayConfig {
     /// Media file sorting order in directory.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort_order: Option<SortOrder>,
+
+    /// Maximum number of corrupted files to auto-skip during navigation.
+    /// When navigating (next/prev), if media fails to load, auto-skip to next.
+    #[serde(
+        default = "default_max_skip_attempts",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_skip_attempts: Option<u32>,
 }
 
 impl Default for DisplayConfig {
@@ -133,6 +141,7 @@ impl Default for DisplayConfig {
             zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
             background_theme: Some(BackgroundTheme::default()),
             sort_order: Some(SortOrder::default()),
+            max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
         }
     }
 }
@@ -332,6 +341,7 @@ impl From<LegacyConfig> for Config {
                 zoom_step: legacy.zoom_step,
                 background_theme: legacy.background_theme,
                 sort_order: legacy.sort_order,
+                max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
             },
             video: VideoConfig {
                 autoplay: legacy.video_autoplay,
@@ -389,6 +399,10 @@ fn default_keyboard_seek_step_secs() -> Option<f64> {
 
 fn default_overlay_timeout_secs() -> Option<u32> {
     Some(DEFAULT_OVERLAY_TIMEOUT_SECS)
+}
+
+fn default_max_skip_attempts() -> Option<u32> {
+    Some(DEFAULT_MAX_SKIP_ATTEMPTS)
 }
 
 fn default_deblur_model_url() -> Option<String> {
@@ -534,6 +548,7 @@ mod tests {
                 zoom_step: Some(5.0),
                 background_theme: Some(BackgroundTheme::Light),
                 sort_order: Some(SortOrder::Alphabetical),
+                max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
             },
             video: VideoConfig {
                 autoplay: Some(false),
@@ -589,6 +604,7 @@ mod tests {
                 zoom_step: Some(7.5),
                 background_theme: Some(BackgroundTheme::Checkerboard),
                 sort_order: Some(SortOrder::CreatedDate),
+                max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
             },
             video: VideoConfig {
                 autoplay: Some(true),
@@ -746,6 +762,7 @@ mod tests {
                 zoom_step: Some(15.0),
                 background_theme: Some(BackgroundTheme::Light),
                 sort_order: Some(SortOrder::CreatedDate),
+                max_skip_attempts: Some(10),
             },
             video: VideoConfig {
                 autoplay: Some(true),

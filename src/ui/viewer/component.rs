@@ -54,6 +54,34 @@ pub enum Message {
     OpenFileRequested,
 }
 
+/// Direction of navigation for auto-skip retry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NavigationDirection {
+    /// Navigate to next media.
+    Next,
+    /// Navigate to previous media.
+    Previous,
+}
+
+/// Origin of a media load request for determining auto-skip behavior.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum LoadOrigin {
+    /// Media was loaded via navigation (arrows, keyboard).
+    /// On failure, auto-skip to next/previous.
+    Navigation {
+        /// Direction of the navigation.
+        direction: NavigationDirection,
+        /// Number of consecutive skip attempts.
+        skip_attempts: u32,
+        /// Filenames that have been skipped (for grouped notification).
+        skipped_files: Vec<String>,
+    },
+    /// Media was loaded directly (drag-drop, file dialog, CLI, initial load).
+    /// On failure, show error notification and stay on current media.
+    #[default]
+    DirectOpen,
+}
+
 /// Side effects the application should perform after handling a viewer message.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Effect {
@@ -83,6 +111,29 @@ pub enum Effect {
     ShowErrorNotification {
         /// The i18n key for the notification message.
         key: &'static str,
+    },
+    /// Retry navigation after a failed load (auto-skip).
+    /// App will navigate in the given direction and try to load the next media.
+    RetryNavigation {
+        /// Direction to retry navigation.
+        direction: NavigationDirection,
+        /// Number of consecutive skip attempts so far.
+        skip_attempts: u32,
+        /// Filenames that have been skipped.
+        skipped_files: Vec<String>,
+    },
+    /// Show grouped notification for skipped files after max attempts reached.
+    ShowSkippedFilesNotification {
+        /// Filenames that were skipped.
+        skipped_files: Vec<String>,
+    },
+    /// Confirm navigation after successful media load.
+    /// App will update MediaNavigator's position to the loaded path.
+    ConfirmNavigation {
+        /// Path to confirm as the current position.
+        path: PathBuf,
+        /// Filenames that were skipped during navigation (if any).
+        skipped_files: Vec<String>,
     },
 }
 
@@ -137,6 +188,11 @@ pub struct State {
     pub is_loading_media: bool,
     pub loading_started_at: Option<Instant>,
     spinner_rotation: f32, // Rotation angle for animated spinner (in radians)
+
+    /// Origin of the current media load request (for auto-skip behavior).
+    pub load_origin: LoadOrigin,
+    /// Maximum number of consecutive corrupted files to skip during navigation.
+    pub max_skip_attempts: u32,
 
     // Video playback state
     video_player: Option<VideoPlayer>,
@@ -196,6 +252,8 @@ impl Default for State {
             is_loading_media: false,
             loading_started_at: None,
             spinner_rotation: 0.0,
+            load_origin: LoadOrigin::DirectOpen,
+            max_skip_attempts: crate::config::DEFAULT_MAX_SKIP_ATTEMPTS,
             video_player: None,
             video_shader: VideoShader::new(),
             current_video_path: None,
@@ -391,6 +449,36 @@ impl State {
         self.keyboard_seek_step_secs = step;
     }
 
+    /// Sets the maximum number of skip attempts for auto-skip.
+    pub fn set_max_skip_attempts(&mut self, max_attempts: u32) {
+        self.max_skip_attempts = max_attempts;
+    }
+
+    /// Sets the origin of the current media load request.
+    ///
+    /// This determines auto-skip behavior when loading fails:
+    /// - `LoadOrigin::Navigation`: Auto-skip to next/previous on failure
+    /// - `LoadOrigin::DirectOpen`: Show error notification, stay on current media
+    pub fn set_load_origin(&mut self, origin: LoadOrigin) {
+        self.load_origin = origin;
+    }
+
+    /// Sets the load origin for navigation with initial state.
+    ///
+    /// Use this when starting a new navigation sequence.
+    pub fn set_navigation_origin(&mut self, direction: NavigationDirection) {
+        self.load_origin = LoadOrigin::Navigation {
+            direction,
+            skip_attempts: 0,
+            skipped_files: Vec::new(),
+        };
+    }
+
+    /// Sets the load origin for direct open (drag-drop, file dialog, CLI).
+    pub fn set_direct_open_origin(&mut self) {
+        self.load_origin = LoadOrigin::DirectOpen;
+    }
+
     /// Starts loading a new media file.
     ///
     /// Sets loading indicators that will be cleared by the MediaLoaded message handler.
@@ -555,6 +643,31 @@ impl State {
                         self.media = Some(media);
                         self.error = None;
 
+                        // Extract skipped files from navigation origin (if any)
+                        let skipped_files =
+                            if let LoadOrigin::Navigation { skipped_files, .. } =
+                                std::mem::take(&mut self.load_origin)
+                            {
+                                skipped_files
+                            } else {
+                                Vec::new()
+                            };
+
+                        // Confirm navigation with the path and any skipped files
+                        let effect = if let Some(ref path) = self.current_media_path {
+                            Effect::ConfirmNavigation {
+                                path: path.clone(),
+                                skipped_files,
+                            }
+                        } else {
+                            // Fallback: no path, just show skipped files if any
+                            if skipped_files.is_empty() {
+                                Effect::None
+                            } else {
+                                Effect::ShowSkippedFilesNotification { skipped_files }
+                            }
+                        };
+
                         // Reset viewport offset for new media (ensures proper centering)
                         self.viewport.reset_offset();
 
@@ -571,26 +684,66 @@ impl State {
                             Id::new(SCROLLABLE_ID),
                             RelativeOffset { x: 0.0, y: 0.0 },
                         );
-                        (Effect::None, scroll_task)
+                        (effect, scroll_task)
                     }
                     Err(error) => {
-                        // Use notification for all load errors (consistent UX)
-                        // This is non-blocking and preserves the current view
-                        let notification_key = match &error {
-                            Error::Io(_) => "notification-load-error-io",
-                            Error::Svg(_) => "notification-load-error-svg",
-                            Error::Video(_) => "notification-load-error-video",
-                            Error::Config(_) => "notification-load-error-io", // Fallback
-                        };
-                        // Don't clear current media - keep showing what was there
-                        // Only clear the path we tried to load
-                        self.current_media_path = None;
-                        (
-                            Effect::ShowErrorNotification {
-                                key: notification_key,
-                            },
-                            Task::none(),
-                        )
+                        // Get the failed filename for the notification
+                        let failed_filename = self
+                            .current_media_path
+                            .as_ref()
+                            .and_then(|p| p.file_name())
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "unknown".to_string());
+
+                        // Handle based on load origin
+                        match std::mem::take(&mut self.load_origin) {
+                            LoadOrigin::Navigation {
+                                direction,
+                                skip_attempts,
+                                mut skipped_files,
+                            } => {
+                                // Add failed file to the list
+                                skipped_files.push(failed_filename);
+                                let new_attempts = skip_attempts + 1;
+
+                                if new_attempts <= self.max_skip_attempts {
+                                    // Auto-skip: retry navigation in the same direction
+                                    // Keep current_media_path so handle_retry_navigation knows
+                                    // which file failed and can advance past it
+                                    (
+                                        Effect::RetryNavigation {
+                                            direction,
+                                            skip_attempts: new_attempts,
+                                            skipped_files,
+                                        },
+                                        Task::none(),
+                                    )
+                                } else {
+                                    // Max attempts reached: clear path and show notification
+                                    self.current_media_path = None;
+                                    (
+                                        Effect::ShowSkippedFilesNotification { skipped_files },
+                                        Task::none(),
+                                    )
+                                }
+                            }
+                            LoadOrigin::DirectOpen => {
+                                // Direct open: clear path and show error notification
+                                self.current_media_path = None;
+                                let notification_key = match &error {
+                                    Error::Io(_) => "notification-load-error-io",
+                                    Error::Svg(_) => "notification-load-error-svg",
+                                    Error::Video(_) => "notification-load-error-video",
+                                    Error::Config(_) => "notification-load-error-io", // Fallback
+                                };
+                                (
+                                    Effect::ShowErrorNotification {
+                                        key: notification_key,
+                                    },
+                                    Task::none(),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -627,13 +780,13 @@ impl State {
             Message::NavigateNext => {
                 // Reset overlay timer on navigation
                 self.last_overlay_interaction = Some(Instant::now());
-                // Emit effect to let App handle navigation with ImageNavigator
+                // Emit effect to let App handle navigation with MediaNavigator
                 (Effect::NavigateNext, Task::none())
             }
             Message::NavigatePrevious => {
                 // Reset overlay timer on navigation
                 self.last_overlay_interaction = Some(Instant::now());
-                // Emit effect to let App handle navigation with ImageNavigator
+                // Emit effect to let App handle navigation with MediaNavigator
                 (Effect::NavigatePrevious, Task::none())
             }
             Message::DeleteCurrentImage => (Effect::RequestDelete, Task::none()),
