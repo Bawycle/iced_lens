@@ -10,6 +10,7 @@ use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
 use crate::media::{self, frame_export::ExportableFrame, MediaData, MediaNavigator};
 use crate::ui::about::{self, Event as AboutEvent};
+use crate::ui::design_tokens::sizing;
 use crate::ui::help::{self, Event as HelpEvent};
 use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
 use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent, MetadataEditorState};
@@ -17,7 +18,7 @@ use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
-use iced::{window, Task};
+use iced::{window, Point, Size, Task};
 use std::path::PathBuf;
 
 /// Navigation direction for unified navigation handler.
@@ -36,6 +37,69 @@ pub enum NavigationMode {
     ImagesOnly,
 }
 
+/// Parameters for viewer area validation.
+pub struct ViewerAreaParams {
+    /// Whether fullscreen mode is active.
+    pub is_fullscreen: bool,
+    /// Whether the metadata panel is visible.
+    pub metadata_panel_visible: bool,
+    /// Whether the hamburger menu is open.
+    pub menu_open: bool,
+    /// Whether the current media is a video (video toolbar visible).
+    pub is_video: bool,
+    /// Whether the video overflow menu is open (adds extra toolbar height).
+    pub overflow_menu_open: bool,
+}
+
+/// Checks if a cursor position is within the viewer area (the pane where media is displayed).
+///
+/// In fullscreen mode, the entire window is considered the viewer area.
+/// In windowed mode, excludes (from top to bottom):
+/// - Navbar at the top
+/// - Hamburger dropdown menu (when open)
+/// - Media toolbar (zoom controls) - positioned at top of viewer content
+/// - Video toolbar (when showing video) - below media toolbar
+/// - Video overflow menu (when open) - below video toolbar
+/// - Metadata panel on the right
+fn is_in_viewer_area(cursor: Point, window_size: Size, params: &ViewerAreaParams) -> bool {
+    if params.is_fullscreen {
+        // In fullscreen, the entire window is viewer (overlays float)
+        return true;
+    }
+
+    // Calculate top exclusion zone
+    // In windowed mode, controls are at the TOP of the viewer area (below navbar)
+    let mut top_exclusion = sizing::NAVBAR_HEIGHT;
+
+    // Add hamburger menu height if open
+    if params.menu_open {
+        top_exclusion += sizing::HAMBURGER_MENU_HEIGHT;
+    }
+
+    // Media toolbar (zoom controls) is always visible in windowed mode
+    top_exclusion += sizing::MEDIA_TOOLBAR_HEIGHT;
+
+    // Video toolbar is only visible when showing a video
+    if params.is_video {
+        top_exclusion += sizing::VIDEO_TOOLBAR_HEIGHT;
+        if params.overflow_menu_open {
+            top_exclusion += sizing::VIDEO_TOOLBAR_HEIGHT; // Overflow menu has same height
+        }
+    }
+
+    // Check if cursor is in the top exclusion zone
+    if cursor.y < top_exclusion {
+        return false;
+    }
+
+    // Check if cursor is in the metadata panel (on the right)
+    if params.metadata_panel_visible && cursor.x > window_size.width - sizing::SIDEBAR_WIDTH {
+        return false;
+    }
+
+    true
+}
+
 /// Context for update operations containing mutable references to app state.
 pub struct UpdateContext<'a> {
     pub i18n: &'a mut I18n,
@@ -46,6 +110,7 @@ pub struct UpdateContext<'a> {
     pub media_navigator: &'a mut MediaNavigator,
     pub fullscreen: &'a mut bool,
     pub window_id: &'a mut Option<window::Id>,
+    pub window_size: &'a Option<iced::Size>,
     pub theme_mode: &'a mut ThemeMode,
     pub video_autoplay: &'a mut bool,
     pub audio_normalization: &'a mut bool,
@@ -1178,7 +1243,26 @@ pub fn handle_open_file_dialog_result(
 }
 
 /// Handles a file dropped on the window.
+///
+/// Only accepts drops within the viewer area (excludes navbar, hamburger menu,
+/// toolbars at top, and metadata panel on right). In fullscreen mode, drops are accepted anywhere.
 pub fn handle_file_dropped(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<Message> {
+    // Validate drop position: only accept drops within the viewer area
+    if let (Some(cursor), Some(window_size)) = (ctx.viewer.cursor_position(), ctx.window_size) {
+        let params = ViewerAreaParams {
+            is_fullscreen: *ctx.fullscreen,
+            metadata_panel_visible: *ctx.info_panel_open,
+            menu_open: *ctx.menu_open,
+            is_video: ctx.viewer.is_video(),
+            overflow_menu_open: ctx.viewer.is_overflow_menu_open(),
+        };
+        if !is_in_viewer_area(cursor, *window_size, &params) {
+            // Drop occurred outside viewer area - ignore
+            return Task::none();
+        }
+    }
+    // If cursor position is unknown, accept the drop (better UX than silent rejection)
+
     // Check if it's a directory
     if path.is_dir() {
         // Scan directory for media and load the first file

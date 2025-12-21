@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Window title now consistently shows metadata title (dc:title) across viewer and image editor.
 - Resize tool now allows free dimension input when aspect ratio is unlocked.
 - Resize slider no longer causes lag with large images (preview now uses optimized thumbnail generation).
+- Video fit-to-window now displays correctly on drop and layout changes.
 
 ## [0.4.1] - 2025-12-19
 

@@ -258,6 +258,22 @@ impl State {
         self.cursor_position = position;
     }
 
+    /// Returns the current cursor position within the viewer.
+    pub fn cursor_position(&self) -> Option<Point> {
+        self.cursor_position
+    }
+
+    /// Returns true if the video overflow menu (advanced controls) is open.
+    pub fn is_overflow_menu_open(&self) -> bool {
+        self.overflow_menu_open
+    }
+
+    /// Resets the viewport offset to zero, causing the media to recenter.
+    /// Call this when the available viewport area changes (e.g., sidebar toggle).
+    pub fn reset_viewport_offset(&mut self) {
+        self.viewport.reset_offset();
+    }
+
     pub fn zoom_step_percent(&self) -> f32 {
         self.zoom.zoom_step.value()
     }
@@ -539,6 +555,9 @@ impl State {
                         self.media = Some(media);
                         self.error = None;
 
+                        // Reset viewport offset for new media (ensures proper centering)
+                        self.viewport.reset_offset();
+
                         // Reset zoom to 100% for images when fit-to-window is disabled
                         if !self.is_video() && !self.image_fit_to_window() {
                             self.zoom
@@ -546,7 +565,13 @@ impl State {
                         }
 
                         self.refresh_fit_zoom();
-                        (Effect::None, Task::none())
+
+                        // Scroll the widget to origin to match the reset offset
+                        let scroll_task = operation::snap_to(
+                            Id::new(SCROLLABLE_ID),
+                            RelativeOffset { x: 0.0, y: 0.0 },
+                        );
+                        (Effect::None, scroll_task)
                     }
                     Err(error) => {
                         // Use notification for all load errors (consistent UX)
@@ -579,19 +604,23 @@ impl State {
                 if matches!(control, controls::Message::DeleteCurrentImage) {
                     return (Effect::RequestDelete, Task::none());
                 }
-                let result = self.handle_controls(control);
-
-                // Sync video canvas scale with zoom changes
-                if self.video_player.is_some() {
-                    let zoom_scale = self.zoom.zoom_percent / 100.0;
-                    self.video_shader.set_scale(zoom_scale);
-                }
-
-                result
+                // No need to sync shader scale - pane calculates display size from zoom at render time
+                self.handle_controls(control)
             }
             Message::ViewportChanged { bounds, offset } => {
-                self.viewport.update(bounds, offset);
-                // Note: centering is now calculated in view via responsive widget
+                let bounds_changed = self.viewport.update(bounds, offset);
+                // When viewport size changes significantly (e.g., sidebar toggle), reset to recenter
+                if bounds_changed {
+                    self.viewport.reset_offset();
+                    // Recalculate fit zoom for new viewport size
+                    self.refresh_fit_zoom();
+                    // Scroll the widget to origin to match the reset offset
+                    let scroll_task = operation::snap_to(
+                        Id::new(SCROLLABLE_ID),
+                        RelativeOffset { x: 0.0, y: 0.0 },
+                    );
+                    return (Effect::None, scroll_task);
+                }
                 (Effect::None, Task::none())
             }
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
@@ -643,10 +672,7 @@ impl State {
 
                             // Increment session ID to create a new unique subscription
                             self.playback_session_id = self.playback_session_id.wrapping_add(1);
-
-                            // Update canvas scale to match current zoom
-                            let zoom_scale = self.zoom.zoom_percent / 100.0;
-                            self.video_shader.set_scale(zoom_scale);
+                            // No need to sync shader scale - pane calculates display size at render time
                         }
                         Err(e) => {
                             eprintln!("Failed to create video player: {}", e);
@@ -695,10 +721,7 @@ impl State {
                                     self.current_video_path = self.current_media_path.clone();
                                     self.playback_session_id =
                                         self.playback_session_id.wrapping_add(1);
-
-                                    // Update canvas scale to match current zoom
-                                    let zoom_scale = self.zoom.zoom_percent / 100.0;
-                                    self.video_shader.set_scale(zoom_scale);
+                                    // No need to sync shader scale - pane calculates display size at render time
                                 }
                                 Err(e) => {
                                     eprintln!("Failed to create video player: {}", e);
@@ -889,7 +912,18 @@ impl State {
                         pts_secs,
                     } => {
                         // Update canvas with new frame
+                        // The shader only stores the frame data - display size is calculated
+                        // by the pane at render time based on current zoom state
                         self.video_shader.set_frame(rgba_data, width, height);
+
+                        // Update zoom display for fit-to-window mode
+                        // This keeps the zoom textbox in sync, but doesn't affect the shader
+                        // (pane calculates display size from zoom at render time)
+                        if self.video_fit_to_window {
+                            if let Some(fit_zoom) = self.compute_fit_zoom_percent() {
+                                self.zoom.update_zoom_display(fit_zoom);
+                            }
+                        }
 
                         // Update player position
                         if let Some(ref mut player) = self.video_player {
@@ -1686,18 +1720,16 @@ impl State {
         if self.is_video() {
             self.video_fit_to_window = false;
         }
-
-        // Sync video shader scale with zoom changes
-        if self.video_player.is_some() {
-            let zoom_scale = self.zoom.zoom_percent / 100.0;
-            self.video_shader.set_scale(zoom_scale);
-        }
+        // No need to sync shader scale - pane calculates display size from zoom at render time
 
         true
     }
 
     /// Recomputes the fit-to-window zoom when layout-affecting events occur so
     /// the zoom textbox always mirrors the actual fit percentage.
+    ///
+    /// Note: This only updates the zoom display state. The actual display size
+    /// is calculated by the pane at render time based on the zoom state.
     fn refresh_fit_zoom(&mut self) {
         // Use effective fit_to_window (considers video vs image)
         let effective_fit_to_window = self.fit_to_window();
@@ -1706,12 +1738,7 @@ impl State {
                 self.zoom.update_zoom_display(fit_zoom);
                 self.zoom.zoom_input_dirty = false;
                 self.zoom.zoom_input_error_key = None;
-
-                // Sync video canvas scale when fit-to-window zoom changes
-                if self.video_player.is_some() {
-                    let zoom_scale = fit_zoom / 100.0;
-                    self.video_shader.set_scale(zoom_scale);
-                }
+                // No need to sync shader scale - pane calculates display size at render time
             }
         }
     }
