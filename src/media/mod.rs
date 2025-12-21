@@ -23,7 +23,7 @@ use std::path::Path;
 // Re-export commonly used types
 pub use image::{load_image, ImageData, SUPPORTED_EXTENSIONS as IMAGE_EXTENSIONS};
 pub use image_transform::ResizeScale;
-pub use navigator::{ImageNavigator, MediaNavigator};
+pub use navigator::MediaNavigator;
 
 /// Represents different types of media formats
 #[derive(Debug, Clone, PartialEq, Eq)]

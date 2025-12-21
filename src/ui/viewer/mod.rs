@@ -10,6 +10,9 @@ pub mod state;
 pub mod video_controls;
 
 use self::component::Message;
+
+// Re-export types for auto-skip functionality
+pub use self::component::{LoadOrigin, NavigationDirection};
 use crate::i18n::fluent::I18n;
 use crate::media::MediaData;
 use crate::ui::components::error_display::{centered_error_view, ErrorDisplay, ErrorSeverity};

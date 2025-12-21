@@ -147,6 +147,7 @@ On macOS, use `Cmd` instead of `Ctrl`.
 - Arrow keys or overlay arrows browse sibling files
 - Navigation loops at directory boundaries
 - Directory is rescanned on each navigation (reflects file changes)
+- Corrupted or unloadable files are automatically skipped (configurable limit in Settings)
 
 ### Fullscreen
 
@@ -260,7 +261,7 @@ Configuration is stored in a platform-appropriate directory:
 | Category | Options |
 |----------|---------|
 | General | Language, theme mode (System/Light/Dark) |
-| Display | Background theme, sort order, zoom step |
+| Display | Background theme, sort order, zoom step, auto-skip limit (1–20) |
 | Video | Autoplay, volume (0–150% with perceptual scaling), audio normalization, frame cache size |
 | Fullscreen | Overlay timeout |
 | AI | Enable deblur, model URL |

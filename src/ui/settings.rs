@@ -8,10 +8,11 @@
 
 use crate::config::{
     BackgroundTheme, SortOrder, DEFAULT_DEBLUR_MODEL_URL, DEFAULT_FRAME_CACHE_MB,
-    DEFAULT_FRAME_HISTORY_MB, DEFAULT_KEYBOARD_SEEK_STEP_SECS, DEFAULT_OVERLAY_TIMEOUT_SECS,
-    DEFAULT_UPSCALE_MODEL_URL, DEFAULT_ZOOM_STEP_PERCENT, MAX_FRAME_CACHE_MB, MAX_FRAME_HISTORY_MB,
-    MAX_KEYBOARD_SEEK_STEP_SECS, MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB,
-    MIN_FRAME_HISTORY_MB, MIN_KEYBOARD_SEEK_STEP_SECS, MIN_OVERLAY_TIMEOUT_SECS,
+    DEFAULT_FRAME_HISTORY_MB, DEFAULT_KEYBOARD_SEEK_STEP_SECS, DEFAULT_MAX_SKIP_ATTEMPTS,
+    DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_UPSCALE_MODEL_URL, DEFAULT_ZOOM_STEP_PERCENT,
+    MAX_FRAME_CACHE_MB, MAX_FRAME_HISTORY_MB, MAX_KEYBOARD_SEEK_STEP_SECS, MAX_MAX_SKIP_ATTEMPTS,
+    MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB, MIN_FRAME_HISTORY_MB,
+    MIN_KEYBOARD_SEEK_STEP_SECS, MIN_MAX_SKIP_ATTEMPTS, MIN_OVERLAY_TIMEOUT_SECS,
 };
 use crate::i18n::fluent::I18n;
 use crate::media::deblur::ModelStatus;
@@ -57,6 +58,8 @@ pub struct StateConfig {
     pub frame_cache_mb: u32,
     pub frame_history_mb: u32,
     pub keyboard_seek_step_secs: f64,
+    // Navigation settings
+    pub max_skip_attempts: u32,
     // AI settings - Deblur
     pub enable_deblur: bool,
     pub deblur_model_url: String,
@@ -80,6 +83,7 @@ impl Default for StateConfig {
             frame_cache_mb: DEFAULT_FRAME_CACHE_MB,
             frame_history_mb: DEFAULT_FRAME_HISTORY_MB,
             keyboard_seek_step_secs: DEFAULT_KEYBOARD_SEEK_STEP_SECS,
+            max_skip_attempts: DEFAULT_MAX_SKIP_ATTEMPTS,
             enable_deblur: false,
             deblur_model_url: DEFAULT_DEBLUR_MODEL_URL.to_string(),
             deblur_model_status: ModelStatus::NotDownloaded,
@@ -106,6 +110,8 @@ pub struct State {
     frame_cache_mb: u32,
     frame_history_mb: u32,
     keyboard_seek_step_secs: f64,
+    // Navigation settings
+    max_skip_attempts: u32,
     // AI settings - Deblur
     enable_deblur: bool,
     deblur_model_url: String,
@@ -132,6 +138,8 @@ pub enum Message {
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
     KeyboardSeekStepChanged(f64),
+    // Navigation messages
+    MaxSkipAttemptsChanged(u32),
     // AI messages - Deblur
     RequestEnableDeblur,
     DisableDeblur,
@@ -159,6 +167,8 @@ pub enum Event {
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
     KeyboardSeekStepChanged(f64),
+    // Navigation events
+    MaxSkipAttemptsChanged(u32),
     // AI events - Deblur
     /// User requested to enable deblur - triggers download/validation flow.
     RequestEnableDeblur,
@@ -237,6 +247,9 @@ impl State {
         let clamped_seek_step = config
             .keyboard_seek_step_secs
             .clamp(MIN_KEYBOARD_SEEK_STEP_SECS, MAX_KEYBOARD_SEEK_STEP_SECS);
+        let clamped_skip_attempts = config
+            .max_skip_attempts
+            .clamp(MIN_MAX_SKIP_ATTEMPTS, MAX_MAX_SKIP_ATTEMPTS);
         Self {
             background_theme: config.background_theme,
             sort_order: config.sort_order,
@@ -251,6 +264,7 @@ impl State {
             frame_cache_mb: clamped_cache,
             frame_history_mb: clamped_history,
             keyboard_seek_step_secs: clamped_seek_step,
+            max_skip_attempts: clamped_skip_attempts,
             enable_deblur: config.enable_deblur,
             deblur_model_url: config.deblur_model_url,
             deblur_model_status: config.deblur_model_status,
@@ -278,6 +292,10 @@ impl State {
 
     pub fn overlay_timeout_secs(&self) -> u32 {
         self.overlay_timeout_secs
+    }
+
+    pub fn max_skip_attempts(&self) -> u32 {
+        self.max_skip_attempts
     }
 
     pub fn video_autoplay(&self) -> bool {
@@ -580,11 +598,39 @@ impl State {
             sort_row.into(),
         );
 
+        // Max skip attempts slider (for auto-skip during navigation)
+        let skip_slider = Slider::new(
+            MIN_MAX_SKIP_ATTEMPTS..=MAX_MAX_SKIP_ATTEMPTS,
+            self.max_skip_attempts,
+            Message::MaxSkipAttemptsChanged,
+        )
+        .step(1u32)
+        .width(Length::Fixed(200.0));
+
+        let skip_value = Text::new(self.max_skip_attempts.to_string());
+
+        let skip_control = Row::new()
+            .spacing(spacing::SM)
+            .align_y(Vertical::Center)
+            .push(skip_slider)
+            .push(skip_value);
+
+        let skip_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-max-skip-attempts-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-max-skip-attempts-hint"))
+                    .size(typography::BODY_SM)
+                    .into(),
+            ),
+            skip_control.into(),
+        );
+
         let content = Column::new()
             .spacing(spacing::MD)
             .push(background_setting)
             .push(zoom_setting)
-            .push(sort_setting);
+            .push(sort_setting)
+            .push(skip_setting);
 
         build_section(
             icons::image(),
@@ -1171,6 +1217,11 @@ impl State {
                 &mut self.keyboard_seek_step_secs,
                 step,
                 Event::KeyboardSeekStepChanged,
+            ),
+            Message::MaxSkipAttemptsChanged(attempts) => update_if_changed(
+                &mut self.max_skip_attempts,
+                attempts,
+                Event::MaxSkipAttemptsChanged,
             ),
             Message::RequestEnableDeblur => {
                 // Don't set enable_deblur here - it will be set after successful validation

@@ -64,6 +64,8 @@ settings-sort-order-label = Orden de navegación de imágenes
 settings-sort-alphabetical = Alfabético
 settings-sort-modified = Fecha de modificación
 settings-sort-created = Fecha de creación
+settings-max-skip-attempts-label = Omitir archivos corruptos
+settings-max-skip-attempts-hint = Máximo de archivos corruptos consecutivos a omitir durante la navegación.
 settings-overlay-timeout-label = Retraso de ocultación automática en pantalla completa
 settings-overlay-timeout-hint = Tiempo antes de que los controles desaparezcan en modo de pantalla completa.
 seconds = segundos
@@ -441,6 +443,8 @@ notification-load-error-io = No se pudo abrir el archivo. Verifica que existe y 
 notification-load-error-svg = No se pudo renderizar el SVG. El archivo puede estar malformado.
 notification-load-error-video = No se pudo reproducir el vídeo. El formato puede no ser compatible.
 notification-load-error-timeout = La carga ha expirado. El archivo puede ser demasiado grande o el sistema está ocupado.
+notification-skipped-corrupted-files = Omitidos: { $files }
+notification-skipped-and-others = +{ $count } más
 
 # Configuración de IA
 settings-enable-deblur-label = Desenfoque IA

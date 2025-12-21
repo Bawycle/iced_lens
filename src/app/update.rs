@@ -18,15 +18,10 @@ use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
+// Re-export NavigationDirection from viewer component (single source of truth)
+pub use crate::ui::viewer::NavigationDirection;
 use iced::{window, Point, Size, Task};
 use std::path::PathBuf;
-
-/// Navigation direction for unified navigation handler.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NavigationDirection {
-    Next,
-    Previous,
-}
 
 /// Navigation mode determines which media types to include.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -225,6 +220,38 @@ pub fn handle_viewer_message(
                 .push(notifications::Notification::error(key));
             Task::none()
         }
+        component::Effect::RetryNavigation {
+            direction,
+            skip_attempts,
+            skipped_files,
+        } => handle_retry_navigation(ctx, direction, skip_attempts, skipped_files),
+        component::Effect::ShowSkippedFilesNotification { skipped_files } => {
+            let files_text = format_skipped_files_message(ctx.i18n, &skipped_files);
+            ctx.notifications.push(
+                notifications::Notification::warning("notification-skipped-corrupted-files")
+                    .with_arg("files", files_text)
+                    .auto_dismiss(std::time::Duration::from_secs(8)),
+            );
+            Task::none()
+        }
+        component::Effect::ConfirmNavigation {
+            path,
+            skipped_files,
+        } => {
+            // Confirm navigation position in MediaNavigator
+            ctx.media_navigator.confirm_navigation(&path);
+
+            // Show notification if any files were skipped during navigation
+            if !skipped_files.is_empty() {
+                let files_text = format_skipped_files_message(ctx.i18n, &skipped_files);
+                ctx.notifications.push(
+                    notifications::Notification::warning("notification-skipped-corrupted-files")
+                        .with_arg("files", files_text)
+                        .auto_dismiss(std::time::Duration::from_secs(8)),
+                );
+            }
+            Task::none()
+        }
         component::Effect::None => Task::none(),
     };
     Task::batch([viewer_task, side_effect])
@@ -379,6 +406,10 @@ pub fn handle_settings_message(
         }
         SettingsEvent::KeyboardSeekStepChanged(step) => {
             ctx.viewer.set_keyboard_seek_step_secs(step);
+            persistence::persist_preferences(ctx.preferences_context())
+        }
+        SettingsEvent::MaxSkipAttemptsChanged(attempts) => {
+            ctx.viewer.set_max_skip_attempts(attempts);
             persistence::persist_preferences(ctx.preferences_context())
         }
         // AI settings events
@@ -809,6 +840,8 @@ fn handle_save_as_dialog(
 
 /// Handles editor navigation to next image (skips videos).
 fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    // Set load origin for auto-skip on failure
+    ctx.viewer.set_navigation_origin(NavigationDirection::Next);
     handle_navigation(
         ctx,
         NavigationDirection::Next,
@@ -819,6 +852,8 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
 /// Handles editor navigation to previous image (skips videos).
 fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    // Set load origin for auto-skip on failure
+    ctx.viewer.set_navigation_origin(NavigationDirection::Previous);
     handle_navigation(
         ctx,
         NavigationDirection::Previous,
@@ -1009,47 +1044,53 @@ pub fn handle_metadata_panel_message(
 /// * `ctx` - Update context with mutable references to app state
 /// * `direction` - Next or Previous
 /// * `mode` - AllMedia (viewer) or ImagesOnly (editor)
+/// * `skip_count` - Number of files to skip (0 for normal navigation, >0 for auto-skip retries)
 /// * `on_loaded` - Message constructor for the load result
-fn handle_navigation<F>(
+fn handle_navigation_with_skip<F>(
     ctx: &mut UpdateContext<'_>,
     direction: NavigationDirection,
     mode: NavigationMode,
+    skip_count: usize,
     on_loaded: F,
 ) -> Task<Message>
 where
     F: FnOnce(Result<MediaData, crate::error::Error>) -> Message + Send + 'static,
 {
     // Rescan directory to handle added/removed media (single implementation)
-    if let Some(current_path) = ctx
-        .media_navigator
-        .current_media_path()
-        .map(|p| p.to_path_buf())
-    {
-        let (config, _) = config::load();
-        let sort_order = config.display.sort_order.unwrap_or_default();
-        let _ = ctx
+    // Only rescan on initial navigation (skip_count == 0), not on retries
+    if skip_count == 0 {
+        if let Some(current_path) = ctx
             .media_navigator
-            .scan_directory(&current_path, sort_order);
+            .current_media_path()
+            .map(|p| p.to_path_buf())
+        {
+            let (config, _) = config::load();
+            let sort_order = config.display.sort_order.unwrap_or_default();
+            let _ = ctx
+                .media_navigator
+                .scan_directory(&current_path, sort_order);
+        }
     }
 
-    // Navigate based on direction and mode
+    // Peek based on direction, mode, and skip_count (pessimistic update: don't change position yet)
     let next_path = match (direction, mode) {
         (NavigationDirection::Next, NavigationMode::AllMedia) => {
-            ctx.media_navigator.navigate_next()
+            ctx.media_navigator.peek_nth_next(skip_count)
         }
         (NavigationDirection::Previous, NavigationMode::AllMedia) => {
-            ctx.media_navigator.navigate_previous()
+            ctx.media_navigator.peek_nth_previous(skip_count)
         }
         (NavigationDirection::Next, NavigationMode::ImagesOnly) => {
-            ctx.media_navigator.navigate_next_image()
+            ctx.media_navigator.peek_nth_next_image(skip_count)
         }
         (NavigationDirection::Previous, NavigationMode::ImagesOnly) => {
-            ctx.media_navigator.navigate_previous_image()
+            ctx.media_navigator.peek_nth_previous_image(skip_count)
         }
     };
 
     if let Some(path) = next_path {
-        // Synchronize viewer state from navigator
+        // Set tentative path in viewer (for error handling and UI feedback).
+        // Navigator position is only confirmed after successful load via ConfirmNavigation.
         ctx.viewer.current_media_path = Some(path.clone());
 
         // Set loading state via encapsulated method
@@ -1062,9 +1103,24 @@ where
     }
 }
 
+/// Wrapper for normal navigation (no skip).
+fn handle_navigation<F>(
+    ctx: &mut UpdateContext<'_>,
+    direction: NavigationDirection,
+    mode: NavigationMode,
+    on_loaded: F,
+) -> Task<Message>
+where
+    F: FnOnce(Result<MediaData, crate::error::Error>) -> Message + Send + 'static,
+{
+    handle_navigation_with_skip(ctx, direction, mode, 0, on_loaded)
+}
+
 /// Handles navigation to next media (images and videos).
 pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
+    // Set load origin for auto-skip on failure
+    ctx.viewer.set_navigation_origin(NavigationDirection::Next);
     handle_navigation(
         ctx,
         NavigationDirection::Next,
@@ -1076,12 +1132,87 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 /// Handles navigation to previous media (images and videos).
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
+    // Set load origin for auto-skip on failure
+    ctx.viewer.set_navigation_origin(NavigationDirection::Previous);
     handle_navigation(
         ctx,
         NavigationDirection::Previous,
         NavigationMode::AllMedia,
         |r| Message::Viewer(component::Message::MediaLoaded(r)),
     )
+}
+
+/// Handles retry navigation after a failed load (auto-skip).
+///
+/// Continues navigation in the same direction, preserving skip context
+/// for grouped notification when max attempts is reached.
+///
+/// Uses `peek_nth_*` with skip_attempts to find the next file without
+/// modifying navigator state. The state is only updated via ConfirmNavigation
+/// after a successful load.
+pub fn handle_retry_navigation(
+    ctx: &mut UpdateContext<'_>,
+    direction: NavigationDirection,
+    skip_attempts: u32,
+    skipped_files: Vec<String>,
+) -> Task<Message> {
+    use crate::ui::viewer::LoadOrigin;
+
+    // Set load origin with accumulated skip state
+    ctx.viewer.set_load_origin(LoadOrigin::Navigation {
+        direction,
+        skip_attempts,
+        skipped_files,
+    });
+
+    // Use skip_attempts as skip_count to peek ahead without modifying navigator state.
+    // Navigator position is only confirmed after successful load via ConfirmNavigation.
+    handle_navigation_with_skip(
+        ctx,
+        direction,
+        NavigationMode::AllMedia,
+        skip_attempts as usize,
+        |r| Message::Viewer(component::Message::MediaLoaded(r)),
+    )
+}
+
+/// Maximum length for a filename in notifications (characters).
+const MAX_FILENAME_LEN: usize = 12;
+
+/// Truncates a filename if it exceeds the maximum length.
+fn truncate_filename(name: &str) -> String {
+    if name.chars().count() <= MAX_FILENAME_LEN {
+        name.to_string()
+    } else {
+        let truncated: String = name.chars().take(MAX_FILENAME_LEN - 1).collect();
+        format!("{}…", truncated)
+    }
+}
+
+/// Formats the message for skipped files notification.
+///
+/// Uses compact format:
+/// - 1-2 files: Show all names (truncated if too long)
+/// - 3+ files: Show first name + "+X more"
+pub fn format_skipped_files_message(i18n: &I18n, skipped_files: &[String]) -> String {
+    match skipped_files.len() {
+        0 => String::new(),
+        1 => truncate_filename(&skipped_files[0]),
+        2 => format!(
+            "{}, {}",
+            truncate_filename(&skipped_files[0]),
+            truncate_filename(&skipped_files[1])
+        ),
+        n => {
+            let others = n - 1;
+            let others_str = others.to_string();
+            let others_text = i18n.tr_with_args(
+                "notification-skipped-and-others",
+                &[("count", others_str.as_str())],
+            );
+            format!("{} {}", truncate_filename(&skipped_files[0]), others_text)
+        }
+    }
 }
 
 /// Handles deletion of the current media file.
@@ -1096,11 +1227,11 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
         return Task::none();
     };
 
-    // Get the next candidate before deletion
+    // Get the next candidate before deletion (peek without changing position)
     let has_multiple = ctx.media_navigator.len() > 1;
     let next_candidate = if has_multiple {
         ctx.media_navigator
-            .navigate_next()
+            .peek_next()
             .filter(|next| *next != current_path)
     } else {
         None

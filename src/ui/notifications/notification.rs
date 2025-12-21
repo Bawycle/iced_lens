@@ -76,6 +76,8 @@ pub struct Notification {
     message_args: Vec<(String, String)>,
     /// When this notification was created.
     created_at: Instant,
+    /// Custom auto-dismiss duration (overrides severity default).
+    custom_dismiss_duration: Option<Duration>,
 }
 
 impl Notification {
@@ -90,6 +92,7 @@ impl Notification {
             message_key: message_key.into(),
             message_args: Vec::new(),
             created_at: Instant::now(),
+            custom_dismiss_duration: None,
         }
     }
 
@@ -118,6 +121,14 @@ impl Notification {
     /// Arguments are passed to the i18n system when resolving the message.
     pub fn with_arg(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.message_args.push((key.into(), value.into()));
+        self
+    }
+
+    /// Sets a custom auto-dismiss duration, overriding the severity default.
+    ///
+    /// Useful for notifications that need more time to read (e.g., long file lists).
+    pub fn auto_dismiss(mut self, duration: Duration) -> Self {
+        self.custom_dismiss_duration = Some(duration);
         self
     }
 
@@ -153,8 +164,13 @@ impl Notification {
 
     /// Returns whether this notification should auto-dismiss.
     pub fn should_auto_dismiss(&self) -> bool {
-        if let Some(duration) = self.severity.auto_dismiss_duration() {
-            self.age() >= duration
+        // Custom duration takes precedence over severity default
+        let duration = self
+            .custom_dismiss_duration
+            .or_else(|| self.severity.auto_dismiss_duration());
+
+        if let Some(d) = duration {
+            self.age() >= d
         } else {
             false
         }

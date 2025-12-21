@@ -39,6 +39,7 @@ fn test_language_change_via_config() {
             zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
             background_theme: Some(config::BackgroundTheme::Dark),
             sort_order: Some(config::SortOrder::Alphabetical),
+            max_skip_attempts: Some(config::DEFAULT_MAX_SKIP_ATTEMPTS),
         },
         video: VideoConfig {
             autoplay: Some(false),
@@ -75,6 +76,7 @@ fn test_language_change_via_config() {
             zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
             background_theme: Some(config::BackgroundTheme::Dark),
             sort_order: Some(config::SortOrder::Alphabetical),
+            max_skip_attempts: Some(config::DEFAULT_MAX_SKIP_ATTEMPTS),
         },
         video: VideoConfig {
             autoplay: Some(false),

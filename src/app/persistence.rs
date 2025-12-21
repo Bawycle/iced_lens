@@ -49,6 +49,7 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     cfg.display.zoom_step = Some(ctx.viewer.zoom_step_percent());
     cfg.display.background_theme = Some(ctx.settings.background_theme());
     cfg.display.sort_order = Some(ctx.settings.sort_order());
+    cfg.display.max_skip_attempts = Some(ctx.settings.max_skip_attempts());
     cfg.fullscreen.overlay_timeout_secs = Some(ctx.settings.overlay_timeout_secs());
     cfg.general.theme_mode = ctx.theme_mode;
     cfg.video.autoplay = Some(ctx.video_autoplay);

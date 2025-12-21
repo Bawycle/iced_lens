@@ -6,7 +6,7 @@
 //! for media list and current media path.
 
 use crate::config::SortOrder;
-use crate::directory_scanner::ImageList;
+use crate::directory_scanner::MediaList;
 use crate::error::Result;
 use crate::media::{detect_media_type, MediaType};
 use std::path::{Path, PathBuf};
@@ -40,7 +40,7 @@ pub struct NavigationInfo {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MediaNavigator {
     /// List of media files in the current directory
-    media_list: ImageList,
+    media_list: MediaList,
     /// Path to the currently selected media
     current_media_path: Option<PathBuf>,
 }
@@ -49,7 +49,7 @@ impl MediaNavigator {
     /// Creates a new empty MediaNavigator.
     pub fn new() -> Self {
         Self {
-            media_list: ImageList::new(),
+            media_list: MediaList::new(),
             current_media_path: None,
         }
     }
@@ -58,7 +58,7 @@ impl MediaNavigator {
     ///
     /// Returns an error if the directory cannot be read or the path has no parent directory.
     pub fn scan_directory(&mut self, current_file: &Path, sort_order: SortOrder) -> Result<()> {
-        self.media_list = ImageList::scan_directory(current_file, sort_order)?;
+        self.media_list = MediaList::scan_directory(current_file, sort_order)?;
         self.current_media_path = Some(current_file.to_path_buf());
         Ok(())
     }
@@ -73,7 +73,7 @@ impl MediaNavigator {
         directory: &Path,
         sort_order: SortOrder,
     ) -> Result<Option<PathBuf>> {
-        self.media_list = ImageList::scan_directory_direct(directory, sort_order)?;
+        self.media_list = MediaList::scan_directory_direct(directory, sort_order)?;
 
         if let Some(first_path) = self.media_list.first() {
             let path = first_path.to_path_buf();
@@ -96,76 +96,134 @@ impl MediaNavigator {
         self.current_media_path = Some(path);
     }
 
-    /// Navigates to the next media and returns its path.
+    /// Returns the next media path WITHOUT updating current position.
     ///
+    /// Use this for pessimistic navigation where position is confirmed after load.
     /// Returns `None` if there are no media in the list.
     /// Wraps around to the first media when at the last media.
-    pub fn navigate_next(&mut self) -> Option<PathBuf> {
-        let next_path = self.media_list.next()?.to_path_buf();
-        self.current_media_path = Some(next_path.clone());
-        self.media_list.set_current(&next_path);
-        Some(next_path)
+    pub fn peek_next(&self) -> Option<PathBuf> {
+        self.media_list.next().map(|p| p.to_path_buf())
     }
 
-    /// Navigates to the previous media and returns its path.
+    /// Returns the previous media path WITHOUT updating current position.
     ///
+    /// Use this for pessimistic navigation where position is confirmed after load.
     /// Returns `None` if there are no media in the list.
     /// Wraps around to the last media when at the first media.
-    pub fn navigate_previous(&mut self) -> Option<PathBuf> {
-        let prev_path = self.media_list.previous()?.to_path_buf();
-        self.current_media_path = Some(prev_path.clone());
-        self.media_list.set_current(&prev_path);
-        Some(prev_path)
+    pub fn peek_previous(&self) -> Option<PathBuf> {
+        self.media_list.previous().map(|p| p.to_path_buf())
     }
 
-    /// Navigates to the next image, skipping videos.
+    /// Returns the n-th next media path WITHOUT updating current position.
+    ///
+    /// `skip_count = 0` returns immediate next, `skip_count = 1` skips one file, etc.
+    /// Returns `None` if there are no media in the list.
+    /// Wraps around when reaching the end.
+    pub fn peek_nth_next(&self, skip_count: usize) -> Option<PathBuf> {
+        self.media_list
+            .peek_nth_next(skip_count)
+            .map(|p| p.to_path_buf())
+    }
+
+    /// Returns the n-th previous media path WITHOUT updating current position.
+    ///
+    /// `skip_count = 0` returns immediate previous, `skip_count = 1` skips one file, etc.
+    /// Returns `None` if there are no media in the list.
+    /// Wraps around when reaching the start.
+    pub fn peek_nth_previous(&self, skip_count: usize) -> Option<PathBuf> {
+        self.media_list
+            .peek_nth_previous(skip_count)
+            .map(|p| p.to_path_buf())
+    }
+
+    /// Returns the next image path (skipping videos) WITHOUT updating position.
     ///
     /// Returns `None` if there are no images in the list (only videos).
     /// Wraps around to the first image when at the last.
-    pub fn navigate_next_image(&mut self) -> Option<PathBuf> {
-        let start_path = self.current_media_path.clone();
+    pub fn peek_next_image(&self) -> Option<PathBuf> {
+        self.peek_nth_next_image(0)
+    }
+
+    /// Returns the previous image path (skipping videos) WITHOUT updating position.
+    ///
+    /// Returns `None` if there are no images in the list (only videos).
+    /// Wraps around to the last image when at the first.
+    pub fn peek_previous_image(&self) -> Option<PathBuf> {
+        self.peek_nth_previous_image(0)
+    }
+
+    /// Returns the n-th next image path (skipping videos) WITHOUT updating position.
+    ///
+    /// `skip_count = 0` returns immediate next image, `skip_count = 1` skips one image, etc.
+    /// Videos are always skipped and don't count toward skip_count.
+    /// Returns `None` if there are no images in the list.
+    /// Wraps around when reaching the end.
+    pub fn peek_nth_next_image(&self, skip_count: usize) -> Option<PathBuf> {
+        let current_index = self.media_list.current_index()?;
         let total = self.len();
 
-        // Try up to `total` times to find an image (avoid infinite loop)
-        for _ in 0..total {
-            if let Some(next_path) = self.navigate_next() {
-                if matches!(detect_media_type(&next_path), Some(MediaType::Image)) {
-                    return Some(next_path);
+        if total == 0 {
+            return None;
+        }
+
+        let mut images_found = 0;
+        // Try up to `total` times to find enough images (avoid infinite loop)
+        for offset in 1..=total {
+            let candidate_index = (current_index + offset) % total;
+            if let Some(path) = self.media_list.get(candidate_index) {
+                if matches!(detect_media_type(path), Some(MediaType::Image)) {
+                    if images_found == skip_count {
+                        return Some(path.to_path_buf());
+                    }
+                    images_found += 1;
                 }
-                // If we've wrapped back to start, no images found
-                if Some(&next_path) == start_path.as_ref() {
-                    return None;
-                }
-            } else {
-                return None;
             }
         }
         None
     }
 
-    /// Navigates to the previous image, skipping videos.
+    /// Returns the n-th previous image path (skipping videos) WITHOUT updating position.
     ///
-    /// Returns `None` if there are no images in the list (only videos).
-    /// Wraps around to the last image when at the first.
-    pub fn navigate_previous_image(&mut self) -> Option<PathBuf> {
-        let start_path = self.current_media_path.clone();
+    /// `skip_count = 0` returns immediate previous image, `skip_count = 1` skips one image, etc.
+    /// Videos are always skipped and don't count toward skip_count.
+    /// Returns `None` if there are no images in the list.
+    /// Wraps around when reaching the start.
+    pub fn peek_nth_previous_image(&self, skip_count: usize) -> Option<PathBuf> {
+        let current_index = self.media_list.current_index()?;
         let total = self.len();
 
-        // Try up to `total` times to find an image (avoid infinite loop)
-        for _ in 0..total {
-            if let Some(prev_path) = self.navigate_previous() {
-                if matches!(detect_media_type(&prev_path), Some(MediaType::Image)) {
-                    return Some(prev_path);
-                }
-                // If we've wrapped back to start, no images found
-                if Some(&prev_path) == start_path.as_ref() {
-                    return None;
-                }
+        if total == 0 {
+            return None;
+        }
+
+        let mut images_found = 0;
+        // Try up to `total` times to find enough images (avoid infinite loop)
+        for offset in 1..=total {
+            let candidate_index = if offset > current_index {
+                total - (offset - current_index)
             } else {
-                return None;
+                current_index - offset
+            };
+            if let Some(path) = self.media_list.get(candidate_index) {
+                if matches!(detect_media_type(path), Some(MediaType::Image)) {
+                    if images_found == skip_count {
+                        return Some(path.to_path_buf());
+                    }
+                    images_found += 1;
+                }
             }
         }
         None
+    }
+
+    /// Confirms navigation to a path after successful load.
+    ///
+    /// Updates `current_media_path` and the internal index.
+    /// This should be called after the media at the peeked path has been
+    /// successfully loaded.
+    pub fn confirm_navigation(&mut self, path: &Path) {
+        self.media_list.set_current(path);
+        self.current_media_path = Some(path.to_path_buf());
     }
 
     /// Checks if there is a next media available.
@@ -225,8 +283,6 @@ impl Default for MediaNavigator {
     }
 }
 
-// Backward compatibility alias
-pub type ImageNavigator = MediaNavigator;
 
 #[cfg(test)]
 mod tests {
@@ -267,7 +323,7 @@ mod tests {
     }
 
     #[test]
-    fn navigate_next_advances_to_next_media() {
+    fn peek_next_returns_next_without_changing_state() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let img1 = create_test_image(temp_dir.path(), "a.jpg");
         let img2 = create_test_image(temp_dir.path(), "b.png");
@@ -276,28 +332,15 @@ mod tests {
         nav.scan_directory(&img1, SortOrder::Alphabetical)
             .expect("scan failed");
 
-        let next = nav.navigate_next();
+        // Peek should return next without changing current position
+        let next = nav.peek_next();
         assert_eq!(next.as_deref(), Some(img2.as_path()));
-        assert_eq!(nav.current_media_path(), Some(img2.as_path()));
-    }
-
-    #[test]
-    fn navigate_previous_goes_to_previous_media() {
-        let temp_dir = tempdir().expect("failed to create temp dir");
-        let img1 = create_test_image(temp_dir.path(), "a.jpg");
-        let img2 = create_test_image(temp_dir.path(), "b.png");
-
-        let mut nav = MediaNavigator::new();
-        nav.scan_directory(&img2, SortOrder::Alphabetical)
-            .expect("scan failed");
-
-        let prev = nav.navigate_previous();
-        assert_eq!(prev.as_deref(), Some(img1.as_path()));
+        // Current should still be img1 (pessimistic update)
         assert_eq!(nav.current_media_path(), Some(img1.as_path()));
     }
 
     #[test]
-    fn navigate_next_wraps_around() {
+    fn peek_previous_returns_previous_without_changing_state() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let img1 = create_test_image(temp_dir.path(), "a.jpg");
         let img2 = create_test_image(temp_dir.path(), "b.png");
@@ -306,12 +349,15 @@ mod tests {
         nav.scan_directory(&img2, SortOrder::Alphabetical)
             .expect("scan failed");
 
-        let next = nav.navigate_next();
-        assert_eq!(next.as_deref(), Some(img1.as_path())); // wraps to first
+        // Peek should return previous without changing current position
+        let prev = nav.peek_previous();
+        assert_eq!(prev.as_deref(), Some(img1.as_path()));
+        // Current should still be img2 (pessimistic update)
+        assert_eq!(nav.current_media_path(), Some(img2.as_path()));
     }
 
     #[test]
-    fn navigate_previous_wraps_around() {
+    fn confirm_navigation_updates_state() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let img1 = create_test_image(temp_dir.path(), "a.jpg");
         let img2 = create_test_image(temp_dir.path(), "b.png");
@@ -320,7 +366,40 @@ mod tests {
         nav.scan_directory(&img1, SortOrder::Alphabetical)
             .expect("scan failed");
 
-        let prev = nav.navigate_previous();
+        // Peek and then confirm
+        let next = nav.peek_next().unwrap();
+        nav.confirm_navigation(&next);
+
+        // Now state should be updated
+        assert_eq!(nav.current_media_path(), Some(img2.as_path()));
+        assert_eq!(nav.current_index(), Some(1));
+    }
+
+    #[test]
+    fn peek_next_wraps_around() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let img2 = create_test_image(temp_dir.path(), "b.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img2, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        let next = nav.peek_next();
+        assert_eq!(next.as_deref(), Some(img1.as_path())); // wraps to first
+    }
+
+    #[test]
+    fn peek_previous_wraps_around() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let img2 = create_test_image(temp_dir.path(), "b.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        let prev = nav.peek_previous();
         assert_eq!(prev.as_deref(), Some(img2.as_path())); // wraps to last
     }
 
@@ -372,10 +451,10 @@ mod tests {
     }
 
     #[test]
-    fn empty_navigator_returns_none_on_navigation() {
-        let mut nav = MediaNavigator::new();
-        assert_eq!(nav.navigate_next(), None);
-        assert_eq!(nav.navigate_previous(), None);
+    fn empty_navigator_returns_none_on_peek() {
+        let nav = MediaNavigator::new();
+        assert_eq!(nav.peek_next(), None);
+        assert_eq!(nav.peek_previous(), None);
         assert!(!nav.has_next());
         assert!(!nav.has_previous());
     }
@@ -389,7 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn navigate_next_image_skips_videos() {
+    fn peek_next_image_skips_videos() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let img1 = create_test_image(temp_dir.path(), "a.jpg");
         let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
@@ -400,14 +479,15 @@ mod tests {
         nav.scan_directory(&img1, SortOrder::Alphabetical)
             .expect("scan failed");
 
-        // Should skip b.mp4 and c.mp4, go directly to d.png
-        let next = nav.navigate_next_image();
+        // Should skip b.mp4 and c.mp4, return d.png WITHOUT changing state
+        let next = nav.peek_next_image();
         assert_eq!(next.as_deref(), Some(img2.as_path()));
-        assert_eq!(nav.current_media_path(), Some(img2.as_path()));
+        // State should not change (pessimistic update)
+        assert_eq!(nav.current_media_path(), Some(img1.as_path()));
     }
 
     #[test]
-    fn navigate_previous_image_skips_videos() {
+    fn peek_previous_image_skips_videos() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let img1 = create_test_image(temp_dir.path(), "a.jpg");
         let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
@@ -418,14 +498,15 @@ mod tests {
         nav.scan_directory(&img2, SortOrder::Alphabetical)
             .expect("scan failed");
 
-        // Should skip c.mp4 and b.mp4, go directly to a.jpg
-        let prev = nav.navigate_previous_image();
+        // Should skip c.mp4 and b.mp4, return a.jpg WITHOUT changing state
+        let prev = nav.peek_previous_image();
         assert_eq!(prev.as_deref(), Some(img1.as_path()));
-        assert_eq!(nav.current_media_path(), Some(img1.as_path()));
+        // State should not change (pessimistic update)
+        assert_eq!(nav.current_media_path(), Some(img2.as_path()));
     }
 
     #[test]
-    fn navigate_next_image_wraps_around_skipping_videos() {
+    fn peek_next_image_wraps_around_skipping_videos() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let img1 = create_test_image(temp_dir.path(), "a.jpg");
         let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
@@ -437,12 +518,12 @@ mod tests {
             .expect("scan failed");
 
         // From c.png, should skip d.mp4, wrap to a.jpg (skipping b.mp4)
-        let next = nav.navigate_next_image();
+        let next = nav.peek_next_image();
         assert_eq!(next.as_deref(), Some(img1.as_path()));
     }
 
     #[test]
-    fn navigate_previous_image_wraps_around_skipping_videos() {
+    fn peek_previous_image_wraps_around_skipping_videos() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let _vid1 = create_test_video(temp_dir.path(), "a.mp4");
         let img1 = create_test_image(temp_dir.path(), "b.jpg");
@@ -454,12 +535,12 @@ mod tests {
             .expect("scan failed");
 
         // From b.jpg, should skip a.mp4, wrap to d.png (skipping c.mp4)
-        let prev = nav.navigate_previous_image();
+        let prev = nav.peek_previous_image();
         assert_eq!(prev.as_deref(), Some(img2.as_path()));
     }
 
     #[test]
-    fn navigate_next_image_returns_same_if_only_one_image() {
+    fn peek_next_image_returns_same_if_only_one_image() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let _vid1 = create_test_video(temp_dir.path(), "a.mp4");
         let img1 = create_test_image(temp_dir.path(), "b.jpg");
@@ -470,12 +551,12 @@ mod tests {
             .expect("scan failed");
 
         // Only one image, should wrap back to itself
-        let next = nav.navigate_next_image();
+        let next = nav.peek_next_image();
         assert_eq!(next.as_deref(), Some(img1.as_path()));
     }
 
     #[test]
-    fn navigate_previous_image_returns_same_if_only_one_image() {
+    fn peek_previous_image_returns_same_if_only_one_image() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let _vid1 = create_test_video(temp_dir.path(), "a.mp4");
         let img1 = create_test_image(temp_dir.path(), "b.jpg");
@@ -486,20 +567,20 @@ mod tests {
             .expect("scan failed");
 
         // Only one image, should wrap back to itself
-        let prev = nav.navigate_previous_image();
+        let prev = nav.peek_previous_image();
         assert_eq!(prev.as_deref(), Some(img1.as_path()));
     }
 
     #[test]
-    fn navigate_next_image_returns_none_for_empty_navigator() {
-        let mut nav = MediaNavigator::new();
-        assert_eq!(nav.navigate_next_image(), None);
+    fn peek_next_image_returns_none_for_empty_navigator() {
+        let nav = MediaNavigator::new();
+        assert_eq!(nav.peek_next_image(), None);
     }
 
     #[test]
-    fn navigate_previous_image_returns_none_for_empty_navigator() {
-        let mut nav = MediaNavigator::new();
-        assert_eq!(nav.navigate_previous_image(), None);
+    fn peek_previous_image_returns_none_for_empty_navigator() {
+        let nav = MediaNavigator::new();
+        assert_eq!(nav.peek_previous_image(), None);
     }
 
     // Tests for scan_from_directory
@@ -564,12 +645,16 @@ mod tests {
         // Should start at first media
         assert_eq!(nav.current_media_path(), Some(img_a.as_path()));
 
-        // Navigate to next
-        let next = nav.navigate_next();
-        assert_eq!(next.as_deref(), Some(img_b.as_path()));
+        // Peek next and confirm
+        let next = nav.peek_next().unwrap();
+        assert_eq!(next.as_path(), img_b.as_path());
+        nav.confirm_navigation(&next);
+        assert_eq!(nav.current_media_path(), Some(img_b.as_path()));
 
-        // Navigate to next again
-        let next = nav.navigate_next();
-        assert_eq!(next.as_deref(), Some(img_c.as_path()));
+        // Peek next again and confirm
+        let next = nav.peek_next().unwrap();
+        assert_eq!(next.as_path(), img_c.as_path());
+        nav.confirm_navigation(&next);
+        assert_eq!(nav.current_media_path(), Some(img_c.as_path()));
     }
 }
