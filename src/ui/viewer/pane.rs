@@ -131,10 +131,15 @@ fn view_inner<'a>(
 
     // Use video shader if it has a frame (playing OR paused with frame),
     // otherwise show static media (image or video thumbnail before playback starts)
+    //
+    // The pane is the single source of truth for display dimensions.
+    // We calculate scaled_width/scaled_height from the effective zoom and pass
+    // them directly to the shader. The shader does NOT store zoom state.
     let media_viewer = if let Some(shader) = model.video_shader {
         if shader.has_frame() {
             // Show the shader frame (whether playing or paused)
-            shader.view()
+            // Pass the calculated display dimensions - pane owns the sizing logic
+            shader.view_sized(scaled_width, scaled_height)
         } else {
             // No frame yet, show thumbnail
             super::view_media(model.media, effective_zoom)

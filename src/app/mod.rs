@@ -47,6 +47,8 @@ pub struct App {
     media_navigator: MediaNavigator,
     fullscreen: bool,
     window_id: Option<window::Id>,
+    /// Current window size for drop zone calculations.
+    window_size: Option<iced::Size>,
     theme_mode: ThemeMode,
     /// Whether videos should auto-play when loaded.
     video_autoplay: bool,
@@ -147,6 +149,7 @@ impl Default for App {
             media_navigator: MediaNavigator::new(),
             fullscreen: false,
             window_id: None,
+            window_size: None,
             theme_mode: ThemeMode::System,
             video_autoplay: false,
             audio_normalization: true, // Enabled by default - normalizes audio volume between media files
@@ -533,6 +536,16 @@ impl App {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
+        // Track window size from resize events before creating context
+        // (must be done before borrowing self.window_size)
+        if let Message::Viewer(component::Message::RawEvent {
+            event: iced::event::Event::Window(iced::window::Event::Resized(size)),
+            ..
+        }) = &message
+        {
+            self.window_size = Some(*size);
+        }
+
         let mut ctx = update::UpdateContext {
             i18n: &mut self.i18n,
             screen: &mut self.screen,
@@ -542,6 +555,7 @@ impl App {
             media_navigator: &mut self.media_navigator,
             fullscreen: &mut self.fullscreen,
             window_id: &mut self.window_id,
+            window_size: &self.window_size,
             theme_mode: &mut self.theme_mode,
             video_autoplay: &mut self.video_autoplay,
             audio_normalization: &mut self.audio_normalization,

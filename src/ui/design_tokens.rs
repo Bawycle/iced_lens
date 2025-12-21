@@ -130,6 +130,23 @@ pub mod sizing {
     pub const SIDEBAR_WIDTH: f32 = 290.0;
     pub const TOAST_WIDTH: f32 = 320.0;
 
+    // Layout heights
+    /// Navbar height (SM padding top + ICON_MD + SM padding bottom)
+    pub const NAVBAR_HEIGHT: f32 = 48.0;
+
+    /// Hamburger dropdown menu height when open (3 menu items + container padding)
+    /// Each item: ICON_SM (16) + vertical padding XS×2 (16) = 32px
+    /// Container: XS padding (8) × 2 + 3 items × 32px + XXS spacing×2 = 112px
+    pub const HAMBURGER_MENU_HEIGHT: f32 = 112.0;
+
+    /// Media toolbar height (zoom controls) at bottom of viewer
+    /// ICON_LG (32) + XXS padding×2 (8) + row padding SM (12) ≈ 52px
+    pub const MEDIA_TOOLBAR_HEIGHT: f32 = 52.0;
+
+    /// Video toolbar height at bottom of viewer
+    /// BUTTON_HEIGHT (36) + XS padding×2 (16) ≈ 52px
+    pub const VIDEO_TOOLBAR_HEIGHT: f32 = 52.0;
+
     // Crop overlay handles
     /// Visual size of crop handles (rendered size)
     pub const CROP_HANDLE_SIZE: f32 = 16.0;

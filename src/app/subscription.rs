@@ -16,7 +16,7 @@ use iced::{event, time, Subscription};
 /// - Editor: Routes keyboard events to editor, window events to viewer
 /// - Settings/Help/About: Routes non-wheel events to viewer
 ///
-/// File drop events are handled on all screens to allow opening media at any time.
+/// File drop events are only handled on the Viewer screen.
 /// Window close requests are handled on all screens for cleanup.
 pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
     match screen {
@@ -26,10 +26,7 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                 return Some(Message::WindowCloseRequested(window_id));
             }
 
-            // Handle file drop on all screens
-            if let event::Event::Window(iced::window::Event::FileDropped(path)) = &event {
-                return Some(Message::FileDropped(path.clone()));
-            }
+            // File drop is only handled on Viewer screen
 
             if let event::Event::Window(iced::window::Event::Resized(_)) = &event {
                 return Some(Message::Viewer(component::Message::RawEvent {
@@ -94,10 +91,13 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                     return Some(Message::WindowCloseRequested(window_id));
                 }
 
-                // Handle file drop on all screens
+                // Handle file drop only on Viewer screen
                 if let event::Event::Window(iced::window::Event::FileDropped(path)) = &event {
                     return Some(Message::FileDropped(path.clone()));
                 }
+
+                // Note: Window::Resized events are passed to the viewer (not intercepted here)
+                // and window_size is updated in App::update when processing viewer messages.
 
                 if matches!(
                     event,
@@ -127,10 +127,7 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                     return Some(Message::WindowCloseRequested(window_id));
                 }
 
-                // Handle file drop on all screens
-                if let event::Event::Window(iced::window::Event::FileDropped(path)) = &event {
-                    return Some(Message::FileDropped(path.clone()));
-                }
+                // File drop is only handled on Viewer screen
 
                 // Don't route wheel scroll to viewer - it's used by scrollable content
                 if matches!(

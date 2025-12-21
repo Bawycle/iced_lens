@@ -33,24 +33,38 @@ impl Default for ViewportState {
     }
 }
 
+/// Minimum bounds change (in pixels) to trigger recenter.
+/// This threshold prevents recentering on small layout fluctuations (e.g., during video loading)
+/// while still catching significant layout changes like sidebar toggle (~290px).
+const SIGNIFICANT_BOUNDS_CHANGE_THRESHOLD: f32 = 100.0;
+
 impl ViewportState {
+    /// Resets the scroll offset to zero (for recentering after layout changes).
+    pub fn reset_offset(&mut self) {
+        self.previous_offset = self.offset;
+        self.offset = AbsoluteOffset { x: 0.0, y: 0.0 };
+    }
+
     /// Updates the viewport state with new bounds and offset.
-    /// Returns true if the bounds size changed (layout change detected).
+    /// Returns true if the bounds size changed significantly (layout change detected).
+    /// Small changes (< 100px) are ignored to avoid resetting during content loading.
     pub fn update(&mut self, bounds: Rectangle, offset: AbsoluteOffset) -> bool {
         self.previous_offset = self.offset;
         self.offset = offset;
         self.previous_bounds = self.bounds;
 
-        let bounds_changed = match self.previous_bounds {
+        let significant_bounds_changed = match self.previous_bounds {
             Some(prev) => {
-                // Check if size changed (not just position)
-                (prev.width - bounds.width).abs() > 0.1 || (prev.height - bounds.height).abs() > 0.1
+                // Only trigger on significant size changes (e.g., sidebar toggle)
+                // Ignore small fluctuations during content loading
+                (prev.width - bounds.width).abs() > SIGNIFICANT_BOUNDS_CHANGE_THRESHOLD
+                    || (prev.height - bounds.height).abs() > SIGNIFICANT_BOUNDS_CHANGE_THRESHOLD
             }
             None => false, // First update, no change
         };
 
         self.bounds = Some(bounds);
-        bounds_changed
+        significant_bounds_changed
     }
 
     /// Checks if content of given size fits within current viewport bounds.
