@@ -8,7 +8,9 @@ use super::{notifications, persistence, Message, Screen};
 use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
-use crate::media::{self, frame_export::ExportableFrame, MediaData, MediaNavigator};
+use crate::media::{
+    self, frame_export::ExportableFrame, MaxSkipAttempts, MediaData, MediaNavigator,
+};
 use crate::ui::about::{self, Event as AboutEvent};
 use crate::ui::design_tokens::sizing;
 use crate::ui::help::{self, Event as HelpEvent};
@@ -18,6 +20,7 @@ use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
+use crate::video_player::KeyboardSeekStep;
 // Re-export NavigationDirection from viewer component (single source of truth)
 pub use crate::ui::viewer::NavigationDirection;
 use iced::{window, Point, Size, Task};
@@ -405,11 +408,13 @@ pub fn handle_settings_message(
             persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::KeyboardSeekStepChanged(step) => {
-            ctx.viewer.set_keyboard_seek_step_secs(step);
+            ctx.viewer
+                .set_keyboard_seek_step(KeyboardSeekStep::new(step));
             persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::MaxSkipAttemptsChanged(attempts) => {
-            ctx.viewer.set_max_skip_attempts(attempts);
+            ctx.viewer
+                .set_max_skip_attempts(MaxSkipAttempts::new(attempts));
             persistence::persist_preferences(ctx.preferences_context())
         }
         // AI settings events
@@ -853,7 +858,8 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 /// Handles editor navigation to previous image (skips videos).
 fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Set load origin for auto-skip on failure
-    ctx.viewer.set_navigation_origin(NavigationDirection::Previous);
+    ctx.viewer
+        .set_navigation_origin(NavigationDirection::Previous);
     handle_navigation(
         ctx,
         NavigationDirection::Previous,
@@ -1133,7 +1139,8 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
     // Set load origin for auto-skip on failure
-    ctx.viewer.set_navigation_origin(NavigationDirection::Previous);
+    ctx.viewer
+        .set_navigation_origin(NavigationDirection::Previous);
     handle_navigation(
         ctx,
         NavigationDirection::Previous,

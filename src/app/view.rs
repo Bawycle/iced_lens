@@ -123,10 +123,12 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
 
 fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
     let (config, _) = config::load();
-    let overlay_timeout_secs = config
-        .fullscreen
-        .overlay_timeout_secs
-        .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
+    let overlay_timeout = crate::ui::state::OverlayTimeout::new(
+        config
+            .fullscreen
+            .overlay_timeout_secs
+            .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS),
+    );
 
     let metadata_editor_has_changes = ctx
         .metadata_editor_state
@@ -139,7 +141,7 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
             i18n: ctx.i18n,
             background_theme: ctx.settings.background_theme(),
             is_fullscreen: ctx.fullscreen,
-            overlay_hide_delay: std::time::Duration::from_secs(overlay_timeout_secs as u64),
+            overlay_hide_delay: overlay_timeout.as_duration(),
             navigation: ctx.navigation,
             metadata_editor_has_changes,
         })
