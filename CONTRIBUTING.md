@@ -632,6 +632,7 @@ Message::ClearMedia => {
 | Effect | Emitted By | Handled By |
 |--------|------------|------------|
 | `NavigateNext/Previous` | Viewer | App (triggers media loading) |
+| `ConfirmNavigation` | Viewer | App (updates MediaNavigator position after successful load) |
 | `ToggleFullscreen` | Viewer | App (manages window state) |
 | `EnterEditor` | Viewer | App (screen transition) |
 

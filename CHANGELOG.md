@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Image editor pan:** grab-and-drag to navigate when zoomed, like in the viewer.
 - **Resize preview:** thumbnail preview in the sidebar shows the result before applying.
 - **AI upscaling:** optional Real-ESRGAN 4x upscaling for image enlargements. Enable in Settings → AI / Machine Learning. Produces sharper results than traditional interpolation for scales above 100%.
+- **Auto-skip corrupted files:** when navigating, corrupted or unloadable files are automatically skipped. A notification lists skipped files. The maximum number of consecutive skips is configurable in Settings → Display (default: 5).
 
 ### Changed
 - Crop handles are now larger for better accessibility (WCAG 2.5.5 compliant).
