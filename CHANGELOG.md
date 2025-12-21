@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Toolbar buttons now use light (white) icons for better contrast on dark button backgrounds.
 - Resize scale maximum increased from 200% to 400% to match Real-ESRGAN 4x native capability.
 - Resize preset buttons now have uniform width for better visual consistency.
+- Tooltips now have improved visibility with opaque background, shadow, and proper contrast adapting to light/dark theme.
 
 ### Fixed
 - Navigation overlay buttons no longer display rendering artifacts on Windows.

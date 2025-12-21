@@ -849,6 +849,7 @@ Ready-to-use style functions for Iced widgets:
 | `container.rs` | `panel()` for settings/editor panels |
 | `overlay.rs` | `indicator()`, `controls_container()`, icon styles |
 | `editor.rs` | `toolbar()`, `settings_panel()` |
+| `tooltip.rs` | `styled()` helper for accessible tooltips with contrast and shadow |
 
 **Usage:**
 ```rust
@@ -857,6 +858,28 @@ use crate::ui::styles::button;
 Button::new("Click me")
     .style(button::primary)
 ```
+
+#### Tooltip Style
+
+All tooltips should use the centralized `styles::tooltip::styled()` helper for consistent visibility:
+
+```rust
+use crate::ui::styles;
+use iced::widget::tooltip;
+
+// Create a styled tooltip with proper contrast and shadow
+styles::tooltip::styled(
+    button_content,
+    "Tooltip text",
+    tooltip::Position::Bottom,
+)
+```
+
+The tooltip style automatically adapts to light/dark theme:
+- **Light theme**: Dark tooltip with light text
+- **Dark theme**: Light tooltip with dark text
+
+Features: opaque background, subtle shadow, rounded corners (4px), consistent padding (8px).
 
 ### Guidelines for Contributors
 
