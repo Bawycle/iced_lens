@@ -130,6 +130,7 @@ video-step-backward-tooltip = Retroceder un fotograma (,)
 video-more-tooltip = Más opciones
 video-speed-down-tooltip = Reducir velocidad (J)
 video-speed-up-tooltip = Aumentar velocidad (L)
+hud-video-no-audio = Sin audio
 settings-audio-normalization-label = Normalización de volumen de audio
 settings-audio-normalization-enabled = Activada
 settings-audio-normalization-disabled = Desactivada

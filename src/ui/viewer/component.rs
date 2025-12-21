@@ -1021,7 +1021,10 @@ impl State {
             None
         };
 
-        let media_type_line = self.media.as_ref().and_then(format_media_indicator);
+        let media_type_line = self
+            .media
+            .as_ref()
+            .and_then(|m| format_media_indicator(env.i18n, m));
 
         let hud_lines = position_line
             .into_iter()
@@ -1829,44 +1832,23 @@ fn format_zoom_indicator(_i18n: &I18n, zoom_percent: f32) -> HudLine {
     }
 }
 
-/// Formats video duration in HH:MM:SS or MM:SS format.
+/// Generates HUD indicator for videos without audio.
 ///
-/// Hours are only shown if duration is >= 1 hour to keep the display compact.
-fn format_duration(duration_secs: f64) -> String {
-    let total_secs = duration_secs as u64;
-    let hours = total_secs / 3600;
-    let minutes = (total_secs % 3600) / 60;
-    let seconds = total_secs % 60;
-
-    if hours > 0 {
-        format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
-    } else {
-        format!("{:02}:{:02}", minutes, seconds)
-    }
-}
-
-/// Generates HUD indicator text for media type.
-///
-/// Returns formatted string for videos (with duration and optional audio badge),
-/// or None for images to avoid cluttering the UI with redundant information.
-fn format_media_indicator(media: &MediaData) -> Option<HudLine> {
+/// Only shows an indicator when a video has no audio track.
+/// Returns None for images and videos with audio to avoid cluttering the UI.
+fn format_media_indicator(i18n: &I18n, media: &MediaData) -> Option<HudLine> {
     match media {
         MediaData::Video(video_data) => {
-            let duration_str = format_duration(video_data.duration_secs);
-            let text = if video_data.has_audio {
-                format!("Video {} (audio)", duration_str)
+            if video_data.has_audio {
+                None // No indicator needed for videos with audio
             } else {
-                format!("Video {}", duration_str)
-            };
-
-            Some(HudLine {
-                icon: HudIconKind::Video {
-                    has_audio: video_data.has_audio,
-                },
-                text,
-            })
+                Some(HudLine {
+                    icon: HudIconKind::Video { has_audio: false },
+                    text: i18n.tr("hud-video-no-audio"),
+                })
+            }
         }
-        MediaData::Image(_) => None, // Don't show indicator for images
+        MediaData::Image(_) => None,
     }
 }
 
@@ -1889,20 +1871,11 @@ mod tests {
     }
 
     #[test]
-    fn format_duration_formats_correctly() {
-        assert_eq!(format_duration(0.0), "00:00");
-        assert_eq!(format_duration(5.0), "00:05");
-        assert_eq!(format_duration(65.0), "01:05");
-        assert_eq!(format_duration(125.0), "02:05");
-        assert_eq!(format_duration(3665.0), "01:01:05");
-        assert_eq!(format_duration(7384.0), "02:03:04");
-    }
-
-    #[test]
-    fn format_media_indicator_shows_video_with_duration() {
+    fn format_media_indicator_shows_no_audio_for_silent_video() {
         use crate::media::{ImageData, VideoData};
         use iced::widget::image::Handle;
 
+        let i18n = I18n::default();
         let pixels = vec![255_u8; 4];
         let thumbnail = ImageData {
             handle: Handle::from_rgba(1, 1, pixels),
@@ -1920,18 +1893,18 @@ mod tests {
         };
 
         let media = MediaData::Video(video_data);
-        let indicator = format_media_indicator(&media);
+        let indicator = format_media_indicator(&i18n, &media);
 
-        let hud = indicator.expect("expected HUD line for video");
+        let hud = indicator.expect("expected HUD line for video without audio");
         assert!(matches!(hud.icon, HudIconKind::Video { has_audio: false }));
-        assert!(hud.text.contains("02:05"));
     }
 
     #[test]
-    fn format_media_indicator_shows_audio_badge() {
+    fn format_media_indicator_returns_none_for_video_with_audio() {
         use crate::media::{ImageData, VideoData};
         use iced::widget::image::Handle;
 
+        let i18n = I18n::default();
         let pixels = vec![255_u8; 4];
         let thumbnail = ImageData {
             handle: Handle::from_rgba(1, 1, pixels),
@@ -1949,12 +1922,9 @@ mod tests {
         };
 
         let media = MediaData::Video(video_data);
-        let indicator = format_media_indicator(&media);
+        let indicator = format_media_indicator(&i18n, &media);
 
-        let hud = indicator.expect("expected HUD line for video with audio");
-        assert!(matches!(hud.icon, HudIconKind::Video { has_audio: true }));
-        assert!(hud.text.contains("01:05"));
-        assert!(hud.text.contains("audio"));
+        assert!(indicator.is_none(), "should not show indicator for video with audio");
     }
 
     #[test]
@@ -2036,6 +2006,7 @@ mod tests {
         use crate::media::ImageData;
         use iced::widget::image::Handle;
 
+        let i18n = I18n::default();
         let pixels = vec![255_u8; 4];
         let image_data = ImageData {
             handle: Handle::from_rgba(1, 1, pixels),
@@ -2044,7 +2015,7 @@ mod tests {
         };
 
         let media = MediaData::Image(image_data);
-        let indicator = format_media_indicator(&media);
+        let indicator = format_media_indicator(&i18n, &media);
         assert!(indicator.is_none());
     }
 
