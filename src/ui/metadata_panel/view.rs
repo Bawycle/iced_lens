@@ -12,8 +12,9 @@ use crate::ui::design_tokens::{palette, radius, sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::styles::button as button_styles;
 use iced::widget::image::{Handle, Image};
+use crate::ui::styles::tooltip as styled_tooltip;
 use iced::widget::{
-    button, container, pick_list, rule, scrollable, text, text_input, tooltip, Column, Row, Text,
+    button, container, pick_list, rule, scrollable, text, text_input, Column, Row, Text,
 };
 use iced::{alignment::Vertical, Border, Element, Length, Padding, Theme};
 
@@ -112,9 +113,11 @@ fn build_header_buttons<'a>(
         .on_press(Message::EnterEditMode)
         .padding(spacing::XXS);
 
-        let edit_button =
-            tooltip::Tooltip::new(edit_btn, Text::new(edit_tooltip), tooltip::Position::Bottom)
-                .gap(spacing::XXS);
+        let edit_button = styled_tooltip::styled(
+            edit_btn,
+            edit_tooltip,
+            iced::widget::tooltip::Position::Bottom,
+        );
         buttons = buttons.push(edit_button);
     } else if !is_editing && !ctx.is_image && ctx.metadata.is_some() {
         // Disabled edit button for videos with tooltip
@@ -125,12 +128,11 @@ fn build_header_buttons<'a>(
         .padding(spacing::XXS)
         .style(button_styles::disabled());
 
-        let edit_button = tooltip::Tooltip::new(
+        let edit_button = styled_tooltip::styled(
             edit_btn,
-            text(ctx.i18n.tr("metadata-edit-disabled-video")),
-            tooltip::Position::Bottom,
-        )
-        .gap(spacing::XXS);
+            ctx.i18n.tr("metadata-edit-disabled-video"),
+            iced::widget::tooltip::Position::Bottom,
+        );
         buttons = buttons.push(edit_button);
     }
 
@@ -155,12 +157,11 @@ fn build_header_buttons<'a>(
         )
     };
 
-    let close_button = tooltip::Tooltip::new(
+    let close_button = styled_tooltip::styled(
         close_btn,
-        Text::new(close_tooltip),
-        tooltip::Position::Bottom,
-    )
-    .gap(spacing::XXS);
+        close_tooltip,
+        iced::widget::tooltip::Position::Bottom,
+    );
 
     buttons.push(close_button)
 }

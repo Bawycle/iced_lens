@@ -15,6 +15,14 @@ use iced::{
     Element, Length, Theme,
 };
 
+/// Helper to create a styled tooltip with the given position.
+fn tip<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+    text: impl Into<String>,
+) -> tooltip::Tooltip<'a, Message, Theme, iced::Renderer> {
+    styles::tooltip::styled(content, text, tooltip::Position::Bottom)
+}
+
 #[derive(Clone)]
 pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
@@ -52,52 +60,33 @@ pub fn view<'a>(
 
     let zoom_percent_label = Text::new("%").size(typography::BODY_LG);
 
-    let reset_tooltip = ctx.i18n.tr("viewer-zoom-reset-button");
-    let reset_button_content: Element<'_, Message> =
+    let reset_button = tip(
         button(icons::fill(action_icons::viewer::toolbar::zoom_reset()))
             .on_press(Message::ResetZoom)
             .padding(spacing::XXS)
             .width(Length::Fixed(shared_styles::ICON_SIZE))
-            .height(Length::Fixed(shared_styles::ICON_SIZE))
-            .into();
-    let reset_button = tooltip(
-        reset_button_content,
-        Text::new(reset_tooltip),
-        tooltip::Position::Bottom,
-    )
-    .gap(spacing::XXS);
+            .height(Length::Fixed(shared_styles::ICON_SIZE)),
+        ctx.i18n.tr("viewer-zoom-reset-button"),
+    );
 
-    let zoom_out_tooltip = ctx.i18n.tr("viewer-zoom-out-tooltip");
-    let zoom_out_button_content: Element<'_, Message> =
+    let zoom_out_button = tip(
         button(icons::fill(action_icons::viewer::toolbar::zoom_out()))
             .on_press(Message::ZoomOut)
             .padding(spacing::XXS)
             .width(Length::Fixed(shared_styles::ICON_SIZE))
-            .height(Length::Fixed(shared_styles::ICON_SIZE))
-            .into();
-    let zoom_out_button = tooltip(
-        zoom_out_button_content,
-        Text::new(zoom_out_tooltip),
-        tooltip::Position::Bottom,
-    )
-    .gap(spacing::XXS);
+            .height(Length::Fixed(shared_styles::ICON_SIZE)),
+        ctx.i18n.tr("viewer-zoom-out-tooltip"),
+    );
 
-    let zoom_in_tooltip = ctx.i18n.tr("viewer-zoom-in-tooltip");
-    let zoom_in_button_content: Element<'_, Message> =
+    let zoom_in_button = tip(
         button(icons::fill(action_icons::viewer::toolbar::zoom_in()))
             .on_press(Message::ZoomIn)
             .padding(spacing::XXS)
             .width(Length::Fixed(shared_styles::ICON_SIZE))
-            .height(Length::Fixed(shared_styles::ICON_SIZE))
-            .into();
-    let zoom_in_button = tooltip(
-        zoom_in_button_content,
-        Text::new(zoom_in_tooltip),
-        tooltip::Position::Bottom,
-    )
-    .gap(spacing::XXS);
+            .height(Length::Fixed(shared_styles::ICON_SIZE)),
+        ctx.i18n.tr("viewer-zoom-in-tooltip"),
+    );
 
-    let fit_tooltip = ctx.i18n.tr("viewer-fit-to-window-toggle");
     let fit_icon = if effective_fit_to_window {
         icons::fill(action_icons::viewer::toolbar::fit_to_window())
     } else {
@@ -115,12 +104,7 @@ pub fn view<'a>(
     } else {
         fit_button.into()
     };
-    let fit_toggle = tooltip(
-        fit_button_content,
-        Text::new(fit_tooltip),
-        tooltip::Position::Bottom,
-    )
-    .gap(spacing::XXS);
+    let fit_toggle = tip(fit_button_content, ctx.i18n.tr("viewer-fit-to-window-toggle"));
 
     // Fullscreen button - disabled when metadata editor has unsaved changes
     let fullscreen_button = button(icons::fill(action_icons::viewer::toolbar::fullscreen()))
@@ -151,27 +135,16 @@ pub fn view<'a>(
                 ctx.i18n.tr("viewer-fullscreen-tooltip"),
             )
         };
-    let fullscreen_toggle = tooltip(
-        fullscreen_button_content,
-        Text::new(fullscreen_tooltip),
-        tooltip::Position::Bottom,
-    )
-    .gap(spacing::XXS);
+    let fullscreen_toggle = tip(fullscreen_button_content, fullscreen_tooltip);
 
-    let delete_tooltip = ctx.i18n.tr("viewer-delete-tooltip");
-    let delete_button_content: Element<'_, Message> =
+    let delete_button = tip(
         button(icons::fill(action_icons::viewer::toolbar::delete()))
             .on_press(Message::DeleteCurrentImage)
             .padding(spacing::XXS)
             .width(Length::Fixed(shared_styles::ICON_SIZE))
-            .height(Length::Fixed(shared_styles::ICON_SIZE))
-            .into();
-    let delete_button = tooltip(
-        delete_button_content,
-        Text::new(delete_tooltip),
-        tooltip::Position::Bottom,
-    )
-    .gap(4);
+            .height(Length::Fixed(shared_styles::ICON_SIZE)),
+        ctx.i18n.tr("viewer-delete-tooltip"),
+    );
 
     let zoom_controls_row = Row::new()
         .spacing(shared_styles::CONTROL_SPACING)

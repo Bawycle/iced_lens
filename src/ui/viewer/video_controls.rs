@@ -9,10 +9,16 @@ use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{sizing, spacing};
 use crate::ui::{action_icons, icons, styles};
 use crate::video_player::Volume;
-use iced::widget::{
-    button, column, container, row, slider, text, tooltip, Column, Row, Space, Text,
-};
-use iced::{Element, Length};
+use iced::widget::{button, column, container, row, slider, text, tooltip, Column, Row, Space};
+use iced::{Element, Length, Theme};
+
+/// Helper to create a styled tooltip positioned above the element.
+fn tip<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+    text: impl Into<String>,
+) -> tooltip::Tooltip<'a, Message, Theme, iced::Renderer> {
+    styles::tooltip::styled(content, text, tooltip::Position::Top)
+}
 
 /// Slider step in seconds (1ms precision).
 /// f64 has ~15 significant digits, so even for 24h videos (86400s),
@@ -156,19 +162,14 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         ctx.i18n.tr("video-play-tooltip")
     };
 
-    let play_pause_button_content: Element<'_, Message> = button(play_pause_svg)
-        .on_press(Message::TogglePlayback)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .into();
-
-    let play_pause_button = tooltip(
-        play_pause_button_content,
-        Text::new(play_pause_tooltip),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let play_pause_button = tip(
+        button(play_pause_svg)
+            .on_press(Message::TogglePlayback)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height)),
+        play_pause_tooltip,
+    );
 
     // Timeline position in seconds
     // Use preview position during drag, otherwise use actual playback position
@@ -216,12 +217,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         volume_button.into()
     };
 
-    let volume_button_tooltip = tooltip(
-        volume_button_content,
-        Text::new(volume_tooltip),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let volume_button_tooltip = tip(volume_button_content, volume_tooltip);
 
     // Volume slider with percentage display
     let volume_slider = slider(0.0..=config::MAX_VOLUME, state.volume, |v| {
@@ -250,15 +246,9 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         more_button_base.into()
     };
 
-    let more_button = tooltip(
-        more_button_content,
-        Text::new(ctx.i18n.tr("video-more-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let more_button = tip(more_button_content, ctx.i18n.tr("video-more-tooltip"));
 
     // Loop button with tooltip
-    let loop_tooltip = ctx.i18n.tr("video-loop-tooltip");
     let loop_button_base = button(icons::sized(
         action_icons::video::toolbar::toggle_loop(),
         icon_size,
@@ -275,12 +265,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         loop_button_base.into()
     };
 
-    let loop_button = tooltip(
-        loop_button_content,
-        Text::new(loop_tooltip),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let loop_button = tip(loop_button_content, ctx.i18n.tr("video-loop-tooltip"));
 
     // Main controls row (simplified - advanced controls in overflow menu)
     let controls: Row<'a, Message> = row![
@@ -348,12 +333,7 @@ fn build_overflow_menu<'a>(
         .height(Length::Fixed(button_height))
         .into()
     };
-    let speed_down_button = tooltip(
-        speed_down_content,
-        Text::new(ctx.i18n.tr("video-speed-down-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let speed_down_button = tip(speed_down_content, ctx.i18n.tr("video-speed-down-tooltip"));
 
     // Speed label (text showing current speed)
     let speed_label = text(format_playback_speed(state.playback_speed))
@@ -383,12 +363,7 @@ fn build_overflow_menu<'a>(
         .height(Length::Fixed(button_height))
         .into()
     };
-    let speed_up_button = tooltip(
-        speed_up_content,
-        Text::new(ctx.i18n.tr("video-speed-up-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let speed_up_button = tip(speed_up_content, ctx.i18n.tr("video-speed-up-tooltip"));
 
     // Step backward button (only enabled when paused AND in stepping mode)
     let step_back_content: Element<'_, Message> = if !state.is_playing && state.can_step_backward {
@@ -412,12 +387,7 @@ fn build_overflow_menu<'a>(
         .style(styles::button::disabled())
         .into()
     };
-    let step_back_button = tooltip(
-        step_back_content,
-        Text::new(ctx.i18n.tr("video-step-backward-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let step_back_button = tip(step_back_content, ctx.i18n.tr("video-step-backward-tooltip"));
 
     // Step forward button (only enabled when paused AND not at end of video)
     let step_forward_content: Element<'_, Message> = if state.can_step_forward {
@@ -441,12 +411,7 @@ fn build_overflow_menu<'a>(
         .style(styles::button::disabled())
         .into()
     };
-    let step_forward_button = tooltip(
-        step_forward_content,
-        Text::new(ctx.i18n.tr("video-step-forward-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let step_forward_button = tip(step_forward_content, ctx.i18n.tr("video-step-forward-tooltip"));
 
     // Capture frame button
     let capture_content: Element<'_, Message> = button(icons::sized(
@@ -458,12 +423,7 @@ fn build_overflow_menu<'a>(
     .width(Length::Shrink)
     .height(Length::Fixed(button_height))
     .into();
-    let capture_button = tooltip(
-        capture_content,
-        Text::new(ctx.i18n.tr("video-capture-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let capture_button = tip(capture_content, ctx.i18n.tr("video-capture-tooltip"));
 
     // Overflow menu container - align to the right
     // Layout: [Speed Down] [1x] [Speed Up] | [Step Back] [Step Fwd] [Capture]

@@ -18,9 +18,17 @@ use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, container, rule, text, tooltip, Column, Row, Scrollable};
-use iced::{alignment::Vertical, Element, Length, Padding};
+use iced::{alignment::Vertical, Element, Length, Padding, Theme};
 
 use super::super::{EditorTool, Message, SidebarMessage, State, ViewContext};
+
+/// Helper to create a styled tooltip that follows the cursor.
+fn tip_cursor<'a, Msg: 'a>(
+    content: impl Into<Element<'a, Msg>>,
+    text: impl Into<String>,
+) -> tooltip::Tooltip<'a, Msg, Theme, iced::Renderer> {
+    styles::tooltip::styled(content, text, tooltip::Position::FollowCursor)
+}
 
 const SIDEBAR_WIDTH: f32 = 310.0;
 
@@ -255,27 +263,21 @@ fn undo_redo_section<'a>(
 fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let icon_size = 28.0;
 
-    let rotate_left_btn = tooltip::Tooltip::new(
+    let rotate_left_btn = tip_cursor(
         button(icons::sized(icons::rotate_left(), icon_size))
             .on_press(SidebarMessage::RotateLeft.into())
             .padding(spacing::XS)
             .width(Length::Fill),
-        text(ctx.i18n.tr("image-editor-rotate-left-tooltip")),
-        tooltip::Position::FollowCursor,
-    )
-    .gap(4)
-    .padding(spacing::XXS);
+        ctx.i18n.tr("image-editor-rotate-left-tooltip"),
+    );
 
-    let rotate_right_btn = tooltip::Tooltip::new(
+    let rotate_right_btn = tip_cursor(
         button(icons::sized(icons::rotate_right(), icon_size))
             .on_press(SidebarMessage::RotateRight.into())
             .padding(spacing::XS)
             .width(Length::Fill),
-        text(ctx.i18n.tr("image-editor-rotate-right-tooltip")),
-        tooltip::Position::FollowCursor,
-    )
-    .gap(4)
-    .padding(spacing::XXS);
+        ctx.i18n.tr("image-editor-rotate-right-tooltip"),
+    );
 
     let controls = Row::new()
         .spacing(spacing::XS)
@@ -298,27 +300,21 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let icon_size = 28.0;
 
-    let flip_horizontal_btn = tooltip::Tooltip::new(
+    let flip_horizontal_btn = tip_cursor(
         button(icons::sized(icons::flip_horizontal(), icon_size))
             .on_press(SidebarMessage::FlipHorizontal.into())
             .padding(spacing::XS)
             .width(Length::Fill),
-        text(ctx.i18n.tr("image-editor-flip-horizontal-tooltip")),
-        tooltip::Position::FollowCursor,
-    )
-    .gap(4)
-    .padding(spacing::XXS);
+        ctx.i18n.tr("image-editor-flip-horizontal-tooltip"),
+    );
 
-    let flip_vertical_btn = tooltip::Tooltip::new(
+    let flip_vertical_btn = tip_cursor(
         button(icons::sized(icons::flip_vertical(), icon_size))
             .on_press(SidebarMessage::FlipVertical.into())
             .padding(spacing::XS)
             .width(Length::Fill),
-        text(ctx.i18n.tr("image-editor-flip-vertical-tooltip")),
-        tooltip::Position::FollowCursor,
-    )
-    .gap(4)
-    .padding(spacing::XXS);
+        ctx.i18n.tr("image-editor-flip-vertical-tooltip"),
+    );
 
     let controls = Row::new()
         .spacing(spacing::XS)

@@ -15,6 +15,7 @@ pub mod button;
 pub mod container;
 pub mod editor;
 pub mod overlay;
+pub mod tooltip;
 
 // Re-exports for convenience
 pub use button::primary as button_primary;

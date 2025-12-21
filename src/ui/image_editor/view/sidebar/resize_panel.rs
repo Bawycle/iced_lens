@@ -6,9 +6,7 @@ use crate::media::upscale::UpscaleModelStatus;
 use crate::media::ImageData;
 use crate::ui::design_tokens::{spacing, typography};
 use crate::ui::styles;
-use iced::widget::{
-    button, checkbox, container, image, slider, text, text_input, tooltip, Column, Row,
-};
+use iced::widget::{button, checkbox, container, image, slider, text, text_input, Column, Row};
 use iced::{Element, Length};
 
 use super::super::ViewContext;
@@ -158,14 +156,11 @@ pub fn panel<'a>(
 
         // Wrap in tooltip when disabled, otherwise just show the checkbox
         if let Some(hint) = tooltip_text {
-            content = content.push(
-                tooltip(
-                    ai_upscale_checkbox,
-                    text(hint).size(typography::BODY_SM),
-                    tooltip::Position::Top,
-                )
-                .gap(spacing::XXS),
-            );
+            content = content.push(styles::tooltip::styled(
+                ai_upscale_checkbox,
+                hint,
+                iced::widget::tooltip::Position::Top,
+            ));
         } else {
             content = content.push(ai_upscale_checkbox);
         }
