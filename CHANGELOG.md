@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-12-22
+
 ### Added
-- **Volume amplification:** volume slider now goes up to 150% for louder playback on quiet videos, with percentage display (like VLC). Uses perceptual scaling (quadratic curve) so the slider feels linear to the ear.
+- **Volume amplification:** volume slider now goes up to 150% for louder playback on quiet videos, with percentage display.
 - **Video playback speed:** control video speed from 0.1x to 8x using `J`/`L` keys or overflow menu buttons.
 - **Image editor zoom:** use mouse wheel to zoom in/out while editing, matching the viewer behavior.
 - **Image editor pan:** grab-and-drag to navigate when zoomed, like in the viewer.
@@ -17,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-skip corrupted files:** when navigating, corrupted or unloadable files are automatically skipped. A notification lists skipped files. The maximum number of consecutive skips is configurable in Settings → Display (default: 5).
 
 ### Changed
-- Crop handles are now larger for better accessibility (WCAG 2.5.5 compliant).
+- Crop handles are now larger for easier selection.
 - Images are now centered in the editor canvas when smaller than the viewport.
 - Toolbar buttons now use light (white) icons for better contrast on dark button backgrounds.
 - Resize scale maximum increased from 200% to 400% to match Real-ESRGAN 4x native capability.
@@ -26,10 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Navigation overlay buttons no longer display rendering artifacts on Windows.
-- Window title now consistently shows metadata title (dc:title) across viewer and image editor.
+- Window title now consistently shows the image title from metadata across viewer and editor.
 - Resize tool now allows free dimension input when aspect ratio is unlocked.
-- Resize slider no longer causes lag with large images (preview now uses optimized thumbnail generation).
+- Resize slider no longer causes lag with large images.
 - Video fit-to-window now displays correctly on drop and layout changes.
+- Video navigation no longer causes frame distortion when switching between videos and images.
 
 ## [0.4.1] - 2025-12-19
 
@@ -123,7 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tested on Linux Mint 22.2
 - Licensed under MPL-2.0
 
-[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.4.1...HEAD
+[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.5.0...HEAD
+[0.5.0]: https://codeberg.org/Bawycle/iced_lens/compare/v0.4.1...v0.5.0
 [0.4.1]: https://codeberg.org/Bawycle/iced_lens/compare/v0.4.0...v0.4.1
 [0.4.0]: https://codeberg.org/Bawycle/iced_lens/compare/v0.3.0...v0.4.0
 [0.3.0]: https://codeberg.org/Bawycle/iced_lens/compare/v0.2.0...v0.3.0

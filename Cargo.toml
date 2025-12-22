@@ -1,6 +1,6 @@
 [package]
 name = "iced_lens"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 authors = ["Bawycle"]
 description = "Privacy-first media viewer and editor with AI enhancement"
