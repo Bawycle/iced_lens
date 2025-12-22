@@ -54,6 +54,20 @@ fn pick_dir(override_dir: Option<String>) -> String {
         }
         eprintln!("Provided i18n directory does not exist or is not a directory: {dir}");
     }
+
+    // On Windows, when launched via file association, the working directory is the
+    // file's directory, not the app's installation directory. Resolve relative to exe.
+    #[cfg(windows)]
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let exe_relative = exe_dir.join(TRANSLATIONS_DIR);
+            if exe_relative.is_dir() {
+                return exe_relative.to_string_lossy().to_string();
+            }
+        }
+    }
+
+    // Relative path (for development / cargo run, and Linux AppImage)
     TRANSLATIONS_DIR.to_string()
 }
 
