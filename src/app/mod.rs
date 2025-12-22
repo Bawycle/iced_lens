@@ -1143,7 +1143,10 @@ impl App {
                     .current_media_path
                     .as_ref()
                     .and_then(|p| p.file_name())
-                    .map_or_else(|| "unknown".to_string(), |n| n.to_string_lossy().to_string());
+                    .map_or_else(
+                        || "unknown".to_string(),
+                        |n| n.to_string_lossy().to_string(),
+                    );
 
                 // Handle based on load origin
                 let load_origin = std::mem::take(&mut self.viewer.load_origin);

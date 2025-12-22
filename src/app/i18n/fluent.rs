@@ -52,9 +52,7 @@ fn pick_dir(override_dir: Option<String>) -> String {
         if std::path::Path::new(&dir).is_dir() {
             return dir;
         }
-        eprintln!(
-            "Provided i18n directory does not exist or is not a directory: {dir}"
-        );
+        eprintln!("Provided i18n directory does not exist or is not a directory: {dir}");
     }
     TRANSLATIONS_DIR.to_string()
 }
@@ -110,9 +108,7 @@ impl I18n {
 
                 let mut bundle = FluentBundle::new(vec![locale.clone()]);
                 if let Err(errors) = bundle.add_resource(resource) {
-                    eprintln!(
-                        "Failed to add resource for locale '{locale}': {errors:?}"
-                    );
+                    eprintln!("Failed to add resource for locale '{locale}': {errors:?}");
                     continue;
                 }
 

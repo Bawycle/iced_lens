@@ -724,7 +724,9 @@ fn parse_date_input(input: &str) -> String {
     // Try date-only formats (add midnight time)
     for fmt in &date_formats {
         if let Ok(d) = NaiveDate::parse_from_str(input, fmt) {
-            let dt = d.and_hms_opt(0, 0, 0).expect("midnight (00:00:00) is always valid");
+            let dt = d
+                .and_hms_opt(0, 0, 0)
+                .expect("midnight (00:00:00) is always valid");
             return dt.format("%Y:%m:%d %H:%M:%S").to_string();
         }
     }

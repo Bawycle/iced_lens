@@ -394,12 +394,13 @@ impl FrameCache {
 
         // Resize LRU capacity if needed
         if self.cache.len() > config.max_frames {
-            self.cache.resize(
-                NonZeroUsize::new(config.max_frames).unwrap_or(
-                    NonZeroUsize::new(DEFAULT_MAX_FRAMES)
-                        .expect("DEFAULT_MAX_FRAMES must be non-zero"),
-                ),
-            );
+            self.cache
+                .resize(
+                    NonZeroUsize::new(config.max_frames).unwrap_or(
+                        NonZeroUsize::new(DEFAULT_MAX_FRAMES)
+                            .expect("DEFAULT_MAX_FRAMES must be non-zero"),
+                    ),
+                );
         }
 
         self.stats.frame_count = self.cache.len();

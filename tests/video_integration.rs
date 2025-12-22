@@ -208,10 +208,7 @@ fn test_video_decoding(path: &str, format_name: &str) {
                         DecoderEvent::FrameReady(frame) => {
                             // Verify frame has valid dimensions
                             assert!(frame.width > 0, "{format_name} frame width should be > 0");
-                            assert!(
-                                frame.height > 0,
-                                "{format_name} frame height should be > 0"
-                            );
+                            assert!(frame.height > 0, "{format_name} frame height should be > 0");
                             assert!(
                                 !frame.rgba_data.is_empty(),
                                 "{format_name} frame should have RGBA data"
@@ -229,9 +226,7 @@ fn test_video_decoding(path: &str, format_name: &str) {
                             panic!("{format_name} decoding error: {msg}");
                         }
                         DecoderEvent::EndOfStream => {
-                            panic!(
-                                "{format_name} reached end of stream without producing frames"
-                            );
+                            panic!("{format_name} reached end of stream without producing frames");
                         }
                         DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => {
                             // Continue waiting
@@ -315,9 +310,7 @@ fn test_decode_corrupted_file() {
                             DecoderEvent::Error(_)
                             | DecoderEvent::EndOfStream
                             | DecoderEvent::FrameReady(_) => return true,
-                            DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => {
-                                continue
-                            }
+                            DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => continue,
                         }
                     }
                 }
@@ -423,9 +416,7 @@ fn test_decode_performance() {
             let elapsed = start.elapsed();
             let fps = f64::from(frame_count) / elapsed.as_secs_f64();
 
-            eprintln!(
-                "{format_name}: decoded {frame_count} frames in {elapsed:?} ({fps:.1} fps)"
-            );
+            eprintln!("{format_name}: decoded {frame_count} frames in {elapsed:?} ({fps:.1} fps)");
 
             // Should decode at least a few frames in 1 second
             assert!(
@@ -455,7 +446,8 @@ fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
     rt.block_on(async {
         match AudioDecoder::new(path) {
             Ok(Some(mut decoder)) => {
-                assert!(expect_audio, 
+                assert!(
+                    expect_audio,
                     "{format_name} should NOT have audio but AudioDecoder was created"
                 );
 
@@ -531,7 +523,8 @@ fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
                 let _ = decoder.send_command(AudioDecoderCommand::Stop);
             }
             Ok(None) => {
-                assert!(!expect_audio, 
+                assert!(
+                    !expect_audio,
                     "{format_name} should have audio but no audio stream found"
                 );
                 // Expected: no audio stream
@@ -590,9 +583,7 @@ fn test_audio_stream_info_all_formats() {
 
     for (path, format_name) in &formats_with_audio {
         if !std::path::Path::new(path).exists() {
-            eprintln!(
-                "Skipping {format_name} audio stream info test: file not found"
-            );
+            eprintln!("Skipping {format_name} audio stream info test: file not found");
             continue;
         }
 

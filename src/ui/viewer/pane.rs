@@ -135,13 +135,18 @@ fn view_inner<'a>(
     // The pane is the single source of truth for display dimensions.
     // We calculate scaled_width/scaled_height from the effective zoom and pass
     // them directly to the shader. The shader does NOT store zoom state.
+    // Only use shader if:
+    // 1. We have a shader with a frame
+    // 2. The current media is a video (not an image)
+    // This prevents stale video frames from being rendered when navigating to an image
+    let is_current_media_video = matches!(model.media, crate::media::MediaData::Video(_));
     let media_viewer = if let Some(shader) = model.video_shader {
-        if shader.has_frame() {
+        if shader.has_frame() && is_current_media_video {
             // Show the shader frame (whether playing or paused)
             // Pass the calculated display dimensions - pane owns the sizing logic
             shader.view_sized(scaled_width, scaled_height)
         } else {
-            // No frame yet, show thumbnail
+            // No frame yet, or current media is an image - show static media
             super::view_media(model.media, effective_zoom)
         }
     } else {
@@ -265,9 +270,11 @@ fn view_inner<'a>(
                 .style(|_theme: &Theme| iced::widget::container::Style::default());
 
             // Wrap in mouse_area to capture clicks outside the button but within the zone
+            // Use on_press (not on_release) so the event is captured immediately,
+            // preventing it from being routed to RawEvent which would start a drag
             let left_zone_clickable = mouse_area(left_zone);
             let left_zone_clickable = if nav_enabled {
-                left_zone_clickable.on_release(Message::NavigatePrevious)
+                left_zone_clickable.on_press(Message::NavigatePrevious)
             } else {
                 left_zone_clickable
             };
@@ -333,9 +340,11 @@ fn view_inner<'a>(
                 .style(|_theme: &Theme| iced::widget::container::Style::default());
 
             // Wrap in mouse_area to capture clicks outside the button but within the zone
+            // Use on_press (not on_release) so the event is captured immediately,
+            // preventing it from being routed to RawEvent which would start a drag
             let right_zone_clickable = mouse_area(right_zone);
             let right_zone_clickable = if nav_enabled {
-                right_zone_clickable.on_release(Message::NavigateNext)
+                right_zone_clickable.on_press(Message::NavigateNext)
             } else {
                 right_zone_clickable
             };

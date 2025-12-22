@@ -59,10 +59,7 @@ impl std::fmt::Display for DeblurError {
             DeblurError::ModelNotFound => write!(f, "Model file not found"),
             DeblurError::DownloadFailed(msg) => write!(f, "Download failed: {msg}"),
             DeblurError::ChecksumMismatch { expected, actual } => {
-                write!(
-                    f,
-                    "Checksum mismatch: expected {expected}, got {actual}"
-                )
+                write!(f, "Checksum mismatch: expected {expected}, got {actual}")
             }
             DeblurError::InferenceFailed(msg) => write!(f, "Inference failed: {msg}"),
             DeblurError::PreprocessingFailed(msg) => write!(f, "Preprocessing failed: {msg}"),

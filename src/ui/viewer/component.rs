@@ -490,6 +490,9 @@ impl State {
         self.is_loading_media = true;
         self.loading_started_at = Some(std::time::Instant::now());
         self.error = None;
+        // Clear video shader immediately to prevent stale frame from being rendered
+        // with wrong dimensions when navigating to a different media
+        self.video_shader.clear();
     }
 
     /// Returns an exportable frame from the video canvas, if available.
@@ -694,7 +697,10 @@ impl State {
                             .current_media_path
                             .as_ref()
                             .and_then(|p| p.file_name())
-                            .map_or_else(|| "unknown".to_string(), |n| n.to_string_lossy().to_string());
+                            .map_or_else(
+                                || "unknown".to_string(),
+                                |n| n.to_string_lossy().to_string(),
+                            );
 
                         // Handle based on load origin
                         match std::mem::take(&mut self.load_origin) {
@@ -779,12 +785,24 @@ impl State {
             }
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
             Message::NavigateNext => {
+                // Stop video playback immediately to prevent rendering issues during navigation
+                if let Some(ref mut player) = self.video_player {
+                    player.pause();
+                }
+                // Cancel any ongoing drag (user clicked on navigation overlay)
+                self.drag.stop();
                 // Reset overlay timer on navigation
                 self.last_overlay_interaction = Some(Instant::now());
                 // Emit effect to let App handle navigation with MediaNavigator
                 (Effect::NavigateNext, Task::none())
             }
             Message::NavigatePrevious => {
+                // Stop video playback immediately to prevent rendering issues during navigation
+                if let Some(ref mut player) = self.video_player {
+                    player.pause();
+                }
+                // Cancel any ongoing drag (user clicked on navigation overlay)
+                self.drag.stop();
                 // Reset overlay timer on navigation
                 self.last_overlay_interaction = Some(Instant::now());
                 // Emit effect to let App handle navigation with MediaNavigator
@@ -1489,15 +1507,15 @@ impl State {
                     self.cursor_position = Some(position);
 
                     // Calculate distance from last recorded position to filter sensor noise
-                    let (_distance, is_real_movement) = self
-                        .last_mouse_position
-                        .map_or((f32::MAX, true), |last_pos| {
-                            // First movement is always real
-                            let dx = position.x - last_pos.x;
-                            let dy = position.y - last_pos.y;
-                            let dist = (dx * dx + dy * dy).sqrt();
-                            (dist, dist >= MOUSE_MOVEMENT_THRESHOLD)
-                        });
+                    let (_distance, is_real_movement) =
+                        self.last_mouse_position
+                            .map_or((f32::MAX, true), |last_pos| {
+                                // First movement is always real
+                                let dx = position.x - last_pos.x;
+                                let dy = position.y - last_pos.y;
+                                let dist = (dx * dx + dy * dy).sqrt();
+                                (dist, dist >= MOUSE_MOVEMENT_THRESHOLD)
+                            });
 
                     // Only process if real movement (not sensor noise)
                     if is_real_movement {
@@ -1508,9 +1526,10 @@ impl State {
 
                         // Ignore mouse movements shortly after entering fullscreen to avoid
                         // triggering controls from window resize events
-                        let ignore_due_to_fullscreen_entry = self
-                            .fullscreen_entered_at
-                            .is_some_and(|entered| entered.elapsed() < FULLSCREEN_ENTRY_IGNORE_DELAY);
+                        let ignore_due_to_fullscreen_entry =
+                            self.fullscreen_entered_at.is_some_and(|entered| {
+                                entered.elapsed() < FULLSCREEN_ENTRY_IGNORE_DELAY
+                            });
 
                         if ignore_due_to_fullscreen_entry {
                             // Ignoring movement within 500ms of fullscreen entry

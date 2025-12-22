@@ -121,7 +121,9 @@ impl MediaList {
             None => offset.saturating_sub(1) % self.media_files.len(),
         };
 
-        self.media_files.get(next_index).map(std::path::PathBuf::as_path)
+        self.media_files
+            .get(next_index)
+            .map(std::path::PathBuf::as_path)
     }
 
     /// Returns the n-th previous media path from current position, wrapping around.
@@ -141,7 +143,9 @@ impl MediaList {
             None => len.saturating_sub(offset % len) % len,
         };
 
-        self.media_files.get(prev_index).map(std::path::PathBuf::as_path)
+        self.media_files
+            .get(prev_index)
+            .map(std::path::PathBuf::as_path)
     }
 
     /// Checks if we're at the first media (used for boundary indication).

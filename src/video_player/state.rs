@@ -609,9 +609,7 @@ impl VideoPlayer {
 
     /// Returns true if audio is available for this video.
     pub fn has_audio(&self) -> bool {
-        self.command_sender
-            .as_ref()
-            .is_some_and(|s| s.has_audio())
+        self.command_sender.as_ref().is_some_and(|s| s.has_audio())
     }
 
     /// Steps forward one frame by decoding the next frame sequentially.

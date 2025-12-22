@@ -66,7 +66,7 @@ fn find_jpeg_xmp_segment<R: Read + Seek>(reader: &mut R) -> Option<Vec<u8>> {
         }
 
         match marker[1] {
-            0xD9 => return None, // End of image, no XMP found
+            0xD9 => return None,     // End of image, no XMP found
             0xD8 | 0x00 => continue, // Start of image or stuffed byte
             0xE1 => {
                 // APP1 segment - could be EXIF or XMP

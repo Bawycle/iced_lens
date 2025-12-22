@@ -68,10 +68,7 @@ impl std::fmt::Display for UpscaleError {
             UpscaleError::ModelNotFound => write!(f, "Model file not found"),
             UpscaleError::DownloadFailed(msg) => write!(f, "Download failed: {msg}"),
             UpscaleError::ChecksumMismatch { expected, actual } => {
-                write!(
-                    f,
-                    "Checksum mismatch: expected {expected}, got {actual}"
-                )
+                write!(f, "Checksum mismatch: expected {expected}, got {actual}")
             }
             UpscaleError::InferenceFailed(msg) => write!(f, "Inference failed: {msg}"),
             UpscaleError::PreprocessingFailed(msg) => write!(f, "Preprocessing failed: {msg}"),
