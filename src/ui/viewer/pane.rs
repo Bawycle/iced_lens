@@ -4,6 +4,7 @@
 
 use crate::config::BackgroundTheme;
 use crate::media::MediaData;
+use crate::ui::action_icons;
 use crate::ui::components::checkerboard;
 use crate::ui::design_tokens::{opacity, radius, sizing, spacing, typography};
 use crate::ui::icons;
@@ -130,12 +131,22 @@ fn view_inner<'a>(
 
     // Use video shader if it has a frame (playing OR paused with frame),
     // otherwise show static media (image or video thumbnail before playback starts)
+    //
+    // The pane is the single source of truth for display dimensions.
+    // We calculate scaled_width/scaled_height from the effective zoom and pass
+    // them directly to the shader. The shader does NOT store zoom state.
+    // Only use shader if:
+    // 1. We have a shader with a frame
+    // 2. The current media is a video (not an image)
+    // This prevents stale video frames from being rendered when navigating to an image
+    let is_current_media_video = matches!(model.media, crate::media::MediaData::Video(_));
     let media_viewer = if let Some(shader) = model.video_shader {
-        if shader.has_frame() {
+        if shader.has_frame() && is_current_media_video {
             // Show the shader frame (whether playing or paused)
-            shader.view()
+            // Pass the calculated display dimensions - pane owns the sizing logic
+            shader.view_sized(scaled_width, scaled_height)
         } else {
-            // No frame yet, show thumbnail
+            // No frame yet, or current media is an image - show static media
             super::view_media(model.media, effective_zoom)
         }
     } else {
@@ -214,29 +225,34 @@ fn view_inner<'a>(
             // Show loop icon at boundaries to indicate wrap-around behavior
             // Choose icon color based on background for optimal visibility
             let button_content: Element<'_, Message> = if model.at_first {
-                let loop_icon = match ctx.background_theme {
-                    BackgroundTheme::Light => icons::sized(icons::loop_icon(), 16.0),
-                    BackgroundTheme::Dark | BackgroundTheme::Checkerboard => {
-                        icons::sized(icons::overlay::loop_icon(), 16.0)
-                    }
-                };
+                let loop_icon = icons::sized(
+                    action_icons::navigation::loop_indicator(ctx.background_theme),
+                    16.0,
+                );
+                let chevron = icons::sized(
+                    action_icons::navigation::previous(ctx.background_theme),
+                    sizing::ICON_MD,
+                );
                 Row::new()
                     .spacing(spacing::XS)
                     .align_y(Vertical::Center)
                     .push(loop_icon)
-                    .push(Text::new("◀").size(typography::TITLE_MD))
+                    .push(chevron)
                     .into()
             } else {
-                Text::new("◀").size(typography::TITLE_LG).into()
+                icons::sized(
+                    action_icons::navigation::previous(ctx.background_theme),
+                    sizing::ICON_LG,
+                )
+                .into()
             };
-            let left_arrow =
-                button(button_content)
-                    .padding(spacing::SM)
-                    .style(styles::button_overlay(
-                        arrow_text_color,
-                        arrow_bg_alpha_normal,
-                        arrow_bg_alpha_hover,
-                    ));
+            let left_arrow = button(button_content).padding(spacing::SM).style(
+                styles::button::overlay::navigation(
+                    arrow_text_color,
+                    arrow_bg_alpha_normal,
+                    arrow_bg_alpha_hover,
+                ),
+            );
             let left_arrow = if nav_enabled {
                 left_arrow.on_press(Message::NavigatePrevious)
             } else {
@@ -245,27 +261,33 @@ fn view_inner<'a>(
 
             // Create a clickable zone that contains the button
             // Fixed height prevents the zone from spanning the entire viewport
+            // Explicit transparent style to avoid default backgrounds on Windows
             let left_zone = Container::new(left_arrow)
                 .height(Length::Fixed(150.0))
                 .padding(spacing::LG)
                 .align_x(Horizontal::Left)
-                .align_y(Vertical::Center);
+                .align_y(Vertical::Center)
+                .style(|_theme: &Theme| iced::widget::container::Style::default());
 
             // Wrap in mouse_area to capture clicks outside the button but within the zone
+            // Use on_press (not on_release) so the event is captured immediately,
+            // preventing it from being routed to RawEvent which would start a drag
             let left_zone_clickable = mouse_area(left_zone);
             let left_zone_clickable = if nav_enabled {
-                left_zone_clickable.on_release(Message::NavigatePrevious)
+                left_zone_clickable.on_press(Message::NavigatePrevious)
             } else {
                 left_zone_clickable
             };
 
             // Outer container centers the clickable zone vertically
+            // Explicit transparent style to avoid default backgrounds on Windows
             stack = stack.push(
                 Container::new(left_zone_clickable)
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .align_x(Horizontal::Left)
-                    .align_y(Vertical::Center),
+                    .align_y(Vertical::Center)
+                    .style(|_theme: &Theme| iced::widget::container::Style::default()),
             );
         }
 
@@ -273,29 +295,34 @@ fn view_inner<'a>(
             // Show loop icon at boundaries to indicate wrap-around behavior
             // Choose icon color based on background for optimal visibility
             let button_content: Element<'_, Message> = if model.at_last {
-                let loop_icon = match ctx.background_theme {
-                    BackgroundTheme::Light => icons::sized(icons::loop_icon(), 16.0),
-                    BackgroundTheme::Dark | BackgroundTheme::Checkerboard => {
-                        icons::sized(icons::overlay::loop_icon(), 16.0)
-                    }
-                };
+                let loop_icon = icons::sized(
+                    action_icons::navigation::loop_indicator(ctx.background_theme),
+                    16.0,
+                );
+                let chevron = icons::sized(
+                    action_icons::navigation::next(ctx.background_theme),
+                    sizing::ICON_MD,
+                );
                 Row::new()
                     .spacing(spacing::XS)
                     .align_y(Vertical::Center)
-                    .push(Text::new("▶").size(typography::TITLE_MD))
+                    .push(chevron)
                     .push(loop_icon)
                     .into()
             } else {
-                Text::new("▶").size(typography::TITLE_LG).into()
+                icons::sized(
+                    action_icons::navigation::next(ctx.background_theme),
+                    sizing::ICON_LG,
+                )
+                .into()
             };
-            let right_arrow =
-                button(button_content)
-                    .padding(spacing::SM)
-                    .style(styles::button_overlay(
-                        arrow_text_color,
-                        arrow_bg_alpha_normal,
-                        arrow_bg_alpha_hover,
-                    ));
+            let right_arrow = button(button_content).padding(spacing::SM).style(
+                styles::button::overlay::navigation(
+                    arrow_text_color,
+                    arrow_bg_alpha_normal,
+                    arrow_bg_alpha_hover,
+                ),
+            );
             let right_arrow = if nav_enabled {
                 right_arrow.on_press(Message::NavigateNext)
             } else {
@@ -304,27 +331,33 @@ fn view_inner<'a>(
 
             // Create a clickable zone that contains the button
             // Fixed height prevents the zone from spanning the entire viewport
+            // Explicit transparent style to avoid default backgrounds on Windows
             let right_zone = Container::new(right_arrow)
                 .height(Length::Fixed(150.0))
                 .padding(spacing::LG)
                 .align_x(Horizontal::Right)
-                .align_y(Vertical::Center);
+                .align_y(Vertical::Center)
+                .style(|_theme: &Theme| iced::widget::container::Style::default());
 
             // Wrap in mouse_area to capture clicks outside the button but within the zone
+            // Use on_press (not on_release) so the event is captured immediately,
+            // preventing it from being routed to RawEvent which would start a drag
             let right_zone_clickable = mouse_area(right_zone);
             let right_zone_clickable = if nav_enabled {
-                right_zone_clickable.on_release(Message::NavigateNext)
+                right_zone_clickable.on_press(Message::NavigateNext)
             } else {
                 right_zone_clickable
             };
 
             // Outer container centers the clickable zone vertically
+            // Explicit transparent style to avoid default backgrounds on Windows
             stack = stack.push(
                 Container::new(right_zone_clickable)
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .align_x(Horizontal::Right)
-                    .align_y(Vertical::Center),
+                    .align_y(Vertical::Center)
+                    .style(|_theme: &Theme| iced::widget::container::Style::default()),
             );
         }
     }
@@ -429,7 +462,7 @@ fn view_inner<'a>(
 
             let play_button = button(play_icon)
                 .on_press(Message::InitiatePlayback)
-                .style(styles::button::video_play_overlay())
+                .style(styles::button::overlay::video_play())
                 .width(Length::Fixed(64.0))
                 .height(Length::Fixed(64.0));
 
@@ -449,7 +482,7 @@ fn view_inner<'a>(
             // For now, we'll reuse InitiatePlayback which should toggle
             let pause_button = button(pause_icon)
                 .on_press(Message::InitiatePlayback)
-                .style(styles::button::video_play_overlay())
+                .style(styles::button::overlay::video_play())
                 .width(Length::Fixed(64.0))
                 .height(Length::Fixed(64.0));
 

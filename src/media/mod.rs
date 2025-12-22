@@ -11,6 +11,8 @@ pub mod image_transform;
 pub mod metadata;
 pub mod metadata_writer;
 pub mod navigator;
+pub mod skip_attempts;
+pub mod upscale;
 pub mod video;
 pub mod xmp;
 
@@ -21,7 +23,9 @@ use std::path::Path;
 
 // Re-export commonly used types
 pub use image::{load_image, ImageData, SUPPORTED_EXTENSIONS as IMAGE_EXTENSIONS};
-pub use navigator::{ImageNavigator, MediaNavigator};
+pub use image_transform::ResizeScale;
+pub use navigator::MediaNavigator;
+pub use skip_attempts::MaxSkipAttempts;
 
 /// Represents different types of media formats
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -245,10 +249,10 @@ fn load_animated_webp(path: &Path) -> crate::error::Result<MediaData> {
 
     // Extract first frame as thumbnail
     let webp_data = std::fs::read(path)
-        .map_err(|e| crate::error::Error::Io(format!("Failed to read WebP file: {}", e)))?;
+        .map_err(|e| crate::error::Error::Io(format!("Failed to read WebP file: {e}")))?;
 
     let decoder = webp_animation::Decoder::new(&webp_data)
-        .map_err(|e| crate::error::Error::Io(format!("Failed to decode WebP: {:?}", e)))?;
+        .map_err(|e| crate::error::Error::Io(format!("Failed to decode WebP: {e:?}")))?;
 
     // Get first frame as thumbnail
     let first_frame = decoder
@@ -289,9 +293,8 @@ pub fn detect_media_type<P: AsRef<Path>>(path: P) -> Option<MediaType> {
     // For GIF and WebP, check if animated
     if extension == "gif" || extension == "webp" {
         match is_animated(path_ref) {
-            Ok(true) => return Some(MediaType::Video),  // Animated
-            Ok(false) => return Some(MediaType::Image), // Static
-            Err(_) => return Some(MediaType::Image),    // Error: treat as static image
+            Ok(true) => return Some(MediaType::Video), // Animated
+            Ok(false) | Err(_) => return Some(MediaType::Image), // Static or error
         }
     }
 

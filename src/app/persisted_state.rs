@@ -46,6 +46,12 @@ pub struct AppState {
     /// The value depends on whether the model has been successfully downloaded and validated.
     #[serde(default)]
     pub enable_deblur: bool,
+
+    /// Whether AI upscaling is enabled.
+    /// This is application-managed state, not a user preference.
+    /// The value depends on whether the model has been successfully downloaded and validated.
+    #[serde(default)]
+    pub enable_upscale: bool,
 }
 
 impl AppState {
@@ -239,6 +245,7 @@ mod tests {
             last_save_directory: Some(PathBuf::from("/home/user/documents")),
             last_open_directory: Some(PathBuf::from("/home/user/pictures")),
             enable_deblur: false,
+            enable_upscale: false,
         };
 
         // Write to CBOR
@@ -279,6 +286,7 @@ mod tests {
             last_save_directory: Some(PathBuf::from("/test/save/directory")),
             last_open_directory: Some(PathBuf::from("/test/open/directory")),
             enable_deblur: true,
+            enable_upscale: false,
         };
 
         // Save to custom directory
@@ -333,6 +341,7 @@ mod tests {
             last_save_directory: Some(PathBuf::from("/path/a")),
             last_open_directory: None,
             enable_deblur: false,
+            enable_upscale: false,
         };
         state_a.save_to(Some(temp_dir_a.path().to_path_buf()));
 
@@ -342,6 +351,7 @@ mod tests {
             last_save_directory: Some(PathBuf::from("/path/b")),
             last_open_directory: None,
             enable_deblur: true,
+            enable_upscale: true,
         };
         state_b.save_to(Some(temp_dir_b.path().to_path_buf()));
 
@@ -362,6 +372,7 @@ mod tests {
             last_save_directory: Some(PathBuf::from("/test")),
             last_open_directory: None,
             enable_deblur: false,
+            enable_upscale: false,
         };
 
         // Save should create nested directories

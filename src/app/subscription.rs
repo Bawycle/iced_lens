@@ -16,7 +16,7 @@ use iced::{event, time, Subscription};
 /// - Editor: Routes keyboard events to editor, window events to viewer
 /// - Settings/Help/About: Routes non-wheel events to viewer
 ///
-/// File drop events are handled on all screens to allow opening media at any time.
+/// File drop events are only handled on the Viewer screen.
 /// Window close requests are handled on all screens for cleanup.
 pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
     match screen {
@@ -26,10 +26,7 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                 return Some(Message::WindowCloseRequested(window_id));
             }
 
-            // Handle file drop on all screens
-            if let event::Event::Window(iced::window::Event::FileDropped(path)) = &event {
-                return Some(Message::FileDropped(path.clone()));
-            }
+            // File drop is only handled on Viewer screen
 
             if let event::Event::Window(iced::window::Event::Resized(_)) = &event {
                 return Some(Message::Viewer(component::Message::RawEvent {
@@ -38,7 +35,38 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                 }));
             }
 
-            // In editor screen, route keyboard events to editor
+            // Route mouse wheel scroll to editor for zoom (always, to override scrollable)
+            if matches!(
+                event,
+                event::Event::Mouse(iced::mouse::Event::WheelScrolled { .. })
+            ) {
+                return Some(Message::ImageEditor(
+                    crate::ui::image_editor::Message::RawEvent {
+                        window: window_id,
+                        event: event.clone(),
+                    },
+                ));
+            }
+
+            // Route mouse events to editor for cursor tracking and pan
+            if matches!(
+                event,
+                event::Event::Mouse(
+                    iced::mouse::Event::CursorMoved { .. }
+                        | iced::mouse::Event::CursorLeft
+                        | iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)
+                        | iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)
+                )
+            ) {
+                return Some(Message::ImageEditor(
+                    crate::ui::image_editor::Message::RawEvent {
+                        window: window_id,
+                        event: event.clone(),
+                    },
+                ));
+            }
+
+            // Route keyboard events to editor
             if let event::Event::Keyboard(..) = &event {
                 match status {
                     event::Status::Ignored => Some(Message::ImageEditor(
@@ -61,10 +89,13 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                     return Some(Message::WindowCloseRequested(window_id));
                 }
 
-                // Handle file drop on all screens
+                // Handle file drop only on Viewer screen
                 if let event::Event::Window(iced::window::Event::FileDropped(path)) = &event {
                     return Some(Message::FileDropped(path.clone()));
                 }
+
+                // Note: Window::Resized events are passed to the viewer (not intercepted here)
+                // and window_size is updated in App::update when processing viewer messages.
 
                 if matches!(
                     event,
@@ -94,10 +125,7 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                     return Some(Message::WindowCloseRequested(window_id));
                 }
 
-                // Handle file drop on all screens
-                if let event::Event::Window(iced::window::Event::FileDropped(path)) = &event {
-                    return Some(Message::FileDropped(path.clone()));
-                }
+                // File drop is only handled on Viewer screen
 
                 // Don't route wheel scroll to viewer - it's used by scrollable content
                 if matches!(

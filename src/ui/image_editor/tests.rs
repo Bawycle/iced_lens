@@ -37,7 +37,7 @@ fn new_editor_state_initializes_resize_state() {
 
     assert_eq!(state.resize_state.width, 4);
     assert_eq!(state.resize_state.height, 3);
-    assert_eq!(state.resize_state.scale_percent, 100.0);
+    assert_eq!(state.resize_state.scale.value(), 100.0);
     assert!(state.resize_state.lock_aspect);
     assert_eq!(state.resize_state.original_aspect, 4.0 / 3.0);
 }
@@ -110,9 +110,12 @@ fn resize_preview_updates_when_width_changes() {
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
     )));
+    // Type the new value
     state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
         "50".to_string(),
     )));
+    // Submit to trigger calculation and preview update
+    state.update(Message::Sidebar(SidebarMessage::WidthInputSubmitted));
 
     // Preview should exist with new dimensions
     assert!(
@@ -163,6 +166,7 @@ fn resize_preview_clears_when_dimensions_match_original() {
     state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
         "50".to_string(),
     )));
+    state.update(Message::Sidebar(SidebarMessage::WidthInputSubmitted));
     assert!(
         state.preview_image.is_some(),
         "Preview should exist after resize"
@@ -172,6 +176,7 @@ fn resize_preview_clears_when_dimensions_match_original() {
     state.update(Message::Sidebar(SidebarMessage::WidthInputChanged(
         "100".to_string(),
     )));
+    state.update(Message::Sidebar(SidebarMessage::WidthInputSubmitted));
 
     // Preview should be cleared when dimensions match original
     assert!(
@@ -195,6 +200,7 @@ fn resize_preview_updates_when_height_changes() {
     state.update(Message::Sidebar(SidebarMessage::HeightInputChanged(
         "75".to_string(),
     )));
+    state.update(Message::Sidebar(SidebarMessage::HeightInputSubmitted));
 
     assert!(
         state.preview_image.is_some(),
@@ -262,7 +268,7 @@ fn crop_handle_detection_with_extended_hit_area() {
     state.crop_state.overlay.drag_state = CropDragState::None;
 
     // Click 15 pixels away from TopLeft handle (within extended hit area)
-    // With HANDLE_SIZE = 20, this should still be detected
+    // With CROP_HANDLE_HIT_SIZE = 44 (radius 22), this should still be detected
     state.handle_crop_overlay_mouse_down(65.0, 65.0);
     assert!(
         matches!(

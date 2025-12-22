@@ -4,13 +4,21 @@
 //! Provides a toolbar with play/pause, timeline scrubber, time display,
 //! volume controls, and loop toggle specifically for video playback.
 
+use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{sizing, spacing};
-use crate::ui::{icons, styles};
-use iced::widget::{
-    button, column, container, row, slider, text, tooltip, Column, Row, Space, Text,
-};
-use iced::{Element, Length};
+use crate::ui::{action_icons, icons, styles};
+use crate::video_player::Volume;
+use iced::widget::{button, column, container, row, slider, text, tooltip, Column, Row, Space};
+use iced::{Element, Length, Theme};
+
+/// Helper to create a styled tooltip positioned above the element.
+fn tip<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+    text: impl Into<String>,
+) -> tooltip::Tooltip<'a, Message, Theme, iced::Renderer> {
+    styles::tooltip::styled(content, text, tooltip::Position::Top)
+}
 
 /// Slider step in seconds (1ms precision).
 /// f64 has ~15 significant digits, so even for 24h videos (86400s),
@@ -34,8 +42,8 @@ pub enum Message {
     /// Used by keyboard shortcuts (e.g., arrow keys for ±5s).
     SeekRelative(f64),
 
-    /// Adjust volume (0.0 to 1.0).
-    SetVolume(f32),
+    /// Adjust volume (guaranteed to be within 0.0–1.0 by Volume type).
+    SetVolume(Volume),
 
     /// Toggle mute state.
     ToggleMute,
@@ -54,6 +62,12 @@ pub enum Message {
 
     /// Toggle the overflow menu (advanced controls).
     ToggleOverflowMenu,
+
+    /// Increase playback speed to next preset.
+    IncreasePlaybackSpeed,
+
+    /// Decrease playback speed to previous preset.
+    DecreasePlaybackSpeed,
 }
 
 /// View context for rendering video controls.
@@ -73,7 +87,7 @@ pub struct PlaybackState {
     /// Total duration in seconds.
     pub duration_secs: f64,
 
-    /// Current volume (0.0 to 1.0).
+    /// Current volume (0.0 to 1.5, where 1.0 = 100%).
     pub volume: f32,
 
     /// Is audio muted?
@@ -96,6 +110,12 @@ pub struct PlaybackState {
     /// Can step forward (paused and not at end of video)?
     /// When false, the step forward button is disabled.
     pub can_step_forward: bool,
+
+    /// Current playback speed (1.0 = normal).
+    pub playback_speed: f64,
+
+    /// Whether audio is auto-muted due to high speed (>2x).
+    pub speed_auto_muted: bool,
 }
 
 impl Default for PlaybackState {
@@ -111,6 +131,8 @@ impl Default for PlaybackState {
             overflow_menu_open: false,
             can_step_backward: false,
             can_step_forward: false,
+            playback_speed: 1.0,
+            speed_auto_muted: false,
         }
     }
 }
@@ -129,9 +151,9 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     let button_height = sizing::BUTTON_HEIGHT;
 
     let play_pause_svg = if state.is_playing {
-        icons::sized(icons::pause(), icon_size)
+        icons::sized(action_icons::video::toolbar::pause(), icon_size)
     } else {
-        icons::sized(icons::play(), icon_size)
+        icons::sized(action_icons::video::toolbar::play(), icon_size)
     };
 
     let play_pause_tooltip = if state.is_playing {
@@ -140,19 +162,14 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         ctx.i18n.tr("video-play-tooltip")
     };
 
-    let play_pause_button_content: Element<'_, Message> = button(play_pause_svg)
-        .on_press(Message::TogglePlayback)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .into();
-
-    let play_pause_button = tooltip(
-        play_pause_button_content,
-        Text::new(play_pause_tooltip),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let play_pause_button = tip(
+        button(play_pause_svg)
+            .on_press(Message::TogglePlayback)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height)),
+        play_pause_tooltip,
+    );
 
     // Timeline position in seconds
     // Use preview position during drag, otherwise use actual playback position
@@ -178,9 +195,9 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
 
     // Volume button with tooltip - shows mute icon when muted
     let volume_icon = if state.muted || state.volume == 0.0 {
-        icons::sized(icons::volume_mute(), icon_size)
+        icons::sized(action_icons::video::toolbar::volume_muted(), icon_size)
     } else {
-        icons::sized(icons::volume(), icon_size)
+        icons::sized(action_icons::video::toolbar::volume(), icon_size)
     };
     let volume_tooltip = if state.muted {
         ctx.i18n.tr("video-unmute-tooltip")
@@ -200,24 +217,28 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         volume_button.into()
     };
 
-    let volume_button_tooltip = tooltip(
-        volume_button_content,
-        Text::new(volume_tooltip),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let volume_button_tooltip = tip(volume_button_content, volume_tooltip);
 
-    // Volume slider (only shown when not muted)
-    let volume_slider = slider(0.0..=1.0, state.volume, Message::SetVolume)
-        .width(Length::Fixed(80.0))
-        .step(0.01);
+    // Volume slider with percentage display
+    let volume_slider = slider(0.0..=config::MAX_VOLUME, state.volume, |v| {
+        Message::SetVolume(Volume::new(v))
+    })
+    .width(Length::Fixed(80.0))
+    .step(0.01);
+
+    let volume_percent = text(format_volume_percent(state.volume))
+        .size(sizing::ICON_SM)
+        .width(Length::Fixed(40.0)); // Fixed width prevents layout shift
 
     // More button (overflow menu toggle)
-    let more_button_base = button(icons::sized(icons::ellipsis_horizontal(), icon_size))
-        .on_press(Message::ToggleOverflowMenu)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height));
+    let more_button_base = button(icons::sized(
+        action_icons::video::toolbar::more_options(),
+        icon_size,
+    ))
+    .on_press(Message::ToggleOverflowMenu)
+    .padding(spacing::XS)
+    .width(Length::Shrink)
+    .height(Length::Fixed(button_height));
 
     let more_button_content: Element<'_, Message> = if state.overflow_menu_open {
         more_button_base.style(styles::button::selected).into()
@@ -225,20 +246,17 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         more_button_base.into()
     };
 
-    let more_button = tooltip(
-        more_button_content,
-        Text::new(ctx.i18n.tr("video-more-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let more_button = tip(more_button_content, ctx.i18n.tr("video-more-tooltip"));
 
     // Loop button with tooltip
-    let loop_tooltip = ctx.i18n.tr("video-loop-tooltip");
-    let loop_button_base = button(icons::sized(icons::loop_icon(), icon_size))
-        .on_press(Message::ToggleLoop)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height));
+    let loop_button_base = button(icons::sized(
+        action_icons::video::toolbar::toggle_loop(),
+        icon_size,
+    ))
+    .on_press(Message::ToggleLoop)
+    .padding(spacing::XS)
+    .width(Length::Shrink)
+    .height(Length::Fixed(button_height));
 
     // Apply active style when loop is enabled (highlighted like mute button)
     let loop_button_content: Element<'_, Message> = if state.loop_enabled {
@@ -247,12 +265,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         loop_button_base.into()
     };
 
-    let loop_button = tooltip(
-        loop_button_content,
-        Text::new(loop_tooltip),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+    let loop_button = tip(loop_button_content, ctx.i18n.tr("video-loop-tooltip"));
 
     // Main controls row (simplified - advanced controls in overflow menu)
     let controls: Row<'a, Message> = row![
@@ -261,6 +274,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         time_display,
         volume_button_tooltip,
         volume_slider,
+        volume_percent,
         loop_button,
         more_button,
     ]
@@ -296,69 +310,134 @@ fn build_overflow_menu<'a>(
     icon_size: f32,
     button_height: f32,
 ) -> Element<'a, Message> {
-    // Step backward button (only enabled when paused AND in stepping mode)
-    let step_back_content: Element<'_, Message> = if !state.is_playing && state.can_step_backward {
-        button(icons::sized(icons::triangle_bar_left(), icon_size))
-            .on_press(Message::StepBackward)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .into()
-    } else {
-        button(icons::sized(icons::triangle_bar_left(), icon_size))
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .style(styles::button::disabled())
-            .into()
-    };
-    let step_back_button = tooltip(
-        step_back_content,
-        Text::new(ctx.i18n.tr("video-step-backward-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
-
-    // Step forward button (only enabled when paused AND not at end of video)
-    let step_forward_content: Element<'_, Message> = if state.can_step_forward {
-        button(icons::sized(icons::triangle_bar_right(), icon_size))
-            .on_press(Message::StepForward)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .into()
-    } else {
-        button(icons::sized(icons::triangle_bar_right(), icon_size))
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .style(styles::button::disabled())
-            .into()
-    };
-    let step_forward_button = tooltip(
-        step_forward_content,
-        Text::new(ctx.i18n.tr("video-step-forward-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
-
-    // Capture frame button
-    let capture_content: Element<'_, Message> = button(icons::sized(icons::camera(), icon_size))
-        .on_press(Message::CaptureFrame)
+    // Speed down button (disabled at minimum speed)
+    let at_min_speed = state.playback_speed <= config::MIN_PLAYBACK_SPEED;
+    let speed_down_content: Element<'_, Message> = if at_min_speed {
+        button(icons::sized(
+            action_icons::video::toolbar::speed_down(),
+            icon_size,
+        ))
         .padding(spacing::XS)
         .width(Length::Shrink)
         .height(Length::Fixed(button_height))
-        .into();
-    let capture_button = tooltip(
-        capture_content,
-        Text::new(ctx.i18n.tr("video-capture-tooltip")),
-        tooltip::Position::Top,
-    )
-    .gap(4);
+        .style(styles::button::disabled())
+        .into()
+    } else {
+        button(icons::sized(
+            action_icons::video::toolbar::speed_down(),
+            icon_size,
+        ))
+        .on_press(Message::DecreasePlaybackSpeed)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .into()
+    };
+    let speed_down_button = tip(speed_down_content, ctx.i18n.tr("video-speed-down-tooltip"));
+
+    // Speed label (text showing current speed)
+    let speed_label = text(format_playback_speed(state.playback_speed))
+        .size(sizing::ICON_SM)
+        .width(Length::Shrink);
+
+    // Speed up button (disabled at maximum speed)
+    let at_max_speed = state.playback_speed >= config::MAX_PLAYBACK_SPEED;
+    let speed_up_content: Element<'_, Message> = if at_max_speed {
+        button(icons::sized(
+            action_icons::video::toolbar::speed_up(),
+            icon_size,
+        ))
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .style(styles::button::disabled())
+        .into()
+    } else {
+        button(icons::sized(
+            action_icons::video::toolbar::speed_up(),
+            icon_size,
+        ))
+        .on_press(Message::IncreasePlaybackSpeed)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .into()
+    };
+    let speed_up_button = tip(speed_up_content, ctx.i18n.tr("video-speed-up-tooltip"));
+
+    // Step backward button (only enabled when paused AND in stepping mode)
+    let step_back_content: Element<'_, Message> = if !state.is_playing && state.can_step_backward {
+        button(icons::sized(
+            action_icons::video::toolbar::step_backward(),
+            icon_size,
+        ))
+        .on_press(Message::StepBackward)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .into()
+    } else {
+        button(icons::sized(
+            action_icons::video::toolbar::step_backward(),
+            icon_size,
+        ))
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .style(styles::button::disabled())
+        .into()
+    };
+    let step_back_button = tip(
+        step_back_content,
+        ctx.i18n.tr("video-step-backward-tooltip"),
+    );
+
+    // Step forward button (only enabled when paused AND not at end of video)
+    let step_forward_content: Element<'_, Message> = if state.can_step_forward {
+        button(icons::sized(
+            action_icons::video::toolbar::step_forward(),
+            icon_size,
+        ))
+        .on_press(Message::StepForward)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .into()
+    } else {
+        button(icons::sized(
+            action_icons::video::toolbar::step_forward(),
+            icon_size,
+        ))
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height))
+        .style(styles::button::disabled())
+        .into()
+    };
+    let step_forward_button = tip(
+        step_forward_content,
+        ctx.i18n.tr("video-step-forward-tooltip"),
+    );
+
+    // Capture frame button
+    let capture_content: Element<'_, Message> = button(icons::sized(
+        action_icons::video::toolbar::capture_frame(),
+        icon_size,
+    ))
+    .on_press(Message::CaptureFrame)
+    .padding(spacing::XS)
+    .width(Length::Shrink)
+    .height(Length::Fixed(button_height))
+    .into();
+    let capture_button = tip(capture_content, ctx.i18n.tr("video-capture-tooltip"));
 
     // Overflow menu container - align to the right
+    // Layout: [Speed Down] [1x] [Speed Up] | [Step Back] [Step Fwd] [Capture]
     let menu_content: Row<'a, Message> = row![
         Space::new().width(Length::Fill),
+        speed_down_button,
+        speed_label,
+        speed_up_button,
         step_back_button,
         step_forward_button,
         capture_button,
@@ -378,10 +457,22 @@ fn format_time(seconds: f64) -> String {
     let secs = total_secs % 60;
 
     if hours > 0 {
-        format!("{:02}:{:02}:{:02}", hours, minutes, secs)
+        format!("{hours:02}:{minutes:02}:{secs:02}")
     } else {
-        format!("{:02}:{:02}", minutes, secs)
+        format!("{minutes:02}:{secs:02}")
     }
+}
+
+/// Formats playback speed for display.
+/// Always shows 2 decimal places for consistent UI width.
+fn format_playback_speed(speed: f64) -> String {
+    format!("{speed:.2}x")
+}
+
+/// Formats volume as percentage for display.
+/// Rounds to integer for cleaner UI (e.g., "75%" not "75.00%").
+fn format_volume_percent(volume: f32) -> String {
+    format!("{}%", (volume * 100.0).round() as u32)
 }
 
 #[cfg(test)]
@@ -436,7 +527,7 @@ mod tests {
     #[test]
     fn message_debug_works() {
         let msg = Message::SeekPreview(30.5);
-        let debug_str = format!("{:?}", msg);
+        let debug_str = format!("{msg:?}");
         assert!(debug_str.contains("SeekPreview"));
         assert!(debug_str.contains("30.5"));
     }
@@ -462,6 +553,8 @@ mod tests {
             overflow_menu_open: false,
             can_step_backward: false,
             can_step_forward: false,
+            playback_speed: 1.0,
+            speed_auto_muted: false,
         };
 
         // Position is in seconds
@@ -484,6 +577,8 @@ mod tests {
             overflow_menu_open: false,
             can_step_backward: false,
             can_step_forward: false,
+            playback_speed: 1.0,
+            speed_auto_muted: false,
         };
 
         // When duration is zero, position is still valid
@@ -508,6 +603,8 @@ mod tests {
             overflow_menu_open: false,
             can_step_backward: false,
             can_step_forward: false,
+            playback_speed: 1.0,
+            speed_auto_muted: false,
         };
 
         // When seek_preview_position is set, it should be used instead of playback position
@@ -515,5 +612,46 @@ mod tests {
 
         // Should use preview position (90s) not playback position (30s)
         assert_eq!(position, 90.0);
+    }
+
+    #[test]
+    fn format_playback_speed_always_two_decimals() {
+        // Integer values show .00
+        assert_eq!(format_playback_speed(1.0), "1.00x");
+        assert_eq!(format_playback_speed(2.0), "2.00x");
+        assert_eq!(format_playback_speed(4.0), "4.00x");
+        assert_eq!(format_playback_speed(8.0), "8.00x");
+
+        // One decimal values show trailing 0
+        assert_eq!(format_playback_speed(0.1), "0.10x");
+        assert_eq!(format_playback_speed(0.5), "0.50x");
+        assert_eq!(format_playback_speed(1.5), "1.50x");
+
+        // Two decimal values shown as-is
+        assert_eq!(format_playback_speed(0.15), "0.15x");
+        assert_eq!(format_playback_speed(0.25), "0.25x");
+        assert_eq!(format_playback_speed(0.33), "0.33x");
+        assert_eq!(format_playback_speed(1.25), "1.25x");
+    }
+
+    #[test]
+    fn playback_state_default_speed() {
+        let state = PlaybackState::default();
+        assert_eq!(state.playback_speed, 1.0);
+        assert!(!state.speed_auto_muted);
+    }
+
+    #[test]
+    fn format_volume_percent_rounds_to_integer() {
+        // Standard values
+        assert_eq!(format_volume_percent(0.0), "0%");
+        assert_eq!(format_volume_percent(0.5), "50%");
+        assert_eq!(format_volume_percent(1.0), "100%");
+        assert_eq!(format_volume_percent(1.5), "150%");
+
+        // Fractional values round correctly
+        assert_eq!(format_volume_percent(0.754), "75%");
+        assert_eq!(format_volume_percent(0.756), "76%");
+        assert_eq!(format_volume_percent(1.25), "125%");
     }
 }

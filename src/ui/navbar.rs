@@ -6,6 +6,7 @@
 //! Help, and About screens.
 
 use crate::i18n::fluent::I18n;
+use crate::ui::action_icons;
 use crate::ui::design_tokens::{radius, sizing, spacing};
 use crate::ui::icons;
 use crate::ui::styles;
@@ -104,9 +105,12 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
 
 /// Build the top bar with hamburger menu button, edit button, and info button.
 fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let menu_button = button(icons::sized(icons::hamburger(), sizing::ICON_MD))
-        .on_press(Message::ToggleMenu)
-        .padding(spacing::XS);
+    let menu_button = button(icons::sized(
+        action_icons::navigation::menu(),
+        sizing::ICON_MD,
+    ))
+    .on_press(Message::ToggleMenu)
+    .padding(spacing::XS);
 
     let edit_label = ctx.i18n.tr("navbar-edit-button");
     let edit_button = if ctx.metadata_editor_has_changes {

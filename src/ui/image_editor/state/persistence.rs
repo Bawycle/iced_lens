@@ -13,12 +13,12 @@ impl State {
 
         // Detect format from file extension
         let format = match path.extension().and_then(|s| s.to_str()) {
-            Some("jpg") | Some("jpeg") => ImageFormat::Jpeg,
+            Some("jpg" | "jpeg") => ImageFormat::Jpeg,
             Some("png") => ImageFormat::Png,
             Some("gif") => ImageFormat::Gif,
             Some("bmp") => ImageFormat::Bmp,
             Some("ico") => ImageFormat::Ico,
-            Some("tiff") | Some("tif") => ImageFormat::Tiff,
+            Some("tiff" | "tif") => ImageFormat::Tiff,
             Some("webp") => ImageFormat::WebP,
             _ => ImageFormat::Png, // Default fallback
         };
@@ -26,7 +26,7 @@ impl State {
         // Save the working image
         self.working_image
             .save_with_format(path, format)
-            .map_err(|err| Error::Io(format!("Failed to save image: {}", err)))?;
+            .map_err(|err| Error::Io(format!("Failed to save image: {err}")))?;
 
         // Clear transformation history after successful save
         self.transformation_history.clear();

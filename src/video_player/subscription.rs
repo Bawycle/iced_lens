@@ -26,8 +26,7 @@ use tokio::sync::mpsc;
 fn is_animated_webp(path: &PathBuf) -> bool {
     path.extension()
         .and_then(|s| s.to_str())
-        .map(|s| s.eq_ignore_ascii_case("webp"))
-        .unwrap_or(false)
+        .is_some_and(|s| s.eq_ignore_ascii_case("webp"))
         && crate::media::detect_media_type(path) == Some(crate::media::MediaType::Video)
 }
 
@@ -56,8 +55,8 @@ impl DecoderCommandSender {
             .map_err(|_| "Video decoder not running".to_string())
     }
 
-    /// Sets the audio volume (0.0 to 1.0).
-    pub fn set_volume(&self, volume: f32) -> Result<(), String> {
+    /// Sets the audio volume.
+    pub fn set_volume(&self, volume: super::Volume) -> Result<(), String> {
         if let Some(ref audio_tx) = self.audio_tx {
             audio_tx
                 .send(AudioDecoderCommand::SetVolume(volume))
@@ -286,7 +285,7 @@ async fn run_playback_loop(
                         }
                         Err(e) => {
                             // Log error but continue without audio
-                            eprintln!("Audio decoder failed: {}", e);
+                            eprintln!("Audio decoder failed: {e}");
                             None
                         }
                     }
@@ -297,7 +296,7 @@ async fn run_playback_loop(
                     match AudioOutput::new(0.8) {
                         Ok(output) => Some(output),
                         Err(e) => {
-                            eprintln!("Audio output failed: {}", e);
+                            eprintln!("Audio output failed: {e}");
                             None
                         }
                     }
@@ -406,6 +405,10 @@ async fn run_playback_loop(
                                     DecoderCommand::StepBackward => {
                                         // No audio action needed for backward stepping
                                     }
+                                    DecoderCommand::SetPlaybackSpeed { .. } => {
+                                        // Clear audio buffer to prevent desync from old-speed samples
+                                        let _ = audio_out.clear_buffer();
+                                    }
                                 }
                             }
 
@@ -418,8 +421,14 @@ async fn run_playback_loop(
                                         Some(AudioDecoderCommand::Seek { target_secs: *target_secs })
                                     }
                                     DecoderCommand::Stop => Some(AudioDecoderCommand::Stop),
-                                    DecoderCommand::StepFrame => None, // No audio sync for frame stepping
-                                    DecoderCommand::StepBackward => None, // No audio sync for backward stepping
+                                    DecoderCommand::StepFrame | DecoderCommand::StepBackward => None, // No audio sync for stepping
+                                    DecoderCommand::SetPlaybackSpeed { speed, instant, reference_pts } => {
+                                        Some(AudioDecoderCommand::SetPlaybackSpeed {
+                                            speed: *speed,
+                                            instant: *instant,
+                                            reference_pts: *reference_pts,
+                                        })
+                                    }
                                 };
                                 if let Some(cmd) = audio_cmd {
                                     let _ = audio_dec.send_command(cmd);
@@ -467,6 +476,10 @@ async fn run_playback_loop(
                                 }
                                 AudioDecoderCommand::SetMuted(muted) => {
                                     let _ = audio_out.set_muted(muted);
+                                }
+                                AudioDecoderCommand::SetPlaybackSpeed { .. } => {
+                                    // Playback speed is handled in the audio decoder loop
+                                    // (affects frame pacing, not audio output directly)
                                 }
                             }
                         }
@@ -535,7 +548,7 @@ async fn run_playback_loop(
                                 // Audio finished - video might still be playing
                             }
                             AudioDecoderEvent::Error(msg) => {
-                                eprintln!("Audio error: {}", msg);
+                                eprintln!("Audio error: {msg}");
                             }
                         }
                     }
@@ -602,7 +615,7 @@ mod tests {
     #[test]
     fn playback_message_can_be_debugged() {
         let msg = PlaybackMessage::Error("test error".to_string());
-        let debug_str = format!("{:?}", msg);
+        let debug_str = format!("{msg:?}");
         assert!(debug_str.contains("test error"));
     }
 

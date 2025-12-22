@@ -6,7 +6,8 @@ As IcedLens is currently in pre-1.0 development, security updates are provided f
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.4.x   | :white_check_mark: |
+| 0.5.x   | :white_check_mark: |
+| 0.4.x   | :x:                |
 | 0.3.x   | :x:                |
 | 0.2.x   | :x:                |
 | 0.1.x   | :x:                |
@@ -17,7 +18,7 @@ Once version 1.0.0 is released, this policy will be updated to reflect long-term
 
 IcedLens is a local-first image viewer and editor:
 - **Local processing**: Images and videos are processed entirely on your machine
-- **Minimal network activity**: The only network connection is the optional AI Deblur feature, which downloads an ONNX model (~92 MB) from Hugging Face on first use. The model integrity is verified with a BLAKE3 checksum.
+- **Minimal network activity**: The only network connections are optional AI features, which download ONNX models from Hugging Face on first use: NAFNet for deblurring (~92 MB) and Real-ESRGAN for upscaling (~64 MB). Each model's integrity is verified with a BLAKE3 checksum.
 - **No telemetry**: No usage data, analytics, or tracking
 
 Security vulnerabilities may arise from:

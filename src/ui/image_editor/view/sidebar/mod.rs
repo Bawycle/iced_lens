@@ -8,6 +8,8 @@ pub mod resize_panel;
 
 use crate::media::deblur::ModelStatus;
 use crate::media::frame_export::ExportFormat;
+use crate::media::upscale::UpscaleModelStatus;
+use crate::media::ImageData;
 use crate::ui::action_icons;
 use crate::ui::design_tokens::{sizing, spacing, typography};
 use crate::ui::icons;
@@ -16,9 +18,17 @@ use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{button, container, rule, text, tooltip, Column, Row, Scrollable};
-use iced::{alignment::Vertical, Element, Length, Padding};
+use iced::{alignment::Vertical, Element, Length, Padding, Theme};
 
 use super::super::{EditorTool, Message, SidebarMessage, State, ViewContext};
+
+/// Helper to create a styled tooltip that follows the cursor.
+fn tip_cursor<'a, Msg: 'a>(
+    content: impl Into<Element<'a, Msg>>,
+    text: impl Into<String>,
+) -> tooltip::Tooltip<'a, Msg, Theme, iced::Renderer> {
+    styles::tooltip::styled(content, text, tooltip::Position::FollowCursor)
+}
 
 const SIDEBAR_WIDTH: f32 = 310.0;
 
@@ -39,6 +49,12 @@ pub struct SidebarModel<'a> {
     pub deblur_model_status: &'a ModelStatus,
     /// True if deblur has already been applied to this image.
     pub has_deblur_applied: bool,
+    /// Thumbnail preview for resize tool (shown in sidebar).
+    pub resize_thumbnail: Option<&'a ImageData>,
+    /// Current status of the AI upscale model.
+    pub upscale_model_status: &'a UpscaleModelStatus,
+    /// Whether AI upscaling is enabled globally in settings.
+    pub enable_upscale: bool,
 }
 
 impl<'a> SidebarModel<'a> {
@@ -56,6 +72,9 @@ impl<'a> SidebarModel<'a> {
             export_format: state.export_format(),
             deblur_model_status: ctx.deblur_model_status,
             has_deblur_applied: state.has_deblur_applied(),
+            resize_thumbnail: state.resize_thumbnail(),
+            upscale_model_status: ctx.upscale_model_status,
+            enable_upscale: ctx.enable_upscale,
         }
     }
 }
@@ -91,7 +110,13 @@ pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'
     );
     scrollable_section = scrollable_section.push(resize_button);
     if model.active_tool == Some(EditorTool::Resize) {
-        scrollable_section = scrollable_section.push(resize_panel::panel(model.resize_state, ctx));
+        scrollable_section = scrollable_section.push(resize_panel::panel(
+            model.resize_state,
+            model.resize_thumbnail,
+            model.upscale_model_status,
+            model.enable_upscale,
+            ctx,
+        ));
     }
 
     let light_button = tool_button(
@@ -238,27 +263,21 @@ fn undo_redo_section<'a>(
 fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let icon_size = 28.0;
 
-    let rotate_left_btn = tooltip::Tooltip::new(
+    let rotate_left_btn = tip_cursor(
         button(icons::sized(icons::rotate_left(), icon_size))
             .on_press(SidebarMessage::RotateLeft.into())
             .padding(spacing::XS)
             .width(Length::Fill),
-        text(ctx.i18n.tr("image-editor-rotate-left-tooltip")),
-        tooltip::Position::FollowCursor,
-    )
-    .gap(4)
-    .padding(spacing::XXS);
+        ctx.i18n.tr("image-editor-rotate-left-tooltip"),
+    );
 
-    let rotate_right_btn = tooltip::Tooltip::new(
+    let rotate_right_btn = tip_cursor(
         button(icons::sized(icons::rotate_right(), icon_size))
             .on_press(SidebarMessage::RotateRight.into())
             .padding(spacing::XS)
             .width(Length::Fill),
-        text(ctx.i18n.tr("image-editor-rotate-right-tooltip")),
-        tooltip::Position::FollowCursor,
-    )
-    .gap(4)
-    .padding(spacing::XXS);
+        ctx.i18n.tr("image-editor-rotate-right-tooltip"),
+    );
 
     let controls = Row::new()
         .spacing(spacing::XS)
@@ -281,27 +300,21 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let icon_size = 28.0;
 
-    let flip_horizontal_btn = tooltip::Tooltip::new(
+    let flip_horizontal_btn = tip_cursor(
         button(icons::sized(icons::flip_horizontal(), icon_size))
             .on_press(SidebarMessage::FlipHorizontal.into())
             .padding(spacing::XS)
             .width(Length::Fill),
-        text(ctx.i18n.tr("image-editor-flip-horizontal-tooltip")),
-        tooltip::Position::FollowCursor,
-    )
-    .gap(4)
-    .padding(spacing::XXS);
+        ctx.i18n.tr("image-editor-flip-horizontal-tooltip"),
+    );
 
-    let flip_vertical_btn = tooltip::Tooltip::new(
+    let flip_vertical_btn = tip_cursor(
         button(icons::sized(icons::flip_vertical(), icon_size))
             .on_press(SidebarMessage::FlipVertical.into())
             .padding(spacing::XS)
             .width(Length::Fill),
-        text(ctx.i18n.tr("image-editor-flip-vertical-tooltip")),
-        tooltip::Position::FollowCursor,
-    )
-    .gap(4)
-    .padding(spacing::XXS);
+        ctx.i18n.tr("image-editor-flip-vertical-tooltip"),
+    );
 
     let controls = Row::new()
         .spacing(spacing::XS)

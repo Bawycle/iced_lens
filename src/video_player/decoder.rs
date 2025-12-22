@@ -58,6 +58,18 @@ pub enum DecoderCommand {
 
     /// Stop decoding and clean up resources.
     Stop,
+
+    /// Set playback speed.
+    /// Affects frame pacing timing.
+    /// - `speed`: Validated playback speed (guaranteed within valid range)
+    /// - `instant`: Wall clock reference for timing synchronization
+    /// - `reference_pts`: Video position (in seconds) at the moment of speed change.
+    ///   Both video and audio decoders use this as their timing reference.
+    SetPlaybackSpeed {
+        speed: super::PlaybackSpeed,
+        instant: std::time::Instant,
+        reference_pts: f64,
+    },
 }
 
 /// Events sent from the decoder to the UI.
@@ -111,7 +123,7 @@ impl AsyncDecoder {
 
         // Validate file exists
         if !path.exists() {
-            return Err(Error::Io(format!("Video file not found: {:?}", path)));
+            return Err(Error::Io(format!("Video file not found: {path:?}")));
         }
 
         // Create channels for bidirectional communication
@@ -127,7 +139,7 @@ impl AsyncDecoder {
             if let Err(e) =
                 Self::decoder_loop_blocking(path, command_rx, event_tx, cache_config, history_mb)
             {
-                eprintln!("Decoder task failed: {}", e);
+                eprintln!("Decoder task failed: {e}");
             }
         });
 
@@ -178,7 +190,7 @@ impl AsyncDecoder {
 
         // Open video file
         let mut ictx = ffmpeg_next::format::input(&video_path)
-            .map_err(|e| Error::Io(format!("Failed to open video: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to open video: {e}")))?;
 
         // Find video stream
         let input = ictx
@@ -190,11 +202,11 @@ impl AsyncDecoder {
         // Create decoder
         let context_decoder =
             ffmpeg_next::codec::context::Context::from_parameters(input.parameters())
-                .map_err(|e| Error::Io(format!("Failed to create codec context: {}", e)))?;
+                .map_err(|e| Error::Io(format!("Failed to create codec context: {e}")))?;
         let mut decoder = context_decoder
             .decoder()
             .video()
-            .map_err(|e| Error::Io(format!("Failed to create video decoder: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to create video decoder: {e}")))?;
 
         let width = decoder.width();
         let height = decoder.height();
@@ -209,7 +221,7 @@ impl AsyncDecoder {
             height,
             ffmpeg_next::software::scaling::Flags::BILINEAR,
         )
-        .map_err(|e| Error::Io(format!("Failed to create scaler: {}", e)))?;
+        .map_err(|e| Error::Io(format!("Failed to create scaler: {e}")))?;
 
         // Extract time base for PTS calculation
         let time_base = input.time_base();
@@ -226,6 +238,9 @@ impl AsyncDecoder {
         // Precise seeking: target PTS to reach after keyframe seek
         // When set, decoder skips frames until reaching this target
         let mut seek_target_secs: Option<f64> = None;
+
+        // Playback speed (1.0 = normal, 0.25 = quarter speed, 2.0 = double speed)
+        let mut playback_speed: f64 = 1.0;
 
         // Frame cache for optimized seeking
         let mut frame_cache = FrameCache::new(cache_config);
@@ -272,7 +287,7 @@ impl AsyncDecoder {
                     let timestamp = (target_secs * 1_000_000.0) as i64;
                     if let Err(e) = ictx.seek(timestamp, ..timestamp) {
                         let _ = event_tx
-                            .blocking_send(DecoderEvent::Error(format!("Seek failed: {}", e)));
+                            .blocking_send(DecoderEvent::Error(format!("Seek failed: {e}")));
                     } else {
                         decoder.flush();
                         // Reset timing after seek
@@ -349,6 +364,20 @@ impl AsyncDecoder {
                 }
                 Ok(DecoderCommand::Stop) => {
                     break;
+                }
+                Ok(DecoderCommand::SetPlaybackSpeed {
+                    speed,
+                    instant,
+                    reference_pts,
+                }) => {
+                    // PlaybackSpeed newtype guarantees valid range
+                    playback_speed = speed.value();
+                    // Use shared reference point for timing synchronization
+                    // Both video and audio decoders use the same reference_pts
+                    if is_playing {
+                        playback_start_time = Some(instant);
+                        first_pts = Some(reference_pts);
+                    }
                 }
                 Err(mpsc::error::TryRecvError::Disconnected) => {
                     // Command channel closed
@@ -442,7 +471,8 @@ impl AsyncDecoder {
                                     first_pts = Some(pts_secs);
                                 }
                                 if let Some(first) = first_pts {
-                                    let frame_delay = pts_secs - first;
+                                    // Divide by playback_speed: at 2x speed, delay is halved
+                                    let frame_delay = (pts_secs - first) / playback_speed;
                                     let target_time = start_time
                                         + std::time::Duration::from_secs_f64(frame_delay);
                                     let now = std::time::Instant::now();
@@ -496,7 +526,7 @@ impl AsyncDecoder {
                 // Send packet to decoder
                 if let Err(e) = decoder.send_packet(&packet) {
                     let _ = event_tx
-                        .blocking_send(DecoderEvent::Error(format!("Packet send failed: {}", e)));
+                        .blocking_send(DecoderEvent::Error(format!("Packet send failed: {e}")));
                     continue;
                 }
 
@@ -531,7 +561,7 @@ impl AsyncDecoder {
                     let mut rgb_frame = ffmpeg_next::frame::Video::empty();
                     if let Err(e) = scaler.run(&decoded_frame, &mut rgb_frame) {
                         let _ = event_tx
-                            .blocking_send(DecoderEvent::Error(format!("Scaling failed: {}", e)));
+                            .blocking_send(DecoderEvent::Error(format!("Scaling failed: {e}")));
                         continue;
                     }
 
@@ -548,7 +578,8 @@ impl AsyncDecoder {
 
                             if let Some(first) = first_pts {
                                 // Calculate when this frame should be displayed relative to playback start
-                                let frame_delay = pts_secs - first;
+                                // Divide by playback_speed: at 2x speed, delay is halved
+                                let frame_delay = (pts_secs - first) / playback_speed;
                                 let target_time =
                                     start_time + std::time::Duration::from_secs_f64(frame_delay);
                                 let now = std::time::Instant::now();
@@ -832,10 +863,10 @@ mod tests {
                 // Also valid if frame is decoded quickly
             }
             Some(DecoderEvent::Error(msg)) => {
-                panic!("Unexpected error from decoder: {}", msg);
+                panic!("Unexpected error from decoder: {msg}");
             }
             other => {
-                panic!("Expected Buffering or FrameReady event, got: {:?}", other);
+                panic!("Expected Buffering or FrameReady event, got: {other:?}");
             }
         }
 

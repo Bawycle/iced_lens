@@ -7,6 +7,7 @@
 use crate::error::{Error, Result};
 use image_rs::{ImageBuffer, ImageFormat, Rgba};
 use std::path::Path;
+use std::sync::Arc;
 
 /// Supported export formats for frame capture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -72,10 +73,13 @@ impl ExportFormat {
 }
 
 /// Data for a frame ready to be exported.
+///
+/// Uses `Arc<Vec<u8>>` to avoid expensive clones when passing frame data around.
+/// The actual data is only cloned when necessary (e.g., for `ImageBuffer::from_raw`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExportableFrame {
-    /// RGBA pixel data.
-    pub rgba_data: Vec<u8>,
+    /// RGBA pixel data (shared reference to avoid expensive clones).
+    pub rgba_data: Arc<Vec<u8>>,
     /// Frame width in pixels.
     pub width: u32,
     /// Frame height in pixels.
@@ -84,7 +88,7 @@ pub struct ExportableFrame {
 
 impl ExportableFrame {
     /// Creates a new exportable frame from RGBA data.
-    pub fn new(rgba_data: Vec<u8>, width: u32, height: u32) -> Self {
+    pub fn new(rgba_data: Arc<Vec<u8>>, width: u32, height: u32) -> Self {
         Self {
             rgba_data,
             width,
@@ -93,18 +97,24 @@ impl ExportableFrame {
     }
 
     /// Converts to a DynamicImage for use with image editing.
+    ///
+    /// Note: This clones the underlying pixel data since `ImageBuffer::from_raw`
+    /// requires ownership of the data.
     pub fn to_dynamic_image(&self) -> Option<image_rs::DynamicImage> {
-        ImageBuffer::<Rgba<u8>, _>::from_raw(self.width, self.height, self.rgba_data.clone())
+        ImageBuffer::<Rgba<u8>, _>::from_raw(self.width, self.height, (*self.rgba_data).clone())
             .map(image_rs::DynamicImage::ImageRgba8)
     }
 
     /// Converts to ImageData for display in the UI.
+    ///
+    /// Note: This clones the underlying pixel data since `Handle::from_rgba`
+    /// requires ownership of the data.
     pub fn to_image_data(&self) -> crate::media::ImageData {
         crate::media::ImageData {
             handle: iced::widget::image::Handle::from_rgba(
                 self.width,
                 self.height,
-                self.rgba_data.clone(),
+                (*self.rgba_data).clone(),
             ),
             width: self.width,
             height: self.height,
@@ -114,6 +124,9 @@ impl ExportableFrame {
     /// Exports the frame to a file.
     ///
     /// The format is determined by the file extension if not specified.
+    ///
+    /// Note: This clones the underlying pixel data since `ImageBuffer::from_raw`
+    /// requires ownership of the data.
     pub fn save_to_file<P: AsRef<Path>>(
         &self,
         path: P,
@@ -129,9 +142,9 @@ impl ExportableFrame {
                 .unwrap_or_default()
         });
 
-        // Create image buffer from RGBA data
+        // Create image buffer from RGBA data (requires cloning the Arc's contents)
         let img: ImageBuffer<Rgba<u8>, _> =
-            ImageBuffer::from_raw(self.width, self.height, self.rgba_data.clone()).ok_or_else(
+            ImageBuffer::from_raw(self.width, self.height, (*self.rgba_data).clone()).ok_or_else(
                 || Error::Io("Failed to create image buffer from frame data".to_string()),
             )?;
 
@@ -140,10 +153,10 @@ impl ExportableFrame {
             let rgb_img = image_rs::DynamicImage::ImageRgba8(img).to_rgb8();
             rgb_img
                 .save_with_format(path, format.image_format())
-                .map_err(|e| Error::Io(format!("Failed to save frame: {}", e)))?;
+                .map_err(|e| Error::Io(format!("Failed to save frame: {e}")))?;
         } else {
             img.save_with_format(path, format.image_format())
-                .map_err(|e| Error::Io(format!("Failed to save frame: {}", e)))?;
+                .map_err(|e| Error::Io(format!("Failed to save frame: {e}")))?;
         }
 
         Ok(())
@@ -231,7 +244,7 @@ mod tests {
 
     #[test]
     fn exportable_frame_can_be_created() {
-        let rgba = vec![255u8; 4 * 10 * 10]; // 10x10 white image
+        let rgba = Arc::new(vec![255u8; 4 * 10 * 10]); // 10x10 white image
         let frame = ExportableFrame::new(rgba, 10, 10);
         assert_eq!(frame.width, 10);
         assert_eq!(frame.height, 10);

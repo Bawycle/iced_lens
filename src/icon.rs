@@ -13,9 +13,8 @@ pub fn load_window_icon() -> Option<Icon> {
     const SVG_SOURCE: &str = include_str!("../assets/branding/iced_lens.svg");
 
     // Parse SVG using usvg (via resvg)
-    let tree = match usvg::Tree::from_data(SVG_SOURCE.as_bytes(), &usvg::Options::default()) {
-        Ok(t) => t,
-        Err(_) => return None,
+    let Ok(tree) = usvg::Tree::from_data(SVG_SOURCE.as_bytes(), &usvg::Options::default()) else {
+        return None;
     };
 
     // Target size

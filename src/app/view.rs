@@ -10,6 +10,7 @@ use crate::i18n::fluent::I18n;
 use crate::media::deblur::ModelStatus;
 use crate::media::metadata::MediaMetadata;
 use crate::media::navigator::NavigationInfo;
+use crate::media::upscale::UpscaleModelStatus;
 use crate::ui::about::{self, ViewContext as AboutViewContext};
 use crate::ui::help::{self, ViewContext as HelpViewContext};
 use crate::ui::image_editor::{self, State as ImageEditorState};
@@ -51,6 +52,10 @@ pub struct ViewContext<'a> {
     pub is_dark_theme: bool,
     /// Current status of the AI deblur model.
     pub deblur_model_status: &'a ModelStatus,
+    /// Current status of the AI upscale model.
+    pub upscale_model_status: &'a UpscaleModelStatus,
+    /// Whether AI upscaling is enabled for resize operations.
+    pub enable_upscale: bool,
 }
 
 /// Context required to render the viewer screen.
@@ -93,6 +98,8 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
             ctx.settings,
             ctx.is_dark_theme,
             ctx.deblur_model_status,
+            ctx.upscale_model_status,
+            ctx.enable_upscale,
         ),
         Screen::Help => view_help(ctx.help_state, ctx.i18n),
         Screen::About => view_about(ctx.i18n),
@@ -116,15 +123,16 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
 
 fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
     let (config, _) = config::load();
-    let overlay_timeout_secs = config
-        .fullscreen
-        .overlay_timeout_secs
-        .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS);
+    let overlay_timeout = crate::ui::state::OverlayTimeout::new(
+        config
+            .fullscreen
+            .overlay_timeout_secs
+            .unwrap_or(config::DEFAULT_OVERLAY_TIMEOUT_SECS),
+    );
 
     let metadata_editor_has_changes = ctx
         .metadata_editor_state
-        .map(|editor| editor.has_changes())
-        .unwrap_or(false);
+        .is_some_and(|editor| editor.has_changes());
 
     let viewer_content = ctx
         .viewer
@@ -132,7 +140,7 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
             i18n: ctx.i18n,
             background_theme: ctx.settings.background_theme(),
             is_fullscreen: ctx.fullscreen,
-            overlay_hide_delay: std::time::Duration::from_secs(overlay_timeout_secs as u64),
+            overlay_hide_delay: overlay_timeout.as_duration(),
             navigation: ctx.navigation,
             metadata_editor_has_changes,
         })
@@ -232,6 +240,8 @@ fn view_image_editor<'a>(
     settings: &'a SettingsState,
     is_dark_theme: bool,
     deblur_model_status: &'a ModelStatus,
+    upscale_model_status: &'a UpscaleModelStatus,
+    enable_upscale: bool,
 ) -> Element<'a, Message> {
     if let Some(editor_state) = image_editor {
         editor_state
@@ -240,6 +250,8 @@ fn view_image_editor<'a>(
                 background_theme: settings.background_theme(),
                 is_dark_theme,
                 deblur_model_status,
+                upscale_model_status,
+                enable_upscale,
             })
             .map(Message::ImageEditor)
     } else {

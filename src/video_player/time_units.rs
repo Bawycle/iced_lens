@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn f64_round_trip_preserves_value() {
-        let original = 123.456789;
+        let original = 123.456_789;
         let result = micros_to_secs(secs_to_micros(original));
         assert!((original - result).abs() < 1e-10);
     }
@@ -108,7 +108,7 @@ mod tests {
         assert_eq!(pts_to_micros(1.0), 1_000_000);
         assert_eq!(pts_to_micros(0.5), 500_000);
         assert_eq!(pts_to_micros(0.0), 0);
-        assert_eq!(pts_to_micros(1.234567), 1_234_567);
+        assert_eq!(pts_to_micros(1.234_567), 1_234_567);
     }
 
     #[test]
@@ -120,11 +120,11 @@ mod tests {
 
     #[test]
     fn i64_round_trip_preserves_value_within_microsecond() {
-        let pts_secs = 1.234567;
+        let pts_secs = 1.234_567;
         let micros = pts_to_micros(pts_secs);
         let back = micros_to_pts(micros);
         // Should be accurate to microsecond precision
-        assert!((pts_secs - back).abs() < 0.000001);
+        assert!((pts_secs - back).abs() < 0.000_001);
     }
 
     #[test]

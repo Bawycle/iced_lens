@@ -4,7 +4,8 @@
 use crate::ui::image_editor::{
     CanvasMessage, EditorTool, Event, ImageSource, SidebarMessage, State, ToolbarMessage,
 };
-use iced::{self, keyboard};
+use iced::widget::scrollable::AbsoluteOffset;
+use iced::{self, keyboard, mouse, Point};
 
 impl State {
     pub(crate) fn handle_toolbar_message(&mut self, message: ToolbarMessage) -> Event {
@@ -26,7 +27,11 @@ impl State {
                     self.preview_image = None;
                     match tool {
                         EditorTool::Crop => self.teardown_crop_tool(),
-                        EditorTool::Resize => self.hide_resize_overlay(),
+                        EditorTool::Resize => {
+                            // Commit any pending input before closing tool
+                            self.commit_dirty_resize_input();
+                            self.hide_resize_overlay();
+                        }
                         EditorTool::Adjust => self.teardown_adjustment_tool(),
                         EditorTool::Deblur => self.teardown_deblur_tool(),
                         EditorTool::Rotate => {}
@@ -37,6 +42,8 @@ impl State {
                         self.hide_crop_overlay();
                     }
                     if self.active_tool == Some(EditorTool::Resize) {
+                        // Commit any pending input before switching tools
+                        self.commit_dirty_resize_input();
                         self.hide_resize_overlay();
                     }
                     if self.active_tool == Some(EditorTool::Adjust) {
@@ -89,6 +96,10 @@ impl State {
                 Event::None
             }
             SidebarMessage::ScaleChanged(percent) => {
+                // Commit any pending input first, then apply scale
+                // Note: scale will override the dimensions, but we commit first
+                // so the dirty flag is cleared properly
+                self.commit_dirty_resize_input();
                 self.sidebar_scale_changed(percent);
                 Event::None
             }
@@ -100,16 +111,48 @@ impl State {
                 self.sidebar_height_input_changed(value);
                 Event::None
             }
+            SidebarMessage::WidthInputSubmitted => {
+                self.sidebar_width_input_submitted();
+                Event::None
+            }
+            SidebarMessage::HeightInputSubmitted => {
+                self.sidebar_height_input_submitted();
+                Event::None
+            }
             SidebarMessage::ToggleLockAspect => {
+                // Commit any pending input before changing lock state
+                self.commit_dirty_resize_input();
                 self.sidebar_toggle_lock();
                 Event::None
             }
             SidebarMessage::ApplyResizePreset(percent) => {
+                // Commit any pending input first, then apply preset
+                self.commit_dirty_resize_input();
                 self.sidebar_scale_changed(percent);
                 Event::None
             }
             SidebarMessage::ApplyResize => {
-                self.sidebar_apply_resize();
+                // Commit any pending input before applying
+                self.commit_dirty_resize_input();
+
+                // Check if this is an enlargement (scale > 100%) with AI upscale enabled
+                // If so, emit event to let app decide whether to use AI upscaling
+                if self.is_resize_enlargement()
+                    && self.has_pending_resize()
+                    && self.resize_state.use_ai_upscale
+                {
+                    let (width, height) = self.pending_resize_dimensions();
+                    // Mark as processing (app will clear this when upscaling completes or falls back)
+                    self.resize_state.is_upscale_processing = true;
+                    Event::UpscaleResizeRequested { width, height }
+                } else {
+                    // For reductions, same size, or when AI upscale is disabled
+                    self.sidebar_apply_resize();
+                    Event::None
+                }
+            }
+            SidebarMessage::ToggleAiUpscale => {
+                self.resize_state.use_ai_upscale = !self.resize_state.use_ai_upscale;
                 Event::None
             }
             SidebarMessage::BrightnessChanged(value) => {
@@ -159,7 +202,19 @@ impl State {
     }
 
     pub(crate) fn handle_canvas_message(&mut self, message: CanvasMessage) -> Event {
-        self.handle_crop_canvas_message(message)
+        match message {
+            CanvasMessage::CursorMoved { position } => {
+                self.cursor_position = Some(position);
+                self.cursor_over_canvas = true;
+                Event::None
+            }
+            CanvasMessage::CursorLeft => {
+                self.cursor_position = None;
+                self.cursor_over_canvas = false;
+                Event::None
+            }
+            _ => self.handle_crop_canvas_message(message),
+        }
     }
 
     pub(crate) fn handle_raw_event(&mut self, event: iced::Event) -> Event {
@@ -204,7 +259,166 @@ impl State {
                     _ => Event::None,
                 }
             }
+            iced::Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
+                self.handle_wheel_zoom(delta);
+                Event::None
+            }
+            iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                if let Some(position) = self.cursor_position {
+                    self.handle_mouse_button_pressed(position);
+                }
+                Event::None
+            }
+            iced::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                self.handle_mouse_button_released();
+                Event::None
+            }
+            iced::Event::Mouse(mouse::Event::CursorMoved { position }) => {
+                self.cursor_position = Some(position);
+                if self.drag.is_dragging {
+                    return self.handle_cursor_moved_during_drag(position);
+                }
+                Event::None
+            }
+            iced::Event::Mouse(mouse::Event::CursorLeft) => {
+                self.cursor_position = None;
+                self.drag.stop();
+                Event::None
+            }
             _ => Event::None,
         }
+    }
+
+    /// Handles wheel scroll for zooming when cursor is over the canvas.
+    fn handle_wheel_zoom(&mut self, delta: mouse::ScrollDelta) {
+        // Only zoom if cursor is over the canvas area
+        if !self.is_cursor_over_canvas() {
+            return;
+        }
+
+        let steps = scroll_steps(&delta);
+        if steps.abs() < f32::EPSILON {
+            return;
+        }
+
+        let new_zoom = self.zoom.zoom_percent + steps * self.zoom.zoom_step.value();
+        self.zoom.apply_manual_zoom(new_zoom);
+    }
+
+    /// Checks if the cursor is currently positioned over the canvas area.
+    ///
+    /// Uses viewport bounds when available, otherwise falls back to the
+    /// `cursor_over_canvas` flag set by mouse_area events. This fallback
+    /// is needed when scrollbars are not visible (image fits in viewport),
+    /// since the scrollable's on_scroll callback is never triggered.
+    fn is_cursor_over_canvas(&self) -> bool {
+        let Some(cursor) = self.cursor_position else {
+            return false;
+        };
+
+        let Some(bounds) = self.viewport.bounds else {
+            // Fallback: use mouse_area tracking when viewport bounds unknown
+            return self.cursor_over_canvas;
+        };
+
+        // Check if cursor is within the canvas viewport bounds
+        cursor.x >= bounds.x
+            && cursor.x <= bounds.x + bounds.width
+            && cursor.y >= bounds.y
+            && cursor.y <= bounds.y + bounds.height
+    }
+
+    /// Handles mouse button press for starting pan drag.
+    fn handle_mouse_button_pressed(&mut self, position: Point) {
+        // Don't start pan if not over canvas
+        if !self.is_cursor_over_canvas() {
+            return;
+        }
+
+        // Don't start pan if crop tool is active and interacting with overlay
+        if self.active_tool == Some(EditorTool::Crop) && self.crop_state.overlay.visible {
+            // Crop overlay handles its own mouse events
+            return;
+        }
+
+        // Start drag for panning
+        self.drag.start(position, self.viewport.offset);
+    }
+
+    /// Handles mouse button release to stop pan drag.
+    fn handle_mouse_button_released(&mut self) {
+        self.drag.stop();
+    }
+
+    /// Updates the viewport when dragging to pan the image.
+    fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Event {
+        let Some(proposed_offset) = self.drag.calculate_offset(position) else {
+            return Event::None;
+        };
+
+        // Get viewport and scaled image size to clamp offset
+        let viewport_bounds = match self.viewport.bounds {
+            Some(bounds) => bounds,
+            None => {
+                self.viewport.offset = proposed_offset;
+                return Event::None;
+            }
+        };
+
+        let zoom_scale = self.zoom.zoom_percent / 100.0;
+        let scaled_width = self.current_image.width as f32 * zoom_scale;
+        let scaled_height = self.current_image.height as f32 * zoom_scale;
+
+        // Calculate maximum offsets (how far we can scroll)
+        let max_offset_x = (scaled_width - viewport_bounds.width).max(0.0);
+        let max_offset_y = (scaled_height - viewport_bounds.height).max(0.0);
+
+        // Clamp offset to valid range
+        let clamped_offset = AbsoluteOffset {
+            x: if max_offset_x > 0.0 {
+                proposed_offset.x.clamp(0.0, max_offset_x)
+            } else {
+                0.0
+            },
+            y: if max_offset_y > 0.0 {
+                proposed_offset.y.clamp(0.0, max_offset_y)
+            } else {
+                0.0
+            },
+        };
+
+        self.viewport.offset = clamped_offset;
+
+        // Calculate relative offset for scroll
+        let relative_x = if max_offset_x > 0.0 {
+            clamped_offset.x / max_offset_x
+        } else {
+            0.0
+        };
+
+        let relative_y = if max_offset_y > 0.0 {
+            clamped_offset.y / max_offset_y
+        } else {
+            0.0
+        };
+
+        Event::ScrollTo {
+            x: relative_x,
+            y: relative_y,
+        }
+    }
+
+    /// Check if dragging is active (for cursor display).
+    pub fn is_dragging(&self) -> bool {
+        self.drag.is_dragging
+    }
+}
+
+/// Normalizes mouse wheel units (lines vs. pixels) into abstract step values
+/// so zooming feels consistent across platforms.
+fn scroll_steps(delta: &mouse::ScrollDelta) -> f32 {
+    match delta {
+        mouse::ScrollDelta::Lines { y, .. } => *y,
+        mouse::ScrollDelta::Pixels { y, .. } => *y / 120.0,
     }
 }

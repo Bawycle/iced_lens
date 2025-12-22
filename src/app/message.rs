@@ -63,6 +63,18 @@ pub enum Message {
     },
     /// Result from applying AI deblur to an image.
     DeblurApplyCompleted(Result<Box<image_rs::DynamicImage>, String>),
+    /// Progress update during upscale model download (0.0 - 1.0).
+    UpscaleDownloadProgress(f32),
+    /// Result from upscale model download.
+    UpscaleDownloadCompleted(Result<(), String>),
+    /// Result from upscale model validation.
+    /// The boolean indicates whether this is a startup validation (true) vs user-initiated (false).
+    UpscaleValidationCompleted {
+        result: Result<(), String>,
+        is_startup: bool,
+    },
+    /// Result from applying AI upscale resize to an image.
+    UpscaleResizeCompleted(Result<Box<image_rs::DynamicImage>, String>),
     /// Window close was requested (user clicked X or pressed Alt+F4).
     WindowCloseRequested(iced::window::Id),
 }

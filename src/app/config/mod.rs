@@ -124,6 +124,14 @@ pub struct DisplayConfig {
     /// Media file sorting order in directory.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort_order: Option<SortOrder>,
+
+    /// Maximum number of corrupted files to auto-skip during navigation.
+    /// When navigating (next/prev), if media fails to load, auto-skip to next.
+    #[serde(
+        default = "default_max_skip_attempts",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_skip_attempts: Option<u32>,
 }
 
 impl Default for DisplayConfig {
@@ -133,6 +141,7 @@ impl Default for DisplayConfig {
             zoom_step: Some(DEFAULT_ZOOM_STEP_PERCENT),
             background_theme: Some(BackgroundTheme::default()),
             sort_order: Some(SortOrder::default()),
+            max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
         }
     }
 }
@@ -221,9 +230,9 @@ impl Default for FullscreenConfig {
 
 /// AI/Machine Learning settings.
 ///
-/// Note: The `enable_deblur` state is stored in persistent application state,
-/// not in configuration, as it's managed by the application (download/validation)
-/// rather than being a user preference.
+/// Note: The `enable_deblur` and `enable_upscale` states are stored in persistent
+/// application state, not in configuration, as they are managed by the application
+/// (download/validation) rather than being user preferences.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AiConfig {
     /// URL for downloading the NAFNet ONNX model.
@@ -232,12 +241,20 @@ pub struct AiConfig {
         skip_serializing_if = "Option::is_none"
     )]
     pub deblur_model_url: Option<String>,
+
+    /// URL for downloading the Real-ESRGAN ONNX model.
+    #[serde(
+        default = "default_upscale_model_url",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub upscale_model_url: Option<String>,
 }
 
 impl Default for AiConfig {
     fn default() -> Self {
         Self {
             deblur_model_url: default_deblur_model_url(),
+            upscale_model_url: default_upscale_model_url(),
         }
     }
 }
@@ -324,6 +341,7 @@ impl From<LegacyConfig> for Config {
                 zoom_step: legacy.zoom_step,
                 background_theme: legacy.background_theme,
                 sort_order: legacy.sort_order,
+                max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
             },
             video: VideoConfig {
                 autoplay: legacy.video_autoplay,
@@ -383,8 +401,16 @@ fn default_overlay_timeout_secs() -> Option<u32> {
     Some(DEFAULT_OVERLAY_TIMEOUT_SECS)
 }
 
+fn default_max_skip_attempts() -> Option<u32> {
+    Some(DEFAULT_MAX_SKIP_ATTEMPTS)
+}
+
 fn default_deblur_model_url() -> Option<String> {
     Some(DEFAULT_DEBLUR_MODEL_URL.to_string())
+}
+
+fn default_upscale_model_url() -> Option<String> {
+    Some(DEFAULT_UPSCALE_MODEL_URL.to_string())
 }
 
 fn deserialize_theme_mode<'de, D>(deserializer: D) -> std::result::Result<ThemeMode, D::Error>
@@ -398,7 +424,7 @@ where
         "light" => Ok(ThemeMode::Light),
         "dark" => Ok(ThemeMode::Dark),
         "system" => Ok(ThemeMode::System),
-        other => Err(D::Error::custom(format!("invalid theme_mode: {}", other))),
+        other => Err(D::Error::custom(format!("invalid theme_mode: {other}"))),
     }
 }
 
@@ -522,6 +548,7 @@ mod tests {
                 zoom_step: Some(5.0),
                 background_theme: Some(BackgroundTheme::Light),
                 sort_order: Some(SortOrder::Alphabetical),
+                max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
             },
             video: VideoConfig {
                 autoplay: Some(false),
@@ -558,7 +585,7 @@ mod tests {
 
         match load_from_path(&config_path) {
             Err(Error::Config(message)) => assert!(message.contains("expected")),
-            other => panic!("expected Config error, got {:?}", other),
+            other => panic!("expected Config error, got {other:?}"),
         }
     }
 
@@ -577,6 +604,7 @@ mod tests {
                 zoom_step: Some(7.5),
                 background_theme: Some(BackgroundTheme::Checkerboard),
                 sort_order: Some(SortOrder::CreatedDate),
+                max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
             },
             video: VideoConfig {
                 autoplay: Some(true),
@@ -707,7 +735,7 @@ mod tests {
     fn volume_constants_are_valid() {
         assert_eq!(DEFAULT_VOLUME, 0.8);
         assert_eq!(MIN_VOLUME, 0.0);
-        assert_eq!(MAX_VOLUME, 1.0);
+        assert_eq!(MAX_VOLUME, 1.5); // 150% amplification
         let step = VOLUME_STEP;
         let default = DEFAULT_VOLUME;
         let min = MIN_VOLUME;
@@ -734,6 +762,7 @@ mod tests {
                 zoom_step: Some(15.0),
                 background_theme: Some(BackgroundTheme::Light),
                 sort_order: Some(SortOrder::CreatedDate),
+                max_skip_attempts: Some(10),
             },
             video: VideoConfig {
                 autoplay: Some(true),

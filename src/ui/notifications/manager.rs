@@ -182,7 +182,7 @@ mod tests {
 
         // Fill visible
         for i in 0..MAX_VISIBLE {
-            manager.push(Notification::success(format!("test-{}", i)));
+            manager.push(Notification::success(format!("test-{i}")));
         }
         assert_eq!(manager.visible_count(), MAX_VISIBLE);
         assert_eq!(manager.queued_count(), 0);
@@ -214,7 +214,7 @@ mod tests {
         // Fill visible
         let mut first_id = None;
         for i in 0..MAX_VISIBLE {
-            let n = Notification::success(format!("visible-{}", i));
+            let n = Notification::success(format!("visible-{i}"));
             if i == 0 {
                 first_id = Some(n.id());
             }
@@ -246,7 +246,7 @@ mod tests {
         let mut manager = Manager::new();
 
         for i in 0..5 {
-            manager.push(Notification::success(format!("test-{}", i)));
+            manager.push(Notification::success(format!("test-{i}")));
         }
 
         manager.clear();

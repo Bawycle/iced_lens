@@ -13,7 +13,7 @@ use crate::ui::image_editor::{Message, SidebarMessage};
 
 /// Format adjustment value with sign and padding for consistent width.
 fn format_value(value: i32) -> String {
-    format!("{:+4}", value)
+    format!("{value:+4}")
 }
 
 pub fn panel<'a>(adjustment: &'a AdjustmentState, ctx: &ViewContext<'a>) -> Element<'a, Message> {
@@ -22,24 +22,24 @@ pub fn panel<'a>(adjustment: &'a AdjustmentState, ctx: &ViewContext<'a>) -> Elem
         .spacing(spacing::XXS)
         .push(text(ctx.i18n.tr("image-editor-light-brightness-label")).size(typography::BODY_SM))
         .push(
-            slider(-100..=100, adjustment.brightness, |value| {
+            slider(-100..=100, adjustment.brightness.value(), |value| {
                 Message::Sidebar(SidebarMessage::BrightnessChanged(value))
             })
             .step(1),
         )
-        .push(text(format_value(adjustment.brightness)).size(typography::BODY_SM));
+        .push(text(format_value(adjustment.brightness.value())).size(typography::BODY_SM));
 
     // Contrast section - vertical layout: label, slider, value
     let contrast_section = Column::new()
         .spacing(spacing::XXS)
         .push(text(ctx.i18n.tr("image-editor-light-contrast-label")).size(typography::BODY_SM))
         .push(
-            slider(-100..=100, adjustment.contrast, |value| {
+            slider(-100..=100, adjustment.contrast.value(), |value| {
                 Message::Sidebar(SidebarMessage::ContrastChanged(value))
             })
             .step(1),
         )
-        .push(text(format_value(adjustment.contrast)).size(typography::BODY_SM));
+        .push(text(format_value(adjustment.contrast.value())).size(typography::BODY_SM));
 
     // Action buttons row
     let reset_btn = button(text(ctx.i18n.tr("image-editor-light-reset")).size(typography::BODY))

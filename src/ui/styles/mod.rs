@@ -15,9 +15,10 @@ pub mod button;
 pub mod container;
 pub mod editor;
 pub mod overlay;
+pub mod tooltip;
 
 // Re-exports for convenience
-pub use button::{overlay as button_overlay, primary as button_primary};
+pub use button::primary as button_primary;
 
 use iced::widget::svg;
 use iced::Theme;

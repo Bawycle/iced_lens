@@ -36,12 +36,12 @@ impl WebpAnimDecoder {
 
         // Validate file exists
         if !path.exists() {
-            return Err(Error::Io(format!("WebP file not found: {:?}", path)));
+            return Err(Error::Io(format!("WebP file not found: {path:?}")));
         }
 
         // Read the entire file into memory (WebP decoder requires full buffer)
         let webp_data = std::fs::read(&path)
-            .map_err(|e| Error::Io(format!("Failed to read WebP file: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to read WebP file: {e}")))?;
 
         // Create channels for bidirectional communication
         let (command_tx, command_rx) = mpsc::unbounded_channel();
@@ -51,7 +51,7 @@ impl WebpAnimDecoder {
         // webp-animation Decoder is not Send, so we use spawn_blocking
         tokio::task::spawn_blocking(move || {
             if let Err(e) = Self::decoder_loop_blocking(webp_data, command_rx, event_tx) {
-                eprintln!("WebP decoder task failed: {}", e);
+                eprintln!("WebP decoder task failed: {e}");
             }
         });
 
@@ -81,7 +81,7 @@ impl WebpAnimDecoder {
     ) -> Result<()> {
         // Create WebP decoder
         let decoder = webp_animation::Decoder::new(&webp_data)
-            .map_err(|e| Error::Io(format!("Failed to create WebP decoder: {:?}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to create WebP decoder: {e:?}")))?;
 
         let (width, height) = decoder.dimensions();
 
@@ -114,6 +114,7 @@ impl WebpAnimDecoder {
         let mut playback_start_time: Option<std::time::Instant> = None;
         let loop_enabled = true; // WebP animations typically loop
         let mut decode_single_frame = false;
+        let mut playback_speed: f64 = 1.0;
 
         // Main loop: process commands and send frames
         loop {
@@ -173,6 +174,19 @@ impl WebpAnimDecoder {
                 Ok(DecoderCommand::Stop) => {
                     break;
                 }
+                Ok(DecoderCommand::SetPlaybackSpeed {
+                    speed,
+                    instant,
+                    reference_pts: _,
+                }) => {
+                    // PlaybackSpeed newtype guarantees valid range
+                    playback_speed = speed.value();
+                    // Reset timing references for smooth speed transition
+                    // WebP animations don't have audio, so reference_pts is unused
+                    if is_playing {
+                        playback_start_time = Some(instant);
+                    }
+                }
                 Err(mpsc::error::TryRecvError::Disconnected) => {
                     break;
                 }
@@ -211,8 +225,10 @@ impl WebpAnimDecoder {
                 .sum();
 
             // Frame pacing: wait until the frame should be displayed
+            // Divide by playback_speed: at 2x speed, delay is halved
             if let Some(start_time) = playback_start_time {
-                let target_time = start_time + std::time::Duration::from_secs_f64(pts_secs);
+                let adjusted_pts = pts_secs / playback_speed;
+                let target_time = start_time + std::time::Duration::from_secs_f64(adjusted_pts);
                 let now = std::time::Instant::now();
 
                 if target_time > now && is_playing {
@@ -253,10 +269,10 @@ impl WebpAnimDecoder {
     /// This is used to populate VideoData when loading the media.
     pub fn get_metadata<P: AsRef<Path>>(webp_path: P) -> Result<WebpMetadata> {
         let webp_data = std::fs::read(webp_path.as_ref())
-            .map_err(|e| Error::Io(format!("Failed to read WebP file: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to read WebP file: {e}")))?;
 
         let decoder = webp_animation::Decoder::new(&webp_data)
-            .map_err(|e| Error::Io(format!("Failed to create WebP decoder: {:?}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to create WebP decoder: {e:?}")))?;
 
         let (width, height) = decoder.dimensions();
 
@@ -315,7 +331,7 @@ mod tests {
         }
 
         let metadata = WebpAnimDecoder::get_metadata(webp_path);
-        assert!(metadata.is_ok(), "Failed to get metadata: {:?}", metadata);
+        assert!(metadata.is_ok(), "Failed to get metadata: {metadata:?}");
 
         let meta = metadata.unwrap();
         assert!(meta.width > 0);
@@ -333,7 +349,7 @@ mod tests {
         }
 
         let decoder = WebpAnimDecoder::new(webp_path);
-        assert!(decoder.is_ok(), "Failed to create decoder: {:?}", decoder);
+        assert!(decoder.is_ok(), "Failed to create decoder: {decoder:?}");
     }
 
     #[tokio::test]
@@ -373,10 +389,10 @@ mod tests {
                 assert!(!frame.rgba_data.is_empty());
             }
             Some(DecoderEvent::Error(msg)) => {
-                panic!("Unexpected error from decoder: {}", msg);
+                panic!("Unexpected error from decoder: {msg}");
             }
             other => {
-                panic!("Expected Buffering or FrameReady event, got: {:?}", other);
+                panic!("Expected Buffering or FrameReady event, got: {other:?}");
             }
         }
 

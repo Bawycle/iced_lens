@@ -64,6 +64,8 @@ settings-sort-order-label = Sortierreihenfolge für Bildnavigation
 settings-sort-alphabetical = Alphabetisch
 settings-sort-modified = Änderungsdatum
 settings-sort-created = Erstellungsdatum
+settings-max-skip-attempts-label = Beschädigte Dateien überspringen
+settings-max-skip-attempts-hint = Maximale Anzahl beschädigter Dateien, die bei der Navigation übersprungen werden.
 settings-overlay-timeout-label = Verzögerung für automatisches Ausblenden im Vollbildmodus
 settings-overlay-timeout-hint = Zeit bis zum Verschwinden der Steuerelemente im Vollbildmodus.
 seconds = Sekunden
@@ -89,6 +91,13 @@ image-editor-resize-height-label = Höhe (px)
 image-editor-resize-lock-aspect = Seitenverhältnis sperren
 image-editor-resize-presets-label = Voreinstellungen
 image-editor-resize-apply = Größenänderung anwenden
+image-editor-resize-preview-label = Vorschau
+image-editor-resize-ai-upscale = KI-Hochskalierung (Real-ESRGAN)
+image-editor-resize-ai-model-not-downloaded = KI-Modell noch nicht heruntergeladen
+image-editor-resize-ai-model-downloading = KI-Modell wird heruntergeladen
+image-editor-resize-ai-model-validating = KI-Modell wird validiert
+image-editor-resize-ai-model-error = KI-Modell-Fehler
+image-editor-resize-ai-enlargement-only = KI-Upscaling gilt nur für Vergrößerungen
 image-editor-light-section-title = Lichtanpassungen
 image-editor-light-brightness-label = Helligkeit
 image-editor-light-contrast-label = Kontrast
@@ -121,6 +130,9 @@ video-capture-tooltip = Aktuelles Bild aufnehmen
 video-step-forward-tooltip = Ein Bild vorwärts (.)
 video-step-backward-tooltip = Ein Bild rückwärts (,)
 video-more-tooltip = Weitere Optionen
+video-speed-down-tooltip = Geschwindigkeit verringern (J)
+video-speed-up-tooltip = Geschwindigkeit erhöhen (L)
+hud-video-no-audio = Kein Audio
 settings-audio-normalization-label = Audio-Lautstärkenormalisierung
 settings-audio-normalization-enabled = Aktiviert
 settings-audio-normalization-disabled = Deaktiviert
@@ -197,7 +209,7 @@ help-video-tool-playback-desc = Starten oder stoppen Sie die Videowiedergabe mit
 help-video-tool-timeline = Zeitleiste
 help-video-tool-timeline-desc = Klicken Sie irgendwo auf die Fortschrittsleiste, um zu dieser Position zu springen.
 help-video-tool-volume = Lautstärke
-help-video-tool-volume-desc = Ziehen Sie den Lautstärkeregler oder klicken Sie auf das Lautsprechersymbol zum Stummschalten/Einschalten.
+help-video-tool-volume-desc = Ziehen Sie den Lautstärkeregler (0-150%) oder klicken Sie auf das Lautsprechersymbol zum Stummschalten/Einschalten.
 help-video-tool-loop = Wiederholen
 help-video-tool-loop-desc = Aktivieren, um das Video automatisch neu zu starten, wenn es endet.
 help-video-tool-stepping = Bildweises Vor- und Zurückgehen
@@ -211,6 +223,8 @@ help-video-key-seek = Rückwärts/Vorwärts suchen (während der Wiedergabe)
 help-video-key-volume = Lautstärke erhöhen/verringern
 help-video-key-step-back = Ein Bild zurück (wenn pausiert)
 help-video-key-step-forward = Ein Bild vor (wenn pausiert)
+help-video-key-speed-down = Wiedergabegeschwindigkeit verringern
+help-video-key-speed-up = Wiedergabegeschwindigkeit erhöhen
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Image Editor Section
@@ -233,10 +247,11 @@ help-editor-crop-usage = Ziehen Sie die Griffe, um die Auswahl anzupassen, und k
 
 help-editor-resize-title = Größe ändern
 help-editor-resize-desc = Ändern Sie die Bildabmessungen, um es größer oder kleiner zu machen.
-help-editor-resize-scale = Nach Prozentsatz skalieren (z.B. 50% um die Größe zu halbieren)
+help-editor-resize-scale = Nach Prozentsatz skalieren (10% bis 400%)
 help-editor-resize-dimensions = Geben Sie exakte Breite und Höhe in Pixeln ein
 help-editor-resize-lock = Seitenverhältnis sperren, um Proportionen beizubehalten
-help-editor-resize-presets = Verwenden Sie Voreinstellungen für gängige Größen (HD, Full HD, 4K...)
+help-editor-resize-presets = Verwenden Sie Voreinstellungen für schnelle Skalierung (25%, 50%, 200%, etc.)
+help-editor-resize-ai-upscale = KI-Upscaling: Verwenden Sie Real-ESRGAN für schärfere Vergrößerungen (in Einstellungen aktivieren)
 
 help-editor-light-title = Licht
 help-editor-light-desc = Passen Sie die Helligkeit und den Kontrast Ihres Bildes fein an.
@@ -252,6 +267,10 @@ help-editor-key-save = Aktuelle Änderungen speichern
 help-editor-key-undo = Letzte Änderung rückgängig machen
 help-editor-key-redo = Rückgängig gemachte Änderung wiederholen
 help-editor-key-cancel = Alle Änderungen abbrechen und beenden
+
+help-editor-mouse-title = Maussteuerung
+help-editor-mouse-wheel = Bild vergrößern oder verkleinern
+help-editor-mouse-drag = Bild verschieben wenn vergrößert
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Frame Capture Section
@@ -307,7 +326,14 @@ about-icon-license-summary = Alle Icons (Anwendungslogo und UI-Icons) dürfen nu
 about-section-credits = Danksagungen
 about-credits-iced = Erstellt mit dem Iced GUI-Toolkit
 about-credits-ffmpeg = Videowiedergabe mit FFmpeg
+about-credits-onnx = KI-Funktionen mit ONNX Runtime (NAFNet, Real-ESRGAN)
 about-credits-fluent = Internationalisierung durch Project Fluent
+about-credits-full-list = Vollständige Abhängigkeitsliste anzeigen
+
+about-section-third-party = Drittanbieter-Lizenzen
+about-third-party-ffmpeg = FFmpeg ist unter LGPL 2.1+ lizenziert
+about-third-party-onnx = ONNX Runtime und DirectML sind unter MIT lizenziert
+about-third-party-details = Siehe THIRD_PARTY_LICENSES.md für Details
 
 about-section-links = Links
 about-link-repository = Quellcode
@@ -417,6 +443,8 @@ notification-load-error-io = Datei konnte nicht geöffnet werden. Prüfen Sie, o
 notification-load-error-svg = SVG konnte nicht gerendert werden. Die Datei ist möglicherweise fehlerhaft.
 notification-load-error-video = Video konnte nicht abgespielt werden. Das Format wird möglicherweise nicht unterstützt.
 notification-load-error-timeout = Laden hat zu lange gedauert. Die Datei ist möglicherweise zu groß oder das System ist ausgelastet.
+notification-skipped-corrupted-files = Übersprungen: { $files }
+notification-skipped-and-others = +{ $count } weitere
 
 # KI-Einstellungen
 settings-enable-deblur-label = KI-Entunschärfung
@@ -433,12 +461,28 @@ settings-deblur-status-not-downloaded = Modell nicht heruntergeladen
 settings-deblur-enabled = Aktiviert
 settings-deblur-disabled = Deaktiviert
 
+# KI-Hochskalierung Einstellungen
+settings-enable-upscale-label = KI-Hochskalierung
+settings-enable-upscale-hint = KI-gestützte Bildvergrößerung mit dem Real-ESRGAN 4x-Modell aktivieren (~64 MB Download).
+settings-upscale-model-url-label = Modell-URL
+settings-upscale-model-url-placeholder = https://huggingface.co/...
+settings-upscale-model-url-hint = URL zum Herunterladen des Real-ESRGAN ONNX-Modells.
+settings-upscale-status-label = Modellstatus
+settings-upscale-status-downloading = Modell wird heruntergeladen ({ $progress }%)...
+settings-upscale-status-validating = Modell wird validiert...
+settings-upscale-status-ready = Modell bereit
+settings-upscale-status-error = Fehler: { $message }
+settings-upscale-status-not-downloaded = Modell nicht heruntergeladen
+settings-upscale-enabled = Aktiviert
+settings-upscale-disabled = Deaktiviert
+
 # KI-Editor-Werkzeug
 image-editor-tool-deblur = KI-Entunschärfung
 image-editor-deblur-lossless-warning = Für beste Qualität als verlustfreies WebP oder PNG exportieren.
 image-editor-deblur-apply = Entunschärfung anwenden
 image-editor-deblur-processing = Verarbeitung
 image-editor-deblur-cancel = Abbrechen
+image-editor-upscale-processing = KI-Hochskalierung...
 image-editor-deblur-model-not-ready = Aktivieren Sie zuerst KI-Entunschärfung in den Einstellungen
 image-editor-deblur-validating = Modell wird validiert, bitte warten...
 image-editor-deblur-downloading = Modell wird heruntergeladen ({ $progress }%)...
@@ -460,3 +504,10 @@ notification-deblur-validation-error = Modellvalidierung fehlgeschlagen: { $erro
 notification-deblur-ready = KI-Entunschärfung ist einsatzbereit
 notification-deblur-apply-success = Bild erfolgreich entunschärft
 notification-deblur-apply-error = Entunschärfung fehlgeschlagen: { $error }
+
+# KI-Hochskalierung Benachrichtigungen
+notification-upscale-ready = KI-Hochskalierung ist einsatzbereit
+notification-upscale-download-error = Herunterladen des Hochskalierungs-Modells fehlgeschlagen: { $error }
+notification-upscale-validation-error = Modellvalidierung fehlgeschlagen: { $error }
+notification-upscale-resize-success = Bild mit KI-Hochskalierung vergrößert
+notification-upscale-resize-error = KI-Hochskalierung fehlgeschlagen: { $error }

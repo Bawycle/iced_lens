@@ -1,9 +1,9 @@
 [package]
 name = "iced_lens"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 authors = ["Bawycle"]
-description = "Privacy-first media viewer and editor with AI deblurring"
+description = "Privacy-first media viewer and editor with AI enhancement"
 repository = "https://codeberg.org/Bawycle/iced_lens"
 homepage = "https://codeberg.org/Bawycle/iced_lens"
 license = "MPL-2.0"
@@ -55,6 +55,9 @@ default = []
 
 [build-dependencies]
 winresource = "0.1"
+resvg = "0.45.1"
+tiny-skia = "0.11.4"
+image_rs = { package = "image", version = "0.25", default-features = false, features = ["png"] }
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
@@ -68,28 +71,3 @@ harness = false # Let Criterion manage the main function
 [[bench]]
 name = "media_navigation"
 harness = false
-
-# Configuration for cargo-bundle (macOS .app and Linux .deb packaging)
-# Install: cargo install cargo-bundle
-# Usage: cargo bundle --release
-[package.metadata.bundle]
-name = "IcedLens"
-identifier = "iced_lens"
-icon = [
-    "assets/branding/iced_lens.icns",
-    "assets/branding/iced_lens-16.png",
-    "assets/branding/iced_lens-32.png",
-    "assets/branding/iced_lens-48.png",
-    "assets/branding/iced_lens-64.png",
-    "assets/branding/iced_lens-128.png",
-    "assets/branding/iced_lens-256.png",
-    "assets/branding/iced_lens-512.png",
-]
-category = "public.app-category.photography"
-short_description = "Privacy-first media viewer and editor"
-long_description = """
-IcedLens is a privacy-first media viewer and editor with AI-powered
-deblurring. Built with the Iced GUI toolkit, it processes everything
-locally with no cloud, no tracking. Supports images, videos, and
-metadata editing.
-"""

@@ -13,20 +13,36 @@
 //! ├─────────────────────────────────────────┤
 //! │         action_icons (this module)      │  ← Semantic → Visual mapping
 //! ├─────────────────────────────────────────┤
-//! │         icons (visual primitives)       │  ← Raw SVG assets
+//! │         icons (visual primitives)       │  ← Raw PNG assets
 //! └─────────────────────────────────────────┘
 //! ```
+//!
+//! # Module Structure
+//!
+//! Each domain module provides dark icons by default (for help screens, sidebars).
+//! Toolbar sub-modules provide light icons for button backgrounds:
+//!
+//! - **`video::*`** - Dark icons for video playback actions
+//! - **`video::toolbar::*`** - Light icons for video toolbar buttons
+//! - **`viewer::*`** - Dark icons for viewer actions
+//! - **`viewer::toolbar::*`** - Light icons for viewer toolbar buttons
+//! - **`editor::*`** - Dark icons for image editor actions
+//! - **`navigation::*`** - Navigation icons (light for buttons, theme-aware for panels)
+//! - **`notification::*`** - Icons for toast notifications
+//! - **`sections::*`** - Icons for help screen section headers
 //!
 //! # Usage
 //!
 //! ```ignore
 //! use crate::ui::action_icons;
 //!
-//! // In UI components
-//! let btn = button(action_icons::video::capture_frame());
+//! // In toolbar buttons (light icons for dark button backgrounds)
+//! let btn = button(action_icons::video::toolbar::play());
+//! let btn = button(action_icons::viewer::toolbar::zoom_in());
 //!
-//! // In help screen
+//! // In help screen or sidebars (dark icons)
 //! let icon = action_icons::editor::rotate_left();
+//! let icon = action_icons::video::capture_frame();
 //! ```
 //!
 //! # Naming Convention
@@ -35,7 +51,6 @@
 //! The underlying visual icon can change without affecting call sites.
 
 use super::icons;
-use iced::widget::image::{Handle, Image};
 
 // =============================================================================
 // Video Playback Actions
@@ -43,7 +58,8 @@ use iced::widget::image::{Handle, Image};
 
 /// Icons for video playback controls.
 pub mod video {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Play video.
     pub fn play() -> Image<Handle> {
@@ -89,6 +105,77 @@ pub mod video {
     pub fn more_options() -> Image<Handle> {
         icons::ellipsis_horizontal()
     }
+
+    /// Decrease playback speed.
+    pub fn speed_down() -> Image<Handle> {
+        icons::triangle_minus()
+    }
+
+    /// Increase playback speed.
+    pub fn speed_up() -> Image<Handle> {
+        icons::triangle_plus()
+    }
+
+    /// Light icon variants for toolbar buttons.
+    pub mod toolbar {
+        use super::icons;
+        use iced::widget::image::{Handle, Image};
+
+        /// Play video (light icon for toolbar).
+        pub fn play() -> Image<Handle> {
+            icons::light::play()
+        }
+
+        /// Pause video (light icon for toolbar).
+        pub fn pause() -> Image<Handle> {
+            icons::light::pause()
+        }
+
+        /// Step forward one frame (light icon for toolbar).
+        pub fn step_forward() -> Image<Handle> {
+            icons::light::triangle_bar_right()
+        }
+
+        /// Step backward one frame (light icon for toolbar).
+        pub fn step_backward() -> Image<Handle> {
+            icons::light::triangle_bar_left()
+        }
+
+        /// Capture current frame (light icon for toolbar).
+        pub fn capture_frame() -> Image<Handle> {
+            icons::light::camera()
+        }
+
+        /// Toggle loop playback (light icon for toolbar).
+        pub fn toggle_loop() -> Image<Handle> {
+            icons::light::loop_icon()
+        }
+
+        /// Volume control (light icon for toolbar).
+        pub fn volume() -> Image<Handle> {
+            icons::light::volume()
+        }
+
+        /// Volume muted (light icon for toolbar).
+        pub fn volume_muted() -> Image<Handle> {
+            icons::light::volume_mute()
+        }
+
+        /// More options (light icon for toolbar).
+        pub fn more_options() -> Image<Handle> {
+            icons::light::ellipsis_horizontal()
+        }
+
+        /// Decrease playback speed (light icon for toolbar).
+        pub fn speed_down() -> Image<Handle> {
+            icons::light::triangle_minus()
+        }
+
+        /// Increase playback speed (light icon for toolbar).
+        pub fn speed_up() -> Image<Handle> {
+            icons::light::triangle_plus()
+        }
+    }
 }
 
 // =============================================================================
@@ -97,7 +184,8 @@ pub mod video {
 
 /// Icons for image editor tools.
 pub mod editor {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Rotate image 90° counter-clockwise.
     pub fn rotate_left() -> Image<Handle> {
@@ -126,7 +214,8 @@ pub mod editor {
 
 /// Icons for image/video viewer controls.
 pub mod viewer {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Zoom in.
     pub fn zoom_in() -> Image<Handle> {
@@ -162,6 +251,47 @@ pub mod viewer {
     pub fn delete() -> Image<Handle> {
         icons::trash()
     }
+
+    /// Light icon variants for toolbar buttons.
+    pub mod toolbar {
+        use super::icons;
+        use iced::widget::image::{Handle, Image};
+
+        /// Zoom in (light icon for toolbar).
+        pub fn zoom_in() -> Image<Handle> {
+            icons::light::zoom_in()
+        }
+
+        /// Zoom out (light icon for toolbar).
+        pub fn zoom_out() -> Image<Handle> {
+            icons::light::zoom_out()
+        }
+
+        /// Reset zoom (light icon for toolbar).
+        pub fn zoom_reset() -> Image<Handle> {
+            icons::light::refresh()
+        }
+
+        /// Fit to window (light icon for toolbar).
+        pub fn fit_to_window() -> Image<Handle> {
+            icons::light::compress()
+        }
+
+        /// Expand (light icon for toolbar).
+        pub fn expand() -> Image<Handle> {
+            icons::light::expand()
+        }
+
+        /// Fullscreen (light icon for toolbar).
+        pub fn fullscreen() -> Image<Handle> {
+            icons::light::fullscreen()
+        }
+
+        /// Delete (light icon for toolbar).
+        pub fn delete() -> Image<Handle> {
+            icons::light::trash()
+        }
+    }
 }
 
 // =============================================================================
@@ -170,11 +300,13 @@ pub mod viewer {
 
 /// Icons for app navigation.
 pub mod navigation {
-    use super::*;
+    use super::icons;
+    use crate::config::BackgroundTheme;
+    use iced::widget::image::{Handle, Image};
 
-    /// Open hamburger menu.
+    /// Open hamburger menu (light icon for navbar button).
     pub fn menu() -> Image<Handle> {
-        icons::hamburger()
+        icons::light::hamburger()
     }
 
     /// Open settings.
@@ -246,6 +378,39 @@ pub mod navigation {
             icons::chevron_double_left()
         }
     }
+
+    /// Navigate to previous media.
+    /// Returns appropriate icon based on background theme:
+    /// - Dark background: light icon for visibility
+    /// - Light/Checkerboard: dark icon for visibility
+    pub fn previous(background: BackgroundTheme) -> Image<Handle> {
+        match background {
+            BackgroundTheme::Dark => icons::overlay::chevron_left(),
+            BackgroundTheme::Light | BackgroundTheme::Checkerboard => icons::chevron_left(),
+        }
+    }
+
+    /// Navigate to next media.
+    /// Returns appropriate icon based on background theme:
+    /// - Dark background: light icon for visibility
+    /// - Light/Checkerboard: dark icon for visibility
+    pub fn next(background: BackgroundTheme) -> Image<Handle> {
+        match background {
+            BackgroundTheme::Dark => icons::overlay::chevron_right(),
+            BackgroundTheme::Light | BackgroundTheme::Checkerboard => icons::chevron_right(),
+        }
+    }
+
+    /// Loop indicator for wrap-around navigation at boundaries.
+    /// Returns appropriate icon based on background theme:
+    /// - Dark background: light icon for visibility
+    /// - Light/Checkerboard: dark icon for visibility
+    pub fn loop_indicator(background: BackgroundTheme) -> Image<Handle> {
+        match background {
+            BackgroundTheme::Dark => icons::overlay::loop_icon(),
+            BackgroundTheme::Light | BackgroundTheme::Checkerboard => icons::loop_icon(),
+        }
+    }
 }
 
 // =============================================================================
@@ -254,7 +419,8 @@ pub mod navigation {
 
 /// Icons for notification severities.
 pub mod notification {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Success notification.
     pub fn success() -> Image<Handle> {
@@ -283,7 +449,8 @@ pub mod notification {
 
 /// Icons for help screen sections.
 pub mod sections {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Image/video viewer section.
     pub fn viewer() -> Image<Handle> {
@@ -320,6 +487,7 @@ pub use icons::sized;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::BackgroundTheme;
 
     #[test]
     fn video_icons_load() {
@@ -332,6 +500,8 @@ mod tests {
         let _ = video::volume();
         let _ = video::volume_muted();
         let _ = video::more_options();
+        let _ = video::speed_down();
+        let _ = video::speed_up();
     }
 
     #[test]
@@ -371,6 +541,16 @@ mod tests {
         let _ = navigation::expand_right_panel(true);
         let _ = navigation::edit(false);
         let _ = navigation::edit(true);
+        // Test media navigation icons with all background themes
+        let _ = navigation::previous(BackgroundTheme::Light);
+        let _ = navigation::previous(BackgroundTheme::Dark);
+        let _ = navigation::previous(BackgroundTheme::Checkerboard);
+        let _ = navigation::next(BackgroundTheme::Light);
+        let _ = navigation::next(BackgroundTheme::Dark);
+        let _ = navigation::next(BackgroundTheme::Checkerboard);
+        let _ = navigation::loop_indicator(BackgroundTheme::Light);
+        let _ = navigation::loop_indicator(BackgroundTheme::Dark);
+        let _ = navigation::loop_indicator(BackgroundTheme::Checkerboard);
     }
 
     #[test]
@@ -387,5 +567,31 @@ mod tests {
         let _ = sections::video();
         let _ = sections::capture();
         let _ = sections::editor();
+    }
+
+    #[test]
+    fn video_toolbar_icons_load() {
+        let _ = video::toolbar::play();
+        let _ = video::toolbar::pause();
+        let _ = video::toolbar::step_forward();
+        let _ = video::toolbar::step_backward();
+        let _ = video::toolbar::capture_frame();
+        let _ = video::toolbar::toggle_loop();
+        let _ = video::toolbar::volume();
+        let _ = video::toolbar::volume_muted();
+        let _ = video::toolbar::more_options();
+        let _ = video::toolbar::speed_down();
+        let _ = video::toolbar::speed_up();
+    }
+
+    #[test]
+    fn viewer_toolbar_icons_load() {
+        let _ = viewer::toolbar::zoom_in();
+        let _ = viewer::toolbar::zoom_out();
+        let _ = viewer::toolbar::zoom_reset();
+        let _ = viewer::toolbar::fit_to_window();
+        let _ = viewer::toolbar::expand();
+        let _ = viewer::toolbar::fullscreen();
+        let _ = viewer::toolbar::delete();
     }
 }

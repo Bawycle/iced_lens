@@ -80,7 +80,7 @@ impl SyncClock {
         let pts_us = (audio_pts_secs * 1_000_000.0) as u64;
         self.audio_pts_us.store(pts_us, Ordering::SeqCst);
         self.start_pts_us.store(pts_us, Ordering::SeqCst);
-        *self.start_time.lock().unwrap() = Some(Instant::now());
+        *self.start_time.lock().expect("SyncClock mutex poisoned") = Some(Instant::now());
         self.is_playing.store(true, Ordering::SeqCst);
     }
 
@@ -93,7 +93,7 @@ impl SyncClock {
     pub fn resume(&self) {
         let current_pts_us = self.audio_pts_us.load(Ordering::SeqCst);
         self.start_pts_us.store(current_pts_us, Ordering::SeqCst);
-        *self.start_time.lock().unwrap() = Some(Instant::now());
+        *self.start_time.lock().expect("SyncClock mutex poisoned") = Some(Instant::now());
         self.is_playing.store(true, Ordering::SeqCst);
     }
 
@@ -101,7 +101,7 @@ impl SyncClock {
     pub fn stop(&self) {
         self.audio_pts_us.store(0, Ordering::SeqCst);
         self.start_pts_us.store(0, Ordering::SeqCst);
-        *self.start_time.lock().unwrap() = None;
+        *self.start_time.lock().expect("SyncClock mutex poisoned") = None;
         self.is_playing.store(false, Ordering::SeqCst);
     }
 
@@ -120,7 +120,7 @@ impl SyncClock {
 
         if self.is_playing.load(Ordering::SeqCst) {
             // Interpolate based on wall clock
-            if let Some(start) = *self.start_time.lock().unwrap() {
+            if let Some(start) = *self.start_time.lock().expect("SyncClock mutex poisoned") {
                 let start_pts_us = self.start_pts_us.load(Ordering::SeqCst);
                 let elapsed = start.elapsed();
                 let elapsed_us = elapsed.as_micros() as u64;
@@ -154,7 +154,7 @@ impl SyncClock {
         self.audio_pts_us.store(pts_us, Ordering::SeqCst);
         self.start_pts_us.store(pts_us, Ordering::SeqCst);
         if self.is_playing.load(Ordering::SeqCst) {
-            *self.start_time.lock().unwrap() = Some(Instant::now());
+            *self.start_time.lock().expect("SyncClock mutex poisoned") = Some(Instant::now());
         }
     }
 }

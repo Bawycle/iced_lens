@@ -10,11 +10,12 @@ Complete documentation for IcedLens features, configuration, and usage.
 4. [Navigation & Viewing](#navigation--viewing)
 5. [Editing Tools](#editing-tools)
 6. [AI Deblur](#ai-deblur)
-7. [Metadata Editing](#metadata-editing)
-8. [Configuration](#configuration)
-9. [Internationalization](#internationalization)
-10. [Download & Installation](#download--installation)
-11. [FAQ](#faq)
+7. [AI Upscaling](#ai-upscaling)
+8. [Metadata Editing](#metadata-editing)
+9. [Configuration](#configuration)
+10. [Internationalization](#internationalization)
+11. [Download & Installation](#download--installation)
+12. [FAQ](#faq)
 
 ---
 
@@ -109,8 +110,13 @@ iced_lens --lang fr image.png
 | `F11` | Toggle fullscreen |
 | `Esc` | Exit fullscreen |
 | `←` / `→` | Navigate media / seek video |
+| `↑` / `↓` | Increase / decrease volume |
 | `Space` | Play/pause video |
 | `M` | Toggle mute |
+| `J` | Decrease playback speed |
+| `L` | Increase playback speed |
+| `,` | Step back one frame (while paused) |
+| `.` | Step forward one frame (while paused) |
 
 ### Editor Mode
 
@@ -144,6 +150,7 @@ On macOS, use `Cmd` instead of `Ctrl`.
 - Arrow keys or overlay arrows browse sibling files
 - Navigation loops at directory boundaries
 - Directory is rescanned on each navigation (reflects file changes)
+- Corrupted or unloadable files are automatically skipped (configurable limit in Settings)
 
 ### Fullscreen
 
@@ -169,9 +176,10 @@ All editing is **non-destructive**. Changes are only applied when you save.
 
 ### Resize
 
-- Slider: 10–200% of original size
+- Slider: 10–400% of original size
 - Width/height inputs with optional aspect lock
 - Live preview updates as you adjust
+- **AI Upscaling:** For enlargements (>100%), optional Real-ESRGAN 4x upscaling produces sharper results than traditional interpolation. Enable in Settings → AI / Machine Learning.
 
 ### Light
 
@@ -182,6 +190,11 @@ All editing is **non-destructive**. Changes are only applied when you save.
 ### Undo/Redo
 
 Full transformation history. Each tool application creates a history entry.
+
+### Mouse Controls
+
+- **Scroll wheel:** Zoom in/out of the image
+- **Click + drag:** Pan when zoomed in
 
 ---
 
@@ -208,6 +221,36 @@ Experimental feature using the NAFNet neural network to sharpen blurry images.
 
 - Works with any image size (small images are automatically padded)
 - Can only be applied once per editing session (multiple applications degrade quality)
+- Model integrity verified with BLAKE3 checksum
+- Processing runs on CPU
+
+---
+
+## AI Upscaling
+
+Enhance image enlargements using the Real-ESRGAN neural network for sharper results than traditional interpolation.
+
+### Setup
+
+1. Go to Settings → AI / Machine Learning
+2. Enable "AI Upscaling"
+3. Wait for model download (~64 MB from Hugging Face)
+4. Model is validated automatically
+
+### Usage
+
+1. Open an image in the editor
+2. Select the Resize tool
+3. Set scale above 100% (enlargement)
+4. Check "Use AI upscaling (Real-ESRGAN)"
+5. Click Apply
+6. Wait for processing (spinner overlay)
+7. Save when satisfied
+
+### Notes
+
+- Only applies to enlargements (>100%), not reductions
+- Uses Real-ESRGAN 4x model for high-quality upscaling
 - Model integrity verified with BLAKE3 checksum
 - Processing runs on CPU
 
@@ -251,10 +294,10 @@ Configuration is stored in a platform-appropriate directory:
 | Category | Options |
 |----------|---------|
 | General | Language, theme mode (System/Light/Dark) |
-| Display | Background theme, sort order, zoom step |
-| Video | Autoplay, volume, audio normalization, frame cache size |
+| Display | Background theme, sort order, zoom step, auto-skip limit (1–20) |
+| Video | Autoplay, volume (0–150% with perceptual scaling), audio normalization, frame cache size |
 | Fullscreen | Overlay timeout |
-| AI | Enable deblur, model URL |
+| AI | Enable deblur, enable upscaling, model URLs |
 
 ### Reset Configuration
 
@@ -294,19 +337,14 @@ Translation files use `.ftl` extension. See `assets/i18n/` for examples.
 
 ## Download & Installation
 
-### Pre-built Binaries (Linux only)
+Download the latest release from [Releases](https://codeberg.org/Bawycle/iced_lens/releases):
 
-AppImage binaries are available for Linux x86_64:
+| Platform | Format | Instructions |
+|----------|--------|--------------|
+| **Linux x86_64** | AppImage | `chmod +x iced_lens-*.AppImage && ./iced_lens-*.AppImage` |
+| **Windows x86_64** | Installer | Run `IcedLens-*-setup.exe` and follow the wizard |
 
-1. Download the latest `.AppImage` from [Releases](https://codeberg.org/Bawycle/iced_lens/releases)
-2. Make it executable: `chmod +x iced_lens-*.AppImage`
-3. Run: `./iced_lens-*.AppImage`
-
-> **Note:** macOS and Windows binaries are not currently provided. Users on these platforms must build from source.
-
-### Build from Source
-
-See the [Installation](#installation) section above.
+> **macOS:** No pre-built binaries are provided. To build from source or create distribution packages, see [CONTRIBUTING.md](../CONTRIBUTING.md#distribution-packaging).
 
 ---
 
@@ -316,7 +354,7 @@ See the [Installation](#installation) section above.
 A: File-level copyleft offers balanced reciprocity without full project copyleft.
 
 **Q: Does it work on Windows/macOS?**
-A: It should work via Iced's cross-platform backends, but these platforms have not been tested. No pre-built binaries are provided—you must build from source.
+A: Windows is fully supported with a pre-built installer. macOS has not been tested—see [CONTRIBUTING.md](../CONTRIBUTING.md) to build from source.
 
 **Q: Can I edit videos?**
 A: Not yet. Video playback and frame capture are supported, but editing is images only.

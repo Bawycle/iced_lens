@@ -64,6 +64,8 @@ settings-sort-order-label = Orden de navegación de imágenes
 settings-sort-alphabetical = Alfabético
 settings-sort-modified = Fecha de modificación
 settings-sort-created = Fecha de creación
+settings-max-skip-attempts-label = Omitir archivos corruptos
+settings-max-skip-attempts-hint = Máximo de archivos corruptos consecutivos a omitir durante la navegación.
 settings-overlay-timeout-label = Retraso de ocultación automática en pantalla completa
 settings-overlay-timeout-hint = Tiempo antes de que los controles desaparezcan en modo de pantalla completa.
 seconds = segundos
@@ -89,6 +91,13 @@ image-editor-resize-height-label = Alto (px)
 image-editor-resize-lock-aspect = Bloquear relación de aspecto
 image-editor-resize-presets-label = Ajustes predefinidos
 image-editor-resize-apply = Aplicar redimensionamiento
+image-editor-resize-preview-label = Vista previa
+image-editor-resize-ai-upscale = Escalado IA (Real-ESRGAN)
+image-editor-resize-ai-model-not-downloaded = Modelo IA no descargado
+image-editor-resize-ai-model-downloading = Descargando modelo IA
+image-editor-resize-ai-model-validating = Validando modelo IA
+image-editor-resize-ai-model-error = Error del modelo IA
+image-editor-resize-ai-enlargement-only = El upscaling IA solo se aplica a ampliaciones
 image-editor-light-section-title = Ajustes de luz
 image-editor-light-brightness-label = Brillo
 image-editor-light-contrast-label = Contraste
@@ -121,6 +130,9 @@ video-capture-tooltip = Capturar fotograma actual
 video-step-forward-tooltip = Avanzar un fotograma (.)
 video-step-backward-tooltip = Retroceder un fotograma (,)
 video-more-tooltip = Más opciones
+video-speed-down-tooltip = Reducir velocidad (J)
+video-speed-up-tooltip = Aumentar velocidad (L)
+hud-video-no-audio = Sin audio
 settings-audio-normalization-label = Normalización de volumen de audio
 settings-audio-normalization-enabled = Activada
 settings-audio-normalization-disabled = Desactivada
@@ -197,7 +209,7 @@ help-video-tool-playback-desc = Inicie o detenga la reproducción de vídeo con 
 help-video-tool-timeline = Línea de tiempo
 help-video-tool-timeline-desc = Haga clic en cualquier lugar de la barra de progreso para saltar a esa posición.
 help-video-tool-volume = Volumen
-help-video-tool-volume-desc = Arrastre el control deslizante de volumen o haga clic en el icono del altavoz para silenciar/activar sonido.
+help-video-tool-volume-desc = Arrastre el control deslizante de volumen (0-150%) o haga clic en el icono del altavoz para silenciar/activar sonido.
 help-video-tool-loop = Repetir
 help-video-tool-loop-desc = Active para reiniciar automáticamente el vídeo cuando termine.
 help-video-tool-stepping = Navegación por fotogramas
@@ -211,6 +223,8 @@ help-video-key-seek = Buscar atrás/adelante (durante la reproducción)
 help-video-key-volume = Aumentar/disminuir volumen
 help-video-key-step-back = Retroceder un fotograma (cuando esté en pausa)
 help-video-key-step-forward = Avanzar un fotograma (cuando esté en pausa)
+help-video-key-speed-down = Reducir velocidad de reproducción
+help-video-key-speed-up = Aumentar velocidad de reproducción
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Image Editor Section
@@ -233,10 +247,11 @@ help-editor-crop-usage = Arrastre los manipuladores para ajustar la selección, 
 
 help-editor-resize-title = Redimensionar
 help-editor-resize-desc = Cambie las dimensiones de la imagen para hacerla más grande o más pequeña.
-help-editor-resize-scale = Escalar por porcentaje (ej. 50% para reducir a la mitad el tamaño)
+help-editor-resize-scale = Escalar por porcentaje (10% a 400%)
 help-editor-resize-dimensions = Ingrese ancho y alto exactos en píxeles
 help-editor-resize-lock = Bloquear relación de aspecto para mantener las proporciones
-help-editor-resize-presets = Use ajustes predefinidos para tamaños comunes (HD, Full HD, 4K...)
+help-editor-resize-presets = Use preajustes para escalar rápidamente (25%, 50%, 200%, etc.)
+help-editor-resize-ai-upscale = Ampliación IA: Use Real-ESRGAN para ampliaciones más nítidas (activar en Configuración)
 
 help-editor-light-title = Luz
 help-editor-light-desc = Ajuste finamente el brillo y el contraste de su imagen.
@@ -252,6 +267,10 @@ help-editor-key-save = Guardar cambios actuales
 help-editor-key-undo = Deshacer último cambio
 help-editor-key-redo = Rehacer cambio deshecho
 help-editor-key-cancel = Cancelar todos los cambios y salir
+
+help-editor-mouse-title = Controles del ratón
+help-editor-mouse-wheel = Ampliar o reducir la imagen
+help-editor-mouse-drag = Mover la imagen cuando está ampliada
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Frame Capture Section
@@ -307,7 +326,14 @@ about-icon-license-summary = Todos los iconos (logotipo de la aplicación e icon
 about-section-credits = Créditos
 about-credits-iced = Construido con el kit de herramientas GUI Iced
 about-credits-ffmpeg = Reproducción de vídeo con FFmpeg
+about-credits-onnx = Funciones IA con ONNX Runtime (NAFNet, Real-ESRGAN)
 about-credits-fluent = Internacionalización por Project Fluent
+about-credits-full-list = Ver la lista completa de dependencias
+
+about-section-third-party = Licencias de terceros
+about-third-party-ffmpeg = FFmpeg está licenciado bajo LGPL 2.1+
+about-third-party-onnx = ONNX Runtime y DirectML están licenciados bajo MIT
+about-third-party-details = Ver THIRD_PARTY_LICENSES.md para más detalles
 
 about-section-links = Enlaces
 about-link-repository = Código fuente
@@ -417,6 +443,8 @@ notification-load-error-io = No se pudo abrir el archivo. Verifica que existe y 
 notification-load-error-svg = No se pudo renderizar el SVG. El archivo puede estar malformado.
 notification-load-error-video = No se pudo reproducir el vídeo. El formato puede no ser compatible.
 notification-load-error-timeout = La carga ha expirado. El archivo puede ser demasiado grande o el sistema está ocupado.
+notification-skipped-corrupted-files = Omitidos: { $files }
+notification-skipped-and-others = +{ $count } más
 
 # Configuración de IA
 settings-enable-deblur-label = Desenfoque IA
@@ -433,12 +461,28 @@ settings-deblur-status-not-downloaded = Modelo no descargado
 settings-deblur-enabled = Habilitado
 settings-deblur-disabled = Deshabilitado
 
+# Configuración de escalado IA
+settings-enable-upscale-label = Escalado IA
+settings-enable-upscale-hint = Habilitar el escalado de imágenes con IA usando el modelo Real-ESRGAN 4x (~64 MB de descarga).
+settings-upscale-model-url-label = URL del modelo
+settings-upscale-model-url-placeholder = https://huggingface.co/...
+settings-upscale-model-url-hint = URL para descargar el modelo Real-ESRGAN ONNX.
+settings-upscale-status-label = Estado del modelo
+settings-upscale-status-downloading = Descargando modelo ({ $progress }%)...
+settings-upscale-status-validating = Validando modelo...
+settings-upscale-status-ready = Modelo listo
+settings-upscale-status-error = Error: { $message }
+settings-upscale-status-not-downloaded = Modelo no descargado
+settings-upscale-enabled = Habilitado
+settings-upscale-disabled = Deshabilitado
+
 # Herramienta de desenfoque del editor
 image-editor-tool-deblur = Desenfoque IA
 image-editor-deblur-lossless-warning = Para mejor calidad, exportar como WebP sin pérdida o PNG.
 image-editor-deblur-apply = Aplicar desenfoque
 image-editor-deblur-processing = Procesando
 image-editor-deblur-cancel = Cancelar
+image-editor-upscale-processing = Escalado IA en proceso...
 image-editor-deblur-model-not-ready = Habilita primero el desenfoque IA en Configuración
 image-editor-deblur-validating = Validando modelo, por favor espera...
 image-editor-deblur-downloading = Descargando modelo ({ $progress }%)...
@@ -460,3 +504,10 @@ notification-deblur-validation-error = Error en la validación del modelo: { $er
 notification-deblur-ready = El desenfoque IA está listo para usar
 notification-deblur-apply-success = Imagen desenfocada exitosamente
 notification-deblur-apply-error = Error al desenfocar: { $error }
+
+# Notificaciones de escalado IA
+notification-upscale-ready = El escalado IA está listo para usar
+notification-upscale-download-error = Error al descargar el modelo de escalado: { $error }
+notification-upscale-validation-error = Error en la validación del modelo: { $error }
+notification-upscale-resize-success = Imagen redimensionada con escalado IA
+notification-upscale-resize-error = Error en el escalado IA: { $error }

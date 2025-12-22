@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="64" height="64" fill="white">
+  <!-- License: LicenseRef-IcedLens-Icon (see ICON_LICENSE.md) -->
+  <!-- Triangle pointing left with a minus sign on the right -->
+  <path d="M 20,7 L 6,16 L 20,25 z" />
+  <rect x="22" y="14" width="6" height="4" rx="1" />
+</svg>

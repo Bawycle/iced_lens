@@ -10,6 +10,7 @@
 //! - **Overlay**: Fullscreen overlay auto-hide timeout
 //! - **Volume**: Audio playback volume settings
 //! - **Frame Cache**: Video frame caching for seek performance
+//! - **Playback Speed**: Video playback speed control
 
 // ==========================================================================
 // Zoom Defaults
@@ -50,14 +51,14 @@ pub const MAX_OVERLAY_TIMEOUT_SECS: u32 = 30;
 // Volume Defaults
 // ==========================================================================
 
-/// Default video playback volume (0.0 to 1.0).
+/// Default video playback volume (0.0 to 1.5, where 1.0 = 100%).
 pub const DEFAULT_VOLUME: f32 = 0.8;
 
 /// Minimum volume level.
 pub const MIN_VOLUME: f32 = 0.0;
 
-/// Maximum volume level.
-pub const MAX_VOLUME: f32 = 1.0;
+/// Maximum volume level (1.5 = 150% amplification).
+pub const MAX_VOLUME: f32 = 1.5;
 
 /// Volume adjustment step per key press (5%).
 pub const VOLUME_STEP: f32 = 0.05;
@@ -110,6 +111,66 @@ pub const DEFAULT_DEBLUR_MODEL_URL: &str =
     "https://huggingface.co/opencv/deblurring_nafnet/resolve/main/deblurring_nafnet_2025may.onnx";
 
 // ==========================================================================
+// AI/Upscale Defaults
+// ==========================================================================
+
+/// Default URL for downloading the Real-ESRGAN x4 ONNX upscaling model.
+/// Uses the CountFloyd/deepfake model which supports dynamic input sizes.
+pub const DEFAULT_UPSCALE_MODEL_URL: &str =
+    "https://huggingface.co/CountFloyd/deepfake/resolve/main/real_esrgan_x4.onnx";
+
+// ==========================================================================
+// Resize Scale Defaults (Image Editor)
+// ==========================================================================
+
+/// Default resize scale percentage.
+pub const DEFAULT_RESIZE_SCALE_PERCENT: f32 = 100.0;
+
+/// Minimum resize scale percentage.
+pub const MIN_RESIZE_SCALE_PERCENT: f32 = 10.0;
+
+/// Maximum resize scale percentage (400% = 4x, optimal for Real-ESRGAN AI upscaling).
+pub const MAX_RESIZE_SCALE_PERCENT: f32 = 400.0;
+
+// ==========================================================================
+// Navigation Auto-Skip Defaults
+// ==========================================================================
+
+/// Default maximum number of consecutive corrupted files to skip during navigation.
+/// When navigating (next/prev), if media fails to load, auto-skip to next.
+/// Stops after this many consecutive failures to prevent infinite loops.
+pub const DEFAULT_MAX_SKIP_ATTEMPTS: u32 = 5;
+
+/// Minimum max skip attempts (1 = skip at least once before stopping).
+pub const MIN_MAX_SKIP_ATTEMPTS: u32 = 1;
+
+/// Maximum max skip attempts (prevent excessive loops).
+pub const MAX_MAX_SKIP_ATTEMPTS: u32 = 20;
+
+// ==========================================================================
+// Playback Speed Defaults
+// ==========================================================================
+
+/// Default playback speed (1.0 = normal speed).
+pub const DEFAULT_PLAYBACK_SPEED: f64 = 1.0;
+
+/// Minimum playback speed (0.1x = ten times slower).
+pub const MIN_PLAYBACK_SPEED: f64 = 0.1;
+
+/// Maximum playback speed (8x = eight times faster).
+pub const MAX_PLAYBACK_SPEED: f64 = 8.0;
+
+/// Playback speed presets for the speed control buttons.
+/// Ordered from slowest to fastest. Users cycle through these with J and L keys.
+pub const PLAYBACK_SPEED_PRESETS: &[f64] = &[
+    0.1, 0.15, 0.2, 0.25, 0.33, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 4.0, 8.0,
+];
+
+/// Speed threshold above which audio is automatically muted.
+/// At speeds > 2x, audio becomes distorted and unintelligible.
+pub const PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD: f64 = 2.0;
+
+// ==========================================================================
 // Compile-time Validation
 // ==========================================================================
 
@@ -146,4 +207,54 @@ const _: () = {
     assert!(MAX_KEYBOARD_SEEK_STEP_SECS >= MIN_KEYBOARD_SEEK_STEP_SECS);
     assert!(DEFAULT_KEYBOARD_SEEK_STEP_SECS >= MIN_KEYBOARD_SEEK_STEP_SECS);
     assert!(DEFAULT_KEYBOARD_SEEK_STEP_SECS <= MAX_KEYBOARD_SEEK_STEP_SECS);
+
+    // Playback speed validation
+    assert!(MIN_PLAYBACK_SPEED > 0.0);
+    assert!(MAX_PLAYBACK_SPEED > MIN_PLAYBACK_SPEED);
+    assert!(DEFAULT_PLAYBACK_SPEED >= MIN_PLAYBACK_SPEED);
+    assert!(DEFAULT_PLAYBACK_SPEED <= MAX_PLAYBACK_SPEED);
+    assert!(PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD > 1.0);
+    assert!(PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD <= MAX_PLAYBACK_SPEED);
+
+    // Ensure presets array is not empty
+    assert!(!PLAYBACK_SPEED_PRESETS.is_empty());
+
+    // Validate presets are in ascending order and within bounds
+    let mut i = 0;
+    while i < PLAYBACK_SPEED_PRESETS.len() {
+        // Each preset must be within valid range
+        assert!(PLAYBACK_SPEED_PRESETS[i] >= MIN_PLAYBACK_SPEED);
+        assert!(PLAYBACK_SPEED_PRESETS[i] <= MAX_PLAYBACK_SPEED);
+
+        // Presets must be in ascending order (for cycling to work correctly)
+        if i > 0 {
+            assert!(PLAYBACK_SPEED_PRESETS[i] > PLAYBACK_SPEED_PRESETS[i - 1]);
+        }
+        i += 1;
+    }
+
+    // Ensure default speed (1.0) is in the presets
+    let mut found_default = false;
+    let mut j = 0;
+    while j < PLAYBACK_SPEED_PRESETS.len() {
+        // Use integer comparison to avoid floating point issues
+        // 1.0 * 100 = 100, comparing integers
+        if (PLAYBACK_SPEED_PRESETS[j] * 100.0) as i32 == (DEFAULT_PLAYBACK_SPEED * 100.0) as i32 {
+            found_default = true;
+        }
+        j += 1;
+    }
+    assert!(found_default);
+
+    // Resize scale validation
+    assert!(MIN_RESIZE_SCALE_PERCENT > 0.0);
+    assert!(MAX_RESIZE_SCALE_PERCENT > MIN_RESIZE_SCALE_PERCENT);
+    assert!(DEFAULT_RESIZE_SCALE_PERCENT >= MIN_RESIZE_SCALE_PERCENT);
+    assert!(DEFAULT_RESIZE_SCALE_PERCENT <= MAX_RESIZE_SCALE_PERCENT);
+
+    // Navigation auto-skip validation
+    assert!(MIN_MAX_SKIP_ATTEMPTS >= 1);
+    assert!(MAX_MAX_SKIP_ATTEMPTS >= MIN_MAX_SKIP_ATTEMPTS);
+    assert!(DEFAULT_MAX_SKIP_ATTEMPTS >= MIN_MAX_SKIP_ATTEMPTS);
+    assert!(DEFAULT_MAX_SKIP_ATTEMPTS <= MAX_MAX_SKIP_ATTEMPTS);
 };

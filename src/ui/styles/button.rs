@@ -34,29 +34,75 @@ pub fn primary(_theme: &Theme, status: button::Status) -> button::Style {
             shadow: shadow::MD,
             snap: true,
         },
-        _ => button::Style::default(),
+        button::Status::Disabled => button::Style::default(),
     }
 }
 
-/// Style pour boutons overlay (navigation, play, etc.).
-pub fn overlay(
-    text_color: Color,
-    alpha_normal: f32,
-    alpha_hover: f32,
-) -> impl Fn(&Theme, button::Status) -> button::Style {
-    move |_theme: &Theme, status: button::Status| {
-        let alpha = match status {
-            button::Status::Hovered => alpha_hover,
-            button::Status::Pressed => opacity::OVERLAY_PRESSED,
-            _ => alpha_normal,
-        };
+/// Overlay button styles for buttons displayed on top of media content.
+pub mod overlay {
+    use super::{opacity, radius, shadow, Background, Border, Color, Theme, BLACK, WHITE};
+    use iced::widget::button;
 
-        button::Style {
-            background: Some(Background::Color(Color { a: alpha, ..BLACK })),
-            text_color,
-            border: Border::default(),
-            shadow: shadow::MD,
-            snap: true,
+    /// Style for navigation arrows overlay (previous/next).
+    ///
+    /// Mostly transparent by default, shows background on hover.
+    /// Uses medium shadow for visibility on various backgrounds.
+    pub fn navigation(
+        text_color: Color,
+        alpha_normal: f32,
+        alpha_hover: f32,
+    ) -> impl Fn(&Theme, button::Status) -> button::Style {
+        move |_theme: &Theme, status: button::Status| {
+            let alpha = match status {
+                button::Status::Hovered => alpha_hover,
+                button::Status::Pressed => opacity::OVERLAY_PRESSED,
+                button::Status::Disabled => alpha_normal * 0.5,
+                button::Status::Active => alpha_normal,
+            };
+
+            // Use explicit TRANSPARENT when alpha is very low to avoid
+            // Windows rendering artifacts with near-zero alpha black
+            let background = if alpha < 0.01 {
+                Some(Background::Color(Color::TRANSPARENT))
+            } else {
+                Some(Background::Color(Color { a: alpha, ..BLACK }))
+            };
+
+            button::Style {
+                background,
+                text_color,
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: radius::SM.into(),
+                },
+                shadow: shadow::MD,
+                snap: true,
+            }
+        }
+    }
+
+    /// Style for video play/pause overlay button.
+    ///
+    /// Circular button with semi-transparent background and large shadow.
+    pub fn video_play() -> impl Fn(&Theme, button::Status) -> button::Style {
+        move |_theme: &Theme, status: button::Status| {
+            let alpha = match status {
+                button::Status::Hovered => opacity::OVERLAY_HOVER,
+                button::Status::Pressed => opacity::OVERLAY_STRONG,
+                button::Status::Active | button::Status::Disabled => opacity::OVERLAY_MEDIUM,
+            };
+
+            button::Style {
+                background: Some(Background::Color(Color { a: alpha, ..BLACK })),
+                text_color: WHITE,
+                border: Border {
+                    radius: radius::FULL.into(),
+                    ..Default::default()
+                },
+                shadow: shadow::LG,
+                snap: true,
+            }
         }
     }
 }
@@ -217,28 +263,6 @@ pub fn unselected(theme: &Theme, status: button::Status) -> button::Style {
     }
 }
 
-/// Style pour bouton play overlay vidéo.
-pub fn video_play_overlay() -> impl Fn(&Theme, button::Status) -> button::Style {
-    move |_theme: &Theme, status: button::Status| {
-        let alpha = match status {
-            button::Status::Hovered => opacity::OVERLAY_HOVER,
-            button::Status::Pressed => opacity::OVERLAY_STRONG,
-            _ => opacity::OVERLAY_MEDIUM,
-        };
-
-        button::Style {
-            background: Some(Background::Color(Color { a: alpha, ..BLACK })),
-            text_color: WHITE,
-            border: Border {
-                radius: radius::FULL.into(),
-                ..Default::default()
-            },
-            shadow: shadow::LG,
-            snap: true,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256,9 +280,9 @@ mod tests {
     }
 
     #[test]
-    fn overlay_button_alpha_changes_on_hover() {
+    fn overlay_navigation_alpha_changes_on_hover() {
         let theme = Theme::Dark;
-        let style_fn = overlay(WHITE, 0.5, 0.8);
+        let style_fn = overlay::navigation(WHITE, 0.5, 0.8);
 
         let normal = style_fn(&theme, button::Status::Active);
         let hover = style_fn(&theme, button::Status::Hovered);
@@ -266,5 +290,14 @@ mod tests {
         // Extract alpha values (would need helper)
         // This is a simplified test
         assert_ne!(normal.background, hover.background);
+    }
+
+    #[test]
+    fn overlay_video_play_has_shadow() {
+        let theme = Theme::Dark;
+        let style_fn = overlay::video_play();
+        let style = style_fn(&theme, button::Status::Active);
+
+        assert_ne!(style.shadow, shadow::NONE);
     }
 }

@@ -57,19 +57,15 @@ impl std::fmt::Display for DeblurError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DeblurError::ModelNotFound => write!(f, "Model file not found"),
-            DeblurError::DownloadFailed(msg) => write!(f, "Download failed: {}", msg),
+            DeblurError::DownloadFailed(msg) => write!(f, "Download failed: {msg}"),
             DeblurError::ChecksumMismatch { expected, actual } => {
-                write!(
-                    f,
-                    "Checksum mismatch: expected {}, got {}",
-                    expected, actual
-                )
+                write!(f, "Checksum mismatch: expected {expected}, got {actual}")
             }
-            DeblurError::InferenceFailed(msg) => write!(f, "Inference failed: {}", msg),
-            DeblurError::PreprocessingFailed(msg) => write!(f, "Preprocessing failed: {}", msg),
-            DeblurError::PostprocessingFailed(msg) => write!(f, "Postprocessing failed: {}", msg),
+            DeblurError::InferenceFailed(msg) => write!(f, "Inference failed: {msg}"),
+            DeblurError::PreprocessingFailed(msg) => write!(f, "Preprocessing failed: {msg}"),
+            DeblurError::PostprocessingFailed(msg) => write!(f, "Postprocessing failed: {msg}"),
             DeblurError::Cancelled => write!(f, "Operation cancelled"),
-            DeblurError::Io(msg) => write!(f, "IO error: {}", msg),
+            DeblurError::Io(msg) => write!(f, "IO error: {msg}"),
             DeblurError::SessionNotInitialized => write!(f, "ONNX session not initialized"),
         }
     }
@@ -183,8 +179,7 @@ impl DeblurManager {
         let input_name = session
             .inputs
             .first()
-            .map(|i| i.name.clone())
-            .unwrap_or_else(|| "lq".to_string());
+            .map_or_else(|| "lq".to_string(), |i| i.name.clone());
 
         // Create tensor reference for inference
         let input_ref = ort::value::TensorRef::from_array_view(&input_tensor)
@@ -210,12 +205,13 @@ impl DeblurManager {
 
 /// Returns the path where the deblur model should be stored.
 pub fn get_model_path() -> PathBuf {
-    paths::get_app_data_dir()
-        .map(|mut p| {
+    paths::get_app_data_dir().map_or_else(
+        || PathBuf::from(MODEL_FILENAME),
+        |mut p| {
             p.push(MODEL_FILENAME);
             p
-        })
-        .unwrap_or_else(|| PathBuf::from(MODEL_FILENAME))
+        },
+    )
 }
 
 /// Minimum expected model size (80 MB) to detect failed downloads.
@@ -268,8 +264,7 @@ pub async fn download_model(
     // Sanity check: if the content length is suspiciously small, something went wrong
     if total_size > 0 && total_size < MIN_MODEL_SIZE_BYTES {
         return Err(DeblurError::DownloadFailed(format!(
-            "Response too small ({} bytes), expected model file (~92 MB). URL may have changed or returned an error page.",
-            total_size
+            "Response too small ({total_size} bytes), expected model file (~92 MB). URL may have changed or returned an error page."
         )));
     }
 
@@ -303,8 +298,7 @@ pub async fn download_model(
         // Delete the incomplete/invalid file
         let _ = std::fs::remove_file(&model_path);
         return Err(DeblurError::DownloadFailed(format!(
-            "Downloaded file too small ({} bytes), expected ~92 MB",
-            downloaded
+            "Downloaded file too small ({downloaded} bytes), expected ~92 MB"
         )));
     }
 

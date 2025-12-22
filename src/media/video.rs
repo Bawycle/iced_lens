@@ -21,7 +21,7 @@ pub fn init_ffmpeg() -> Result<()> {
     FFMPEG_INIT.call_once(|| {
         // Initialize FFmpeg
         if let Err(e) = ffmpeg_next::init() {
-            init_result = Err(Error::Io(format!("FFmpeg initialization failed: {}", e)));
+            init_result = Err(Error::Io(format!("FFmpeg initialization failed: {e}")));
             return;
         }
 
@@ -60,7 +60,7 @@ pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
 
     // Open video file
     let mut ictx = ffmpeg_next::format::input(&path)
-        .map_err(|e| Error::Io(format!("Failed to open video file: {}", e)))?;
+        .map_err(|e| Error::Io(format!("Failed to open video file: {e}")))?;
 
     // Find video stream
     let input = ictx
@@ -71,19 +71,18 @@ pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
 
     // Create decoder
     let context_decoder = ffmpeg_next::codec::context::Context::from_parameters(input.parameters())
-        .map_err(|e| Error::Io(format!("Failed to create codec context: {}", e)))?;
+        .map_err(|e| Error::Io(format!("Failed to create codec context: {e}")))?;
     let mut decoder = context_decoder
         .decoder()
         .video()
-        .map_err(|e| Error::Io(format!("Failed to create video decoder: {}", e)))?;
+        .map_err(|e| Error::Io(format!("Failed to create video decoder: {e}")))?;
 
     // Validate dimensions before creating scaler
     let width = decoder.width();
     let height = decoder.height();
     if width == 0 || height == 0 {
         return Err(Error::Io(format!(
-            "Invalid video dimensions: {}x{} (possibly unsupported format)",
-            width, height
+            "Invalid video dimensions: {width}x{height} (possibly unsupported format)"
         )));
     }
 
@@ -97,7 +96,7 @@ pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
         height,
         ffmpeg_next::software::scaling::Flags::BILINEAR,
     )
-    .map_err(|e| Error::Io(format!("Failed to create scaler: {}", e)))?;
+    .map_err(|e| Error::Io(format!("Failed to create scaler: {e}")))?;
 
     // Decode first frame
     let mut rgb_frame = ffmpeg_next::frame::Video::empty();
@@ -106,14 +105,14 @@ pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
         if stream.index() == video_stream_index {
             decoder
                 .send_packet(&packet)
-                .map_err(|e| Error::Io(format!("Failed to send packet: {}", e)))?;
+                .map_err(|e| Error::Io(format!("Failed to send packet: {e}")))?;
 
             let mut decoded = ffmpeg_next::frame::Video::empty();
             if decoder.receive_frame(&mut decoded).is_ok() {
                 // Convert to RGBA
                 scaler
                     .run(&decoded, &mut rgb_frame)
-                    .map_err(|e| Error::Io(format!("Failed to scale frame: {}", e)))?;
+                    .map_err(|e| Error::Io(format!("Failed to scale frame: {e}")))?;
                 break;
             }
         }
@@ -158,7 +157,7 @@ pub fn extract_video_metadata<P: AsRef<Path>>(path: P) -> Result<VideoMetadata> 
 
     // Open video file
     let ictx = ffmpeg_next::format::input(&path)
-        .map_err(|e| Error::Io(format!("Failed to open video file: {}", e)))?;
+        .map_err(|e| Error::Io(format!("Failed to open video file: {e}")))?;
 
     // Find video stream
     let video_stream = ictx
@@ -169,11 +168,11 @@ pub fn extract_video_metadata<P: AsRef<Path>>(path: P) -> Result<VideoMetadata> 
     // Create decoder context to get dimensions
     let context_decoder =
         ffmpeg_next::codec::context::Context::from_parameters(video_stream.parameters())
-            .map_err(|e| Error::Io(format!("Failed to create codec context: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to create codec context: {e}")))?;
     let decoder = context_decoder
         .decoder()
         .video()
-        .map_err(|e| Error::Io(format!("Failed to create video decoder: {}", e)))?;
+        .map_err(|e| Error::Io(format!("Failed to create video decoder: {e}")))?;
 
     // Extract video dimensions
     let width = decoder.width();
@@ -182,8 +181,7 @@ pub fn extract_video_metadata<P: AsRef<Path>>(path: P) -> Result<VideoMetadata> 
     // Validate dimensions
     if width == 0 || height == 0 {
         return Err(Error::Io(format!(
-            "Invalid video dimensions: {}x{} (possibly unsupported format)",
-            width, height
+            "Invalid video dimensions: {width}x{height} (possibly unsupported format)"
         )));
     }
 

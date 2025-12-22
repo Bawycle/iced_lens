@@ -8,13 +8,15 @@
 
 use crate::config::{
     BackgroundTheme, SortOrder, DEFAULT_DEBLUR_MODEL_URL, DEFAULT_FRAME_CACHE_MB,
-    DEFAULT_FRAME_HISTORY_MB, DEFAULT_KEYBOARD_SEEK_STEP_SECS, DEFAULT_OVERLAY_TIMEOUT_SECS,
-    DEFAULT_ZOOM_STEP_PERCENT, MAX_FRAME_CACHE_MB, MAX_FRAME_HISTORY_MB,
-    MAX_KEYBOARD_SEEK_STEP_SECS, MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB,
-    MIN_FRAME_HISTORY_MB, MIN_KEYBOARD_SEEK_STEP_SECS, MIN_OVERLAY_TIMEOUT_SECS,
+    DEFAULT_FRAME_HISTORY_MB, DEFAULT_KEYBOARD_SEEK_STEP_SECS, DEFAULT_MAX_SKIP_ATTEMPTS,
+    DEFAULT_OVERLAY_TIMEOUT_SECS, DEFAULT_UPSCALE_MODEL_URL, DEFAULT_ZOOM_STEP_PERCENT,
+    MAX_FRAME_CACHE_MB, MAX_FRAME_HISTORY_MB, MAX_KEYBOARD_SEEK_STEP_SECS, MAX_MAX_SKIP_ATTEMPTS,
+    MAX_OVERLAY_TIMEOUT_SECS, MIN_FRAME_CACHE_MB, MIN_FRAME_HISTORY_MB,
+    MIN_KEYBOARD_SEEK_STEP_SECS, MIN_MAX_SKIP_ATTEMPTS, MIN_OVERLAY_TIMEOUT_SECS,
 };
 use crate::i18n::fluent::I18n;
 use crate::media::deblur::ModelStatus;
+use crate::media::upscale::UpscaleModelStatus;
 use crate::ui::design_tokens::{radius, sizing, spacing, typography};
 use crate::ui::icons;
 use crate::ui::state::zoom::{
@@ -56,10 +58,16 @@ pub struct StateConfig {
     pub frame_cache_mb: u32,
     pub frame_history_mb: u32,
     pub keyboard_seek_step_secs: f64,
-    // AI settings
+    // Navigation settings
+    pub max_skip_attempts: u32,
+    // AI settings - Deblur
     pub enable_deblur: bool,
     pub deblur_model_url: String,
     pub deblur_model_status: ModelStatus,
+    // AI settings - Upscale
+    pub enable_upscale: bool,
+    pub upscale_model_url: String,
+    pub upscale_model_status: UpscaleModelStatus,
 }
 
 impl Default for StateConfig {
@@ -75,9 +83,13 @@ impl Default for StateConfig {
             frame_cache_mb: DEFAULT_FRAME_CACHE_MB,
             frame_history_mb: DEFAULT_FRAME_HISTORY_MB,
             keyboard_seek_step_secs: DEFAULT_KEYBOARD_SEEK_STEP_SECS,
+            max_skip_attempts: DEFAULT_MAX_SKIP_ATTEMPTS,
             enable_deblur: false,
             deblur_model_url: DEFAULT_DEBLUR_MODEL_URL.to_string(),
             deblur_model_status: ModelStatus::NotDownloaded,
+            enable_upscale: false,
+            upscale_model_url: DEFAULT_UPSCALE_MODEL_URL.to_string(),
+            upscale_model_status: UpscaleModelStatus::NotDownloaded,
         }
     }
 }
@@ -98,10 +110,16 @@ pub struct State {
     frame_cache_mb: u32,
     frame_history_mb: u32,
     keyboard_seek_step_secs: f64,
-    // AI settings
+    // Navigation settings
+    max_skip_attempts: u32,
+    // AI settings - Deblur
     enable_deblur: bool,
     deblur_model_url: String,
     deblur_model_status: ModelStatus,
+    // AI settings - Upscale
+    enable_upscale: bool,
+    upscale_model_url: String,
+    upscale_model_status: UpscaleModelStatus,
 }
 
 /// Messages emitted directly by the settings widgets.
@@ -120,10 +138,16 @@ pub enum Message {
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
     KeyboardSeekStepChanged(f64),
-    // AI messages
+    // Navigation messages
+    MaxSkipAttemptsChanged(u32),
+    // AI messages - Deblur
     RequestEnableDeblur,
     DisableDeblur,
     DeblurModelUrlChanged(String),
+    // AI messages - Upscale
+    RequestEnableUpscale,
+    DisableUpscale,
+    UpscaleModelUrlChanged(String),
 }
 
 /// Events propagated to the parent application for side effects.
@@ -143,12 +167,20 @@ pub enum Event {
     FrameCacheMbChanged(u32),
     FrameHistoryMbChanged(u32),
     KeyboardSeekStepChanged(f64),
-    // AI events
+    // Navigation events
+    MaxSkipAttemptsChanged(u32),
+    // AI events - Deblur
     /// User requested to enable deblur - triggers download/validation flow.
     RequestEnableDeblur,
     /// User requested to disable deblur.
     DisableDeblur,
     DeblurModelUrlChanged(String),
+    // AI events - Upscale
+    /// User requested to enable upscale - triggers download/validation flow.
+    RequestEnableUpscale,
+    /// User requested to disable upscale.
+    DisableUpscale,
+    UpscaleModelUrlChanged(String),
 }
 
 /// Language option for the pick_list widget.
@@ -215,6 +247,9 @@ impl State {
         let clamped_seek_step = config
             .keyboard_seek_step_secs
             .clamp(MIN_KEYBOARD_SEEK_STEP_SECS, MAX_KEYBOARD_SEEK_STEP_SECS);
+        let clamped_skip_attempts = config
+            .max_skip_attempts
+            .clamp(MIN_MAX_SKIP_ATTEMPTS, MAX_MAX_SKIP_ATTEMPTS);
         Self {
             background_theme: config.background_theme,
             sort_order: config.sort_order,
@@ -229,9 +264,13 @@ impl State {
             frame_cache_mb: clamped_cache,
             frame_history_mb: clamped_history,
             keyboard_seek_step_secs: clamped_seek_step,
+            max_skip_attempts: clamped_skip_attempts,
             enable_deblur: config.enable_deblur,
             deblur_model_url: config.deblur_model_url,
             deblur_model_status: config.deblur_model_status,
+            enable_upscale: config.enable_upscale,
+            upscale_model_url: config.upscale_model_url,
+            upscale_model_status: config.upscale_model_status,
         }
     }
 
@@ -253,6 +292,10 @@ impl State {
 
     pub fn overlay_timeout_secs(&self) -> u32 {
         self.overlay_timeout_secs
+    }
+
+    pub fn max_skip_attempts(&self) -> u32 {
+        self.max_skip_attempts
     }
 
     pub fn video_autoplay(&self) -> bool {
@@ -299,6 +342,32 @@ impl State {
     /// successfully downloaded and validated, not in response to user UI action.
     pub fn set_enable_deblur(&mut self, enabled: bool) {
         self.enable_deblur = enabled;
+    }
+
+    pub fn enable_upscale(&self) -> bool {
+        self.enable_upscale
+    }
+
+    pub fn upscale_model_url(&self) -> &str {
+        &self.upscale_model_url
+    }
+
+    /// Returns the current status of the upscale model.
+    pub fn upscale_model_status(&self) -> &UpscaleModelStatus {
+        &self.upscale_model_status
+    }
+
+    /// Updates the upscale model status (called from app when status changes).
+    pub fn set_upscale_model_status(&mut self, status: UpscaleModelStatus) {
+        self.upscale_model_status = status;
+    }
+
+    /// Sets the enable_upscale flag (called from app after successful validation).
+    ///
+    /// This should only be called by the application after the model has been
+    /// successfully downloaded and validated, not in response to user UI action.
+    pub fn set_enable_upscale(&mut self, enabled: bool) {
+        self.enable_upscale = enabled;
     }
 
     pub(crate) fn zoom_step_input_value(&self) -> &str {
@@ -376,12 +445,12 @@ impl State {
             .available_locales
             .iter()
             .map(|locale| {
-                let translated_name_key = format!("language-name-{}", locale);
+                let translated_name_key = format!("language-name-{locale}");
                 let translated_name = ctx.i18n.tr(&translated_name_key);
                 let display_name = if translated_name.starts_with("MISSING:") {
                     locale.to_string()
                 } else {
-                    format!("{} ({})", translated_name, locale)
+                    format!("{translated_name} ({locale})")
                 };
                 LanguageOption {
                     locale: locale.clone(),
@@ -529,11 +598,39 @@ impl State {
             sort_row.into(),
         );
 
+        // Max skip attempts slider (for auto-skip during navigation)
+        let skip_slider = Slider::new(
+            MIN_MAX_SKIP_ATTEMPTS..=MAX_MAX_SKIP_ATTEMPTS,
+            self.max_skip_attempts,
+            Message::MaxSkipAttemptsChanged,
+        )
+        .step(1u32)
+        .width(Length::Fixed(200.0));
+
+        let skip_value = Text::new(self.max_skip_attempts.to_string());
+
+        let skip_control = Row::new()
+            .spacing(spacing::SM)
+            .align_y(Vertical::Center)
+            .push(skip_slider)
+            .push(skip_value);
+
+        let skip_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-max-skip-attempts-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-max-skip-attempts-hint"))
+                    .size(typography::BODY_SM)
+                    .into(),
+            ),
+            skip_control.into(),
+        );
+
         let content = Column::new()
             .spacing(spacing::MD)
             .push(background_setting)
             .push(zoom_setting)
-            .push(sort_setting);
+            .push(sort_setting)
+            .push(skip_setting);
 
         build_section(
             icons::image(),
@@ -704,8 +801,32 @@ impl State {
         )
     }
 
-    /// Build the AI section (Deblur model).
+    /// Build the AI section (Deblur and Upscale models).
     fn build_ai_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+        let mut content = Column::new().spacing(spacing::MD);
+
+        // =========================================================================
+        // Deblur subsection
+        // =========================================================================
+        content = content.push(self.build_deblur_subsection(ctx));
+
+        // Add a separator between deblur and upscale
+        content = content.push(rule::horizontal(1));
+
+        // =========================================================================
+        // Upscale subsection
+        // =========================================================================
+        content = content.push(self.build_upscale_subsection(ctx));
+
+        build_section(
+            icons::cog(),
+            ctx.i18n.tr("settings-section-ai"),
+            content.into(),
+        )
+    }
+
+    /// Build the deblur subsection within the AI section.
+    fn build_deblur_subsection<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         // Determine if an operation is in progress (downloading or validating)
         let is_busy = matches!(
             self.deblur_model_status,
@@ -718,14 +839,9 @@ impl State {
         // "Disabled" button
         let disable_btn = {
             let btn = Button::new(Text::new(ctx.i18n.tr("settings-deblur-disabled")));
-            if is_busy {
-                // During operation, button is visually disabled
-                btn.style(button_styles::disabled())
-            } else if !self.enable_deblur {
-                // Currently disabled state - this button shows current state (disabled style)
+            if is_busy || !self.enable_deblur {
                 btn.style(button_styles::disabled())
             } else {
-                // Feature is enabled - this button can be clicked to disable (default style)
                 btn.on_press(Message::DisableDeblur)
             }
         };
@@ -734,14 +850,9 @@ impl State {
         // "Enabled" button
         let enable_btn = {
             let btn = Button::new(Text::new(ctx.i18n.tr("settings-deblur-enabled")));
-            if is_busy {
-                // During operation, button is visually disabled
-                btn.style(button_styles::disabled())
-            } else if self.enable_deblur {
-                // Currently enabled state - this button shows current state (disabled style)
+            if is_busy || self.enable_deblur {
                 btn.style(button_styles::disabled())
             } else {
-                // Feature is disabled - this button can be clicked to enable (default style)
                 btn.on_press(Message::RequestEnableDeblur)
             }
         };
@@ -757,10 +868,9 @@ impl State {
             enable_row.into(),
         );
 
-        let mut content = Column::new().spacing(spacing::MD).push(enable_setting);
+        let mut subsection = Column::new().spacing(spacing::MD).push(enable_setting);
 
-        // Model URL input - show when NOT busy (allow configuration before enabling or when ready)
-        // Hide during download/validation to prevent URL changes during operation
+        // Model URL input - show when NOT busy
         if !is_busy {
             let url_input = text_input(
                 &ctx.i18n.tr("settings-deblur-model-url-placeholder"),
@@ -780,13 +890,12 @@ impl State {
                 url_input.into(),
             );
 
-            content = content.push(url_setting);
+            subsection = subsection.push(url_setting);
         }
 
         // Show status and progress when enabled OR when an operation is in progress
         let show_status = self.enable_deblur || is_busy;
         if show_status {
-            // Progress bar during download
             if let ModelStatus::Downloading { progress } = &self.deblur_model_status {
                 let progress_bar_widget = progress_bar(0.0..=1.0, *progress);
                 let progress_percent = format!("{}", (progress * 100.0) as u32);
@@ -809,9 +918,8 @@ impl State {
                     None,
                     progress_column.into(),
                 );
-                content = content.push(progress_setting);
+                subsection = subsection.push(progress_setting);
             } else {
-                // Status text for other states
                 let status_text = match &self.deblur_model_status {
                     ModelStatus::NotDownloaded => {
                         ctx.i18n.tr("settings-deblur-status-not-downloaded")
@@ -842,15 +950,146 @@ impl State {
                     None,
                     status_display.into(),
                 );
-                content = content.push(status_setting);
+                subsection = subsection.push(status_setting);
             }
         }
 
-        build_section(
-            icons::cog(),
-            ctx.i18n.tr("settings-section-ai"),
-            content.into(),
-        )
+        subsection.into()
+    }
+
+    /// Build the upscale subsection within the AI section.
+    fn build_upscale_subsection<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+        // Determine if an operation is in progress (downloading or validating)
+        let is_busy = matches!(
+            self.upscale_model_status,
+            UpscaleModelStatus::Downloading { .. } | UpscaleModelStatus::Validating
+        );
+
+        // Enable/disable upscale toggle
+        let mut enable_row = Row::new().spacing(spacing::XS);
+
+        // "Disabled" button
+        let disable_btn = {
+            let btn = Button::new(Text::new(ctx.i18n.tr("settings-upscale-disabled")));
+            if is_busy || !self.enable_upscale {
+                btn.style(button_styles::disabled())
+            } else {
+                btn.on_press(Message::DisableUpscale)
+            }
+        };
+        enable_row = enable_row.push(disable_btn);
+
+        // "Enabled" button
+        let enable_btn = {
+            let btn = Button::new(Text::new(ctx.i18n.tr("settings-upscale-enabled")));
+            if is_busy || self.enable_upscale {
+                btn.style(button_styles::disabled())
+            } else {
+                btn.on_press(Message::RequestEnableUpscale)
+            }
+        };
+        enable_row = enable_row.push(enable_btn);
+
+        let enable_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-enable-upscale-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-enable-upscale-hint"))
+                    .size(typography::BODY_SM)
+                    .into(),
+            ),
+            enable_row.into(),
+        );
+
+        let mut subsection = Column::new().spacing(spacing::MD).push(enable_setting);
+
+        // Model URL input - show when NOT busy
+        if !is_busy {
+            let url_input = text_input(
+                &ctx.i18n.tr("settings-upscale-model-url-placeholder"),
+                &self.upscale_model_url,
+            )
+            .on_input(Message::UpscaleModelUrlChanged)
+            .padding(spacing::XXS)
+            .width(Length::Fixed(400.0));
+
+            let url_setting = self.build_setting_row(
+                ctx.i18n.tr("settings-upscale-model-url-label"),
+                Some(
+                    Text::new(ctx.i18n.tr("settings-upscale-model-url-hint"))
+                        .size(typography::BODY_SM)
+                        .into(),
+                ),
+                url_input.into(),
+            );
+
+            subsection = subsection.push(url_setting);
+        }
+
+        // Show status and progress when enabled OR when an operation is in progress
+        let show_status = self.enable_upscale || is_busy;
+        if show_status {
+            if let UpscaleModelStatus::Downloading { progress } = &self.upscale_model_status {
+                let progress_bar_widget = progress_bar(0.0..=1.0, *progress);
+                let progress_percent = format!("{}", (progress * 100.0) as u32);
+                let progress_text = Text::new(ctx.i18n.tr_with_args(
+                    "settings-upscale-status-downloading",
+                    &[("progress", progress_percent.as_str())],
+                ))
+                .size(typography::BODY_SM)
+                .style(|_: &Theme| text::Style {
+                    color: Some(theme::muted_text_color()),
+                });
+
+                let progress_column = Column::new()
+                    .spacing(spacing::XS)
+                    .push(progress_bar_widget)
+                    .push(progress_text);
+
+                let progress_setting = self.build_setting_row(
+                    ctx.i18n.tr("settings-upscale-status-label"),
+                    None,
+                    progress_column.into(),
+                );
+                subsection = subsection.push(progress_setting);
+            } else {
+                let status_text = match &self.upscale_model_status {
+                    UpscaleModelStatus::NotDownloaded => {
+                        ctx.i18n.tr("settings-upscale-status-not-downloaded")
+                    }
+                    UpscaleModelStatus::Downloading { .. } => unreachable!(),
+                    UpscaleModelStatus::Validating => {
+                        ctx.i18n.tr("settings-upscale-status-validating")
+                    }
+                    UpscaleModelStatus::Ready => ctx.i18n.tr("settings-upscale-status-ready"),
+                    UpscaleModelStatus::Error(msg) => ctx.i18n.tr_with_args(
+                        "settings-upscale-status-error",
+                        &[("message", msg.as_str())],
+                    ),
+                };
+
+                let status_style = match &self.upscale_model_status {
+                    UpscaleModelStatus::Ready => theme::success_text_color(),
+                    UpscaleModelStatus::Error(_) => theme::error_text_color(),
+                    _ => theme::muted_text_color(),
+                };
+
+                let status_display =
+                    Text::new(status_text)
+                        .size(typography::BODY_SM)
+                        .style(move |_: &Theme| text::Style {
+                            color: Some(status_style),
+                        });
+
+                let status_setting = self.build_setting_row(
+                    ctx.i18n.tr("settings-upscale-status-label"),
+                    None,
+                    status_display.into(),
+                );
+                subsection = subsection.push(status_setting);
+            }
+        }
+
+        subsection.into()
     }
 
     /// Build the Fullscreen section (Overlay timeout).
@@ -979,6 +1218,11 @@ impl State {
                 step,
                 Event::KeyboardSeekStepChanged,
             ),
+            Message::MaxSkipAttemptsChanged(attempts) => update_if_changed(
+                &mut self.max_skip_attempts,
+                attempts,
+                Event::MaxSkipAttemptsChanged,
+            ),
             Message::RequestEnableDeblur => {
                 // Don't set enable_deblur here - it will be set after successful validation
                 Event::RequestEnableDeblur
@@ -991,6 +1235,19 @@ impl State {
             Message::DeblurModelUrlChanged(url) => {
                 self.deblur_model_url = url.clone();
                 Event::DeblurModelUrlChanged(url)
+            }
+            Message::RequestEnableUpscale => {
+                // Don't set enable_upscale here - it will be set after successful validation
+                Event::RequestEnableUpscale
+            }
+            Message::DisableUpscale => {
+                self.enable_upscale = false;
+                self.upscale_model_status = UpscaleModelStatus::NotDownloaded;
+                Event::DisableUpscale
+            }
+            Message::UpscaleModelUrlChanged(url) => {
+                self.upscale_model_url = url.clone();
+                Event::UpscaleModelUrlChanged(url)
             }
         }
     }

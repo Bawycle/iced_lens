@@ -143,7 +143,7 @@ impl LufsAnalyzer {
                 "-",
             ])
             .output()
-            .map_err(|e| Error::Io(format!("Failed to run FFmpeg: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to run FFmpeg: {e}")))?;
 
         // FFmpeg outputs to stderr
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -175,8 +175,7 @@ impl LufsAnalyzer {
         // Validate the LUFS value
         if lufs < MIN_VALID_LUFS {
             return Err(Error::Io(format!(
-                "Measured LUFS {} is below silence threshold",
-                lufs
+                "Measured LUFS {lufs} is below silence threshold"
             )));
         }
 
@@ -186,7 +185,7 @@ impl LufsAnalyzer {
     /// Extracts a numeric value from a simple JSON object.
     fn extract_json_value(&self, json: &str, key: &str) -> Option<f64> {
         // Look for "key" : "value" or "key" : value
-        let pattern = format!("\"{}\"", key);
+        let pattern = format!("\"{key}\"");
         let key_pos = json.find(&pattern)?;
 
         // Find the colon after the key

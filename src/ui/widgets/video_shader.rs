@@ -34,16 +34,13 @@ pub struct FrameData {
 /// This widget maintains a persistent GPU texture that is updated in-place
 /// when new video frames arrive, eliminating the flickering caused by
 /// texture recreation in the standard Image widget.
+///
+/// Note: The shader does NOT store zoom or display dimensions.
+/// The caller (pane) is the single source of truth for display size.
 #[derive(Debug)]
 pub struct VideoShader<Message> {
     /// Current frame data (if any)
     frame: Option<FrameData>,
-    /// Display width (scaled)
-    display_width: f32,
-    /// Display height (scaled)
-    display_height: f32,
-    /// Zoom factor (1.0 = 100%)
-    zoom: f32,
     /// Phantom data for message type
     _phantom: std::marker::PhantomData<Message>,
 }
@@ -59,9 +56,6 @@ impl<Message> VideoShader<Message> {
     pub fn new() -> Self {
         Self {
             frame: None,
-            display_width: 0.0,
-            display_height: 0.0,
-            zoom: 1.0,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -73,15 +67,11 @@ impl<Message> VideoShader<Message> {
             width,
             height,
         });
-        self.display_width = width as f32 * self.zoom;
-        self.display_height = height as f32 * self.zoom;
     }
 
     /// Clears the current frame.
     pub fn clear_frame(&mut self) {
         self.frame = None;
-        self.display_width = 0.0;
-        self.display_height = 0.0;
     }
 
     /// Clears the current frame (alias for `clear_frame` for API compatibility).
@@ -94,32 +84,14 @@ impl<Message> VideoShader<Message> {
         self.frame.is_some()
     }
 
-    /// Sets the zoom factor.
-    pub fn set_zoom(&mut self, zoom: f32) {
-        self.zoom = zoom;
-        if let Some(ref frame) = self.frame {
-            self.display_width = frame.width as f32 * zoom;
-            self.display_height = frame.height as f32 * zoom;
-        }
-    }
-
-    /// Sets the scale factor (alias for `set_zoom` for API compatibility).
-    pub fn set_scale(&mut self, scale: f32) {
-        self.set_zoom(scale);
-    }
-
-    /// Returns the current zoom factor.
-    pub fn zoom(&self) -> f32 {
-        self.zoom
-    }
-
     /// Returns an exportable frame if one is available.
     ///
     /// This can be used to save the current frame to a file.
+    /// Uses `Arc::clone` to share the frame data without copying the pixels.
     pub fn exportable_frame(&self) -> Option<ExportableFrame> {
         self.frame
             .as_ref()
-            .map(|f| ExportableFrame::new((*f.rgba).clone(), f.width, f.height))
+            .map(|f| ExportableFrame::new(Arc::clone(&f.rgba), f.width, f.height))
     }
 
     /// Returns the current frame data if available.
@@ -132,23 +104,17 @@ impl<Message> VideoShader<Message> {
         self.frame.as_ref().map(|f| &f.rgba)
     }
 
-    /// Returns the frame dimensions.
+    /// Returns the frame dimensions (native, unscaled).
     pub fn dimensions(&self) -> Option<(u32, u32)> {
         self.frame.as_ref().map(|f| (f.width, f.height))
     }
 
-    /// Returns the scaled display width.
-    pub fn scaled_width(&self) -> f32 {
-        self.display_width
-    }
-
-    /// Returns the scaled display height.
-    pub fn scaled_height(&self) -> f32 {
-        self.display_height
-    }
-
-    /// Creates an Element for rendering this video frame.
-    pub fn view(&self) -> Element<'_, Message>
+    /// Creates an Element for rendering this video frame at the specified display size.
+    ///
+    /// The caller (pane) is responsible for calculating the correct display dimensions
+    /// based on zoom level and fit-to-window settings. This ensures a single source
+    /// of truth for display sizing.
+    pub fn view_sized(&self, display_width: f32, display_height: f32) -> Element<'_, Message>
     where
         Message: 'static,
     {
@@ -157,12 +123,9 @@ impl<Message> VideoShader<Message> {
                 frame: frame.clone(),
             };
 
-            // The widget size is handled by Iced's layout system.
-            // The shader's viewport will be set to the visible clip_bounds,
-            // and the fullscreen quad will fill that area.
             shader::Shader::new(program)
-                .width(Length::Fixed(self.display_width.max(1.0)))
-                .height(Length::Fixed(self.display_height.max(1.0)))
+                .width(Length::Fixed(display_width.max(1.0)))
+                .height(Length::Fixed(display_height.max(1.0)))
                 .into()
         } else {
             iced::widget::Space::new()
@@ -492,7 +455,7 @@ impl VideoPipeline {
 /// This shader renders a fullscreen quad that fills the entire viewport.
 /// The viewport is set to the widget's clip_bounds in the render() method,
 /// so the quad automatically fills the correct area on screen.
-const VIDEO_SHADER: &str = r#"
+const VIDEO_SHADER: &str = r"
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) tex_coord: vec2<f32>,
@@ -525,7 +488,7 @@ var video_sampler: sampler;
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     return textureSample(video_texture, video_sampler, input.tex_coord);
 }
-"#;
+";
 
 #[cfg(test)]
 mod tests {
@@ -535,6 +498,7 @@ mod tests {
     fn video_shader_default_has_no_frame() {
         let shader: VideoShader<()> = VideoShader::new();
         assert!(!shader.has_frame());
+        assert!(shader.dimensions().is_none());
     }
 
     #[test]
@@ -545,19 +509,6 @@ mod tests {
 
         assert!(shader.has_frame());
         assert_eq!(shader.dimensions(), Some((100, 50)));
-        assert_eq!(shader.scaled_width(), 100.0);
-        assert_eq!(shader.scaled_height(), 50.0);
-    }
-
-    #[test]
-    fn video_shader_zoom_scales_display() {
-        let mut shader: VideoShader<()> = VideoShader::new();
-        let data = Arc::new(vec![0u8; 100 * 50 * 4]);
-        shader.set_frame(data, 100, 50);
-        shader.set_zoom(2.0);
-
-        assert_eq!(shader.scaled_width(), 200.0);
-        assert_eq!(shader.scaled_height(), 100.0);
     }
 
     #[test]
@@ -568,6 +519,19 @@ mod tests {
         shader.clear_frame();
 
         assert!(!shader.has_frame());
-        assert_eq!(shader.scaled_width(), 0.0);
+        assert!(shader.dimensions().is_none());
+    }
+
+    #[test]
+    fn video_shader_exportable_frame_returns_data() {
+        let mut shader: VideoShader<()> = VideoShader::new();
+        let data = Arc::new(vec![255u8; 100 * 50 * 4]);
+        shader.set_frame(data, 100, 50);
+
+        let frame = shader.exportable_frame();
+        assert!(frame.is_some());
+        let frame = frame.unwrap();
+        assert_eq!(frame.width, 100);
+        assert_eq!(frame.height, 50);
     }
 }

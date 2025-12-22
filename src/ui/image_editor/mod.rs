@@ -7,7 +7,7 @@
 
 use crate::media::frame_export::ExportFormat;
 use crate::media::ImageData;
-use crate::ui::state::ViewportState;
+use crate::ui::state::{DragState, ViewportState, ZoomState};
 
 mod component;
 mod messages;
@@ -78,6 +78,14 @@ pub struct State {
     pub viewport: ViewportState,
     /// Export format for Save As (used when editing captured frames).
     export_format: ExportFormat,
+    /// Zoom state for the editor canvas
+    pub zoom: ZoomState,
+    /// Current cursor position (for zoom-on-scroll detection)
+    cursor_position: Option<iced::Point>,
+    /// Whether cursor is currently over the canvas area (set by mouse_area events)
+    cursor_over_canvas: bool,
+    /// Drag state for pan navigation
+    drag: DragState,
 }
 
 impl std::fmt::Debug for State {
@@ -112,9 +120,9 @@ impl State {
         }
     }
 
-    /// Returns the subscriptions needed for the editor (spinner animation during deblur).
+    /// Returns the subscriptions needed for the editor (spinner animation during AI processing).
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        if self.deblur_state.is_processing {
+        if self.deblur_state.is_processing || self.resize_state.is_upscale_processing {
             // Animate spinner at 60 FPS while processing
             iced::time::every(std::time::Duration::from_millis(16)).map(|_| Message::SpinnerTick)
         } else {
@@ -170,6 +178,16 @@ impl State {
     /// Set the export format.
     pub fn set_export_format(&mut self, format: ExportFormat) {
         self.export_format = format;
+    }
+
+    /// Get the resize thumbnail preview (for sidebar display).
+    pub fn resize_thumbnail(&self) -> Option<&ImageData> {
+        // Only return thumbnail when resize tool is active
+        if self.active_tool == Some(EditorTool::Resize) {
+            self.preview_image.as_ref()
+        } else {
+            None
+        }
     }
 }
 

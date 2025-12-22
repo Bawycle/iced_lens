@@ -1,9 +1,95 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Image transformation functions for rotate, crop, and resize operations.
 
+use crate::app::config::{
+    DEFAULT_RESIZE_SCALE_PERCENT, MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT,
+};
 use crate::error::Result;
 use crate::media::ImageData;
 use image_rs::{imageops::FilterType, DynamicImage, GenericImageView};
+
+// ==========================================================================
+// Resize Scale Value Object
+// ==========================================================================
+
+/// Resize scale percentage, guaranteed to be within valid range (10%–400%).
+///
+/// This value object encapsulates the business rules for resize scaling:
+/// - Valid range is defined by configuration constants
+/// - Values are automatically clamped to the valid range
+/// - Provides conversion to dimensions based on original image size
+///
+/// # Example
+///
+/// ```ignore
+/// let scale = ResizeScale::new(200.0); // 200% = 2x enlargement
+/// let (new_width, new_height) = scale.apply_to_dimensions(800, 600);
+/// assert_eq!((new_width, new_height), (1600, 1200));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ResizeScale(f32);
+
+impl ResizeScale {
+    /// Creates a new resize scale, clamping the value to the valid range.
+    pub fn new(percent: f32) -> Self {
+        Self(percent.clamp(MIN_RESIZE_SCALE_PERCENT, MAX_RESIZE_SCALE_PERCENT))
+    }
+
+    /// Returns the raw percentage value.
+    pub fn value(self) -> f32 {
+        self.0
+    }
+
+    /// Returns the scale as a multiplier (e.g., 100% → 1.0, 200% → 2.0).
+    pub fn as_factor(self) -> f32 {
+        self.0 / 100.0
+    }
+
+    /// Applies the scale to the given dimensions, returning the new dimensions.
+    ///
+    /// Both dimensions are guaranteed to be at least 1 pixel.
+    pub fn apply_to_dimensions(self, width: u32, height: u32) -> (u32, u32) {
+        let factor = self.as_factor();
+        let new_width = (width as f32 * factor).round().max(1.0) as u32;
+        let new_height = (height as f32 * factor).round().max(1.0) as u32;
+        (new_width, new_height)
+    }
+
+    /// Returns whether the scale is at the minimum value.
+    pub fn is_min(self) -> bool {
+        self.0 <= MIN_RESIZE_SCALE_PERCENT
+    }
+
+    /// Returns whether the scale is at the maximum value.
+    pub fn is_max(self) -> bool {
+        self.0 >= MAX_RESIZE_SCALE_PERCENT
+    }
+
+    /// Returns whether the scale represents 100% (no resize).
+    pub fn is_original(self) -> bool {
+        (self.0 - DEFAULT_RESIZE_SCALE_PERCENT).abs() < f32::EPSILON
+    }
+
+    /// Returns whether this scale represents an enlargement (> 100%).
+    pub fn is_enlargement(self) -> bool {
+        self.0 > DEFAULT_RESIZE_SCALE_PERCENT
+    }
+
+    /// Returns whether this scale represents a reduction (< 100%).
+    pub fn is_reduction(self) -> bool {
+        self.0 < DEFAULT_RESIZE_SCALE_PERCENT
+    }
+}
+
+impl Default for ResizeScale {
+    fn default() -> Self {
+        Self(DEFAULT_RESIZE_SCALE_PERCENT)
+    }
+}
+
+// ==========================================================================
+// Image Transformation Functions
+// ==========================================================================
 
 /// Rotate an image 90 degrees counter-clockwise (left).
 pub fn rotate_left(image: &DynamicImage) -> DynamicImage {
@@ -52,7 +138,11 @@ pub fn resize(image: &DynamicImage, width: u32, height: u32) -> DynamicImage {
 /// The `value` parameter ranges from -100 to +100:
 /// - Negative values darken the image
 /// - Positive values brighten the image
-/// - Zero returns the image unchanged
+/// - Zero returns a clone of the original image (no modification needed)
+///
+/// Note: When `value` is zero, this function returns a cloned image to maintain
+/// a consistent return type. Callers that frequently pass zero may want to check
+/// the value before calling to avoid unnecessary clones.
 pub fn adjust_brightness(image: &DynamicImage, value: i32) -> DynamicImage {
     if value == 0 {
         return image.clone();
@@ -65,10 +155,14 @@ pub fn adjust_brightness(image: &DynamicImage, value: i32) -> DynamicImage {
 /// The `value` parameter ranges from -100 to +100:
 /// - Negative values reduce contrast (flatten toward gray)
 /// - Positive values increase contrast (more separation between light/dark)
-/// - Zero returns the image unchanged
+/// - Zero returns a clone of the original image (no modification needed)
 ///
 /// Internally converts the -100..+100 range to a multiplier for the image crate's
 /// contrast function which expects a float (-100 = 0.0x, 0 = 1.0x, +100 = 2.0x).
+///
+/// Note: When `value` is zero, this function returns a cloned image to maintain
+/// a consistent return type. Callers that frequently pass zero may want to check
+/// the value before calling to avoid unnecessary clones.
 pub fn adjust_contrast(image: &DynamicImage, value: i32) -> DynamicImage {
     if value == 0 {
         return image.clone();
@@ -307,5 +401,85 @@ mod tests {
         let result = adjust_contrast(&img, 50);
         assert_eq!(result.width(), 8);
         assert_eq!(result.height(), 6);
+    }
+
+    // =========================================================================
+    // ResizeScale Tests
+    // =========================================================================
+
+    #[test]
+    fn resize_scale_clamps_to_valid_range() {
+        use crate::app::config::{MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT};
+
+        // Below minimum
+        let too_small = ResizeScale::new(5.0);
+        assert_eq!(too_small.value(), MIN_RESIZE_SCALE_PERCENT);
+
+        // Above maximum
+        let too_large = ResizeScale::new(1000.0);
+        assert_eq!(too_large.value(), MAX_RESIZE_SCALE_PERCENT);
+
+        // Valid value
+        let valid = ResizeScale::new(150.0);
+        assert_eq!(valid.value(), 150.0);
+    }
+
+    #[test]
+    fn resize_scale_default_is_100_percent() {
+        let scale = ResizeScale::default();
+        assert_eq!(scale.value(), 100.0);
+        assert!(scale.is_original());
+    }
+
+    #[test]
+    fn resize_scale_as_factor_converts_correctly() {
+        assert_eq!(ResizeScale::new(100.0).as_factor(), 1.0);
+        assert_eq!(ResizeScale::new(200.0).as_factor(), 2.0);
+        assert_eq!(ResizeScale::new(50.0).as_factor(), 0.5);
+    }
+
+    #[test]
+    fn resize_scale_apply_to_dimensions_calculates_correctly() {
+        let scale = ResizeScale::new(200.0); // 2x
+        let (w, h) = scale.apply_to_dimensions(100, 50);
+        assert_eq!((w, h), (200, 100));
+
+        let scale = ResizeScale::new(50.0); // 0.5x
+        let (w, h) = scale.apply_to_dimensions(100, 50);
+        assert_eq!((w, h), (50, 25));
+    }
+
+    #[test]
+    fn resize_scale_apply_to_dimensions_ensures_minimum_1px() {
+        let scale = ResizeScale::new(10.0); // 0.1x
+        let (w, h) = scale.apply_to_dimensions(5, 5);
+        // 5 * 0.1 = 0.5, rounded = 1 (minimum)
+        assert!(w >= 1);
+        assert!(h >= 1);
+    }
+
+    #[test]
+    fn resize_scale_is_enlargement_and_reduction() {
+        assert!(ResizeScale::new(150.0).is_enlargement());
+        assert!(!ResizeScale::new(150.0).is_reduction());
+
+        assert!(ResizeScale::new(50.0).is_reduction());
+        assert!(!ResizeScale::new(50.0).is_enlargement());
+
+        assert!(!ResizeScale::new(100.0).is_enlargement());
+        assert!(!ResizeScale::new(100.0).is_reduction());
+    }
+
+    #[test]
+    fn resize_scale_boundary_checks() {
+        use crate::app::config::{MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT};
+
+        let min_scale = ResizeScale::new(MIN_RESIZE_SCALE_PERCENT);
+        assert!(min_scale.is_min());
+        assert!(!min_scale.is_max());
+
+        let max_scale = ResizeScale::new(MAX_RESIZE_SCALE_PERCENT);
+        assert!(max_scale.is_max());
+        assert!(!max_scale.is_min());
     }
 }

@@ -8,8 +8,11 @@ use super::{notifications, persistence, Message, Screen};
 use crate::config;
 use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
-use crate::media::{self, frame_export::ExportableFrame, MediaData, MediaNavigator};
+use crate::media::{
+    self, frame_export::ExportableFrame, MaxSkipAttempts, MediaData, MediaNavigator,
+};
 use crate::ui::about::{self, Event as AboutEvent};
+use crate::ui::design_tokens::sizing;
 use crate::ui::help::{self, Event as HelpEvent};
 use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
 use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent, MetadataEditorState};
@@ -17,15 +20,11 @@ use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
 use crate::ui::viewer::component;
-use iced::{window, Task};
+use crate::video_player::KeyboardSeekStep;
+// Re-export NavigationDirection from viewer component (single source of truth)
+pub use crate::ui::viewer::NavigationDirection;
+use iced::{window, Point, Size, Task};
 use std::path::PathBuf;
-
-/// Navigation direction for unified navigation handler.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NavigationDirection {
-    Next,
-    Previous,
-}
 
 /// Navigation mode determines which media types to include.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +33,69 @@ pub enum NavigationMode {
     AllMedia,
     /// Navigate only to images (skip videos) - used by editor.
     ImagesOnly,
+}
+
+/// Parameters for viewer area validation.
+pub struct ViewerAreaParams {
+    /// Whether fullscreen mode is active.
+    pub is_fullscreen: bool,
+    /// Whether the metadata panel is visible.
+    pub metadata_panel_visible: bool,
+    /// Whether the hamburger menu is open.
+    pub menu_open: bool,
+    /// Whether the current media is a video (video toolbar visible).
+    pub is_video: bool,
+    /// Whether the video overflow menu is open (adds extra toolbar height).
+    pub overflow_menu_open: bool,
+}
+
+/// Checks if a cursor position is within the viewer area (the pane where media is displayed).
+///
+/// In fullscreen mode, the entire window is considered the viewer area.
+/// In windowed mode, excludes (from top to bottom):
+/// - Navbar at the top
+/// - Hamburger dropdown menu (when open)
+/// - Media toolbar (zoom controls) - positioned at top of viewer content
+/// - Video toolbar (when showing video) - below media toolbar
+/// - Video overflow menu (when open) - below video toolbar
+/// - Metadata panel on the right
+fn is_in_viewer_area(cursor: Point, window_size: Size, params: &ViewerAreaParams) -> bool {
+    if params.is_fullscreen {
+        // In fullscreen, the entire window is viewer (overlays float)
+        return true;
+    }
+
+    // Calculate top exclusion zone
+    // In windowed mode, controls are at the TOP of the viewer area (below navbar)
+    let mut top_exclusion = sizing::NAVBAR_HEIGHT;
+
+    // Add hamburger menu height if open
+    if params.menu_open {
+        top_exclusion += sizing::HAMBURGER_MENU_HEIGHT;
+    }
+
+    // Media toolbar (zoom controls) is always visible in windowed mode
+    top_exclusion += sizing::MEDIA_TOOLBAR_HEIGHT;
+
+    // Video toolbar is only visible when showing a video
+    if params.is_video {
+        top_exclusion += sizing::VIDEO_TOOLBAR_HEIGHT;
+        if params.overflow_menu_open {
+            top_exclusion += sizing::VIDEO_TOOLBAR_HEIGHT; // Overflow menu has same height
+        }
+    }
+
+    // Check if cursor is in the top exclusion zone
+    if cursor.y < top_exclusion {
+        return false;
+    }
+
+    // Check if cursor is in the metadata panel (on the right)
+    if params.metadata_panel_visible && cursor.x > window_size.width - sizing::SIDEBAR_WIDTH {
+        return false;
+    }
+
+    true
 }
 
 /// Context for update operations containing mutable references to app state.
@@ -46,6 +108,7 @@ pub struct UpdateContext<'a> {
     pub media_navigator: &'a mut MediaNavigator,
     pub fullscreen: &'a mut bool,
     pub window_id: &'a mut Option<window::Id>,
+    pub window_size: &'a Option<iced::Size>,
     pub theme_mode: &'a mut ThemeMode,
     pub video_autoplay: &'a mut bool,
     pub audio_normalization: &'a mut bool,
@@ -124,8 +187,7 @@ pub fn handle_viewer_message(
             let has_unsaved_changes = ctx
                 .metadata_editor_state
                 .as_ref()
-                .map(|editor| editor.has_changes())
-                .unwrap_or(false);
+                .is_some_and(crate::ui::metadata_panel::MetadataEditorState::has_changes);
             if has_unsaved_changes {
                 Task::none()
             } else {
@@ -160,6 +222,38 @@ pub fn handle_viewer_message(
                 .push(notifications::Notification::error(key));
             Task::none()
         }
+        component::Effect::RetryNavigation {
+            direction,
+            skip_attempts,
+            skipped_files,
+        } => handle_retry_navigation(ctx, direction, skip_attempts, skipped_files),
+        component::Effect::ShowSkippedFilesNotification { skipped_files } => {
+            let files_text = format_skipped_files_message(ctx.i18n, &skipped_files);
+            ctx.notifications.push(
+                notifications::Notification::warning("notification-skipped-corrupted-files")
+                    .with_arg("files", files_text)
+                    .auto_dismiss(std::time::Duration::from_secs(8)),
+            );
+            Task::none()
+        }
+        component::Effect::ConfirmNavigation {
+            path,
+            skipped_files,
+        } => {
+            // Confirm navigation position in MediaNavigator
+            ctx.media_navigator.confirm_navigation(&path);
+
+            // Show notification if any files were skipped during navigation
+            if !skipped_files.is_empty() {
+                let files_text = format_skipped_files_message(ctx.i18n, &skipped_files);
+                ctx.notifications.push(
+                    notifications::Notification::warning("notification-skipped-corrupted-files")
+                        .with_arg("files", files_text)
+                        .auto_dismiss(std::time::Duration::from_secs(8)),
+                );
+            }
+            Task::none()
+        }
         component::Effect::None => Task::none(),
     };
     Task::batch([viewer_task, side_effect])
@@ -173,8 +267,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
         let has_unsaved_changes = ctx
             .metadata_editor_state
             .as_ref()
-            .map(|editor| editor.has_changes())
-            .unwrap_or(false);
+            .is_some_and(crate::ui::metadata_panel::MetadataEditorState::has_changes);
         if has_unsaved_changes {
             return Task::none();
         }
@@ -205,7 +298,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
         if let (Some(image_path), Some(media_data)) = (
             ctx.media_navigator
                 .current_media_path()
-                .map(|p| p.to_path_buf()),
+                .map(std::path::Path::to_path_buf),
             ctx.viewer.media().cloned(),
         ) {
             // Editor only supports images in v0.2, not videos
@@ -244,10 +337,9 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                 }
             }
             return Task::none();
-        } else {
-            // Can't enter editor screen without an image
-            return Task::none();
         }
+        // Can't enter editor screen without an image
+        return Task::none();
     }
 
     // Handle Editor → Viewer transition
@@ -313,7 +405,13 @@ pub fn handle_settings_message(
             persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::KeyboardSeekStepChanged(step) => {
-            ctx.viewer.set_keyboard_seek_step_secs(step);
+            ctx.viewer
+                .set_keyboard_seek_step(KeyboardSeekStep::new(step));
+            persistence::persist_preferences(ctx.preferences_context())
+        }
+        SettingsEvent::MaxSkipAttemptsChanged(attempts) => {
+            ctx.viewer
+                .set_max_skip_attempts(MaxSkipAttempts::new(attempts));
             persistence::persist_preferences(ctx.preferences_context())
         }
         // AI settings events
@@ -431,6 +529,108 @@ pub fn handle_settings_message(
         SettingsEvent::DeblurModelUrlChanged(_) => {
             persistence::persist_preferences(ctx.preferences_context())
         }
+        // AI Upscale settings events
+        SettingsEvent::RequestEnableUpscale => {
+            use iced::futures::channel::{mpsc, oneshot};
+            use iced::futures::stream;
+            use iced::futures::StreamExt;
+
+            // Start the download/validation process
+            ctx.settings.set_upscale_model_status(
+                crate::media::upscale::UpscaleModelStatus::Downloading { progress: 0.0 },
+            );
+
+            let url = ctx.settings.upscale_model_url().to_string();
+
+            // Channels for progress and result
+            let (progress_tx, progress_rx) = mpsc::channel::<f32>(100);
+            let (result_tx, result_rx) = oneshot::channel::<Result<u64, String>>();
+
+            // Spawn the download task
+            let url_clone = url.clone();
+            tokio::spawn(async move {
+                let mut progress_tx = progress_tx;
+                let download_result =
+                    crate::media::upscale::download_model(&url_clone, |progress| {
+                        let _ = progress_tx.try_send(progress);
+                    })
+                    .await;
+
+                let _ = result_tx.send(download_result.map_err(|e| e.to_string()));
+            });
+
+            // State for the stream
+            enum UpscaleDownloadPhase {
+                ReceivingProgress {
+                    progress_rx: mpsc::Receiver<f32>,
+                    result_rx: oneshot::Receiver<Result<u64, String>>,
+                },
+                WaitingForResult {
+                    result_rx: oneshot::Receiver<Result<u64, String>>,
+                },
+                Completed,
+            }
+
+            let download_stream = stream::unfold(
+                UpscaleDownloadPhase::ReceivingProgress {
+                    progress_rx,
+                    result_rx,
+                },
+                |phase| async move {
+                    match phase {
+                        UpscaleDownloadPhase::ReceivingProgress {
+                            mut progress_rx,
+                            result_rx,
+                        } => match progress_rx.next().await {
+                            Some(progress) => Some((
+                                Message::UpscaleDownloadProgress(progress),
+                                UpscaleDownloadPhase::ReceivingProgress {
+                                    progress_rx,
+                                    result_rx,
+                                },
+                            )),
+                            None => Some((
+                                Message::UpscaleDownloadProgress(1.0),
+                                UpscaleDownloadPhase::WaitingForResult { result_rx },
+                            )),
+                        },
+                        UpscaleDownloadPhase::WaitingForResult { result_rx } => {
+                            match result_rx.await {
+                                Ok(Ok(_bytes)) => Some((
+                                    Message::UpscaleDownloadCompleted(Ok(())),
+                                    UpscaleDownloadPhase::Completed,
+                                )),
+                                Ok(Err(e)) => Some((
+                                    Message::UpscaleDownloadCompleted(Err(e)),
+                                    UpscaleDownloadPhase::Completed,
+                                )),
+                                Err(_) => Some((
+                                    Message::UpscaleDownloadCompleted(Err(
+                                        "Download task cancelled".to_string(),
+                                    )),
+                                    UpscaleDownloadPhase::Completed,
+                                )),
+                            }
+                        }
+                        UpscaleDownloadPhase::Completed => None,
+                    }
+                },
+            );
+
+            Task::stream(download_stream)
+        }
+        SettingsEvent::DisableUpscale => {
+            ctx.app_state.enable_upscale = false;
+            if let Some(key) = ctx.app_state.save() {
+                ctx.notifications
+                    .push(notifications::Notification::warning(&key));
+            }
+            let _ = std::fs::remove_file(crate::media::upscale::get_model_path());
+            Task::none()
+        }
+        SettingsEvent::UpscaleModelUrlChanged(_) => {
+            persistence::persist_preferences(ctx.preferences_context())
+        }
     }
 }
 
@@ -502,6 +702,17 @@ pub fn handle_editor_message(
             // The actual inference task will check this flag and stop
             Task::none()
         }
+        ImageEditorEvent::UpscaleResizeRequested { width, height } => {
+            handle_upscale_resize_request(ctx, width, height)
+        }
+        ImageEditorEvent::ScrollTo { x, y } => {
+            use iced::widget::scrollable::RelativeOffset;
+            use iced::widget::{operation, Id};
+            operation::snap_to(
+                Id::new("image-editor-canvas-scrollable"),
+                RelativeOffset { x, y },
+            )
+        }
     }
 }
 
@@ -530,6 +741,54 @@ fn handle_deblur_request(ctx: &mut UpdateContext<'_>) -> Task<Message> {
             Err(e) => Message::DeblurApplyCompleted(Err(e.to_string())),
         },
     )
+}
+
+/// Handles resize request that may use AI upscaling.
+/// - If AI upscaling is enabled and model is ready: run async AI inference
+/// - Otherwise: fall back to standard Lanczos resize
+fn handle_upscale_resize_request(
+    ctx: &mut UpdateContext<'_>,
+    target_width: u32,
+    target_height: u32,
+) -> Task<Message> {
+    let Some(editor_state) = ctx.image_editor.as_mut() else {
+        return Task::none();
+    };
+
+    // Check if AI upscaling should be used
+    let use_ai_upscale = ctx.app_state.enable_upscale
+        && matches!(
+            ctx.settings.upscale_model_status(),
+            media::upscale::UpscaleModelStatus::Ready
+        );
+
+    if use_ai_upscale {
+        // Get the current working image from the editor
+        let working_image = editor_state.working_image().clone();
+
+        // Run the AI upscale + Lanczos resize in a blocking task
+        Task::perform(
+            async move {
+                tokio::task::spawn_blocking(move || {
+                    let mut manager = media::upscale::UpscaleManager::new();
+                    manager.load_session(None)?;
+                    manager.upscale_to_size(&working_image, target_width, target_height)
+                })
+                .await
+                .map_err(|e| media::upscale::UpscaleError::InferenceFailed(e.to_string()))?
+            },
+            |result: media::upscale::UpscaleResult<image_rs::DynamicImage>| match result {
+                Ok(upscaled) => Message::UpscaleResizeCompleted(Ok(Box::new(upscaled))),
+                Err(e) => Message::UpscaleResizeCompleted(Err(e.to_string())),
+            },
+        )
+    } else {
+        // Fall back to standard Lanczos resize (sync)
+        // Clear the processing state that was set by the event emission
+        editor_state.clear_upscale_processing();
+        editor_state.sidebar_apply_resize();
+        Task::none()
+    }
 }
 
 /// Handles Save As dialog request.
@@ -583,6 +842,8 @@ fn handle_save_as_dialog(
 
 /// Handles editor navigation to next image (skips videos).
 fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    // Set load origin for auto-skip on failure
+    ctx.viewer.set_navigation_origin(NavigationDirection::Next);
     handle_navigation(
         ctx,
         NavigationDirection::Next,
@@ -593,6 +854,9 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
 /// Handles editor navigation to previous image (skips videos).
 fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    // Set load origin for auto-skip on failure
+    ctx.viewer
+        .set_navigation_origin(NavigationDirection::Previous);
     handle_navigation(
         ctx,
         NavigationDirection::Previous,
@@ -783,47 +1047,53 @@ pub fn handle_metadata_panel_message(
 /// * `ctx` - Update context with mutable references to app state
 /// * `direction` - Next or Previous
 /// * `mode` - AllMedia (viewer) or ImagesOnly (editor)
+/// * `skip_count` - Number of files to skip (0 for normal navigation, >0 for auto-skip retries)
 /// * `on_loaded` - Message constructor for the load result
-fn handle_navigation<F>(
+fn handle_navigation_with_skip<F>(
     ctx: &mut UpdateContext<'_>,
     direction: NavigationDirection,
     mode: NavigationMode,
+    skip_count: usize,
     on_loaded: F,
 ) -> Task<Message>
 where
     F: FnOnce(Result<MediaData, crate::error::Error>) -> Message + Send + 'static,
 {
     // Rescan directory to handle added/removed media (single implementation)
-    if let Some(current_path) = ctx
-        .media_navigator
-        .current_media_path()
-        .map(|p| p.to_path_buf())
-    {
-        let (config, _) = config::load();
-        let sort_order = config.display.sort_order.unwrap_or_default();
-        let _ = ctx
+    // Only rescan on initial navigation (skip_count == 0), not on retries
+    if skip_count == 0 {
+        if let Some(current_path) = ctx
             .media_navigator
-            .scan_directory(&current_path, sort_order);
+            .current_media_path()
+            .map(std::path::Path::to_path_buf)
+        {
+            let (config, _) = config::load();
+            let sort_order = config.display.sort_order.unwrap_or_default();
+            let _ = ctx
+                .media_navigator
+                .scan_directory(&current_path, sort_order);
+        }
     }
 
-    // Navigate based on direction and mode
+    // Peek based on direction, mode, and skip_count (pessimistic update: don't change position yet)
     let next_path = match (direction, mode) {
         (NavigationDirection::Next, NavigationMode::AllMedia) => {
-            ctx.media_navigator.navigate_next()
+            ctx.media_navigator.peek_nth_next(skip_count)
         }
         (NavigationDirection::Previous, NavigationMode::AllMedia) => {
-            ctx.media_navigator.navigate_previous()
+            ctx.media_navigator.peek_nth_previous(skip_count)
         }
         (NavigationDirection::Next, NavigationMode::ImagesOnly) => {
-            ctx.media_navigator.navigate_next_image()
+            ctx.media_navigator.peek_nth_next_image(skip_count)
         }
         (NavigationDirection::Previous, NavigationMode::ImagesOnly) => {
-            ctx.media_navigator.navigate_previous_image()
+            ctx.media_navigator.peek_nth_previous_image(skip_count)
         }
     };
 
     if let Some(path) = next_path {
-        // Synchronize viewer state from navigator
+        // Set tentative path in viewer (for error handling and UI feedback).
+        // Navigator position is only confirmed after successful load via ConfirmNavigation.
         ctx.viewer.current_media_path = Some(path.clone());
 
         // Set loading state via encapsulated method
@@ -836,9 +1106,24 @@ where
     }
 }
 
+/// Wrapper for normal navigation (no skip).
+fn handle_navigation<F>(
+    ctx: &mut UpdateContext<'_>,
+    direction: NavigationDirection,
+    mode: NavigationMode,
+    on_loaded: F,
+) -> Task<Message>
+where
+    F: FnOnce(Result<MediaData, crate::error::Error>) -> Message + Send + 'static,
+{
+    handle_navigation_with_skip(ctx, direction, mode, 0, on_loaded)
+}
+
 /// Handles navigation to next media (images and videos).
 pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
+    // Set load origin for auto-skip on failure
+    ctx.viewer.set_navigation_origin(NavigationDirection::Next);
     handle_navigation(
         ctx,
         NavigationDirection::Next,
@@ -850,12 +1135,88 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 /// Handles navigation to previous media (images and videos).
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
+    // Set load origin for auto-skip on failure
+    ctx.viewer
+        .set_navigation_origin(NavigationDirection::Previous);
     handle_navigation(
         ctx,
         NavigationDirection::Previous,
         NavigationMode::AllMedia,
         |r| Message::Viewer(component::Message::MediaLoaded(r)),
     )
+}
+
+/// Handles retry navigation after a failed load (auto-skip).
+///
+/// Continues navigation in the same direction, preserving skip context
+/// for grouped notification when max attempts is reached.
+///
+/// Uses `peek_nth_*` with skip_attempts to find the next file without
+/// modifying navigator state. The state is only updated via ConfirmNavigation
+/// after a successful load.
+pub fn handle_retry_navigation(
+    ctx: &mut UpdateContext<'_>,
+    direction: NavigationDirection,
+    skip_attempts: u32,
+    skipped_files: Vec<String>,
+) -> Task<Message> {
+    use crate::ui::viewer::LoadOrigin;
+
+    // Set load origin with accumulated skip state
+    ctx.viewer.set_load_origin(LoadOrigin::Navigation {
+        direction,
+        skip_attempts,
+        skipped_files,
+    });
+
+    // Use skip_attempts as skip_count to peek ahead without modifying navigator state.
+    // Navigator position is only confirmed after successful load via ConfirmNavigation.
+    handle_navigation_with_skip(
+        ctx,
+        direction,
+        NavigationMode::AllMedia,
+        skip_attempts as usize,
+        |r| Message::Viewer(component::Message::MediaLoaded(r)),
+    )
+}
+
+/// Maximum length for a filename in notifications (characters).
+const MAX_FILENAME_LEN: usize = 12;
+
+/// Truncates a filename if it exceeds the maximum length.
+fn truncate_filename(name: &str) -> String {
+    if name.chars().count() <= MAX_FILENAME_LEN {
+        name.to_string()
+    } else {
+        let truncated: String = name.chars().take(MAX_FILENAME_LEN - 1).collect();
+        format!("{truncated}…")
+    }
+}
+
+/// Formats the message for skipped files notification.
+///
+/// Uses compact format:
+/// - 1-2 files: Show all names (truncated if too long)
+/// - 3+ files: Show first name + "+X more"
+pub fn format_skipped_files_message(i18n: &I18n, skipped_files: &[String]) -> String {
+    match skipped_files.len() {
+        0 => String::new(),
+        1 => truncate_filename(&skipped_files[0]),
+        2 => format!(
+            "{}, {}",
+            truncate_filename(&skipped_files[0]),
+            truncate_filename(&skipped_files[1])
+        ),
+        n => {
+            let others = n - 1;
+            let others_str = others.to_string();
+            let others_text = i18n.tr_with_args(
+                "notification-skipped-and-others",
+                &[("count", others_str.as_str())],
+            );
+            format!("{} {}", truncate_filename(&skipped_files[0]), others_text)
+        }
+    }
 }
 
 /// Handles deletion of the current media file.
@@ -865,16 +1226,16 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
     let Some(current_path) = ctx
         .media_navigator
         .current_media_path()
-        .map(|p| p.to_path_buf())
+        .map(std::path::Path::to_path_buf)
     else {
         return Task::none();
     };
 
-    // Get the next candidate before deletion
+    // Get the next candidate before deletion (peek without changing position)
     let has_multiple = ctx.media_navigator.len() > 1;
     let next_candidate = if has_multiple {
         ctx.media_navigator
-            .navigate_next()
+            .peek_next()
             .filter(|next| *next != current_path)
     } else {
         None
@@ -1017,7 +1378,26 @@ pub fn handle_open_file_dialog_result(
 }
 
 /// Handles a file dropped on the window.
+///
+/// Only accepts drops within the viewer area (excludes navbar, hamburger menu,
+/// toolbars at top, and metadata panel on right). In fullscreen mode, drops are accepted anywhere.
 pub fn handle_file_dropped(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<Message> {
+    // Validate drop position: only accept drops within the viewer area
+    if let (Some(cursor), Some(window_size)) = (ctx.viewer.cursor_position(), ctx.window_size) {
+        let params = ViewerAreaParams {
+            is_fullscreen: *ctx.fullscreen,
+            metadata_panel_visible: *ctx.info_panel_open,
+            menu_open: *ctx.menu_open,
+            is_video: ctx.viewer.is_video(),
+            overflow_menu_open: ctx.viewer.is_overflow_menu_open(),
+        };
+        if !is_in_viewer_area(cursor, *window_size, &params) {
+            // Drop occurred outside viewer area - ignore
+            return Task::none();
+        }
+    }
+    // If cursor position is unknown, accept the drop (better UX than silent rejection)
+
     // Check if it's a directory
     if path.is_dir() {
         // Scan directory for media and load the first file
@@ -1031,7 +1411,7 @@ pub fn handle_file_dropped(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<M
             if let Some(first_path) = ctx
                 .media_navigator
                 .current_media_path()
-                .map(|p| p.to_path_buf())
+                .map(std::path::Path::to_path_buf)
             {
                 return load_media_from_path(ctx, first_path);
             }

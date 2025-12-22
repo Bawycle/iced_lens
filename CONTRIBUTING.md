@@ -12,10 +12,11 @@ Thank you for your interest in contributing to IcedLens! We welcome contribution
 6. [Code Contributions](#code-contributions)
 7. [Development Workflow](#development-workflow)
 8. [Pull Request Process](#pull-request-process)
-9. [Project Structure](#project-structure)
-10. [Event-Driven Architecture](#event-driven-architecture)
-11. [Style Architecture](#style-architecture)
-12. [Notification System](#notification-system)
+9. [Distribution Packaging](#distribution-packaging)
+10. [Project Structure](#project-structure)
+11. [Event-Driven Architecture](#event-driven-architecture)
+12. [Style Architecture](#style-architecture)
+13. [Notification System](#notification-system)
 
 ## Code of Conduct
 
@@ -220,7 +221,9 @@ Code contributions should follow the project's development practices and quality
 
 ### Code Quality Standards
 
-IcedLens follows strict quality standards to maintain code quality and reliability:
+IcedLens follows quality standards to maintain code quality and reliability.
+
+> **Note:** There is no automated CI/CD pipeline. Contributors are expected to run all quality checks locally before submitting PRs: `cargo test`, `cargo clippy`, `cargo fmt`, and `cargo audit`.
 
 #### Test-Driven Development (TDD)
 
@@ -255,7 +258,92 @@ All code should include appropriate tests:
 - Follow secure coding practices
 - Validate all user inputs (file paths, zoom values, etc.)
 - Use proper error handling (avoid `unwrap()` on user-provided data)
+- Never log or display full file paths (may contain usernames or sensitive info)
+- Sanitize paths before display to prevent path traversal information leaks
 - Run `cargo audit` to check for vulnerable dependencies
+- Report security vulnerabilities privately via [SECURITY.md](SECURITY.md)
+
+#### Accessibility
+
+IcedLens aims to be usable by everyone. When contributing UI changes:
+
+- Ensure sufficient color contrast (WCAG 2.1 AA minimum: 4.5:1 for text, 3:1 for UI)
+- Provide keyboard navigation for all interactive elements
+- Make click targets at least 44×44 pixels (WCAG 2.5.5)
+- Use semantic widget roles where Iced supports them
+- Test both light and dark themes for visibility
+- Avoid conveying information through color alone
+
+#### Performance
+
+- Avoid blocking the main thread—use `Task` for I/O and heavy computation
+- Profile before optimizing (`cargo bench`, `perf`, `flamegraph`)
+- Prefer streaming/chunked processing over loading entire files in memory
+- Pool or cache large allocations (see `FrameCache`, `FrameHistory`)
+- Consider memory impact on low-end systems (aim for <500 MB typical usage)
+
+#### Newtype Pattern for Bounded Values
+
+IcedLens uses the **newtype pattern** for values that have valid ranges, ensuring type-safe validation at compile time.
+
+**When to use:**
+- Values that cross module boundaries (risk of misuse)
+- Multiple values of the same primitive type coexist (risk of confusion)
+- Valid range isn't obvious (e.g., 0.0–1.0 vs 0–100)
+- Value is frequently manipulated (not just stored)
+
+**Pattern:**
+```rust
+/// Volume level, guaranteed to be within 0.0–1.0.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Volume(f32);
+
+impl Volume {
+    /// Creates a new volume, clamping to valid range.
+    pub fn new(value: f32) -> Self {
+        Self(value.clamp(0.0, 1.0))
+    }
+
+    /// Returns the raw value.
+    pub fn value(self) -> f32 {
+        self.0
+    }
+
+    /// Domain-specific helpers
+    pub fn is_muted(self) -> bool {
+        self.0 < 0.001
+    }
+}
+
+impl Default for Volume {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
+```
+
+**Benefits:**
+- **Compile-time safety**: Impossible to pass out-of-range values
+- **Self-documenting**: Type name explains what the value represents
+- **Single source of truth**: Validation logic in one place
+- **Eliminates `.clamp()` calls**: Type guarantees validity
+
+**Existing newtypes:**
+| Type | Range | Location |
+|------|-------|----------|
+| `Volume` | 0.0–1.5 | `video_player/volume.rs` |
+| `PlaybackSpeed` | 0.1–8.0 | `video_player/playback_speed.rs` |
+| `KeyboardSeekStep` | 0.5–30.0 sec | `video_player/seek_step.rs` |
+| `FrameCacheMb` | 16–512 MB | `video_player/frame_cache_size.rs` |
+| `FrameHistoryMb` | 32–512 MB | `video_player/frame_history_size.rs` |
+| `ZoomPercent` | 10%–800% | `ui/state/zoom.rs` |
+| `ZoomStep` | 1%–200% | `ui/state/zoom.rs` |
+| `OverlayTimeout` | 1–30 sec | `ui/state/overlay_timeout.rs` |
+| `ResizeScale` | 10%–400% | `media/image_transform.rs` |
+| `MaxSkipAttempts` | 1–20 | `media/skip_attempts.rs` |
+| `AdjustmentPercent` | -100–+100 | `ui/image_editor/state/adjustment.rs` |
+
+**Location rule:** Domain types live in their domain module (not in `config/`). Constants stay in `config/defaults.rs`, types go where they're used.
 
 ### Development Workflow
 
@@ -291,6 +379,27 @@ git commit -m "feat: Add descriptive commit message"
 # Push to your fork
 git push origin feature/your-feature-name
 ```
+
+### Branching Strategy
+
+IcedLens uses a simple two-branch workflow:
+
+| Branch | Purpose |
+|--------|---------|
+| `master` | Stable releases only. PRs target this branch. |
+| `dev` | Active development. Feature branches merge here first. |
+
+**Workflow:**
+1. Create feature branches from `dev`: `git checkout -b feature/my-feature dev`
+2. Develop and test locally
+3. Merge into `dev` for integration testing
+4. When ready for release, `dev` is merged into `master`
+
+**Naming conventions:**
+- `feature/description` - New functionality
+- `fix/description` - Bug fixes
+- `refactor/description` - Code restructuring
+- `docs/description` - Documentation only
 
 ### Commit Message Guidelines
 
@@ -328,6 +437,101 @@ Follow conventional commits format for clarity:
 - [ ] CHANGELOG.md updated (for notable changes)
 - [ ] Commit messages follow conventional commits format
 - [ ] PR description is clear and complete
+
+## Distribution Packaging
+
+IcedLens provides pre-built binaries for Linux (AppImage) and Windows (Inno Setup installer).
+
+### Linux AppImage
+
+The AppImage bundles all dependencies (FFmpeg, GTK, audio libraries) for portable distribution.
+
+#### Prerequisites
+
+- [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy) with GTK plugin
+- FFmpeg development headers (`libavcodec-dev`, `libavformat-dev`, etc.)
+- ALSA development headers (`libasound2-dev`)
+
+#### Building
+
+```bash
+# Basic usage
+scripts/build-appimage.sh
+
+# With custom linuxdeploy path
+LINUXDEPLOY_BIN=/path/to/linuxdeploy scripts/build-appimage.sh
+
+# Cross-compile for specific target
+scripts/build-appimage.sh --target x86_64-unknown-linux-gnu
+```
+
+#### Output
+
+- `target/release/iced_lens-{version}-{arch}.AppImage`
+- `target/release/iced_lens-{version}-{arch}.AppImage.sha256`
+
+#### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `LINUXDEPLOY_BIN` | Path to linuxdeploy binary |
+| `LINUXDEPLOY_PLUGIN_GTK` | Path to GTK plugin (auto-detected) |
+| `APPIMAGE_OUTPUT_DIR` | Output directory (default: `target/release`) |
+| `APPIMAGE_BUNDLE_GTK` | Set to `0` to skip GTK bundling |
+
+### Windows Installer (Inno Setup)
+
+Creates a standard Windows installer with Start Menu shortcuts and optional file associations.
+
+#### Prerequisites
+
+1. **MSVC Build Tools**: Visual Studio with "Desktop development with C++"
+
+2. **FFmpeg via vcpkg**:
+   ```powershell
+   git clone https://github.com/microsoft/vcpkg
+   cd vcpkg
+   .\bootstrap-vcpkg.bat
+   .\vcpkg install ffmpeg:x64-windows
+
+   # Set environment variables
+   $env:VCPKG_ROOT = "C:\path\to\vcpkg"
+   setx VCPKG_ROOT "C:\path\to\vcpkg"
+   ```
+
+3. **LLVM/Clang**: Download from [llvm/llvm-project releases](https://github.com/llvm/llvm-project/releases)
+   ```powershell
+   $env:PATH = "C:\Program Files\LLVM\bin;$env:PATH"
+   $env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
+   setx LIBCLANG_PATH "C:\Program Files\LLVM\bin"
+   ```
+
+4. **Inno Setup 6+**: Download from [jrsoftware.org](https://jrsoftware.org/isdown.php)
+
+#### Building
+
+```powershell
+.\scripts\build-windows-installer.ps1
+```
+
+> **Note:** If you get an execution policy error:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+
+#### Output
+
+- `target\release\IcedLens-{version}-x86_64-setup.exe`
+- `target\release\IcedLens-{version}-x86_64-setup.exe.sha256`
+
+#### Installer Features
+
+- Start Menu shortcuts
+- Optional desktop shortcut
+- Optional file associations (images and videos)
+- Per-user installation (no admin required)
+- Clean uninstallation
+- FFmpeg DLLs auto-detected from vcpkg or PATH
 
 ## Project Structure
 
@@ -380,10 +584,7 @@ iced_lens/
 │   ├── branding/               # Application icon (SVG, PNG, ICO, ICNS)
 │   ├── i18n/                   # Translation files (.ftl)
 │   └── icons/                  # UI icons
-│       ├── source/             # SVG sources (not embedded)
-│       └── png/
-│           ├── dark/           # Dark icons (for light backgrounds)
-│           └── light/          # Light icons (for dark backgrounds)
+│       └── source/             # SVG sources (PNGs generated at build time)
 ├── tests/                      # Integration tests
 ├── benches/                    # Performance benchmarks
 ├── CONTRIBUTING.md             # This file
@@ -481,6 +682,7 @@ Message::ClearMedia => {
 | Effect | Emitted By | Handled By |
 |--------|------------|------------|
 | `NavigateNext/Previous` | Viewer | App (triggers media loading) |
+| `ConfirmNavigation` | Viewer | App (updates MediaNavigator position after successful load) |
 | `ToggleFullscreen` | Viewer | App (manages window state) |
 | `EnterEditor` | Viewer | App (screen transition) |
 
@@ -606,9 +808,9 @@ let padding = spacing::MD; // 16px
 
 #### 2. Icons (`src/ui/icons.rs`)
 
-PNG icons named by their **visual appearance**, not their function. Two variants exist:
-- **`icons::*`** - Dark icons from `assets/icons/png/dark/` (for light backgrounds)
-- **`icons::overlay::*`** - Light icons from `assets/icons/png/light/` (for dark backgrounds)
+PNG icons named by their **visual appearance**, not their function. Icons are **generated at build time** from SVG sources via `build.rs`. Two variants exist:
+- **`icons::*`** - Dark icons (black on transparent) for light backgrounds
+- **`icons::overlay::*`** - Light icons (white on transparent) for dark backgrounds
 
 | Icon | Visual Description |
 |------|-------------------|
@@ -620,10 +822,17 @@ PNG icons named by their **visual appearance**, not their function. Two variants
 **Naming rule:** Describe what you see, not what it does.
 
 **Adding a new icon:**
-1. Create SVG in `assets/icons/source/`
-2. Generate PNG: `rsvg-convert -w 32 -h 32 source/icon.svg -o png/dark/icon.png`
-3. If needed for overlays: `rsvg-convert ... | convert - -negate png/light/icon.png`
-4. Add to `src/ui/icons.rs` using the `define_icon!` macro
+1. Create SVG in `assets/icons/source/` with `fill="white"` and `viewBox="0 0 32 32"`
+2. Add to `src/ui/icons.rs` using the `define_icon!` macro:
+   ```rust
+   define_icon!(icon_name, dark, "icon_name.png", "Description.");
+   ```
+3. If needed for overlays, add to `build.rs::needs_light_variant()` and define in `icons.rs`:
+   ```rust
+   // In overlay module
+   define_icon!(icon_name, light, "icon_name.png", "Description (white).");
+   ```
+4. Run `cargo build` - PNGs are generated automatically
 
 #### 3. Action Icons (`src/ui/action_icons.rs`)
 
@@ -691,6 +900,7 @@ Ready-to-use style functions for Iced widgets:
 | `container.rs` | `panel()` for settings/editor panels |
 | `overlay.rs` | `indicator()`, `controls_container()`, icon styles |
 | `editor.rs` | `toolbar()`, `settings_panel()` |
+| `tooltip.rs` | `styled()` helper for accessible tooltips with contrast and shadow |
 
 **Usage:**
 ```rust
@@ -699,6 +909,28 @@ use crate::ui::styles::button;
 Button::new("Click me")
     .style(button::primary)
 ```
+
+#### Tooltip Style
+
+All tooltips should use the centralized `styles::tooltip::styled()` helper for consistent visibility:
+
+```rust
+use crate::ui::styles;
+use iced::widget::tooltip;
+
+// Create a styled tooltip with proper contrast and shadow
+styles::tooltip::styled(
+    button_content,
+    "Tooltip text",
+    tooltip::Position::Bottom,
+)
+```
+
+The tooltip style automatically adapts to light/dark theme:
+- **Light theme**: Dark tooltip with light text
+- **Dark theme**: Light tooltip with dark text
+
+Features: opaque background, subtle shadow, rounded corners (4px), consistent padding (8px).
 
 ### Guidelines for Contributors
 

@@ -64,6 +64,8 @@ settings-sort-order-label = Image navigation sort order
 settings-sort-alphabetical = Alphabetical
 settings-sort-modified = Modified date
 settings-sort-created = Created date
+settings-max-skip-attempts-label = Auto-skip corrupted files
+settings-max-skip-attempts-hint = Maximum consecutive corrupted files to skip during navigation.
 settings-overlay-timeout-label = Fullscreen overlay auto-hide delay
 settings-overlay-timeout-hint = Time before controls disappear when in fullscreen mode.
 seconds = seconds
@@ -89,6 +91,13 @@ image-editor-resize-height-label = Height (px)
 image-editor-resize-lock-aspect = Lock aspect ratio
 image-editor-resize-presets-label = Presets
 image-editor-resize-apply = Apply resize
+image-editor-resize-preview-label = Preview
+image-editor-resize-ai-upscale = Use AI upscaling (Real-ESRGAN)
+image-editor-resize-ai-model-not-downloaded = AI model not downloaded yet
+image-editor-resize-ai-model-downloading = Downloading AI model
+image-editor-resize-ai-model-validating = Validating AI model
+image-editor-resize-ai-model-error = AI model error
+image-editor-resize-ai-enlargement-only = AI upscaling only applies to enlargements
 image-editor-light-section-title = Light Adjustments
 image-editor-light-brightness-label = Brightness
 image-editor-light-contrast-label = Contrast
@@ -121,6 +130,9 @@ video-capture-tooltip = Capture current frame
 video-step-forward-tooltip = Step forward one frame (.)
 video-step-backward-tooltip = Step backward one frame (,)
 video-more-tooltip = More options
+video-speed-down-tooltip = Decrease speed (J)
+video-speed-up-tooltip = Increase speed (L)
+hud-video-no-audio = No audio
 settings-audio-normalization-label = Audio volume normalization
 settings-audio-normalization-enabled = Enabled
 settings-audio-normalization-disabled = Disabled
@@ -197,7 +209,7 @@ help-video-tool-playback-desc = Start or stop video playback with the play butto
 help-video-tool-timeline = Timeline
 help-video-tool-timeline-desc = Click anywhere on the progress bar to jump to that position.
 help-video-tool-volume = Volume
-help-video-tool-volume-desc = Drag the volume slider or click the speaker icon to mute/unmute.
+help-video-tool-volume-desc = Drag the volume slider (0-150%) or click the speaker icon to mute/unmute.
 help-video-tool-loop = Loop
 help-video-tool-loop-desc = Enable to automatically restart the video when it ends.
 help-video-tool-stepping = Frame stepping
@@ -211,6 +223,8 @@ help-video-key-seek = Seek backward/forward (during playback)
 help-video-key-volume = Increase/decrease volume
 help-video-key-step-back = Step backward one frame (when paused)
 help-video-key-step-forward = Step forward one frame (when paused)
+help-video-key-speed-down = Decrease playback speed
+help-video-key-speed-up = Increase playback speed
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Image Editor Section
@@ -233,10 +247,11 @@ help-editor-crop-usage = Drag the handles to adjust the selection, then click "A
 
 help-editor-resize-title = Resize
 help-editor-resize-desc = Change the image dimensions to make it larger or smaller.
-help-editor-resize-scale = Scale by percentage (e.g., 50% to halve the size)
+help-editor-resize-scale = Scale by percentage (10% to 400%)
 help-editor-resize-dimensions = Enter exact width and height in pixels
 help-editor-resize-lock = Lock aspect ratio to maintain proportions
-help-editor-resize-presets = Use presets for common sizes (HD, Full HD, 4K...)
+help-editor-resize-presets = Use presets for quick scaling (25%, 50%, 200%, etc.)
+help-editor-resize-ai-upscale = AI Upscaling: Use Real-ESRGAN for sharper enlargements (enable in Settings)
 
 help-editor-light-title = Light
 help-editor-light-desc = Fine-tune the brightness and contrast of your image.
@@ -252,6 +267,10 @@ help-editor-key-save = Save current changes
 help-editor-key-undo = Undo last change
 help-editor-key-redo = Redo undone change
 help-editor-key-cancel = Cancel all changes and exit
+
+help-editor-mouse-title = Mouse Controls
+help-editor-mouse-wheel = Zoom in or out of the image
+help-editor-mouse-drag = Pan the image when zoomed in
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Frame Capture Section
@@ -307,7 +326,14 @@ about-icon-license-summary = All icons (application logo and UI icons) may only 
 about-section-credits = Credits
 about-credits-iced = Built with the Iced GUI toolkit
 about-credits-ffmpeg = Video playback powered by FFmpeg
+about-credits-onnx = AI features powered by ONNX Runtime (NAFNet, Real-ESRGAN)
 about-credits-fluent = Internationalization by Project Fluent
+about-credits-full-list = See the full list of dependencies
+
+about-section-third-party = Third-Party Licenses
+about-third-party-ffmpeg = FFmpeg is licensed under LGPL 2.1+
+about-third-party-onnx = ONNX Runtime and DirectML are licensed under MIT
+about-third-party-details = See THIRD_PARTY_LICENSES.md for details
 
 about-section-links = Links
 about-link-repository = Source Code
@@ -417,6 +443,8 @@ notification-load-error-io = Could not open file. Check that it exists and you h
 notification-load-error-svg = Could not render SVG. The file may be malformed.
 notification-load-error-video = Could not play video. The format may be unsupported.
 notification-load-error-timeout = Loading timed out. The file may be too large or the system is busy.
+notification-skipped-corrupted-files = Skipped: { $files }
+notification-skipped-and-others = +{ $count } more
 
 # AI Settings
 settings-enable-deblur-label = AI Deblurring
@@ -433,12 +461,28 @@ settings-deblur-status-not-downloaded = Model not downloaded
 settings-deblur-enabled = Enabled
 settings-deblur-disabled = Disabled
 
+# AI Upscale Settings
+settings-enable-upscale-label = AI Upscaling
+settings-enable-upscale-hint = Enable AI-powered image upscaling using Real-ESRGAN 4x model (~64 MB download).
+settings-upscale-model-url-label = Model URL
+settings-upscale-model-url-placeholder = https://huggingface.co/...
+settings-upscale-model-url-hint = URL to download the Real-ESRGAN ONNX model from.
+settings-upscale-status-label = Model Status
+settings-upscale-status-downloading = Downloading model ({ $progress }%)...
+settings-upscale-status-validating = Validating model...
+settings-upscale-status-ready = Model ready
+settings-upscale-status-error = Error: { $message }
+settings-upscale-status-not-downloaded = Model not downloaded
+settings-upscale-enabled = Enabled
+settings-upscale-disabled = Disabled
+
 # AI Editor tool
 image-editor-tool-deblur = AI Deblur
 image-editor-deblur-lossless-warning = For best quality, export as WebP lossless or PNG.
 image-editor-deblur-apply = Apply Deblur
 image-editor-deblur-processing = Processing
 image-editor-deblur-cancel = Cancel
+image-editor-upscale-processing = AI Upscaling...
 image-editor-deblur-model-not-ready = Enable AI deblur in Settings first
 image-editor-deblur-validating = Validating model, please wait...
 image-editor-deblur-downloading = Downloading model ({ $progress }%)...
@@ -460,3 +504,10 @@ notification-deblur-validation-error = Model validation failed: { $error }
 notification-deblur-ready = AI Deblur is ready to use
 notification-deblur-apply-success = Image deblurred successfully
 notification-deblur-apply-error = Deblurring failed: { $error }
+
+# AI Upscale Notifications
+notification-upscale-ready = AI Upscaling is ready to use
+notification-upscale-download-error = Failed to download upscale model: { $error }
+notification-upscale-validation-error = Model validation failed: { $error }
+notification-upscale-resize-success = Image resized with AI upscaling
+notification-upscale-resize-error = AI upscaling failed: { $error }

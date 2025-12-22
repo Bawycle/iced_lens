@@ -66,9 +66,8 @@ fn find_jpeg_xmp_segment<R: Read + Seek>(reader: &mut R) -> Option<Vec<u8>> {
         }
 
         match marker[1] {
-            0xD9 => return None, // End of image, no XMP found
-            0xD8 => continue,    // Start of image (shouldn't happen here)
-            0x00 => continue,    // Stuffed byte
+            0xD9 => return None,     // End of image, no XMP found
+            0xD8 | 0x00 => continue, // Start of image or stuffed byte
             0xE1 => {
                 // APP1 segment - could be EXIF or XMP
                 let mut len_bytes = [0u8; 2];
@@ -130,7 +129,7 @@ fn parse_xmp_xml(xmp_data: &[u8]) -> Option<DublinCoreMetadata> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let local_name = e.local_name();
                 let name = String::from_utf8_lossy(local_name.as_ref()).to_string();
 
@@ -138,7 +137,7 @@ fn parse_xmp_xml(xmp_data: &[u8]) -> Option<DublinCoreMetadata> {
                 let is_dc = e.attributes().any(|attr| {
                     if let Ok(a) = attr {
                         a.key.as_ref() == b"xmlns:dc"
-                            && a.unescape_value().map(|v| v == DC_NS).unwrap_or(false)
+                            && a.unescape_value().is_ok_and(|v| v == DC_NS)
                     } else {
                         false
                     }
@@ -197,8 +196,7 @@ fn parse_xmp_xml(xmp_data: &[u8]) -> Option<DublinCoreMetadata> {
                     current_element = None;
                 }
             }
-            Ok(Event::Eof) => break,
-            Err(_) => break,
+            Ok(Event::Eof) | Err(_) => break,
             _ => {}
         }
         buf.clear();

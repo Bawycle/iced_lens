@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Crop overlay renderer for interactive crop selection.
 
+use crate::ui::design_tokens::sizing;
 use crate::ui::image_editor::{CanvasMessage, Message};
 use crate::ui::theme;
 
@@ -262,7 +263,7 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
         }
 
         // Draw resize handles
-        let handle_size = 10.0;
+        let handle_size = sizing::CROP_HANDLE_SIZE;
         let handle_color = theme::crop_overlay_handle_color();
         let handles = [
             (crop_screen_x, crop_screen_y),                           // TopLeft

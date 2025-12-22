@@ -2,7 +2,7 @@
 //! Integration tests for video thumbnail extraction, metadata, and playback
 //!
 //! These tests validate the complete video processing pipeline with real video files,
-//! including multi-format playback support (MP4, AVI, MOV, MKV, WebM).
+//! including multi-format playback support (MP4, AVI, MOV, MKV, `WebM`).
 
 use iced_lens::media::video::{extract_thumbnail, extract_video_metadata};
 use iced_lens::video_player::audio::{AudioDecoder, AudioDecoderCommand, AudioDecoderEvent};
@@ -181,7 +181,7 @@ fn test_thumbnail_extraction_performance() {
 /// Creates a decoder, sends Play command, and verifies at least one frame is received.
 fn test_video_decoding(path: &str, format_name: &str) {
     if !std::path::Path::new(path).exists() {
-        eprintln!("Skipping {} test: file not found", format_name);
+        eprintln!("Skipping {format_name} test: file not found");
         return;
     }
 
@@ -190,7 +190,7 @@ fn test_video_decoding(path: &str, format_name: &str) {
 
     rt.block_on(async {
         let decoder = AsyncDecoder::new(path, CacheConfig::disabled(), 0)
-            .unwrap_or_else(|_| panic!("Should create decoder for {}", format_name));
+            .unwrap_or_else(|_| panic!("Should create decoder for {format_name}"));
 
         // Send play command
         decoder
@@ -207,35 +207,26 @@ fn test_video_decoding(path: &str, format_name: &str) {
                     match event {
                         DecoderEvent::FrameReady(frame) => {
                             // Verify frame has valid dimensions
-                            assert!(frame.width > 0, "{} frame width should be > 0", format_name);
-                            assert!(
-                                frame.height > 0,
-                                "{} frame height should be > 0",
-                                format_name
-                            );
+                            assert!(frame.width > 0, "{format_name} frame width should be > 0");
+                            assert!(frame.height > 0, "{format_name} frame height should be > 0");
                             assert!(
                                 !frame.rgba_data.is_empty(),
-                                "{} frame should have RGBA data",
-                                format_name
+                                "{format_name} frame should have RGBA data"
                             );
                             // Verify RGBA data size matches dimensions
                             let expected_size = (frame.width * frame.height * 4) as usize;
                             assert_eq!(
                                 frame.rgba_data.len(),
                                 expected_size,
-                                "{} frame RGBA size should match dimensions",
-                                format_name
+                                "{format_name} frame RGBA size should match dimensions"
                             );
                             return true;
                         }
                         DecoderEvent::Error(msg) => {
-                            panic!("{} decoding error: {}", format_name, msg);
+                            panic!("{format_name} decoding error: {msg}");
                         }
                         DecoderEvent::EndOfStream => {
-                            panic!(
-                                "{} reached end of stream without producing frames",
-                                format_name
-                            );
+                            panic!("{format_name} reached end of stream without producing frames");
                         }
                         DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => {
                             // Continue waiting
@@ -248,8 +239,7 @@ fn test_video_decoding(path: &str, format_name: &str) {
 
         assert!(
             timeout.is_ok(),
-            "{} decoding timed out after 5 seconds",
-            format_name
+            "{format_name} decoding timed out after 5 seconds"
         );
 
         // Stop the decoder
@@ -304,40 +294,33 @@ fn test_decode_corrupted_file() {
 
     rt.block_on(async {
         // Corrupted file should either fail to create decoder or produce an error event
-        match AsyncDecoder::new(path, CacheConfig::disabled(), 0) {
-            Ok(mut decoder) => {
-                decoder
-                    .send_command(DecoderCommand::Play {
-                        resume_position_secs: None,
-                    })
-                    .expect("Should send Play command");
+        if let Ok(mut decoder) = AsyncDecoder::new(path, CacheConfig::disabled(), 0) {
+            decoder
+                .send_command(DecoderCommand::Play {
+                    resume_position_secs: None,
+                })
+                .expect("Should send Play command");
 
-                // Should get an error event, not a valid frame
-                let timeout = tokio::time::timeout(Duration::from_secs(2), async {
-                    loop {
-                        if let Some(event) = decoder.recv_event().await {
-                            match event {
-                                DecoderEvent::Error(_) => return true,    // Expected
-                                DecoderEvent::EndOfStream => return true, // Also acceptable
-                                DecoderEvent::FrameReady(_) => {
-                                    // Unexpected but not necessarily wrong
-                                    return true;
-                                }
-                                DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => {
-                                    continue
-                                }
-                            }
+            // Should get an error event, not a valid frame
+            let timeout = tokio::time::timeout(Duration::from_secs(2), async {
+                loop {
+                    if let Some(event) = decoder.recv_event().await {
+                        match event {
+                            // Error, EOS, or frame received - all acceptable termination conditions
+                            DecoderEvent::Error(_)
+                            | DecoderEvent::EndOfStream
+                            | DecoderEvent::FrameReady(_) => return true,
+                            DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => continue,
                         }
                     }
-                })
-                .await;
+                }
+            })
+            .await;
 
-                // Timeout is also acceptable for corrupted files
-                let _ = timeout;
-            }
-            Err(_) => {
-                // Expected: decoder creation failed
-            }
+            // Timeout is also acceptable for corrupted files
+            let _ = timeout;
+        } else {
+            // Expected: decoder creation failed
         }
     });
 }
@@ -355,38 +338,32 @@ fn test_metadata_all_formats() {
 
     for (path, format_name) in &formats {
         if !std::path::Path::new(path).exists() {
-            eprintln!("Skipping {} metadata test: file not found", format_name);
+            eprintln!("Skipping {format_name} metadata test: file not found");
             continue;
         }
 
         let result = extract_video_metadata(path);
         assert!(
             result.is_ok(),
-            "Should extract metadata from {} ({})",
-            format_name,
-            path
+            "Should extract metadata from {format_name} ({path})"
         );
 
         let metadata = result.unwrap();
         assert!(
             metadata.width > 0,
-            "{} metadata width should be > 0",
-            format_name
+            "{format_name} metadata width should be > 0"
         );
         assert!(
             metadata.height > 0,
-            "{} metadata height should be > 0",
-            format_name
+            "{format_name} metadata height should be > 0"
         );
         assert!(
             metadata.duration_secs > 0.0,
-            "{} metadata duration should be > 0",
-            format_name
+            "{format_name} metadata duration should be > 0"
         );
         assert!(
             metadata.fps > 0.0,
-            "{} metadata FPS should be > 0",
-            format_name
+            "{format_name} metadata FPS should be > 0"
         );
     }
 }
@@ -412,9 +389,8 @@ fn test_decode_performance() {
         rt.block_on(async {
             let start = std::time::Instant::now();
 
-            let decoder = match AsyncDecoder::new(path, CacheConfig::disabled(), 0) {
-                Ok(d) => d,
-                Err(_) => return,
+            let Ok(decoder) = AsyncDecoder::new(path, CacheConfig::disabled(), 0) else {
+                return;
             };
 
             decoder
@@ -438,18 +414,14 @@ fn test_decode_performance() {
             .await;
 
             let elapsed = start.elapsed();
-            let fps = frame_count as f64 / elapsed.as_secs_f64();
+            let fps = f64::from(frame_count) / elapsed.as_secs_f64();
 
-            eprintln!(
-                "{}: decoded {} frames in {:?} ({:.1} fps)",
-                format_name, frame_count, elapsed, fps
-            );
+            eprintln!("{format_name}: decoded {frame_count} frames in {elapsed:?} ({fps:.1} fps)");
 
             // Should decode at least a few frames in 1 second
             assert!(
                 frame_count > 0,
-                "{} should decode at least 1 frame in 1 second",
-                format_name
+                "{format_name} should decode at least 1 frame in 1 second"
             );
 
             let _ = decoder.send_command(DecoderCommand::Stop);
@@ -465,7 +437,7 @@ fn test_decode_performance() {
 /// Creates an audio decoder, sends Play command, and verifies audio buffers are received.
 fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
     if !std::path::Path::new(path).exists() {
-        eprintln!("Skipping {} audio test: file not found", format_name);
+        eprintln!("Skipping {format_name} audio test: file not found");
         return;
     }
 
@@ -474,12 +446,10 @@ fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
     rt.block_on(async {
         match AudioDecoder::new(path) {
             Ok(Some(mut decoder)) => {
-                if !expect_audio {
-                    panic!(
-                        "{} should NOT have audio but AudioDecoder was created",
-                        format_name
-                    );
-                }
+                assert!(
+                    expect_audio,
+                    "{format_name} should NOT have audio but AudioDecoder was created"
+                );
 
                 // Send play command
                 decoder
@@ -498,13 +468,11 @@ fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
                                     got_stream_info = true;
                                     assert!(
                                         info.sample_rate > 0,
-                                        "{} sample rate should be > 0",
-                                        format_name
+                                        "{format_name} sample rate should be > 0"
                                     );
                                     assert!(
                                         info.channels > 0,
-                                        "{} channels should be > 0",
-                                        format_name
+                                        "{format_name} channels should be > 0"
                                     );
                                     eprintln!(
                                         "{} audio: {}Hz, {} channels, codec: {}",
@@ -518,18 +486,15 @@ fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
                                     got_audio_buffer = true;
                                     assert!(
                                         !buffer.samples.is_empty(),
-                                        "{} audio buffer should have samples",
-                                        format_name
+                                        "{format_name} audio buffer should have samples"
                                     );
                                     assert!(
                                         buffer.sample_rate > 0,
-                                        "{} audio sample rate should be > 0",
-                                        format_name
+                                        "{format_name} audio sample rate should be > 0"
                                     );
                                     assert!(
                                         buffer.channels > 0,
-                                        "{} audio channels should be > 0",
-                                        format_name
+                                        "{format_name} audio channels should be > 0"
                                     );
                                     // Got what we need, exit
                                     if got_stream_info {
@@ -537,7 +502,7 @@ fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
                                     }
                                 }
                                 AudioDecoderEvent::Error(msg) => {
-                                    panic!("{} audio decoding error: {}", format_name, msg);
+                                    panic!("{format_name} audio decoding error: {msg}");
                                 }
                                 AudioDecoderEvent::EndOfStream => {
                                     // Some short videos might reach end before we get buffers
@@ -551,24 +516,21 @@ fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
 
                 assert!(
                     timeout.is_ok(),
-                    "{} audio decoding timed out after 5 seconds",
-                    format_name
+                    "{format_name} audio decoding timed out after 5 seconds"
                 );
 
                 // Stop the decoder
                 let _ = decoder.send_command(AudioDecoderCommand::Stop);
             }
             Ok(None) => {
-                if expect_audio {
-                    panic!(
-                        "{} should have audio but no audio stream found",
-                        format_name
-                    );
-                }
+                assert!(
+                    !expect_audio,
+                    "{format_name} should have audio but no audio stream found"
+                );
                 // Expected: no audio stream
             }
             Err(e) => {
-                panic!("{} audio decoder creation failed: {}", format_name, e);
+                panic!("{format_name} audio decoder creation failed: {e}");
             }
         }
     });
@@ -621,10 +583,7 @@ fn test_audio_stream_info_all_formats() {
 
     for (path, format_name) in &formats_with_audio {
         if !std::path::Path::new(path).exists() {
-            eprintln!(
-                "Skipping {} audio stream info test: file not found",
-                format_name
-            );
+            eprintln!("Skipping {format_name} audio stream info test: file not found");
             continue;
         }
 
@@ -649,8 +608,7 @@ fn test_audio_stream_info_all_formats() {
 
                     assert!(
                         timeout.is_ok(),
-                        "{} should provide audio stream info",
-                        format_name
+                        "{format_name} should provide audio stream info"
                     );
 
                     if let Ok(Some(info)) = timeout {
@@ -663,10 +621,10 @@ fn test_audio_stream_info_all_formats() {
                     let _ = decoder.send_command(AudioDecoderCommand::Stop);
                 }
                 Ok(None) => {
-                    eprintln!("{} has no audio stream (unexpected)", format_name);
+                    eprintln!("{format_name} has no audio stream (unexpected)");
                 }
                 Err(e) => {
-                    panic!("{} audio decoder creation failed: {}", format_name, e);
+                    panic!("{format_name} audio decoder creation failed: {e}");
                 }
             }
         });

@@ -14,8 +14,8 @@ mod tests {
 
         // Smoke-test all button styles compile and are callable
         let _ = button::primary(&theme, iced::widget::button::Status::Active);
-        let _ = button::overlay(palette::WHITE, 0.5, 0.8);
-        let _ = button::video_play_overlay();
+        let _ = button::overlay::navigation(palette::WHITE, 0.5, 0.8);
+        let _ = button::overlay::video_play();
     }
 
     #[test]

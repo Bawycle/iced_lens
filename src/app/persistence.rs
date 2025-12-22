@@ -49,6 +49,7 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     cfg.display.zoom_step = Some(ctx.viewer.zoom_step_percent());
     cfg.display.background_theme = Some(ctx.settings.background_theme());
     cfg.display.sort_order = Some(ctx.settings.sort_order());
+    cfg.display.max_skip_attempts = Some(ctx.settings.max_skip_attempts());
     cfg.fullscreen.overlay_timeout_secs = Some(ctx.settings.overlay_timeout_secs());
     cfg.general.theme_mode = ctx.theme_mode;
     cfg.video.autoplay = Some(ctx.video_autoplay);
@@ -62,8 +63,9 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     cfg.video.muted = Some(ctx.viewer.video_muted());
     cfg.video.loop_enabled = Some(ctx.viewer.video_loop());
 
-    // AI preferences (note: enable_deblur is stored in AppState, not config)
+    // AI preferences (note: enable flags are stored in AppState, not config)
     cfg.ai.deblur_model_url = Some(ctx.settings.deblur_model_url().to_string());
+    cfg.ai.upscale_model_url = Some(ctx.settings.upscale_model_url().to_string());
 
     if config::save(&cfg).is_err() {
         ctx.notifications.push(notifications::Notification::warning(
@@ -120,7 +122,7 @@ pub fn rescan_directory_if_same(media_navigator: &mut MediaNavigator, saved_path
             // Clone the path to avoid borrow conflict
             if let Some(path) = media_navigator
                 .current_media_path()
-                .map(|p| p.to_path_buf())
+                .map(std::path::Path::to_path_buf)
             {
                 // Rescan the media navigator
                 let (config, _) = config::load();

@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let video_path = &args[1];
-    println!("🎬 Extracting metadata from: {}", video_path);
+    println!("🎬 Extracting metadata from: {video_path}");
 
     // Extract metadata
     let result = video::extract_video_metadata(video_path);
@@ -48,15 +48,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             println!("\n📊 Calculated:");
-            println!("   Resolution: {}", resolution_class);
-            println!("   Total frames: ~{}", total_frames);
+            println!("   Resolution: {resolution_class}");
+            println!("   Total frames: ~{total_frames}");
             println!(
                 "   Aspect ratio: {:.2}",
-                metadata.width as f64 / metadata.height as f64
+                f64::from(metadata.width) / f64::from(metadata.height)
             );
         }
         Err(e) => {
-            eprintln!("❌ Failed to extract metadata: {}", e);
+            eprintln!("❌ Failed to extract metadata: {e}");
             std::process::exit(1);
         }
     }

@@ -22,7 +22,7 @@ pub use message::{Flags, Message};
 pub use screen::Screen;
 
 use crate::media::metadata::MediaMetadata;
-use crate::media::{self, MediaData, MediaNavigator};
+use crate::media::{self, MaxSkipAttempts, MediaData, MediaNavigator};
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
 use crate::ui::metadata_panel::MetadataEditorState;
@@ -47,6 +47,8 @@ pub struct App {
     media_navigator: MediaNavigator,
     fullscreen: bool,
     window_id: Option<window::Id>,
+    /// Current window size for drop zone calculations.
+    window_size: Option<iced::Size>,
     theme_mode: ThemeMode,
     /// Whether videos should auto-play when loaded.
     video_autoplay: bool,
@@ -55,9 +57,9 @@ pub struct App {
     /// Shared cache for LUFS measurements to avoid re-analyzing files.
     lufs_cache: SharedLufsCache,
     /// Frame cache size in MB for video seek optimization.
-    frame_cache_mb: u32,
+    frame_cache_mb: crate::video_player::FrameCacheMb,
     /// Frame history size in MB for backward frame stepping.
-    frame_history_mb: u32,
+    frame_history_mb: crate::video_player::FrameHistoryMb,
     /// Whether the hamburger menu is open.
     menu_open: bool,
     /// Whether the info panel is open.
@@ -147,12 +149,13 @@ impl Default for App {
             media_navigator: MediaNavigator::new(),
             fullscreen: false,
             window_id: None,
+            window_size: None,
             theme_mode: ThemeMode::System,
             video_autoplay: false,
             audio_normalization: true, // Enabled by default - normalizes audio volume between media files
             lufs_cache: create_lufs_cache(),
-            frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
-            frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
+            frame_cache_mb: crate::video_player::FrameCacheMb::default(),
+            frame_history_mb: crate::video_player::FrameHistoryMb::default(),
             menu_open: false,
             info_panel_open: false,
             current_metadata: None,
@@ -202,31 +205,44 @@ impl App {
             .video
             .keyboard_seek_step_secs
             .unwrap_or(config::DEFAULT_KEYBOARD_SEEK_STEP_SECS);
-        let frame_cache_mb = config
-            .video
-            .frame_cache_mb
-            .unwrap_or(config::DEFAULT_FRAME_CACHE_MB);
-        let frame_history_mb = config
-            .video
-            .frame_history_mb
-            .unwrap_or(config::DEFAULT_FRAME_HISTORY_MB);
+        let frame_cache_mb = crate::video_player::FrameCacheMb::new(
+            config
+                .video
+                .frame_cache_mb
+                .unwrap_or(config::DEFAULT_FRAME_CACHE_MB),
+        );
+        let frame_history_mb = crate::video_player::FrameHistoryMb::new(
+            config
+                .video
+                .frame_history_mb
+                .unwrap_or(config::DEFAULT_FRAME_HISTORY_MB),
+        );
         app.frame_cache_mb = frame_cache_mb;
         app.frame_history_mb = frame_history_mb;
         // Load application state (last save directory, deblur enabled, etc.)
         let (app_state, state_warning) = persisted_state::AppState::load();
-        app.app_state = app_state.clone();
 
-        // AI settings (enable_deblur comes from persisted state, not config)
+        // Read AI settings before moving app_state (enable flags come from persisted state)
         let enable_deblur = app_state.enable_deblur;
+        let enable_upscale = app_state.enable_upscale;
+
+        // Move app_state (no clone needed since we've already extracted the values we need)
+        app.app_state = app_state;
         let deblur_model_url = config
             .ai
             .deblur_model_url
             .clone()
             .unwrap_or_else(|| config::DEFAULT_DEBLUR_MODEL_URL.to_string());
 
+        let upscale_model_url = config
+            .ai
+            .upscale_model_url
+            .clone()
+            .unwrap_or_else(|| config::DEFAULT_UPSCALE_MODEL_URL.to_string());
+
         // Check if the deblur model needs validation at startup
         // If enable_deblur is true and model exists, we need to validate it before making it available
-        let (deblur_model_status, needs_startup_validation) =
+        let (deblur_model_status, needs_deblur_startup_validation) =
             if enable_deblur && media::deblur::is_model_downloaded() {
                 // Model exists but needs validation - set to Validating, not Ready
                 (crate::media::deblur::ModelStatus::Validating, true)
@@ -234,6 +250,21 @@ impl App {
                 (crate::media::deblur::ModelStatus::NotDownloaded, false)
             };
 
+        // Check if the upscale model needs validation at startup
+        let (upscale_model_status, needs_upscale_startup_validation) =
+            if enable_upscale && media::upscale::is_model_downloaded() {
+                (crate::media::upscale::UpscaleModelStatus::Validating, true)
+            } else {
+                (
+                    crate::media::upscale::UpscaleModelStatus::NotDownloaded,
+                    false,
+                )
+            };
+
+        let max_skip_attempts = config
+            .display
+            .max_skip_attempts
+            .unwrap_or(config::DEFAULT_MAX_SKIP_ATTEMPTS);
         app.settings = SettingsState::new(SettingsConfig {
             zoom_step_percent: app.viewer.zoom_step_percent(),
             background_theme: theme,
@@ -242,18 +273,24 @@ impl App {
             theme_mode: config.general.theme_mode,
             video_autoplay,
             audio_normalization,
-            frame_cache_mb,
-            frame_history_mb,
+            frame_cache_mb: frame_cache_mb.value(),
+            frame_history_mb: frame_history_mb.value(),
             keyboard_seek_step_secs,
+            max_skip_attempts,
             enable_deblur,
             deblur_model_url,
             deblur_model_status,
+            enable_upscale,
+            upscale_model_url,
+            upscale_model_status,
         });
         app.video_autoplay = video_autoplay;
         app.audio_normalization = audio_normalization;
         app.viewer.set_video_autoplay(video_autoplay);
         app.viewer
-            .set_keyboard_seek_step_secs(keyboard_seek_step_secs);
+            .set_keyboard_seek_step(crate::video_player::KeyboardSeekStep::new(
+                keyboard_seek_step_secs,
+            ));
 
         // Apply video playback preferences from config
         if let Some(volume) = config.video.volume {
@@ -264,6 +301,12 @@ impl App {
         }
         if let Some(loop_enabled) = config.video.loop_enabled {
             app.viewer.set_video_loop(loop_enabled);
+        }
+
+        // Apply display preferences from config
+        if let Some(max_skip) = config.display.max_skip_attempts {
+            app.viewer
+                .set_max_skip_attempts(MaxSkipAttempts::new(max_skip));
         }
 
         // Show warnings for config/state loading issues
@@ -330,7 +373,7 @@ impl App {
 
         // If deblur was enabled and model exists, start validation in background
         // Use spawn_blocking to avoid blocking the tokio runtime during CPU-intensive ONNX inference
-        let validation_task = if needs_startup_validation {
+        let deblur_validation_task = if needs_deblur_startup_validation {
             let cancel_token = app.cancellation_token.clone();
             Task::perform(
                 async move {
@@ -358,8 +401,37 @@ impl App {
             Task::none()
         };
 
+        // If upscale was enabled and model exists, start validation in background
+        let upscale_validation_task = if needs_upscale_startup_validation {
+            let cancel_token = app.cancellation_token.clone();
+            Task::perform(
+                async move {
+                    tokio::task::spawn_blocking(move || {
+                        let mut manager = media::upscale::UpscaleManager::new();
+                        manager.load_session(Some(&cancel_token))?;
+                        media::upscale::validate_model(&mut manager, Some(&cancel_token))?;
+                        Ok::<(), media::upscale::UpscaleError>(())
+                    })
+                    .await
+                    .map_err(|e| media::upscale::UpscaleError::InferenceFailed(e.to_string()))?
+                },
+                |result: media::upscale::UpscaleResult<()>| match result {
+                    Ok(()) => Message::UpscaleValidationCompleted {
+                        result: Ok(()),
+                        is_startup: true,
+                    },
+                    Err(e) => Message::UpscaleValidationCompleted {
+                        result: Err(e.to_string()),
+                        is_startup: true,
+                    },
+                },
+            )
+        } else {
+            Task::none()
+        };
+
         // Combine tasks
-        let combined_task = Task::batch([task, validation_task]);
+        let combined_task = Task::batch([task, deblur_validation_task, upscale_validation_task]);
 
         (app, combined_task)
     }
@@ -367,45 +439,9 @@ impl App {
     fn title(&self) -> String {
         let app_name = self.i18n.tr("window-title");
 
-        // Special handling for image editor screen
-        if self.screen == Screen::ImageEditor {
-            if let Some(editor) = &self.image_editor {
-                // Captured frame: show "New Image" without asterisk
-                // (it's a new document, not a modified existing file)
-                if editor.is_captured_frame() {
-                    let new_image = self.i18n.tr("new-image-title");
-                    return format!("{new_image} - {app_name}");
-                }
-
-                // Existing file: show filename with asterisk if unsaved changes
-                if let Some(path) = editor.image_path() {
-                    let file_name = path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("Unknown");
-
-                    return if editor.has_unsaved_changes() {
-                        format!("*{file_name} - {app_name}")
-                    } else {
-                        format!("{file_name} - {app_name}")
-                    };
-                }
-            }
-        }
-
-        // All other screens: try dc:title first, then fall back to filename
-        let display_title = self.get_media_display_title();
-
-        // Check for metadata editor unsaved changes
-        let metadata_has_changes = self
-            .metadata_editor_state
-            .as_ref()
-            .map(|editor| editor.has_changes())
-            .unwrap_or(false);
-
-        match display_title {
+        match self.get_display_title() {
             Some(title) => {
-                if metadata_has_changes {
+                if self.has_any_unsaved_changes() {
                     format!("*{title} - {app_name}")
                 } else {
                     format!("{title} - {app_name}")
@@ -415,10 +451,19 @@ impl App {
         }
     }
 
-    /// Gets the display title for the current media.
-    /// Prefers dc:title (Dublin Core) if available, falls back to filename.
-    fn get_media_display_title(&self) -> Option<String> {
-        // First, try to get dc:title from Dublin Core metadata
+    /// Gets the display title for the current context.
+    ///
+    /// Priority order:
+    /// 1. Captured frame → "New Image" (i18n)
+    /// 2. Dublin Core title (dc:title) from metadata
+    /// 3. Filename from media navigator
+    fn get_display_title(&self) -> Option<String> {
+        // Captured frame: use localized "New Image" title
+        if self.is_editing_captured_frame() {
+            return Some(self.i18n.tr("new-image-title"));
+        }
+
+        // Try dc:title from Dublin Core metadata
         if let Some(media::metadata::MediaMetadata::Image(image_meta)) =
             self.current_metadata.as_ref()
         {
@@ -429,7 +474,7 @@ impl App {
             }
         }
 
-        // Fall back to filename (use media_navigator as single source of truth)
+        // Fall back to filename (media_navigator as single source of truth)
         self.media_navigator.current_media_path().and_then(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
@@ -437,11 +482,46 @@ impl App {
         })
     }
 
+    /// Checks if currently editing a captured video frame (no source file).
+    fn is_editing_captured_frame(&self) -> bool {
+        self.image_editor
+            .as_ref()
+            .is_some_and(crate::ui::image_editor::State::is_captured_frame)
+    }
+
+    /// Checks if any domain has unsaved changes.
+    ///
+    /// Aggregates unsaved state from:
+    /// - Image editor (transformations)
+    /// - Metadata editor (metadata changes)
+    ///
+    /// Note: Captured frames never show the unsaved indicator since they
+    /// are conceptually new documents, not modified existing files.
+    fn has_any_unsaved_changes(&self) -> bool {
+        // Captured frames don't show unsaved indicator
+        if self.is_editing_captured_frame() {
+            return false;
+        }
+
+        // Check image editor
+        let image_editor_changes = self
+            .image_editor
+            .as_ref()
+            .is_some_and(crate::ui::image_editor::State::has_unsaved_changes);
+
+        // Check metadata editor
+        let metadata_editor_changes = self
+            .metadata_editor_state
+            .as_ref()
+            .is_some_and(crate::ui::metadata_panel::MetadataEditorState::has_changes);
+
+        image_editor_changes || metadata_editor_changes
+    }
+
     fn theme(&self) -> Theme {
         match self.theme_mode {
             ThemeMode::Light => Theme::Light,
-            ThemeMode::Dark => Theme::Dark,
-            ThemeMode::System => Theme::Dark,
+            ThemeMode::Dark | ThemeMode::System => Theme::Dark,
         }
     }
 
@@ -456,7 +536,7 @@ impl App {
             &self.viewer,
             Some(self.lufs_cache.clone()),
             self.audio_normalization,
-            self.frame_cache_mb,
+            self.frame_cache_mb.value(),
             self.settings.frame_history_mb(),
         );
 
@@ -464,13 +544,24 @@ impl App {
         let editor_sub = self
             .image_editor
             .as_ref()
-            .map(|editor| editor.subscription().map(Message::ImageEditor))
-            .unwrap_or_else(Subscription::none);
+            .map_or_else(Subscription::none, |editor| {
+                editor.subscription().map(Message::ImageEditor)
+            });
 
         Subscription::batch([event_sub, tick_sub, video_sub, editor_sub])
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
+        // Track window size from resize events before creating context
+        // (must be done before borrowing self.window_size)
+        if let Message::Viewer(component::Message::RawEvent {
+            event: iced::event::Event::Window(iced::window::Event::Resized(size)),
+            ..
+        }) = &message
+        {
+            self.window_size = Some(*size);
+        }
+
         let mut ctx = update::UpdateContext {
             i18n: &mut self.i18n,
             screen: &mut self.screen,
@@ -480,6 +571,7 @@ impl App {
             media_navigator: &mut self.media_navigator,
             fullscreen: &mut self.fullscreen,
             window_id: &mut self.window_id,
+            window_size: &self.window_size,
             theme_mode: &mut self.theme_mode,
             video_autoplay: &mut self.video_autoplay,
             audio_normalization: &mut self.audio_normalization,
@@ -639,6 +731,19 @@ impl App {
                 self.handle_deblur_validation_completed(result, is_startup)
             }
             Message::DeblurApplyCompleted(result) => self.handle_deblur_apply_completed(result),
+            Message::UpscaleDownloadProgress(progress) => {
+                self.settings.set_upscale_model_status(
+                    media::upscale::UpscaleModelStatus::Downloading { progress },
+                );
+                Task::none()
+            }
+            Message::UpscaleDownloadCompleted(result) => {
+                self.handle_upscale_download_completed(result)
+            }
+            Message::UpscaleValidationCompleted { result, is_startup } => {
+                self.handle_upscale_validation_completed(result, is_startup)
+            }
+            Message::UpscaleResizeCompleted(result) => self.handle_upscale_resize_completed(result),
             Message::WindowCloseRequested(id) => {
                 // Mark app as shutting down to cancel background tasks
                 self.shutting_down = true;
@@ -674,6 +779,39 @@ impl App {
                     editor.deblur_failed();
                     self.notifications.push(
                         notifications::Notification::error("notification-deblur-apply-error")
+                            .with_arg("error", e),
+                    );
+                }
+            }
+        }
+        Task::none()
+    }
+
+    /// Handles the result of applying AI upscale resize to an image.
+    fn handle_upscale_resize_completed(
+        &mut self,
+        result: Result<Box<image_rs::DynamicImage>, String>,
+    ) -> Task<Message> {
+        // Ignore results if shutting down
+        if self.shutting_down {
+            return Task::none();
+        }
+
+        if let Some(editor) = self.image_editor.as_mut() {
+            match result {
+                Ok(upscaled_image) => {
+                    // apply_upscale_resize_result clears the processing state
+                    editor.apply_upscale_resize_result(*upscaled_image);
+                    self.notifications
+                        .push(notifications::Notification::success(
+                            "notification-upscale-resize-success",
+                        ));
+                }
+                Err(e) => {
+                    // Clear processing state on error
+                    editor.clear_upscale_processing();
+                    self.notifications.push(
+                        notifications::Notification::error("notification-upscale-resize-error")
                             .with_arg("error", e),
                     );
                 }
@@ -844,41 +982,255 @@ impl App {
         Task::none()
     }
 
+    /// Handles the result of upscale model download.
+    fn handle_upscale_download_completed(&mut self, result: Result<(), String>) -> Task<Message> {
+        // Don't start validation if shutting down
+        if self.shutting_down {
+            return Task::none();
+        }
+
+        match result {
+            Ok(()) => {
+                // Download succeeded - start validation
+                self.settings
+                    .set_upscale_model_status(media::upscale::UpscaleModelStatus::Validating);
+
+                // Start validation task using spawn_blocking for CPU-intensive ONNX inference
+                let cancel_token = self.cancellation_token.clone();
+                Task::perform(
+                    async move {
+                        tokio::task::spawn_blocking(move || {
+                            let mut manager = media::upscale::UpscaleManager::new();
+                            manager.load_session(Some(&cancel_token))?;
+                            media::upscale::validate_model(&mut manager, Some(&cancel_token))?;
+                            Ok::<(), media::upscale::UpscaleError>(())
+                        })
+                        .await
+                        .map_err(|e| media::upscale::UpscaleError::InferenceFailed(e.to_string()))?
+                    },
+                    |result: media::upscale::UpscaleResult<()>| match result {
+                        Ok(()) => Message::UpscaleValidationCompleted {
+                            result: Ok(()),
+                            is_startup: false,
+                        },
+                        Err(e) => Message::UpscaleValidationCompleted {
+                            result: Err(e.to_string()),
+                            is_startup: false,
+                        },
+                    },
+                )
+            }
+            Err(e) => {
+                // Download failed
+                self.settings
+                    .set_upscale_model_status(media::upscale::UpscaleModelStatus::Error(e.clone()));
+                self.notifications.push(
+                    notifications::Notification::error("notification-upscale-download-error")
+                        .with_arg("error", e),
+                );
+                Task::none()
+            }
+        }
+    }
+
+    /// Handles the result of upscale model validation.
+    fn handle_upscale_validation_completed(
+        &mut self,
+        result: Result<(), String>,
+        is_startup: bool,
+    ) -> Task<Message> {
+        // Ignore validation results if the app is shutting down
+        if self.shutting_down {
+            return Task::none();
+        }
+
+        match result {
+            Ok(()) => {
+                // Validation succeeded - enable upscale and persist state
+                self.settings
+                    .set_upscale_model_status(media::upscale::UpscaleModelStatus::Ready);
+                self.settings.set_enable_upscale(true);
+                self.app_state.enable_upscale = true;
+                if let Some(key) = self.app_state.save() {
+                    self.notifications
+                        .push(notifications::Notification::warning(&key));
+                }
+                // Only show success notification for user-initiated activation, not startup
+                if !is_startup {
+                    self.notifications
+                        .push(notifications::Notification::success(
+                            "notification-upscale-ready",
+                        ));
+                }
+            }
+            Err(e) => {
+                // Validation failed - reset enable_upscale, delete the model and show error
+                self.settings
+                    .set_upscale_model_status(media::upscale::UpscaleModelStatus::Error(e.clone()));
+                self.settings.set_enable_upscale(false);
+                self.app_state.enable_upscale = false;
+                if let Some(key) = self.app_state.save() {
+                    self.notifications
+                        .push(notifications::Notification::warning(&key));
+                }
+                // Delete the invalid model file
+                let _ = std::fs::remove_file(media::upscale::get_model_path());
+                self.notifications.push(
+                    notifications::Notification::error("notification-upscale-validation-error")
+                        .with_arg("error", e),
+                );
+            }
+        }
+        Task::none()
+    }
+
     /// Handles async image loading result for the editor.
     fn handle_image_editor_loaded(
         &mut self,
         result: Result<MediaData, crate::error::Error>,
     ) -> Task<Message> {
+        use crate::ui::viewer::{LoadOrigin, NavigationDirection};
+
         match result {
             Ok(media_data) => {
                 // Editor only supports images - videos are skipped during navigation
                 let MediaData::Image(image_data) = media_data else {
-                    // Should not happen: navigate_*_image() only returns images
+                    // Should not happen: peek_*_image() only returns images
                     return Task::none();
                 };
 
+                // Get the tentative path from viewer and confirm navigation
+                let Some(path) = self.viewer.current_media_path.clone() else {
+                    return Task::none();
+                };
+
+                // Confirm navigation in MediaNavigator (pessimistic update)
+                self.media_navigator.confirm_navigation(&path);
+
+                // Check if we skipped any files during navigation
+                let load_origin = std::mem::take(&mut self.viewer.load_origin);
+                if let LoadOrigin::Navigation { skipped_files, .. } = load_origin {
+                    if !skipped_files.is_empty() {
+                        let files_text =
+                            update::format_skipped_files_message(&self.i18n, &skipped_files);
+                        self.notifications.push(
+                            notifications::Notification::warning(
+                                "notification-skipped-corrupted-files",
+                            )
+                            .with_arg("files", files_text)
+                            .auto_dismiss(std::time::Duration::from_secs(8)),
+                        );
+                    }
+                }
+
                 // Create a new ImageEditorState with the loaded image
-                if let Some(current_media_path) = self.media_navigator.current_media_path() {
-                    let path = current_media_path.to_path_buf();
-                    match image_editor::State::new(path, image_data) {
-                        Ok(new_editor_state) => {
-                            self.image_editor = Some(new_editor_state);
+                match image_editor::State::new(path, image_data) {
+                    Ok(new_editor_state) => {
+                        self.image_editor = Some(new_editor_state);
+                    }
+                    Err(_) => {
+                        self.notifications.push(notifications::Notification::error(
+                            "notification-editor-create-error",
+                        ));
+                    }
+                }
+                Task::none()
+            }
+            Err(_) => {
+                // Get the failed filename from viewer's tentative path
+                let failed_filename = self
+                    .viewer
+                    .current_media_path
+                    .as_ref()
+                    .and_then(|p| p.file_name())
+                    .map_or_else(
+                        || "unknown".to_string(),
+                        |n| n.to_string_lossy().to_string(),
+                    );
+
+                // Handle based on load origin
+                let load_origin = std::mem::take(&mut self.viewer.load_origin);
+                match load_origin {
+                    LoadOrigin::Navigation {
+                        direction,
+                        skip_attempts,
+                        mut skipped_files,
+                    } => {
+                        // Add failed file to the list
+                        skipped_files.push(failed_filename);
+                        let new_attempts = skip_attempts + 1;
+                        let max_attempts = self.viewer.max_skip_attempts;
+
+                        if new_attempts <= max_attempts.value() {
+                            // Use peek_nth_*_image with skip_count to find the next file
+                            // without modifying navigator state. State is only updated
+                            // via confirm_navigation after successful load.
+                            let next_path = match direction {
+                                NavigationDirection::Next => self
+                                    .media_navigator
+                                    .peek_nth_next_image(new_attempts as usize),
+                                NavigationDirection::Previous => self
+                                    .media_navigator
+                                    .peek_nth_previous_image(new_attempts as usize),
+                            };
+
+                            if let Some(path) = next_path {
+                                // Set tentative path for next retry
+                                self.viewer.current_media_path = Some(path.clone());
+
+                                // Auto-skip: retry navigation in the same direction
+                                self.viewer.set_load_origin(LoadOrigin::Navigation {
+                                    direction,
+                                    skip_attempts: new_attempts,
+                                    skipped_files,
+                                });
+
+                                Task::perform(
+                                    async move { media::load_media(&path) },
+                                    Message::ImageEditorLoaded,
+                                )
+                            } else {
+                                // No more images to navigate to
+                                let files_text = update::format_skipped_files_message(
+                                    &self.i18n,
+                                    &skipped_files,
+                                );
+                                self.notifications.push(
+                                    notifications::Notification::warning(
+                                        "notification-skipped-corrupted-files",
+                                    )
+                                    .with_arg("files", files_text)
+                                    .auto_dismiss(std::time::Duration::from_secs(8)),
+                                );
+                                Task::none()
+                            }
+                        } else {
+                            // Max attempts reached: show grouped notification
+                            let files_text =
+                                update::format_skipped_files_message(&self.i18n, &skipped_files);
+                            self.notifications.push(
+                                notifications::Notification::warning(
+                                    "notification-skipped-corrupted-files",
+                                )
+                                .with_arg("files", files_text)
+                                .auto_dismiss(std::time::Duration::from_secs(8)),
+                            );
+                            Task::none()
                         }
-                        Err(_) => {
-                            self.notifications.push(notifications::Notification::error(
-                                "notification-editor-create-error",
-                            ));
-                        }
+                    }
+                    LoadOrigin::DirectOpen => {
+                        // This case should not happen in the editor since all loads
+                        // come from navigation. Kept as defensive fallback.
+                        #[cfg(debug_assertions)]
+                        eprintln!("[WARN] Unexpected DirectOpen in image editor error handler");
+                        self.notifications.push(notifications::Notification::error(
+                            "notification-load-error",
+                        ));
+                        Task::none()
                     }
                 }
             }
-            Err(_) => {
-                self.notifications.push(notifications::Notification::error(
-                    "notification-editor-load-error",
-                ));
-            }
         }
-        Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -906,6 +1258,8 @@ impl App {
             notifications: &self.notifications,
             is_dark_theme,
             deblur_model_status: self.settings.deblur_model_status(),
+            upscale_model_status: self.settings.upscale_model_status(),
+            enable_upscale: self.app_state.enable_upscale,
         })
     }
 }
@@ -1027,7 +1381,7 @@ mod tests {
         assert!(zoom.fit_to_window);
         assert_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert_eq!(zoom.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));
-        assert_eq!(zoom.zoom_step_percent, DEFAULT_ZOOM_STEP_PERCENT);
+        assert_eq!(zoom.zoom_step.value(), DEFAULT_ZOOM_STEP_PERCENT);
         assert_eq!(
             app.settings.background_theme(),
             config::BackgroundTheme::default()
@@ -1367,8 +1721,8 @@ mod tests {
                 theme_mode: crate::ui::theming::ThemeMode::System,
                 video_autoplay: false,
                 audio_normalization: true,
-                frame_cache_mb: config::DEFAULT_FRAME_CACHE_MB,
-                frame_history_mb: config::DEFAULT_FRAME_HISTORY_MB,
+                frame_cache_mb: crate::video_player::FrameCacheMb::default().value(),
+                frame_history_mb: crate::video_player::FrameHistoryMb::default().value(),
                 keyboard_seek_step_secs: config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
                 notifications: &mut notifs,
             });
@@ -1742,9 +2096,10 @@ mod tests {
     #[test]
     fn title_shows_new_image_for_captured_frame() {
         use crate::media::frame_export::ExportableFrame;
+        use std::sync::Arc;
 
         // Create a captured frame (4x3 black pixels)
-        let rgba_data = vec![0u8; 4 * 3 * 4]; // width * height * 4 channels
+        let rgba_data = Arc::new(vec![0u8; 4 * 3 * 4]); // width * height * 4 channels
         let frame = ExportableFrame::new(rgba_data, 4, 3);
         let video_path = PathBuf::from("/path/to/video.mp4");
 
@@ -1767,9 +2122,10 @@ mod tests {
     #[test]
     fn title_shows_new_image_for_captured_frame_even_with_changes() {
         use crate::media::frame_export::ExportableFrame;
+        use std::sync::Arc;
 
         // Create a captured frame
-        let rgba_data = vec![0u8; 4 * 3 * 4];
+        let rgba_data = Arc::new(vec![0u8; 4 * 3 * 4]);
         let frame = ExportableFrame::new(rgba_data, 4, 3);
         let video_path = PathBuf::from("/path/to/video.mp4");
 

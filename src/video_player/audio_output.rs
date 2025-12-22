@@ -34,8 +34,12 @@ pub enum AudioOutputCommand {
     /// Used during seek to discard old audio without interrupting playback.
     ClearBuffer,
 
-    /// Set volume (0.0 to 1.0).
-    SetVolume(f32),
+    /// Set volume (0.0–1.5, perceptually scaled).
+    /// A quadratic curve is applied: actual = slider², so:
+    /// - 50% slider → 25% actual (-12 dB)
+    /// - 100% slider → 100% actual (0 dB)
+    /// - 150% slider → 225% actual (+7 dB)
+    SetVolume(super::Volume),
 
     /// Set mute state.
     SetMuted(bool),
@@ -122,7 +126,7 @@ impl AudioOutput {
         // Get supported config
         let supported_config = device
             .default_output_config()
-            .map_err(|e| Error::Io(format!("Failed to get audio config: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to get audio config: {e}")))?;
 
         let sample_rate = supported_config.sample_rate().0;
         let channels = supported_config.channels();
@@ -181,8 +185,9 @@ impl AudioOutput {
                             buf.clear();
                         }
                     }
-                    AudioOutputCommand::SetVolume(vol) => {
-                        shared_for_task.set_volume(vol.clamp(0.0, 1.0));
+                    AudioOutputCommand::SetVolume(volume) => {
+                        // Volume type guarantees valid range, no clamp needed
+                        shared_for_task.set_volume(volume.value());
                     }
                     AudioOutputCommand::SetMuted(muted) => {
                         shared_for_task.set_muted(muted);
@@ -217,7 +222,7 @@ impl AudioOutput {
         // Start the stream
         stream
             .play()
-            .map_err(|e| Error::Io(format!("Failed to start audio stream: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to start audio stream: {e}")))?;
 
         Ok(Self {
             command_tx,
@@ -265,9 +270,22 @@ impl AudioOutput {
                         }
                     };
 
+                    // Apply perceptual volume curve (quadratic) for natural-feeling control.
+                    // Human hearing is logarithmic, so a linear slider feels wrong.
+                    // Squaring the volume makes the slider perceptually linear:
+                    // - 50% slider → 25% actual (-12 dB, sounds like "half")
+                    // - 100% slider → 100% actual (0 dB, unchanged)
+                    // - 150% slider → 225% actual (+7 dB, clearly louder)
+                    let perceptual_volume = volume * volume;
+
                     for (i, sample) in data.iter_mut().enumerate() {
                         if i < buf.len() {
-                            *sample = T::from_sample(buf[i] * volume);
+                            // Apply volume and clamp to safe range.
+                            // Clamping to slightly below 1.0 prevents i16 overflow
+                            // (dasp's from_sample overflows at exactly 1.0 for i16).
+                            // Values > 1.0 represent amplification and will be clipped.
+                            let amplified = (buf[i] * perceptual_volume).clamp(-1.0, 0.999_999_9);
+                            *sample = T::from_sample(amplified);
                         } else {
                             *sample = T::from_sample(0.0f32);
                         }
@@ -278,11 +296,11 @@ impl AudioOutput {
                     buf.drain(..consumed);
                 },
                 |err| {
-                    eprintln!("Audio output error: {}", err);
+                    eprintln!("Audio output error: {err}");
                 },
                 None,
             )
-            .map_err(|e| Error::Io(format!("Failed to build audio stream: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to build audio stream: {e}")))?;
 
         Ok(stream)
     }
@@ -320,8 +338,8 @@ impl AudioOutput {
         self.send_command(AudioOutputCommand::ClearBuffer)
     }
 
-    /// Sets the volume (0.0 to 1.0).
-    pub fn set_volume(&self, volume: f32) -> Result<()> {
+    /// Sets the volume.
+    pub fn set_volume(&self, volume: super::Volume) -> Result<()> {
         self.send_command(AudioOutputCommand::SetVolume(volume))
     }
 
@@ -354,6 +372,7 @@ impl AudioOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::video_player::Volume;
 
     #[test]
     fn shared_state_volume_operations() {
@@ -393,8 +412,8 @@ mod tests {
 
     #[test]
     fn audio_output_command_debug() {
-        let cmd = AudioOutputCommand::SetVolume(0.5);
-        let debug_str = format!("{:?}", cmd);
+        let cmd = AudioOutputCommand::SetVolume(Volume::new(0.5));
+        let debug_str = format!("{cmd:?}");
         assert!(debug_str.contains("SetVolume"));
     }
 

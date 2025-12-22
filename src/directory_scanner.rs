@@ -1,31 +1,31 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Directory scanner module for finding and sorting image files.
+//! Directory scanner module for finding and sorting media files.
 //!
-//! This module scans a directory for supported image formats, filters them,
-//! and sorts them according to the configured sort order.
+//! This module scans a directory for supported media formats (images and videos),
+//! filters them, and sorts them according to the configured sort order.
 
 use crate::config::SortOrder;
 use crate::error::Result;
 use crate::media;
 use std::path::{Path, PathBuf};
 
-/// Represents a list of image files in a directory with navigation capabilities.
+/// Represents a list of media files (images and videos) in a directory with navigation capabilities.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ImageList {
-    images: Vec<PathBuf>,
+pub struct MediaList {
+    media_files: Vec<PathBuf>,
     current_index: Option<usize>,
 }
 
-impl ImageList {
-    /// Creates a new empty ImageList.
+impl MediaList {
+    /// Creates a new empty MediaList.
     pub fn new() -> Self {
         Self {
-            images: Vec::new(),
+            media_files: Vec::new(),
             current_index: None,
         }
     }
 
-    /// Scans a directory for supported image files and sorts them.
+    /// Scans a directory for supported media files and sorts them.
     /// If the current file doesn't exist anymore, the scan still succeeds but
     /// current_index will be None.
     pub fn scan_directory(current_file: &Path, sort_order: SortOrder) -> Result<Self> {
@@ -33,24 +33,24 @@ impl ImageList {
             .parent()
             .ok_or_else(|| crate::error::Error::Io("No parent directory".into()))?;
 
-        let mut images = Vec::new();
+        let mut media_files = Vec::new();
 
         for entry in std::fs::read_dir(parent)? {
             let entry = entry?;
             let path = entry.path();
 
             if path.is_file() && is_supported_media(&path) {
-                images.push(path);
+                media_files.push(path);
             }
         }
 
-        sort_images(&mut images, sort_order)?;
+        sort_media_files(&mut media_files, sort_order)?;
 
         // Find current file in the list (may be None if file was deleted)
-        let current_index = images.iter().position(|p| p == current_file);
+        let current_index = media_files.iter().position(|p| p == current_file);
 
         Ok(Self {
-            images,
+            media_files,
             current_index,
         })
     }
@@ -60,100 +60,120 @@ impl ImageList {
     ///
     /// Returns an error if the directory cannot be read.
     pub fn scan_directory_direct(directory: &Path, sort_order: SortOrder) -> Result<Self> {
-        let mut images = Vec::new();
+        let mut media_files = Vec::new();
 
         for entry in std::fs::read_dir(directory)? {
             let entry = entry?;
             let path = entry.path();
 
             if path.is_file() && is_supported_media(&path) {
-                images.push(path);
+                media_files.push(path);
             }
         }
 
-        sort_images(&mut images, sort_order)?;
+        sort_media_files(&mut media_files, sort_order)?;
 
         // Set current_index to first file if any exist
-        let current_index = if images.is_empty() { None } else { Some(0) };
+        let current_index = if media_files.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
 
         Ok(Self {
-            images,
+            media_files,
             current_index,
         })
     }
 
     /// Returns the first media file in the list, if any.
     pub fn first(&self) -> Option<&Path> {
-        self.images.first().map(|p| p.as_path())
+        self.media_files.first().map(std::path::PathBuf::as_path)
     }
 
-    /// Returns the current image path.
+    /// Returns the current media path.
     pub fn current(&self) -> Option<&Path> {
         self.current_index
-            .and_then(|idx| self.images.get(idx))
-            .map(|p| p.as_path())
+            .and_then(|idx| self.media_files.get(idx))
+            .map(std::path::PathBuf::as_path)
     }
 
-    /// Returns the next image path, wrapping around to the start.
+    /// Returns the next media path, wrapping around to the start.
     pub fn next(&self) -> Option<&Path> {
-        if self.images.is_empty() {
+        self.peek_nth_next(0)
+    }
+
+    /// Returns the previous media path, wrapping around to the end.
+    pub fn previous(&self) -> Option<&Path> {
+        self.peek_nth_previous(0)
+    }
+
+    /// Returns the n-th next media path from current position, wrapping around.
+    /// `skip_count = 0` returns immediate next, `skip_count = 1` skips one file, etc.
+    pub fn peek_nth_next(&self, skip_count: usize) -> Option<&Path> {
+        if self.media_files.is_empty() {
             return None;
         }
 
+        let offset = skip_count + 1;
         let next_index = match self.current_index {
-            Some(idx) => (idx + 1) % self.images.len(),
-            None => 0,
+            Some(idx) => (idx + offset) % self.media_files.len(),
+            None => offset.saturating_sub(1) % self.media_files.len(),
         };
 
-        self.images.get(next_index).map(|p| p.as_path())
+        self.media_files
+            .get(next_index)
+            .map(std::path::PathBuf::as_path)
     }
 
-    /// Returns the previous image path, wrapping around to the end.
-    pub fn previous(&self) -> Option<&Path> {
-        if self.images.is_empty() {
+    /// Returns the n-th previous media path from current position, wrapping around.
+    /// `skip_count = 0` returns immediate previous, `skip_count = 1` skips one file, etc.
+    pub fn peek_nth_previous(&self, skip_count: usize) -> Option<&Path> {
+        if self.media_files.is_empty() {
             return None;
         }
 
+        let offset = skip_count + 1;
+        let len = self.media_files.len();
         let prev_index = match self.current_index {
             Some(idx) => {
-                if idx == 0 {
-                    self.images.len() - 1
-                } else {
-                    idx - 1
-                }
+                // Handle wrap-around with modular arithmetic
+                (idx + len - (offset % len)) % len
             }
-            None => self.images.len() - 1,
+            None => len.saturating_sub(offset % len) % len,
         };
 
-        self.images.get(prev_index).map(|p| p.as_path())
+        self.media_files
+            .get(prev_index)
+            .map(std::path::PathBuf::as_path)
     }
 
-    /// Checks if we're at the first image (used for boundary indication).
+    /// Checks if we're at the first media (used for boundary indication).
     pub fn is_at_first(&self) -> bool {
         matches!(self.current_index, Some(0))
     }
 
-    /// Checks if we're at the last image (used for boundary indication).
+    /// Checks if we're at the last media (used for boundary indication).
     pub fn is_at_last(&self) -> bool {
-        if self.images.is_empty() {
+        if self.media_files.is_empty() {
             return false;
         }
-        matches!(self.current_index, Some(idx) if idx == self.images.len() - 1)
+        matches!(self.current_index, Some(idx) if idx == self.media_files.len() - 1)
     }
 
-    /// Returns the total number of images in the list.
+    /// Returns the total number of media files in the list.
     pub fn len(&self) -> usize {
-        self.images.len()
+        self.media_files.len()
     }
 
-    /// Checks if the image list is empty.
+    /// Checks if the media list is empty.
     pub fn is_empty(&self) -> bool {
-        self.images.is_empty()
+        self.media_files.is_empty()
     }
 
     /// Updates the current index to the given path if it exists in the list.
     pub fn set_current(&mut self, path: &Path) {
-        self.current_index = self.images.iter().position(|p| p == path);
+        self.current_index = self.media_files.iter().position(|p| p == path);
     }
 
     /// Returns the current index if set.
@@ -163,18 +183,18 @@ impl ImageList {
 
     /// Returns the path at the specified index.
     pub fn get(&self, index: usize) -> Option<&Path> {
-        self.images.get(index).map(|p| p.as_path())
+        self.media_files.get(index).map(std::path::PathBuf::as_path)
     }
 
     /// Sets the current index directly.
     pub fn set_current_index(&mut self, index: usize) {
-        if index < self.images.len() {
+        if index < self.media_files.len() {
             self.current_index = Some(index);
         }
     }
 }
 
-impl Default for ImageList {
+impl Default for MediaList {
     fn default() -> Self {
         Self::new()
     }
@@ -185,14 +205,14 @@ fn is_supported_media(path: &Path) -> bool {
     media::detect_media_type(path).is_some()
 }
 
-/// Sorts a list of image paths according to the specified sort order.
-fn sort_images(images: &mut [PathBuf], sort_order: SortOrder) -> Result<()> {
+/// Sorts a list of media file paths according to the specified sort order.
+fn sort_media_files(media_files: &mut [PathBuf], sort_order: SortOrder) -> Result<()> {
     match sort_order {
         SortOrder::Alphabetical => {
-            images.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+            media_files.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
         }
         SortOrder::ModifiedDate => {
-            images.sort_by(|a, b| {
+            media_files.sort_by(|a, b| {
                 let a_time = a
                     .metadata()
                     .and_then(|m| m.modified())
@@ -205,7 +225,7 @@ fn sort_images(images: &mut [PathBuf], sort_order: SortOrder) -> Result<()> {
             });
         }
         SortOrder::CreatedDate => {
-            images.sort_by(|a, b| {
+            media_files.sort_by(|a, b| {
                 let a_time = a
                     .metadata()
                     .and_then(|m| m.created())
@@ -252,7 +272,7 @@ mod tests {
         let _img3 = create_test_image(temp_dir.path(), "c.gif");
         create_test_image(temp_dir.path(), "not_image.txt");
 
-        let list = ImageList::scan_directory(&img1, SortOrder::Alphabetical)
+        let list = MediaList::scan_directory(&img1, SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         assert_eq!(list.len(), 3);
@@ -266,12 +286,12 @@ mod tests {
         let img_a = create_test_image(temp_dir.path(), "a.jpg");
         let img_b = create_test_image(temp_dir.path(), "b.jpg");
 
-        let list = ImageList::scan_directory(&img_a, SortOrder::Alphabetical)
+        let list = MediaList::scan_directory(&img_a, SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
-        assert_eq!(list.images[0], img_a);
-        assert_eq!(list.images[1], img_b);
-        assert_eq!(list.images[2], img_c);
+        assert_eq!(list.media_files[0], img_a);
+        assert_eq!(list.media_files[1], img_b);
+        assert_eq!(list.media_files[2], img_c);
     }
 
     #[test]
@@ -281,7 +301,7 @@ mod tests {
         let _img2 = create_test_image(temp_dir.path(), "b.jpg");
         let img3 = create_test_image(temp_dir.path(), "c.jpg");
 
-        let list = ImageList::scan_directory(&img3, SortOrder::Alphabetical)
+        let list = MediaList::scan_directory(&img3, SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         assert_eq!(list.current(), Some(img3.as_path()));
@@ -295,7 +315,7 @@ mod tests {
         let _img2 = create_test_image(temp_dir.path(), "b.jpg");
         let img3 = create_test_image(temp_dir.path(), "c.jpg");
 
-        let list = ImageList::scan_directory(&img1, SortOrder::Alphabetical)
+        let list = MediaList::scan_directory(&img1, SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         assert_eq!(list.current(), Some(img1.as_path()));
@@ -309,17 +329,17 @@ mod tests {
         let img2 = create_test_image(temp_dir.path(), "b.jpg");
         let img3 = create_test_image(temp_dir.path(), "c.jpg");
 
-        let list_first = ImageList::scan_directory(&img1, SortOrder::Alphabetical)
+        let list_first = MediaList::scan_directory(&img1, SortOrder::Alphabetical)
             .expect("failed to scan directory");
         assert!(list_first.is_at_first());
         assert!(!list_first.is_at_last());
 
-        let list_last = ImageList::scan_directory(&img3, SortOrder::Alphabetical)
+        let list_last = MediaList::scan_directory(&img3, SortOrder::Alphabetical)
             .expect("failed to scan directory");
         assert!(!list_last.is_at_first());
         assert!(list_last.is_at_last());
 
-        let list_middle = ImageList::scan_directory(&img2, SortOrder::Alphabetical)
+        let list_middle = MediaList::scan_directory(&img2, SortOrder::Alphabetical)
             .expect("failed to scan directory");
         assert!(!list_middle.is_at_first());
         assert!(!list_middle.is_at_last());
@@ -327,7 +347,7 @@ mod tests {
 
     #[test]
     fn empty_list_navigation_returns_none() {
-        let list = ImageList::new();
+        let list = MediaList::new();
         assert!(list.current().is_none());
         assert!(list.next().is_none());
         assert!(list.previous().is_none());
@@ -340,7 +360,7 @@ mod tests {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let img1 = create_test_image(temp_dir.path(), "only.jpg");
 
-        let list = ImageList::scan_directory(&img1, SortOrder::Alphabetical)
+        let list = MediaList::scan_directory(&img1, SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         assert_eq!(list.current(), Some(img1.as_path()));
@@ -385,7 +405,7 @@ mod tests {
         let _vid2 = create_test_video(temp_dir.path(), "d.avi");
         create_test_image(temp_dir.path(), "not_media.txt");
 
-        let list = ImageList::scan_directory(&img1, SortOrder::Alphabetical)
+        let list = MediaList::scan_directory(&img1, SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         // Should find 4 media files (2 images + 2 videos)
@@ -399,7 +419,7 @@ mod tests {
         let vid1 = create_test_video(temp_dir.path(), "b.mp4");
         let img2 = create_test_image(temp_dir.path(), "c.png");
 
-        let mut list = ImageList::scan_directory(&img1, SortOrder::Alphabetical)
+        let mut list = MediaList::scan_directory(&img1, SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         // Start at first image
@@ -426,7 +446,7 @@ mod tests {
         let _vid = create_test_video(temp_dir.path(), "c.mp4");
         create_test_image(temp_dir.path(), "not_media.txt");
 
-        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+        let list = MediaList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         assert_eq!(list.len(), 3);
@@ -441,7 +461,7 @@ mod tests {
         let img_a = create_test_image(temp_dir.path(), "a.jpg");
         let _img_b = create_test_image(temp_dir.path(), "b.jpg");
 
-        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+        let list = MediaList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         assert_eq!(list.first(), Some(img_a.as_path()));
@@ -454,7 +474,7 @@ mod tests {
         create_test_image(temp_dir.path(), "readme.txt");
         create_test_image(temp_dir.path(), "document.pdf");
 
-        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+        let list = MediaList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         assert!(list.is_empty());
@@ -466,7 +486,7 @@ mod tests {
     fn scan_directory_direct_handles_empty_directory() {
         let temp_dir = tempdir().expect("failed to create temp dir");
 
-        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+        let list = MediaList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         assert!(list.is_empty());
@@ -479,7 +499,7 @@ mod tests {
         let img_a = create_test_image(temp_dir.path(), "a.jpg");
         let _img_b = create_test_image(temp_dir.path(), "b.jpg");
 
-        let list = ImageList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
+        let list = MediaList::scan_directory_direct(temp_dir.path(), SortOrder::Alphabetical)
             .expect("failed to scan directory");
 
         assert_eq!(list.first(), Some(img_a.as_path()));

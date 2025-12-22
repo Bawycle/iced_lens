@@ -5,6 +5,7 @@ use crate::config::BackgroundTheme;
 use crate::error::{Error, Result};
 use crate::media::deblur::ModelStatus;
 use crate::media::frame_export::{ExportFormat, ExportableFrame};
+use crate::media::upscale::UpscaleModelStatus;
 use crate::media::ImageData;
 use iced::{Element, Rectangle};
 use image_rs;
@@ -20,6 +21,10 @@ pub struct ViewContext<'a> {
     pub is_dark_theme: bool,
     /// Current status of the AI deblur model.
     pub deblur_model_status: &'a ModelStatus,
+    /// Current status of the AI upscale model.
+    pub upscale_model_status: &'a UpscaleModelStatus,
+    /// Whether AI upscaling is enabled for resize operations > 100%.
+    pub enable_upscale: bool,
 }
 
 impl State {
@@ -48,6 +53,10 @@ impl State {
             preview_image: None,
             viewport: crate::ui::state::ViewportState::default(),
             export_format: ExportFormat::Png,
+            zoom: crate::ui::state::ZoomState::default(),
+            cursor_position: None,
+            cursor_over_canvas: false,
+            drag: crate::ui::state::DragState::default(),
         })
     }
 
@@ -85,6 +94,10 @@ impl State {
             preview_image: None,
             viewport: crate::ui::state::ViewportState::default(),
             export_format: ExportFormat::Png,
+            zoom: crate::ui::state::ZoomState::default(),
+            cursor_position: None,
+            cursor_over_canvas: false,
+            drag: crate::ui::state::DragState::default(),
         })
     }
 
@@ -94,6 +107,11 @@ impl State {
     }
 
     pub(crate) fn display_image(&self) -> &ImageData {
+        // For resize tool, always show the original image on canvas
+        // (preview is shown as thumbnail in sidebar to avoid zoom confusion)
+        if self.active_tool == Some(EditorTool::Resize) {
+            return &self.current_image;
+        }
         self.preview_image.as_ref().unwrap_or(&self.current_image)
     }
 }

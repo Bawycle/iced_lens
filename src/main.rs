@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
+
+// Hide console window on Windows release builds
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use iced_lens::app::{self, Flags};
 
 /// Application run mode derived from CLI arguments.
@@ -89,7 +93,7 @@ mod tests {
                 assert_eq!(flags.file_path.as_deref(), Some("image.png"));
                 assert_eq!(flags.i18n_dir.as_deref(), Some("custom/langs"));
             }
-            _ => panic!("expected Normal mode"),
+            RunMode::Help(_, _) => panic!("expected Normal mode"),
         }
     }
 
@@ -105,7 +109,7 @@ mod tests {
                 assert!(flags.data_dir.is_none());
                 assert!(flags.config_dir.is_none());
             }
-            _ => panic!("expected Normal mode"),
+            RunMode::Help(_, _) => panic!("expected Normal mode"),
         }
     }
 
@@ -123,7 +127,7 @@ mod tests {
                 assert_eq!(flags.data_dir.as_deref(), Some("/custom/data"));
                 assert_eq!(flags.config_dir.as_deref(), Some("/custom/config"));
             }
-            _ => panic!("expected Normal mode"),
+            RunMode::Help(_, _) => panic!("expected Normal mode"),
         }
     }
 
@@ -133,7 +137,7 @@ mod tests {
         let mode = parse_run_mode(pico_args::Arguments::from_vec(args)).expect("parse should work");
         match mode {
             RunMode::Help(_, _) => {}
-            _ => panic!("expected Help mode"),
+            RunMode::Normal(_) => panic!("expected Help mode"),
         }
     }
 
@@ -155,7 +159,7 @@ mod tests {
                 assert!(text.contains("UTILISATION"));
                 assert!(text.contains("OPTIONS"));
             }
-            _ => panic!("expected Help mode"),
+            RunMode::Normal(_) => panic!("expected Help mode"),
         }
     }
 }

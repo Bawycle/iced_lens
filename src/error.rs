@@ -134,13 +134,13 @@ impl fmt::Display for VideoError {
         match self {
             VideoError::UnsupportedFormat => write!(f, "Unsupported video format"),
             VideoError::UnsupportedCodec(codec) => {
-                write!(f, "Unsupported video codec: {}", codec)
+                write!(f, "Unsupported video codec: {codec}")
             }
             VideoError::CorruptedFile => write!(f, "Video file is corrupted"),
             VideoError::NoVideoStream => write!(f, "No video stream found"),
-            VideoError::DecodingFailed(msg) => write!(f, "Decoding failed: {}", msg),
-            VideoError::IoError(msg) => write!(f, "I/O error: {}", msg),
-            VideoError::Other(msg) => write!(f, "{}", msg),
+            VideoError::DecodingFailed(msg) => write!(f, "Decoding failed: {msg}"),
+            VideoError::IoError(msg) => write!(f, "I/O error: {msg}"),
+            VideoError::Other(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -148,10 +148,10 @@ impl fmt::Display for VideoError {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Io(e) => write!(f, "I/O Error: {}", e),
-            Error::Svg(e) => write!(f, "SVG Error: {}", e),
-            Error::Config(e) => write!(f, "Config Error: {}", e),
-            Error::Video(e) => write!(f, "Video Error: {}", e),
+            Error::Io(e) => write!(f, "I/O Error: {e}"),
+            Error::Svg(e) => write!(f, "SVG Error: {e}"),
+            Error::Config(e) => write!(f, "Config Error: {e}"),
+            Error::Video(e) => write!(f, "Video Error: {e}"),
         }
     }
 }
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn display_formats_io_error() {
         let err = Error::Io("disk failure".to_string());
-        assert_eq!(format!("{}", err), "I/O Error: disk failure");
+        assert_eq!(format!("{err}"), "I/O Error: disk failure");
     }
 
     #[test]
@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn config_error_formats_properly() {
         let err = Error::Config("bad field".into());
-        assert_eq!(format!("{}", err), "Config Error: bad field");
+        assert_eq!(format!("{err}"), "Config Error: bad field");
     }
 
     #[test]
@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn video_error_display() {
         let err = VideoError::UnsupportedCodec("H264".to_string());
-        assert!(format!("{}", err).contains("H264"));
+        assert!(format!("{err}").contains("H264"));
     }
 
     #[test]
