@@ -82,6 +82,8 @@ pub struct State {
     pub zoom: ZoomState,
     /// Current cursor position (for zoom-on-scroll detection)
     cursor_position: Option<iced::Point>,
+    /// Whether cursor is currently over the canvas area (set by mouse_area events)
+    cursor_over_canvas: bool,
     /// Drag state for pan navigation
     drag: DragState,
 }

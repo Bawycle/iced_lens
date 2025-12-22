@@ -205,10 +205,12 @@ impl State {
         match message {
             CanvasMessage::CursorMoved { position } => {
                 self.cursor_position = Some(position);
+                self.cursor_over_canvas = true;
                 Event::None
             }
             CanvasMessage::CursorLeft => {
                 self.cursor_position = None;
+                self.cursor_over_canvas = false;
                 Event::None
             }
             _ => self.handle_crop_canvas_message(message),
@@ -304,13 +306,19 @@ impl State {
     }
 
     /// Checks if the cursor is currently positioned over the canvas area.
+    ///
+    /// Uses viewport bounds when available, otherwise falls back to the
+    /// `cursor_over_canvas` flag set by mouse_area events. This fallback
+    /// is needed when scrollbars are not visible (image fits in viewport),
+    /// since the scrollable's on_scroll callback is never triggered.
     fn is_cursor_over_canvas(&self) -> bool {
         let Some(cursor) = self.cursor_position else {
             return false;
         };
 
         let Some(bounds) = self.viewport.bounds else {
-            return false;
+            // Fallback: use mouse_area tracking when viewport bounds unknown
+            return self.cursor_over_canvas;
         };
 
         // Check if cursor is within the canvas viewport bounds

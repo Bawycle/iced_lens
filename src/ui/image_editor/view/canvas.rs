@@ -16,7 +16,7 @@ use iced::{Background, Color, Element, Length, Padding, Size, Theme};
 
 use super::super::{
     overlay::{CropOverlayRenderer, ResizeOverlayRenderer},
-    CropState, DeblurState, Message, ResizeState, State, ViewContext,
+    CanvasMessage, CropState, DeblurState, Message, ResizeState, State, ViewContext,
 };
 use super::scrollable_canvas;
 
@@ -206,8 +206,11 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
         mouse::Interaction::Grab
     };
 
-    // Wrap canvas in mouse_area for cursor feedback
-    let canvas_with_cursor = mouse_area(canvas_content).interaction(cursor_interaction);
+    // Wrap canvas in mouse_area for cursor feedback and tracking
+    let canvas_with_cursor = mouse_area(canvas_content)
+        .interaction(cursor_interaction)
+        .on_move(|position| Message::Canvas(CanvasMessage::CursorMoved { position }))
+        .on_exit(Message::Canvas(CanvasMessage::CursorLeft));
 
     // Apply background
     let build_surface = || {

@@ -55,6 +55,7 @@ impl State {
             export_format: ExportFormat::Png,
             zoom: crate::ui::state::ZoomState::default(),
             cursor_position: None,
+            cursor_over_canvas: false,
             drag: crate::ui::state::DragState::default(),
         })
     }
@@ -95,6 +96,7 @@ impl State {
             export_format: ExportFormat::Png,
             zoom: crate::ui::state::ZoomState::default(),
             cursor_position: None,
+            cursor_over_canvas: false,
             drag: crate::ui::state::DragState::default(),
         })
     }
