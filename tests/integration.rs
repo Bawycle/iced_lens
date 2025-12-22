@@ -15,14 +15,6 @@ use tempfile::tempdir;
 static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
 #[test]
-#[allow(clippy::assertions_on_constants)]
-fn test_open_image_updates_state() {
-    // This will require the full application state and image loading to be implemented.
-    // For now, this is a placeholder.
-    assert!(true);
-}
-
-#[test]
 fn test_language_change_via_config() {
     // Create a temporary directory for the config file
     let dir = tempdir().expect("Failed to create temporary directory");
@@ -110,7 +102,7 @@ fn test_language_change_via_config() {
 // Path Injection Integration Tests
 // =============================================================================
 
-/// Tests that AppState and Config can use separate isolated directories.
+/// Tests that `AppState` and Config can use separate isolated directories.
 #[test]
 fn test_isolated_directories_for_state_and_config() {
     let state_dir = tempdir().expect("create state temp dir");
@@ -276,11 +268,11 @@ fn test_ci_friendly_isolated_tests() {
             let base = dir.path().to_path_buf();
 
             let mut config = Config::default();
-            config.general.language = Some(format!("lang-{}", i));
+            config.general.language = Some(format!("lang-{i}"));
             config::save_with_override(&config, Some(base.clone())).expect("save");
 
             let state = AppState {
-                last_save_directory: Some(PathBuf::from(format!("/run/{}/save", i))),
+                last_save_directory: Some(PathBuf::from(format!("/run/{i}/save"))),
                 last_open_directory: None,
                 enable_deblur: false,
                 enable_upscale: false,
@@ -296,10 +288,10 @@ fn test_ci_friendly_isolated_tests() {
         let (loaded_config, _) = config::load_with_override(Some(base.clone()));
         let (loaded_state, _) = AppState::load_from(Some(base));
 
-        assert_eq!(loaded_config.general.language, Some(format!("lang-{}", i)));
+        assert_eq!(loaded_config.general.language, Some(format!("lang-{i}")));
         assert_eq!(
             loaded_state.last_save_directory,
-            Some(PathBuf::from(format!("/run/{}/save", i)))
+            Some(PathBuf::from(format!("/run/{i}/save")))
         );
 
         // Explicitly drop to clean up temp dir

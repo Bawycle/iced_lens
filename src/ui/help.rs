@@ -578,7 +578,7 @@ fn build_tool_item<'a>(name: String, description: String) -> Element<'a, Message
     Row::new()
         .spacing(spacing::SM)
         .push(
-            Text::new(format!("• {}:", name))
+            Text::new(format!("• {name}:"))
                 .size(typography::BODY)
                 .font(Font {
                     weight: Weight::Bold,
@@ -606,7 +606,7 @@ fn build_tool_item_with_icon<'a>(
         .push(Text::new("•").size(typography::BODY))
         .push(icon_widget)
         .push(
-            Text::new(format!("{}:", name))
+            Text::new(format!("{name}:"))
                 .size(typography::BODY)
                 .font(Font {
                     weight: Weight::Bold,
@@ -632,7 +632,7 @@ fn build_bullet_with_icon<'a>(icon: Image<Handle>, content: String) -> Element<'
 
 /// Build a bullet point.
 fn build_bullet<'a>(content: String) -> Element<'a, Message> {
-    Text::new(format!("  • {}", content))
+    Text::new(format!("  • {content}"))
         .size(typography::BODY)
         .into()
 }

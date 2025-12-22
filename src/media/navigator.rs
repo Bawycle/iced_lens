@@ -102,7 +102,7 @@ impl MediaNavigator {
     /// Returns `None` if there are no media in the list.
     /// Wraps around to the first media when at the last media.
     pub fn peek_next(&self) -> Option<PathBuf> {
-        self.media_list.next().map(|p| p.to_path_buf())
+        self.media_list.next().map(std::path::Path::to_path_buf)
     }
 
     /// Returns the previous media path WITHOUT updating current position.
@@ -111,7 +111,7 @@ impl MediaNavigator {
     /// Returns `None` if there are no media in the list.
     /// Wraps around to the last media when at the first media.
     pub fn peek_previous(&self) -> Option<PathBuf> {
-        self.media_list.previous().map(|p| p.to_path_buf())
+        self.media_list.previous().map(std::path::Path::to_path_buf)
     }
 
     /// Returns the n-th next media path WITHOUT updating current position.
@@ -122,7 +122,7 @@ impl MediaNavigator {
     pub fn peek_nth_next(&self, skip_count: usize) -> Option<PathBuf> {
         self.media_list
             .peek_nth_next(skip_count)
-            .map(|p| p.to_path_buf())
+            .map(std::path::Path::to_path_buf)
     }
 
     /// Returns the n-th previous media path WITHOUT updating current position.
@@ -133,7 +133,7 @@ impl MediaNavigator {
     pub fn peek_nth_previous(&self, skip_count: usize) -> Option<PathBuf> {
         self.media_list
             .peek_nth_previous(skip_count)
-            .map(|p| p.to_path_buf())
+            .map(std::path::Path::to_path_buf)
     }
 
     /// Returns the next image path (skipping videos) WITHOUT updating position.

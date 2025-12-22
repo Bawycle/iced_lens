@@ -305,14 +305,12 @@ impl State {
 
     /// Checks if the cursor is currently positioned over the canvas area.
     fn is_cursor_over_canvas(&self) -> bool {
-        let cursor = match self.cursor_position {
-            Some(pos) => pos,
-            None => return false,
+        let Some(cursor) = self.cursor_position else {
+            return false;
         };
 
-        let bounds = match self.viewport.bounds {
-            Some(bounds) => bounds,
-            None => return false,
+        let Some(bounds) = self.viewport.bounds else {
+            return false;
         };
 
         // Check if cursor is within the canvas viewport bounds
@@ -346,9 +344,8 @@ impl State {
 
     /// Updates the viewport when dragging to pan the image.
     fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Event {
-        let proposed_offset = match self.drag.calculate_offset(position) {
-            Some(offset) => offset,
-            None => return Event::None,
+        let Some(proposed_offset) = self.drag.calculate_offset(position) else {
+            return Event::None;
         };
 
         // Get viewport and scaled image size to clamp offset

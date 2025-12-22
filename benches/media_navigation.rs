@@ -54,17 +54,27 @@ fn bench_navigate(c: &mut Criterion) {
         .scan_directory(&sample_image, SortOrder::Alphabetical)
         .unwrap();
 
-    group.bench_function("navigate_next", |b| {
+    group.bench_function("peek_next", |b| {
         b.iter(|| {
-            let mut nav = navigator.clone();
-            black_box(nav.navigate_next());
+            let nav = navigator.clone();
+            black_box(nav.peek_next());
         });
     });
 
-    group.bench_function("navigate_previous", |b| {
+    group.bench_function("peek_previous", |b| {
+        b.iter(|| {
+            let nav = navigator.clone();
+            black_box(nav.peek_previous());
+        });
+    });
+
+    group.bench_function("peek_and_confirm_next", |b| {
         b.iter(|| {
             let mut nav = navigator.clone();
-            black_box(nav.navigate_previous());
+            if let Some(next) = nav.peek_next() {
+                nav.confirm_navigation(&next);
+            }
+            black_box(&nav);
         });
     });
 

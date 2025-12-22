@@ -51,12 +51,10 @@ fn pick_dir(override_dir: Option<String>) -> String {
     if let Some(dir) = override_dir {
         if std::path::Path::new(&dir).is_dir() {
             return dir;
-        } else {
-            eprintln!(
-                "Provided i18n directory does not exist or is not a directory: {}",
-                dir
-            );
         }
+        eprintln!(
+            "Provided i18n directory does not exist or is not a directory: {dir}"
+        );
     }
     TRANSLATIONS_DIR.to_string()
 }
@@ -68,7 +66,7 @@ impl I18n {
 
         let dir = pick_dir(cli_dir);
         if let Ok(entries) = fs::read_dir(&dir) {
-            for entry in entries.filter_map(|e| e.ok()) {
+            for entry in entries.filter_map(Result::ok) {
                 let path = entry.path();
                 if !path.is_file() {
                     continue;
@@ -83,7 +81,7 @@ impl I18n {
                     Some(locale_str) => match locale_str.parse::<LanguageIdentifier>() {
                         Ok(locale) => locale,
                         Err(_) => {
-                            eprintln!("Invalid locale in FTL filename '{}'; skipping", filename);
+                            eprintln!("Invalid locale in FTL filename '{filename}'; skipping");
                             continue;
                         }
                     },
@@ -113,8 +111,7 @@ impl I18n {
                 let mut bundle = FluentBundle::new(vec![locale.clone()]);
                 if let Err(errors) = bundle.add_resource(resource) {
                     eprintln!(
-                        "Failed to add resource for locale '{}': {:?}",
-                        locale, errors
+                        "Failed to add resource for locale '{locale}': {errors:?}"
                     );
                     continue;
                 }
@@ -123,10 +120,10 @@ impl I18n {
                 available_locales.push(locale);
             }
         } else {
-            eprintln!("Failed to read translations directory: {}", dir);
+            eprintln!("Failed to read translations directory: {dir}");
         }
 
-        available_locales.sort_by_key(|a| a.to_string());
+        available_locales.sort_by_key(std::string::ToString::to_string);
 
         let default_locale: LanguageIdentifier = "en-US".parse().unwrap();
         let current_locale =
@@ -189,7 +186,7 @@ impl I18n {
                 }
             }
         }
-        format!("MISSING: {}", key)
+        format!("MISSING: {key}")
     }
 
     pub fn current_locale(&self) -> &LanguageIdentifier {

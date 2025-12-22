@@ -114,9 +114,8 @@ mod tests {
     #[test]
     fn light_theme_uses_dark_tooltip() {
         let style = tooltip_container(&Theme::Light);
-        let bg = match style.background {
-            Some(Background::Color(c)) => c,
-            _ => panic!("Expected color background"),
+        let Some(Background::Color(bg)) = style.background else {
+            panic!("Expected color background")
         };
         // Dark tooltip on light theme: low RGB values
         assert!(bg.r < 0.5);
@@ -125,9 +124,8 @@ mod tests {
     #[test]
     fn dark_theme_uses_light_tooltip() {
         let style = tooltip_container(&Theme::Dark);
-        let bg = match style.background {
-            Some(Background::Color(c)) => c,
-            _ => panic!("Expected color background"),
+        let Some(Background::Color(bg)) = style.background else {
+            panic!("Expected color background")
         };
         // Light tooltip on dark theme: high RGB values
         assert!(bg.r > 0.5);

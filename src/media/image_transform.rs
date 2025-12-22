@@ -138,7 +138,11 @@ pub fn resize(image: &DynamicImage, width: u32, height: u32) -> DynamicImage {
 /// The `value` parameter ranges from -100 to +100:
 /// - Negative values darken the image
 /// - Positive values brighten the image
-/// - Zero returns the image unchanged
+/// - Zero returns a clone of the original image (no modification needed)
+///
+/// Note: When `value` is zero, this function returns a cloned image to maintain
+/// a consistent return type. Callers that frequently pass zero may want to check
+/// the value before calling to avoid unnecessary clones.
 pub fn adjust_brightness(image: &DynamicImage, value: i32) -> DynamicImage {
     if value == 0 {
         return image.clone();
@@ -151,10 +155,14 @@ pub fn adjust_brightness(image: &DynamicImage, value: i32) -> DynamicImage {
 /// The `value` parameter ranges from -100 to +100:
 /// - Negative values reduce contrast (flatten toward gray)
 /// - Positive values increase contrast (more separation between light/dark)
-/// - Zero returns the image unchanged
+/// - Zero returns a clone of the original image (no modification needed)
 ///
 /// Internally converts the -100..+100 range to a multiplier for the image crate's
 /// contrast function which expects a float (-100 = 0.0x, 0 = 1.0x, +100 = 2.0x).
+///
+/// Note: When `value` is zero, this function returns a cloned image to maintain
+/// a consistent return type. Callers that frequently pass zero may want to check
+/// the value before calling to avoid unnecessary clones.
 pub fn adjust_contrast(image: &DynamicImage, value: i32) -> DynamicImage {
     if value == 0 {
         return image.clone();

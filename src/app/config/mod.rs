@@ -424,7 +424,7 @@ where
         "light" => Ok(ThemeMode::Light),
         "dark" => Ok(ThemeMode::Dark),
         "system" => Ok(ThemeMode::System),
-        other => Err(D::Error::custom(format!("invalid theme_mode: {}", other))),
+        other => Err(D::Error::custom(format!("invalid theme_mode: {other}"))),
     }
 }
 
@@ -585,7 +585,7 @@ mod tests {
 
         match load_from_path(&config_path) {
             Err(Error::Config(message)) => assert!(message.contains("expected")),
-            other => panic!("expected Config error, got {:?}", other),
+            other => panic!("expected Config error, got {other:?}"),
         }
     }
 

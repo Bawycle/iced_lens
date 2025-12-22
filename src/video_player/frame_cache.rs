@@ -310,10 +310,14 @@ impl FrameCache {
         let mut best_match: Option<(i64, Arc<DecodedFrame>)> = None;
 
         for (&pts, entry) in self.cache.iter() {
-            if pts <= target_micros
-                && (best_match.is_none() || pts > best_match.as_ref().unwrap().0)
-            {
-                best_match = Some((pts, Arc::clone(&entry.frame)));
+            if pts <= target_micros {
+                let should_update = match &best_match {
+                    None => true,
+                    Some((best_pts, _)) => pts > *best_pts,
+                };
+                if should_update {
+                    best_match = Some((pts, Arc::clone(&entry.frame)));
+                }
             }
         }
 
@@ -391,8 +395,10 @@ impl FrameCache {
         // Resize LRU capacity if needed
         if self.cache.len() > config.max_frames {
             self.cache.resize(
-                NonZeroUsize::new(config.max_frames)
-                    .unwrap_or(NonZeroUsize::new(DEFAULT_MAX_FRAMES).unwrap()),
+                NonZeroUsize::new(config.max_frames).unwrap_or(
+                    NonZeroUsize::new(DEFAULT_MAX_FRAMES)
+                        .expect("DEFAULT_MAX_FRAMES must be non-zero"),
+                ),
             );
         }
 
@@ -570,12 +576,12 @@ mod tests {
 
     #[test]
     fn pts_conversion_round_trip() {
-        let pts_secs = 1.234567;
+        let pts_secs = 1.234_567;
         let micros = pts_to_micros(pts_secs);
         let back = micros_to_pts(micros);
 
         // Should be accurate to microsecond precision
-        assert!((pts_secs - back).abs() < 0.000001);
+        assert!((pts_secs - back).abs() < 0.000_001);
     }
 
     #[test]

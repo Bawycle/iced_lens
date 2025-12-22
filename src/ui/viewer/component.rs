@@ -637,7 +637,7 @@ impl State {
                                     self.current_video_path = self.current_media_path.clone();
                                 }
                                 Err(e) => {
-                                    eprintln!("Failed to create video player: {}", e);
+                                    eprintln!("Failed to create video player: {e}");
                                 }
                             }
                         }
@@ -694,8 +694,7 @@ impl State {
                             .current_media_path
                             .as_ref()
                             .and_then(|p| p.file_name())
-                            .map(|n| n.to_string_lossy().to_string())
-                            .unwrap_or_else(|| "unknown".to_string());
+                            .map_or_else(|| "unknown".to_string(), |n| n.to_string_lossy().to_string());
 
                         // Handle based on load origin
                         match std::mem::take(&mut self.load_origin) {
@@ -830,7 +829,7 @@ impl State {
                             // No need to sync shader scale - pane calculates display size at render time
                         }
                         Err(e) => {
-                            eprintln!("Failed to create video player: {}", e);
+                            eprintln!("Failed to create video player: {e}");
                         }
                     }
                 }
@@ -879,7 +878,7 @@ impl State {
                                     // No need to sync shader scale - pane calculates display size at render time
                                 }
                                 Err(e) => {
-                                    eprintln!("Failed to create video player: {}", e);
+                                    eprintln!("Failed to create video player: {e}");
                                 }
                             }
                         }
@@ -1129,7 +1128,7 @@ impl State {
                     }
                     PlaybackMessage::Error(msg) => {
                         // Display error
-                        eprintln!("Playback error: {}", msg);
+                        eprintln!("Playback error: {msg}");
                         if let Some(ref mut player) = self.video_player {
                             player.set_error(msg);
                         }
@@ -1191,8 +1190,7 @@ impl State {
         // In windowed mode, controls stay visible but center overlay (pause button) can hide
         let overlay_should_be_visible = if env.is_fullscreen {
             self.last_overlay_interaction
-                .map(|t| t.elapsed() < env.overlay_hide_delay)
-                .unwrap_or(false)
+                .is_some_and(|t| t.elapsed() < env.overlay_hide_delay)
         } else {
             true
         };
@@ -1201,15 +1199,16 @@ impl State {
         let is_currently_playing = self.video_player.is_some()
             && matches!(
                 self.video_player.as_ref().map(|p| p.state()),
-                Some(crate::video_player::PlaybackState::Playing { .. })
-                    | Some(crate::video_player::PlaybackState::Buffering { .. })
+                Some(
+                    crate::video_player::PlaybackState::Playing { .. }
+                        | crate::video_player::PlaybackState::Buffering { .. }
+                )
             );
 
         let center_overlay_visible = if is_currently_playing {
             // When playing, center overlay (pause button) auto-hides after delay
             self.last_overlay_interaction
-                .map(|t| t.elapsed() < env.overlay_hide_delay)
-                .unwrap_or(false)
+                .is_some_and(|t| t.elapsed() < env.overlay_hide_delay)
         } else {
             // When paused/stopped, play button always visible
             true
@@ -1371,6 +1370,7 @@ impl State {
     }
 
     fn handle_controls(&mut self, message: controls::Message) -> (Effect, Task<Message>) {
+        #[allow(clippy::enum_glob_use)] // Match ergonomics for many Message variants
         use controls::Message::*;
 
         match message {
@@ -1491,13 +1491,13 @@ impl State {
                     // Calculate distance from last recorded position to filter sensor noise
                     let (_distance, is_real_movement) = self
                         .last_mouse_position
-                        .map(|last_pos| {
+                        .map_or((f32::MAX, true), |last_pos| {
+                            // First movement is always real
                             let dx = position.x - last_pos.x;
                             let dy = position.y - last_pos.y;
                             let dist = (dx * dx + dy * dy).sqrt();
                             (dist, dist >= MOUSE_MOVEMENT_THRESHOLD)
-                        })
-                        .unwrap_or((f32::MAX, true)); // First movement is always real
+                        });
 
                     // Only process if real movement (not sensor noise)
                     if is_real_movement {
@@ -1510,8 +1510,7 @@ impl State {
                         // triggering controls from window resize events
                         let ignore_due_to_fullscreen_entry = self
                             .fullscreen_entered_at
-                            .map(|entered| entered.elapsed() < FULLSCREEN_ENTRY_IGNORE_DELAY)
-                            .unwrap_or(false);
+                            .is_some_and(|entered| entered.elapsed() < FULLSCREEN_ENTRY_IGNORE_DELAY);
 
                         if ignore_due_to_fullscreen_entry {
                             // Ignoring movement within 500ms of fullscreen entry
@@ -1538,7 +1537,7 @@ impl State {
                     }
                     (Effect::None, Task::none())
                 }
-                _ => (Effect::None, Task::none()),
+                mouse::Event::CursorEntered => (Effect::None, Task::none()),
             },
             event::Event::Keyboard(keyboard_event) => match keyboard_event {
                 keyboard::Event::KeyPressed {
@@ -1773,8 +1772,7 @@ impl State {
             let now = Instant::now();
             let double_click = self
                 .last_click
-                .map(|instant| now.duration_since(instant) <= DOUBLE_CLICK_THRESHOLD)
-                .unwrap_or(false);
+                .is_some_and(|instant| now.duration_since(instant) <= DOUBLE_CLICK_THRESHOLD);
             self.last_click = Some(now);
 
             // Reset overlay timer on any left click, even on UI controls
@@ -1807,9 +1805,8 @@ impl State {
     /// the scaled image bounds and mirrors the change to the scrollable widget
     /// so keyboard/scroll interactions stay in sync.
     fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Task<Message> {
-        let proposed_offset = match self.drag.calculate_offset(position) {
-            Some(offset) => offset,
-            None => return Task::none(),
+        let Some(proposed_offset) = self.drag.calculate_offset(position) else {
+            return Task::none();
         };
 
         let geometry_state = self.geometry_state();
@@ -1976,14 +1973,14 @@ fn scroll_steps(delta: &mouse::ScrollDelta) -> f32 {
 fn format_position_indicator(_i18n: &I18n, px: f32, py: f32) -> HudLine {
     HudLine {
         icon: HudIconKind::Position,
-        text: format!("{:.0}% x {:.0}%", px, py),
+        text: format!("{px:.0}% x {py:.0}%"),
     }
 }
 
 fn format_zoom_indicator(_i18n: &I18n, zoom_percent: f32) -> HudLine {
     HudLine {
         icon: HudIconKind::Zoom,
-        text: format!("{:.0}%", zoom_percent),
+        text: format!("{zoom_percent:.0}%"),
     }
 }
 

@@ -34,13 +34,14 @@ pub fn primary(_theme: &Theme, status: button::Status) -> button::Style {
             shadow: shadow::MD,
             snap: true,
         },
-        _ => button::Style::default(),
+        button::Status::Disabled => button::Style::default(),
     }
 }
 
 /// Overlay button styles for buttons displayed on top of media content.
 pub mod overlay {
-    use super::*;
+    use super::{opacity, radius, shadow, Background, Border, Color, Theme, BLACK, WHITE};
+    use iced::widget::button;
 
     /// Style for navigation arrows overlay (previous/next).
     ///
@@ -89,7 +90,7 @@ pub mod overlay {
             let alpha = match status {
                 button::Status::Hovered => opacity::OVERLAY_HOVER,
                 button::Status::Pressed => opacity::OVERLAY_STRONG,
-                _ => opacity::OVERLAY_MEDIUM,
+                button::Status::Active | button::Status::Disabled => opacity::OVERLAY_MEDIUM,
             };
 
             button::Style {

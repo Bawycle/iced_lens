@@ -126,7 +126,7 @@ impl AudioOutput {
         // Get supported config
         let supported_config = device
             .default_output_config()
-            .map_err(|e| Error::Io(format!("Failed to get audio config: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to get audio config: {e}")))?;
 
         let sample_rate = supported_config.sample_rate().0;
         let channels = supported_config.channels();
@@ -222,7 +222,7 @@ impl AudioOutput {
         // Start the stream
         stream
             .play()
-            .map_err(|e| Error::Io(format!("Failed to start audio stream: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to start audio stream: {e}")))?;
 
         Ok(Self {
             command_tx,
@@ -296,11 +296,11 @@ impl AudioOutput {
                     buf.drain(..consumed);
                 },
                 |err| {
-                    eprintln!("Audio output error: {}", err);
+                    eprintln!("Audio output error: {err}");
                 },
                 None,
             )
-            .map_err(|e| Error::Io(format!("Failed to build audio stream: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to build audio stream: {e}")))?;
 
         Ok(stream)
     }
@@ -413,7 +413,7 @@ mod tests {
     #[test]
     fn audio_output_command_debug() {
         let cmd = AudioOutputCommand::SetVolume(Volume::new(0.5));
-        let debug_str = format!("{:?}", cmd);
+        let debug_str = format!("{cmd:?}");
         assert!(debug_str.contains("SetVolume"));
     }
 

@@ -88,14 +88,14 @@ impl MediaList {
 
     /// Returns the first media file in the list, if any.
     pub fn first(&self) -> Option<&Path> {
-        self.media_files.first().map(|p| p.as_path())
+        self.media_files.first().map(std::path::PathBuf::as_path)
     }
 
     /// Returns the current media path.
     pub fn current(&self) -> Option<&Path> {
         self.current_index
             .and_then(|idx| self.media_files.get(idx))
-            .map(|p| p.as_path())
+            .map(std::path::PathBuf::as_path)
     }
 
     /// Returns the next media path, wrapping around to the start.
@@ -121,7 +121,7 @@ impl MediaList {
             None => offset.saturating_sub(1) % self.media_files.len(),
         };
 
-        self.media_files.get(next_index).map(|p| p.as_path())
+        self.media_files.get(next_index).map(std::path::PathBuf::as_path)
     }
 
     /// Returns the n-th previous media path from current position, wrapping around.
@@ -141,7 +141,7 @@ impl MediaList {
             None => len.saturating_sub(offset % len) % len,
         };
 
-        self.media_files.get(prev_index).map(|p| p.as_path())
+        self.media_files.get(prev_index).map(std::path::PathBuf::as_path)
     }
 
     /// Checks if we're at the first media (used for boundary indication).
@@ -179,7 +179,7 @@ impl MediaList {
 
     /// Returns the path at the specified index.
     pub fn get(&self, index: usize) -> Option<&Path> {
-        self.media_files.get(index).map(|p| p.as_path())
+        self.media_files.get(index).map(std::path::PathBuf::as_path)
     }
 
     /// Sets the current index directly.

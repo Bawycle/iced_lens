@@ -93,7 +93,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
 /// Build the application info section.
 fn build_app_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let app_name = Text::new(ctx.i18n.tr("about-app-name")).size(typography::TITLE_MD);
-    let version = Text::new(format!("v{}", APP_VERSION)).size(typography::BODY);
+    let version = Text::new(format!("v{APP_VERSION}")).size(typography::BODY);
     let description = Text::new(ctx.i18n.tr("about-app-description")).size(typography::BODY);
 
     let content = Column::new()
@@ -189,7 +189,7 @@ fn build_third_party_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> 
 
 /// Build a single credit item.
 fn build_credit_item<'a>(description: String) -> Element<'a, Message> {
-    Text::new(format!("• {}", description))
+    Text::new(format!("• {description}"))
         .size(typography::BODY)
         .into()
 }
@@ -215,7 +215,7 @@ fn build_links_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 fn build_link_item<'a>(label: &str, url: &'a str) -> Element<'a, Message> {
     Row::new()
         .spacing(spacing::SM)
-        .push(Text::new(format!("{}:", label)).size(typography::BODY))
+        .push(Text::new(format!("{label}:")).size(typography::BODY))
         .push(Text::new(url).size(typography::BODY))
         .into()
 }

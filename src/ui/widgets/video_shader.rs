@@ -87,10 +87,11 @@ impl<Message> VideoShader<Message> {
     /// Returns an exportable frame if one is available.
     ///
     /// This can be used to save the current frame to a file.
+    /// Uses `Arc::clone` to share the frame data without copying the pixels.
     pub fn exportable_frame(&self) -> Option<ExportableFrame> {
         self.frame
             .as_ref()
-            .map(|f| ExportableFrame::new((*f.rgba).clone(), f.width, f.height))
+            .map(|f| ExportableFrame::new(Arc::clone(&f.rgba), f.width, f.height))
     }
 
     /// Returns the current frame data if available.
@@ -454,7 +455,7 @@ impl VideoPipeline {
 /// This shader renders a fullscreen quad that fills the entire viewport.
 /// The viewport is set to the widget's clip_bounds in the render() method,
 /// so the quad automatically fills the correct area on screen.
-const VIDEO_SHADER: &str = r#"
+const VIDEO_SHADER: &str = r"
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) tex_coord: vec2<f32>,
@@ -487,7 +488,7 @@ var video_sampler: sampler;
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     return textureSample(video_texture, video_sampler, input.tex_coord);
 }
-"#;
+";
 
 #[cfg(test)]
 mod tests {

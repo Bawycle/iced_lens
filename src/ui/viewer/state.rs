@@ -114,24 +114,20 @@ impl<'a> ViewerState<'a> {
 
     /// Indicates whether the cursor is currently positioned over the media.
     pub fn is_cursor_over_media(&self) -> bool {
-        let cursor = match self.cursor_position {
-            Some(position) => position,
-            None => return false,
+        let Some(cursor) = self.cursor_position else {
+            return false;
         };
 
-        let viewport = match self.viewport.bounds {
-            Some(bounds) => bounds,
-            None => return false,
+        let Some(viewport) = self.viewport.bounds else {
+            return false;
         };
 
-        let size = match self.scaled_media_size() {
-            Some(dimensions) => dimensions,
-            None => return false,
+        let Some(size) = self.scaled_media_size() else {
+            return false;
         };
 
-        let media_bounds = match self.media_bounds_in_window() {
-            Some(bounds) => bounds,
-            None => return false,
+        let Some(media_bounds) = self.media_bounds_in_window() else {
+            return false;
         };
 
         let viewport_rect = Rectangle::new(
@@ -143,9 +139,8 @@ impl<'a> ViewerState<'a> {
             return false;
         }
 
-        let mut hitbox = match intersect_rectangles(media_bounds, viewport_rect) {
-            Some(intersection) => intersection,
-            None => return false,
+        let Some(mut hitbox) = intersect_rectangles(media_bounds, viewport_rect) else {
+            return false;
         };
 
         if size.height > viewport.height {

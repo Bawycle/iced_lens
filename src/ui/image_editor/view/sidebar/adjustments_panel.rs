@@ -13,7 +13,7 @@ use crate::ui::image_editor::{Message, SidebarMessage};
 
 /// Format adjustment value with sign and padding for consistent width.
 fn format_value(value: i32) -> String {
-    format!("{:+4}", value)
+    format!("{value:+4}")
 }
 
 pub fn panel<'a>(adjustment: &'a AdjustmentState, ctx: &ViewContext<'a>) -> Element<'a, Message> {

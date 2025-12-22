@@ -140,7 +140,7 @@ impl AudioDecoder {
 
         // Validate file exists
         if !path.exists() {
-            return Err(Error::Io(format!("Video file not found: {:?}", path)));
+            return Err(Error::Io(format!("Video file not found: {path:?}")));
         }
 
         // Check if file has audio before spawning decoder task
@@ -157,7 +157,7 @@ impl AudioDecoder {
         // Spawn the decoder task in a blocking thread
         tokio::task::spawn_blocking(move || {
             if let Err(e) = Self::decoder_loop(path, command_rx, event_tx) {
-                eprintln!("Audio decoder task failed: {}", e);
+                eprintln!("Audio decoder task failed: {e}");
             }
         });
 
@@ -172,7 +172,7 @@ impl AudioDecoder {
         crate::media::video::init_ffmpeg()?;
 
         let ictx = ffmpeg_next::format::input(path)
-            .map_err(|e| Error::Io(format!("Failed to open file: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to open file: {e}")))?;
 
         Ok(ictx
             .streams()
@@ -208,7 +208,7 @@ impl AudioDecoder {
 
         // Open video file
         let mut ictx = ffmpeg_next::format::input(&video_path)
-            .map_err(|e| Error::Io(format!("Failed to open video: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to open video: {e}")))?;
 
         // Find audio stream
         let input = ictx
@@ -224,19 +224,18 @@ impl AudioDecoder {
         // Create audio decoder
         let context_decoder =
             ffmpeg_next::codec::context::Context::from_parameters(input.parameters())
-                .map_err(|e| Error::Io(format!("Failed to create codec context: {}", e)))?;
+                .map_err(|e| Error::Io(format!("Failed to create codec context: {e}")))?;
         let mut decoder = context_decoder
             .decoder()
             .audio()
-            .map_err(|e| Error::Io(format!("Failed to create audio decoder: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to create audio decoder: {e}")))?;
 
         // Get audio parameters
         let sample_rate = decoder.rate();
         let channels = decoder.channels() as u16;
         let codec_name = decoder
             .codec()
-            .map(|c| c.name().to_string())
-            .unwrap_or_else(|| "unknown".to_string());
+            .map_or_else(|| "unknown".to_string(), |c| c.name().to_string());
 
         // Calculate duration if available
         let duration_secs = if input.duration() > 0 {
@@ -263,7 +262,7 @@ impl AudioDecoder {
             decoder.channel_layout(),
             decoder.rate(),
         )
-        .map_err(|e| Error::Io(format!("Failed to create resampler: {}", e)))?;
+        .map_err(|e| Error::Io(format!("Failed to create resampler: {e}")))?;
 
         // Playback state
         let mut is_playing = false;
@@ -304,8 +303,7 @@ impl AudioDecoder {
                     let timestamp = (target_secs * 1_000_000.0) as i64;
                     if let Err(e) = ictx.seek(timestamp, ..timestamp) {
                         let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
-                            "Audio seek failed: {}",
-                            e
+                            "Audio seek failed: {e}"
                         )));
                         seek_target_secs = None;
                     } else {
@@ -361,8 +359,7 @@ impl AudioDecoder {
                 // Send packet to decoder
                 if let Err(e) = decoder.send_packet(&packet) {
                     let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
-                        "Audio packet failed: {}",
-                        e
+                        "Audio packet failed: {e}"
                     )));
                     continue;
                 }
@@ -374,8 +371,7 @@ impl AudioDecoder {
                     let mut resampled = ffmpeg_next::frame::Audio::empty();
                     if let Err(e) = resampler.run(&decoded_frame, &mut resampled) {
                         let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
-                            "Resampling failed: {}",
-                            e
+                            "Resampling failed: {e}"
                         )));
                         continue;
                     }
@@ -530,14 +526,14 @@ mod tests {
             channels: 2,
             duration_secs: Some(180.5),
             codec_name: "aac".to_string(),
-            bit_rate: Some(128000),
+            bit_rate: Some(128_000),
         };
 
         assert_eq!(info.sample_rate, 44100);
         assert_eq!(info.channels, 2);
         assert_eq!(info.duration_secs, Some(180.5));
         assert_eq!(info.codec_name, "aac");
-        assert_eq!(info.bit_rate, Some(128000));
+        assert_eq!(info.bit_rate, Some(128_000));
     }
 
     #[test]

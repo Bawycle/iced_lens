@@ -51,8 +51,6 @@
 //! The underlying visual icon can change without affecting call sites.
 
 use super::icons;
-use crate::config::BackgroundTheme;
-use iced::widget::image::{Handle, Image};
 
 // =============================================================================
 // Video Playback Actions
@@ -60,7 +58,8 @@ use iced::widget::image::{Handle, Image};
 
 /// Icons for video playback controls.
 pub mod video {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Play video.
     pub fn play() -> Image<Handle> {
@@ -119,7 +118,8 @@ pub mod video {
 
     /// Light icon variants for toolbar buttons.
     pub mod toolbar {
-        use super::*;
+        use super::icons;
+        use iced::widget::image::{Handle, Image};
 
         /// Play video (light icon for toolbar).
         pub fn play() -> Image<Handle> {
@@ -184,7 +184,8 @@ pub mod video {
 
 /// Icons for image editor tools.
 pub mod editor {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Rotate image 90° counter-clockwise.
     pub fn rotate_left() -> Image<Handle> {
@@ -213,7 +214,8 @@ pub mod editor {
 
 /// Icons for image/video viewer controls.
 pub mod viewer {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Zoom in.
     pub fn zoom_in() -> Image<Handle> {
@@ -252,7 +254,8 @@ pub mod viewer {
 
     /// Light icon variants for toolbar buttons.
     pub mod toolbar {
-        use super::*;
+        use super::icons;
+        use iced::widget::image::{Handle, Image};
 
         /// Zoom in (light icon for toolbar).
         pub fn zoom_in() -> Image<Handle> {
@@ -297,7 +300,9 @@ pub mod viewer {
 
 /// Icons for app navigation.
 pub mod navigation {
-    use super::*;
+    use super::icons;
+    use crate::config::BackgroundTheme;
+    use iced::widget::image::{Handle, Image};
 
     /// Open hamburger menu (light icon for navbar button).
     pub fn menu() -> Image<Handle> {
@@ -414,7 +419,8 @@ pub mod navigation {
 
 /// Icons for notification severities.
 pub mod notification {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Success notification.
     pub fn success() -> Image<Handle> {
@@ -443,7 +449,8 @@ pub mod notification {
 
 /// Icons for help screen sections.
 pub mod sections {
-    use super::*;
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
 
     /// Image/video viewer section.
     pub fn viewer() -> Image<Handle> {
@@ -480,6 +487,7 @@ pub use icons::sized;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::BackgroundTheme;
 
     #[test]
     fn video_icons_load() {

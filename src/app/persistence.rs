@@ -122,7 +122,7 @@ pub fn rescan_directory_if_same(media_navigator: &mut MediaNavigator, saved_path
             // Clone the path to avoid borrow conflict
             if let Some(path) = media_navigator
                 .current_media_path()
-                .map(|p| p.to_path_buf())
+                .map(std::path::Path::to_path_buf)
             {
                 // Rescan the media navigator
                 let (config, _) = config::load();

@@ -36,8 +36,7 @@ pub fn panel<'a>(ctx: PanelContext<'a>) -> Element<'a, Message> {
     // Header buttons
     let has_unsaved_changes = ctx
         .editor_state
-        .map(|editor| editor.has_changes())
-        .unwrap_or(false);
+        .is_some_and(MetadataEditorState::has_changes);
     let header_buttons = build_header_buttons(&ctx, is_editing, has_unsaved_changes);
 
     // Header row with title and buttons
@@ -524,7 +523,7 @@ fn build_edit_field<'a>(
     let mut col = Column::new().spacing(spacing::XXS);
 
     // Label
-    col = col.push(text(format!("{}:", label)).size(typography::BODY_SM));
+    col = col.push(text(format!("{label}:")).size(typography::BODY_SM));
 
     // Input
     let placeholder_str = placeholder.unwrap_or_default();
@@ -560,7 +559,7 @@ fn build_edit_field_with_remove<'a>(
     let label_row = Row::new()
         .spacing(spacing::XS)
         .align_y(Vertical::Center)
-        .push(text(format!("{}:", label)).size(typography::BODY_SM))
+        .push(text(format!("{label}:")).size(typography::BODY_SM))
         .push(iced::widget::Space::new().width(Length::Fill))
         .push(
             button(icons::sized(icons::cross(), sizing::ICON_SM))
@@ -605,7 +604,7 @@ fn build_date_field_with_remove<'a>(
     let label_row = Row::new()
         .spacing(spacing::XS)
         .align_y(Vertical::Center)
-        .push(text(format!("{}:", label)).size(typography::BODY_SM))
+        .push(text(format!("{label}:")).size(typography::BODY_SM))
         .push(iced::widget::Space::new().width(Length::Fill))
         .push(
             button(icons::sized(icons::cross(), sizing::ICON_SM))
@@ -725,7 +724,7 @@ fn parse_date_input(input: &str) -> String {
     // Try date-only formats (add midnight time)
     for fmt in &date_formats {
         if let Ok(d) = NaiveDate::parse_from_str(input, fmt) {
-            let dt = d.and_hms_opt(0, 0, 0).unwrap();
+            let dt = d.and_hms_opt(0, 0, 0).expect("midnight (00:00:00) is always valid");
             return dt.format("%Y:%m:%d %H:%M:%S").to_string();
         }
     }
@@ -954,7 +953,7 @@ fn build_camera_section_view<'a>(i18n: &'a I18n, meta: &ImageMetadata) -> Elemen
 
     if meta.camera_make.is_some() || meta.camera_model.is_some() {
         let camera = match (&meta.camera_make, &meta.camera_model) {
-            (Some(make), Some(model)) => format!("{} {}", make, model),
+            (Some(make), Some(model)) => format!("{make} {model}"),
             (Some(make), None) => make.clone(),
             (None, Some(model)) => model.clone(),
             _ => i18n.tr("metadata-value-unknown"),
@@ -1002,7 +1001,7 @@ fn build_exposure_section_view<'a>(i18n: &'a I18n, meta: &ImageMetadata) -> Elem
 
     if let Some(ref focal) = meta.focal_length {
         let focal_str = if let Some(ref focal_35) = meta.focal_length_35mm {
-            format!("{} ({})", focal, focal_35)
+            format!("{focal} ({focal_35})")
         } else {
             focal.clone()
         };
@@ -1141,7 +1140,7 @@ fn build_metadata_row<'a>(label: String, value: String) -> Element<'a, Message> 
     Row::new()
         .spacing(spacing::SM)
         .push(
-            Text::new(format!("{}:", label))
+            Text::new(format!("{label}:"))
                 .size(typography::BODY)
                 .width(Length::FillPortion(2)),
         )
@@ -1180,9 +1179,9 @@ fn format_duration(duration_secs: f64) -> String {
     let seconds = total_secs % 60;
 
     if hours > 0 {
-        format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+        format!("{hours:02}:{minutes:02}:{seconds:02}")
     } else {
-        format!("{:02}:{:02}", minutes, seconds)
+        format!("{minutes:02}:{seconds:02}")
     }
 }
 

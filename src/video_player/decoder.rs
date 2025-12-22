@@ -123,7 +123,7 @@ impl AsyncDecoder {
 
         // Validate file exists
         if !path.exists() {
-            return Err(Error::Io(format!("Video file not found: {:?}", path)));
+            return Err(Error::Io(format!("Video file not found: {path:?}")));
         }
 
         // Create channels for bidirectional communication
@@ -139,7 +139,7 @@ impl AsyncDecoder {
             if let Err(e) =
                 Self::decoder_loop_blocking(path, command_rx, event_tx, cache_config, history_mb)
             {
-                eprintln!("Decoder task failed: {}", e);
+                eprintln!("Decoder task failed: {e}");
             }
         });
 
@@ -190,7 +190,7 @@ impl AsyncDecoder {
 
         // Open video file
         let mut ictx = ffmpeg_next::format::input(&video_path)
-            .map_err(|e| Error::Io(format!("Failed to open video: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to open video: {e}")))?;
 
         // Find video stream
         let input = ictx
@@ -202,11 +202,11 @@ impl AsyncDecoder {
         // Create decoder
         let context_decoder =
             ffmpeg_next::codec::context::Context::from_parameters(input.parameters())
-                .map_err(|e| Error::Io(format!("Failed to create codec context: {}", e)))?;
+                .map_err(|e| Error::Io(format!("Failed to create codec context: {e}")))?;
         let mut decoder = context_decoder
             .decoder()
             .video()
-            .map_err(|e| Error::Io(format!("Failed to create video decoder: {}", e)))?;
+            .map_err(|e| Error::Io(format!("Failed to create video decoder: {e}")))?;
 
         let width = decoder.width();
         let height = decoder.height();
@@ -221,7 +221,7 @@ impl AsyncDecoder {
             height,
             ffmpeg_next::software::scaling::Flags::BILINEAR,
         )
-        .map_err(|e| Error::Io(format!("Failed to create scaler: {}", e)))?;
+        .map_err(|e| Error::Io(format!("Failed to create scaler: {e}")))?;
 
         // Extract time base for PTS calculation
         let time_base = input.time_base();
@@ -287,7 +287,7 @@ impl AsyncDecoder {
                     let timestamp = (target_secs * 1_000_000.0) as i64;
                     if let Err(e) = ictx.seek(timestamp, ..timestamp) {
                         let _ = event_tx
-                            .blocking_send(DecoderEvent::Error(format!("Seek failed: {}", e)));
+                            .blocking_send(DecoderEvent::Error(format!("Seek failed: {e}")));
                     } else {
                         decoder.flush();
                         // Reset timing after seek
@@ -526,7 +526,7 @@ impl AsyncDecoder {
                 // Send packet to decoder
                 if let Err(e) = decoder.send_packet(&packet) {
                     let _ = event_tx
-                        .blocking_send(DecoderEvent::Error(format!("Packet send failed: {}", e)));
+                        .blocking_send(DecoderEvent::Error(format!("Packet send failed: {e}")));
                     continue;
                 }
 
@@ -561,7 +561,7 @@ impl AsyncDecoder {
                     let mut rgb_frame = ffmpeg_next::frame::Video::empty();
                     if let Err(e) = scaler.run(&decoded_frame, &mut rgb_frame) {
                         let _ = event_tx
-                            .blocking_send(DecoderEvent::Error(format!("Scaling failed: {}", e)));
+                            .blocking_send(DecoderEvent::Error(format!("Scaling failed: {e}")));
                         continue;
                     }
 
@@ -863,10 +863,10 @@ mod tests {
                 // Also valid if frame is decoded quickly
             }
             Some(DecoderEvent::Error(msg)) => {
-                panic!("Unexpected error from decoder: {}", msg);
+                panic!("Unexpected error from decoder: {msg}");
             }
             other => {
-                panic!("Expected Buffering or FrameReady event, got: {:?}", other);
+                panic!("Expected Buffering or FrameReady event, got: {other:?}");
             }
         }
 

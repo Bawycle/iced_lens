@@ -205,7 +205,7 @@ pub fn panel<'a>(
                     .center_x(Length::Fill),
             )
             .push(
-                text(format!("{}×{} px", target_width, target_height))
+                text(format!("{target_width}×{target_height} px"))
                     .size(typography::BODY_SM)
                     .center(),
             );
@@ -223,7 +223,7 @@ pub fn panel<'a>(
 /// Creates a preset button for a given scale percentage.
 /// Uses `Length::Fill` to ensure uniform width within each row.
 fn preset_button(percent: f32) -> iced::widget::Button<'static, Message> {
-    let label = format!("{:.0}%", percent);
+    let label = format!("{percent:.0}%");
     button(text(label).center())
         .on_press(SidebarMessage::ApplyResizePreset(percent).into())
         .padding([spacing::XXS, spacing::XS])

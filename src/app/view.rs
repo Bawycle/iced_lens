@@ -132,8 +132,7 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
 
     let metadata_editor_has_changes = ctx
         .metadata_editor_state
-        .map(|editor| editor.has_changes())
-        .unwrap_or(false);
+        .is_some_and(|editor| editor.has_changes());
 
     let viewer_content = ctx
         .viewer

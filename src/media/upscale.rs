@@ -66,19 +66,18 @@ impl std::fmt::Display for UpscaleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             UpscaleError::ModelNotFound => write!(f, "Model file not found"),
-            UpscaleError::DownloadFailed(msg) => write!(f, "Download failed: {}", msg),
+            UpscaleError::DownloadFailed(msg) => write!(f, "Download failed: {msg}"),
             UpscaleError::ChecksumMismatch { expected, actual } => {
                 write!(
                     f,
-                    "Checksum mismatch: expected {}, got {}",
-                    expected, actual
+                    "Checksum mismatch: expected {expected}, got {actual}"
                 )
             }
-            UpscaleError::InferenceFailed(msg) => write!(f, "Inference failed: {}", msg),
-            UpscaleError::PreprocessingFailed(msg) => write!(f, "Preprocessing failed: {}", msg),
-            UpscaleError::PostprocessingFailed(msg) => write!(f, "Postprocessing failed: {}", msg),
+            UpscaleError::InferenceFailed(msg) => write!(f, "Inference failed: {msg}"),
+            UpscaleError::PreprocessingFailed(msg) => write!(f, "Preprocessing failed: {msg}"),
+            UpscaleError::PostprocessingFailed(msg) => write!(f, "Postprocessing failed: {msg}"),
             UpscaleError::Cancelled => write!(f, "Operation cancelled"),
-            UpscaleError::Io(msg) => write!(f, "IO error: {}", msg),
+            UpscaleError::Io(msg) => write!(f, "IO error: {msg}"),
             UpscaleError::SessionNotInitialized => write!(f, "ONNX session not initialized"),
         }
     }
@@ -190,8 +189,7 @@ impl UpscaleManager {
         let input_name = session
             .inputs
             .first()
-            .map(|i| i.name.clone())
-            .unwrap_or_else(|| "input".to_string());
+            .map_or_else(|| "input".to_string(), |i| i.name.clone());
 
         // Create tensor reference for inference
         let input_ref = ort::value::TensorRef::from_array_view(&input_tensor)
@@ -246,12 +244,13 @@ impl UpscaleManager {
 
 /// Returns the path where the upscale model should be stored.
 pub fn get_model_path() -> PathBuf {
-    paths::get_app_data_dir()
-        .map(|mut p| {
+    paths::get_app_data_dir().map_or_else(
+        || PathBuf::from(MODEL_FILENAME),
+        |mut p| {
             p.push(MODEL_FILENAME);
             p
-        })
-        .unwrap_or_else(|| PathBuf::from(MODEL_FILENAME))
+        },
+    )
 }
 
 /// Minimum expected model size (60 MB) to detect failed downloads.
@@ -304,8 +303,7 @@ pub async fn download_model(
     // Sanity check: if the content length is suspiciously small, something went wrong
     if total_size > 0 && total_size < MIN_MODEL_SIZE_BYTES {
         return Err(UpscaleError::DownloadFailed(format!(
-            "Response too small ({} bytes), expected model file (~64 MB). URL may have changed or returned an error page.",
-            total_size
+            "Response too small ({total_size} bytes), expected model file (~64 MB). URL may have changed or returned an error page."
         )));
     }
 
@@ -340,8 +338,7 @@ pub async fn download_model(
         // Delete the incomplete/invalid file
         let _ = std::fs::remove_file(&model_path);
         return Err(UpscaleError::DownloadFailed(format!(
-            "Downloaded file too small ({} bytes), expected ~64 MB",
-            downloaded
+            "Downloaded file too small ({downloaded} bytes), expected ~64 MB"
         )));
     }
 

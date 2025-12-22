@@ -329,6 +329,7 @@ define_icon!(
 ///
 /// These icons provide better contrast on dark button backgrounds.
 /// Access via [`action_icons`](super::action_icons) for semantic usage.
+#[allow(clippy::wildcard_imports)] // Required for define_icon! macro expansion
 pub mod light {
     use super::*;
 
@@ -492,6 +493,7 @@ pub mod light {
 // =============================================================================
 
 /// Light icon variants for use on dark backgrounds (overlays, HUD).
+#[allow(clippy::wildcard_imports)] // Required for define_icon! macro expansion
 pub mod overlay {
     use super::*;
 

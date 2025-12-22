@@ -49,10 +49,10 @@ fn main() {
             None => "Non supporté",
         };
 
-        println!("{} {} → {}", result, path, type_str);
+        println!("{result} {path} → {type_str}");
     }
 
-    println!("\n📊 Résultats: {} passés, {} échoués", passed, failed);
+    println!("\n📊 Résultats: {passed} passés, {failed} échoués");
 
     if failed > 0 {
         std::process::exit(1);

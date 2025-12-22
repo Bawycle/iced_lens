@@ -18,7 +18,7 @@ fn main() {
     // Get file size
     let file_size = std::fs::metadata(file_path).map(|m| m.len()).unwrap_or(0);
 
-    println!("🎯 Benchmark de détection: {}", file_path);
+    println!("🎯 Benchmark de détection: {file_path}");
     println!(
         "📦 Taille du fichier: {:.2} KB ({} bytes)",
         file_size as f64 / 1024.0,
@@ -51,10 +51,10 @@ fn main() {
     let max = times.iter().max().unwrap();
 
     println!();
-    println!("📊 Résultats ({} itérations):", iterations);
-    println!("   Moyenne: {:?}", avg);
-    println!("   Min:     {:?}", min);
-    println!("   Max:     {:?}", max);
+    println!("📊 Résultats ({iterations} itérations):");
+    println!("   Moyenne: {avg:?}");
+    println!("   Min:     {min:?}");
+    println!("   Max:     {max:?}");
     println!();
 
     // Check target
@@ -62,7 +62,7 @@ fn main() {
     let avg_ms = avg.as_millis();
 
     if avg_ms < target_ms {
-        println!("✅ Performance EXCELLENTE (< {}ms)", target_ms);
+        println!("✅ Performance EXCELLENTE (< {target_ms}ms)");
         println!(
             "   {}x plus rapide que la cible!",
             target_ms as f64 / avg_ms as f64

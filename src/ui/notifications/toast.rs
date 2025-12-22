@@ -112,8 +112,7 @@ impl Toast {
         match severity {
             Severity::Success => icons::checkmark(),
             Severity::Info => icons::info(),
-            Severity::Warning => icons::warning(),
-            Severity::Error => icons::warning(),
+            Severity::Warning | Severity::Error => icons::warning(),
         }
     }
 }

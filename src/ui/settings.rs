@@ -445,12 +445,12 @@ impl State {
             .available_locales
             .iter()
             .map(|locale| {
-                let translated_name_key = format!("language-name-{}", locale);
+                let translated_name_key = format!("language-name-{locale}");
                 let translated_name = ctx.i18n.tr(&translated_name_key);
                 let display_name = if translated_name.starts_with("MISSING:") {
                     locale.to_string()
                 } else {
-                    format!("{} ({})", translated_name, locale)
+                    format!("{translated_name} ({locale})")
                 };
                 LanguageOption {
                     locale: locale.clone(),

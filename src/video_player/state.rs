@@ -611,8 +611,7 @@ impl VideoPlayer {
     pub fn has_audio(&self) -> bool {
         self.command_sender
             .as_ref()
-            .map(|s| s.has_audio())
-            .unwrap_or(false)
+            .is_some_and(|s| s.has_audio())
     }
 
     /// Steps forward one frame by decoding the next frame sequentially.
@@ -1372,9 +1371,7 @@ mod tests {
         let sync_time = player.sync_time();
         assert!(
             (sync_time - stepped_position).abs() < 0.1,
-            "Sync clock {} doesn't match stepped position {}",
-            sync_time,
-            stepped_position
+            "Sync clock {sync_time} doesn't match stepped position {stepped_position}"
         );
     }
 
@@ -1415,8 +1412,7 @@ mod tests {
         let sync_time = player.sync_time();
         assert!(
             sync_time.abs() < 0.1,
-            "Sync clock {} should be near 0 after loop restart",
-            sync_time
+            "Sync clock {sync_time} should be near 0 after loop restart"
         );
     }
 
@@ -1453,8 +1449,7 @@ mod tests {
         let sync_time = player.sync_time();
         assert!(
             (sync_time - 60.0).abs() < 0.1,
-            "Sync clock {} should be near 60.0 after seek from end",
-            sync_time
+            "Sync clock {sync_time} should be near 60.0 after seek from end"
         );
     }
 
@@ -1500,8 +1495,7 @@ mod tests {
         let sync_time = player.sync_time();
         assert!(
             (sync_time - 50.066).abs() < 0.1,
-            "Sync clock {} should match stepped position 50.066",
-            sync_time
+            "Sync clock {sync_time} should match stepped position 50.066"
         );
     }
 
@@ -1527,8 +1521,7 @@ mod tests {
         let sync_time = player.sync_time();
         assert!(
             sync_time.abs() < 0.1,
-            "Sync clock {} should be near 0",
-            sync_time
+            "Sync clock {sync_time} should be near 0"
         );
     }
 }

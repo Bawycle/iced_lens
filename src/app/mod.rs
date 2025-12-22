@@ -221,17 +221,19 @@ impl App {
         app.frame_history_mb = frame_history_mb;
         // Load application state (last save directory, deblur enabled, etc.)
         let (app_state, state_warning) = persisted_state::AppState::load();
-        app.app_state = app_state.clone();
 
-        // AI settings (enable flags come from persisted state, not config)
+        // Read AI settings before moving app_state (enable flags come from persisted state)
         let enable_deblur = app_state.enable_deblur;
+        let enable_upscale = app_state.enable_upscale;
+
+        // Move app_state (no clone needed since we've already extracted the values we need)
+        app.app_state = app_state;
         let deblur_model_url = config
             .ai
             .deblur_model_url
             .clone()
             .unwrap_or_else(|| config::DEFAULT_DEBLUR_MODEL_URL.to_string());
 
-        let enable_upscale = app_state.enable_upscale;
         let upscale_model_url = config
             .ai
             .upscale_model_url
@@ -484,8 +486,7 @@ impl App {
     fn is_editing_captured_frame(&self) -> bool {
         self.image_editor
             .as_ref()
-            .map(|e| e.is_captured_frame())
-            .unwrap_or(false)
+            .is_some_and(crate::ui::image_editor::State::is_captured_frame)
     }
 
     /// Checks if any domain has unsaved changes.
@@ -506,15 +507,13 @@ impl App {
         let image_editor_changes = self
             .image_editor
             .as_ref()
-            .map(|e| e.has_unsaved_changes())
-            .unwrap_or(false);
+            .is_some_and(crate::ui::image_editor::State::has_unsaved_changes);
 
         // Check metadata editor
         let metadata_editor_changes = self
             .metadata_editor_state
             .as_ref()
-            .map(|e| e.has_changes())
-            .unwrap_or(false);
+            .is_some_and(crate::ui::metadata_panel::MetadataEditorState::has_changes);
 
         image_editor_changes || metadata_editor_changes
     }
@@ -522,8 +521,7 @@ impl App {
     fn theme(&self) -> Theme {
         match self.theme_mode {
             ThemeMode::Light => Theme::Light,
-            ThemeMode::Dark => Theme::Dark,
-            ThemeMode::System => Theme::Dark,
+            ThemeMode::Dark | ThemeMode::System => Theme::Dark,
         }
     }
 
@@ -546,8 +544,9 @@ impl App {
         let editor_sub = self
             .image_editor
             .as_ref()
-            .map(|editor| editor.subscription().map(Message::ImageEditor))
-            .unwrap_or_else(Subscription::none);
+            .map_or_else(Subscription::none, |editor| {
+                editor.subscription().map(Message::ImageEditor)
+            });
 
         Subscription::batch([event_sub, tick_sub, video_sub, editor_sub])
     }
@@ -1144,8 +1143,7 @@ impl App {
                     .current_media_path
                     .as_ref()
                     .and_then(|p| p.file_name())
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "unknown".to_string());
+                    .map_or_else(|| "unknown".to_string(), |n| n.to_string_lossy().to_string());
 
                 // Handle based on load origin
                 let load_origin = std::mem::take(&mut self.viewer.load_origin);
@@ -2095,9 +2093,10 @@ mod tests {
     #[test]
     fn title_shows_new_image_for_captured_frame() {
         use crate::media::frame_export::ExportableFrame;
+        use std::sync::Arc;
 
         // Create a captured frame (4x3 black pixels)
-        let rgba_data = vec![0u8; 4 * 3 * 4]; // width * height * 4 channels
+        let rgba_data = Arc::new(vec![0u8; 4 * 3 * 4]); // width * height * 4 channels
         let frame = ExportableFrame::new(rgba_data, 4, 3);
         let video_path = PathBuf::from("/path/to/video.mp4");
 
@@ -2120,9 +2119,10 @@ mod tests {
     #[test]
     fn title_shows_new_image_for_captured_frame_even_with_changes() {
         use crate::media::frame_export::ExportableFrame;
+        use std::sync::Arc;
 
         // Create a captured frame
-        let rgba_data = vec![0u8; 4 * 3 * 4];
+        let rgba_data = Arc::new(vec![0u8; 4 * 3 * 4]);
         let frame = ExportableFrame::new(rgba_data, 4, 3);
         let video_path = PathBuf::from("/path/to/video.mp4");
 

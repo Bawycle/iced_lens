@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let video_path = &args[1];
-    println!("🎬 Testing thumbnail extraction from: {}", video_path);
+    println!("🎬 Testing thumbnail extraction from: {video_path}");
 
     // Measure extraction time
     let start = Instant::now();
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(image_data) => {
             println!("✅ Thumbnail extracted successfully!");
             println!("   Dimensions: {}x{}", image_data.width, image_data.height);
-            println!("   Time taken: {:?}", duration);
+            println!("   Time taken: {duration:?}");
 
             // Check if extraction time is acceptable (< 500ms target for 1080p)
             if duration.as_millis() < 500 {
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
         Err(e) => {
-            eprintln!("❌ Failed to extract thumbnail: {}", e);
+            eprintln!("❌ Failed to extract thumbnail: {e}");
             std::process::exit(1);
         }
     }

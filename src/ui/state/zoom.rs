@@ -236,7 +236,7 @@ pub fn format_number(value: f32) -> String {
     if value.fract().abs() < f32::EPSILON {
         format!("{}", value as i32)
     } else {
-        format!("{:.1}", value)
+        format!("{value:.1}")
             .trim_end_matches('0')
             .trim_end_matches('.')
             .to_string()

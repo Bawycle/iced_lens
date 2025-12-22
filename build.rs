@@ -26,7 +26,7 @@ fn main() {
 
 /// Generates PNG icons from SVG sources at compile time.
 ///
-/// Icons are rendered to the OUT_DIR for inclusion via `include_bytes!`.
+/// Icons are rendered to the `OUT_DIR` for inclusion via `include_bytes!`.
 /// Dark icons (black on transparent) are created by inverting the white SVGs.
 /// Light icons (white on transparent) are direct renders of the SVGs.
 fn generate_icons() {
@@ -43,9 +43,11 @@ fn generate_icons() {
     println!("cargo::rerun-if-changed=assets/icons/source/");
 
     let source_dir = Path::new("assets/icons/source");
-    if !source_dir.exists() {
-        panic!("Icon source directory not found: {}", source_dir.display());
-    }
+    assert!(
+        source_dir.exists(),
+        "Icon source directory not found: {}",
+        source_dir.display()
+    );
 
     // Process each SVG file
     for entry in fs::read_dir(source_dir).expect("Failed to read icon source directory") {
@@ -95,14 +97,17 @@ fn render_svg_to_png(svg_path: &Path, output_path: &Path, invert: bool) {
     let mut pixmap = tiny_skia::Pixmap::new(ICON_SIZE, ICON_SIZE).expect("Failed to create pixmap");
 
     // Calculate transform to fit SVG into icon size
+    // Note: ICON_SIZE is small (32), so f32 precision loss is negligible
+    #[allow(clippy::cast_precision_loss)]
+    let icon_size_f32 = ICON_SIZE as f32;
     let svg_size = tree.size();
-    let scale_x = ICON_SIZE as f32 / svg_size.width();
-    let scale_y = ICON_SIZE as f32 / svg_size.height();
+    let scale_x = icon_size_f32 / svg_size.width();
+    let scale_y = icon_size_f32 / svg_size.height();
     let scale = scale_x.min(scale_y);
 
     // Center the icon
-    let offset_x = (ICON_SIZE as f32 - svg_size.width() * scale) / 2.0;
-    let offset_y = (ICON_SIZE as f32 - svg_size.height() * scale) / 2.0;
+    let offset_x = (icon_size_f32 - svg_size.width() * scale) / 2.0;
+    let offset_y = (icon_size_f32 - svg_size.height() * scale) / 2.0;
 
     let transform =
         tiny_skia::Transform::from_scale(scale, scale).post_translate(offset_x, offset_y);
@@ -124,8 +129,8 @@ fn render_svg_to_png(svg_path: &Path, output_path: &Path, invert: bool) {
 /// Transforms white (255, 255, 255) → black (0, 0, 0) while keeping
 /// transparent pixels transparent.
 ///
-/// tiny-skia uses premultiplied alpha, where stored_rgb = rgb * alpha / 255.
-/// For premultiplied pixels: inverted_rgb = alpha - stored_rgb
+/// tiny-skia uses premultiplied alpha, where `stored_rgb` = rgb * alpha / 255.
+/// For premultiplied pixels: `inverted_rgb` = alpha - `stored_rgb`
 fn invert_colors(pixmap: &mut tiny_skia::Pixmap) {
     let data = pixmap.data_mut();
     // Pixels are stored as RGBA (premultiplied), 4 bytes each

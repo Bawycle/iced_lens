@@ -131,7 +131,7 @@ mod tests {
 
         match load_image(&missing_path) {
             Err(Error::Io(_)) => {}
-            other => panic!("expected Io error, got {:?}", other),
+            other => panic!("expected Io error, got {other:?}"),
         }
     }
 
@@ -143,7 +143,7 @@ mod tests {
 
         match load_image(&bad_path) {
             Err(Error::Io(message)) => assert!(!message.is_empty()),
-            other => panic!("expected Io error for invalid png, got {:?}", other),
+            other => panic!("expected Io error for invalid png, got {other:?}"),
         }
     }
 
@@ -155,7 +155,7 @@ mod tests {
 
         match load_image(&bad_svg_path) {
             Err(Error::Svg(message)) => assert!(!message.is_empty()),
-            other => panic!("expected Svg error, got {:?}", other),
+            other => panic!("expected Svg error, got {other:?}"),
         }
     }
 
@@ -163,12 +163,12 @@ mod tests {
     fn load_svg_with_zero_dimensions_errors() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let svg_path = temp_dir.path().join("zero.svg");
-        let svg = r#"<svg xmlns='http://www.w3.org/2000/svg' width='0' height='10'></svg>"#;
+        let svg = r"<svg xmlns='http://www.w3.org/2000/svg' width='0' height='10'></svg>";
         fs::write(&svg_path, svg).expect("write svg");
 
         match load_image(&svg_path) {
             Err(Error::Svg(_)) => {}
-            other => panic!("expected Svg error, got {:?}", other),
+            other => panic!("expected Svg error, got {other:?}"),
         }
     }
 
@@ -179,7 +179,7 @@ mod tests {
         let error: Error = image_error.into();
         match error {
             Error::Io(message) => assert!(message.contains("decode failed")),
-            other => panic!("expected Io variant from ImageError, got {:?}", other),
+            other => panic!("expected Io variant from ImageError, got {other:?}"),
         }
     }
 }

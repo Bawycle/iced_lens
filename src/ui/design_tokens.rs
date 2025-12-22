@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-#![doc = r#"
+#![doc = r"
 # Design Tokens
 
 This module defines all of the application's design tokens, following the W3C Design Tokens standard.
@@ -37,7 +37,7 @@ let padding = spacing::MD; // 16px
 1. Check the impact on all components
 2. Maintain ratios (e.g., MD = XS * 2)
 3. Run validation tests
-"#]
+"]
 
 //! Design tokens centralisés suivant le Design Tokens W3C standard.
 

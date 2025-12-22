@@ -457,16 +457,16 @@ fn format_time(seconds: f64) -> String {
     let secs = total_secs % 60;
 
     if hours > 0 {
-        format!("{:02}:{:02}:{:02}", hours, minutes, secs)
+        format!("{hours:02}:{minutes:02}:{secs:02}")
     } else {
-        format!("{:02}:{:02}", minutes, secs)
+        format!("{minutes:02}:{secs:02}")
     }
 }
 
 /// Formats playback speed for display.
 /// Always shows 2 decimal places for consistent UI width.
 fn format_playback_speed(speed: f64) -> String {
-    format!("{:.2}x", speed)
+    format!("{speed:.2}x")
 }
 
 /// Formats volume as percentage for display.
@@ -527,7 +527,7 @@ mod tests {
     #[test]
     fn message_debug_works() {
         let msg = Message::SeekPreview(30.5);
-        let debug_str = format!("{:?}", msg);
+        let debug_str = format!("{msg:?}");
         assert!(debug_str.contains("SeekPreview"));
         assert!(debug_str.contains("30.5"));
     }

@@ -305,7 +305,7 @@ pub fn extract_extended_video_metadata<P: AsRef<Path>>(path: P) -> Result<Extend
 
     // Open video file
     let ictx = ffmpeg_next::format::input(path)
-        .map_err(|e| Error::Io(format!("Failed to open video file: {}", e)))?;
+        .map_err(|e| Error::Io(format!("Failed to open video file: {e}")))?;
 
     // Get container format
     metadata.container_format = Some(ictx.format().name().to_string());
@@ -396,7 +396,7 @@ pub fn format_file_size(bytes: u64) -> String {
     } else if bytes >= KB {
         format!("{:.1} KB", bytes as f64 / KB as f64)
     } else {
-        format!("{} B", bytes)
+        format!("{bytes} B")
     }
 }
 
@@ -410,7 +410,7 @@ pub fn format_bitrate(bits_per_sec: u64) -> String {
     } else if bits_per_sec >= KBPS {
         format!("{:.0} kbps", bits_per_sec as f64 / KBPS as f64)
     } else {
-        format!("{} bps", bits_per_sec)
+        format!("{bits_per_sec} bps")
     }
 }
 
@@ -467,18 +467,18 @@ mod tests {
         assert_eq!(format_file_size(500), "500 B");
         assert_eq!(format_file_size(1024), "1.0 KB");
         assert_eq!(format_file_size(1536), "1.5 KB");
-        assert_eq!(format_file_size(1048576), "1.00 MB");
-        assert_eq!(format_file_size(1572864), "1.50 MB");
-        assert_eq!(format_file_size(1073741824), "1.00 GB");
+        assert_eq!(format_file_size(1_048_576), "1.00 MB");
+        assert_eq!(format_file_size(1_572_864), "1.50 MB");
+        assert_eq!(format_file_size(1_073_741_824), "1.00 GB");
     }
 
     #[test]
     fn format_bitrate_formats_correctly() {
         assert_eq!(format_bitrate(500), "500 bps");
         assert_eq!(format_bitrate(1000), "1 kbps");
-        assert_eq!(format_bitrate(128000), "128 kbps");
-        assert_eq!(format_bitrate(1000000), "1.00 Mbps");
-        assert_eq!(format_bitrate(5000000), "5.00 Mbps");
+        assert_eq!(format_bitrate(128_000), "128 kbps");
+        assert_eq!(format_bitrate(1_000_000), "1.00 Mbps");
+        assert_eq!(format_bitrate(5_000_000), "5.00 Mbps");
     }
 
     #[test]

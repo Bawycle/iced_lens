@@ -67,12 +67,12 @@ pub fn init_cli_overrides(data_dir: Option<String>, config_dir: Option<String>) 
 
 /// Returns the CLI override for data directory, if set.
 fn get_cli_data_dir() -> Option<PathBuf> {
-    CLI_DATA_DIR.get().and_then(|opt| opt.clone())
+    CLI_DATA_DIR.get().and_then(Clone::clone)
 }
 
 /// Returns the CLI override for config directory, if set.
 fn get_cli_config_dir() -> Option<PathBuf> {
-    CLI_CONFIG_DIR.get().and_then(|opt| opt.clone())
+    CLI_CONFIG_DIR.get().and_then(Clone::clone)
 }
 
 /// Returns the application data directory path.

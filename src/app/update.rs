@@ -187,8 +187,7 @@ pub fn handle_viewer_message(
             let has_unsaved_changes = ctx
                 .metadata_editor_state
                 .as_ref()
-                .map(|editor| editor.has_changes())
-                .unwrap_or(false);
+                .is_some_and(crate::ui::metadata_panel::MetadataEditorState::has_changes);
             if has_unsaved_changes {
                 Task::none()
             } else {
@@ -268,8 +267,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
         let has_unsaved_changes = ctx
             .metadata_editor_state
             .as_ref()
-            .map(|editor| editor.has_changes())
-            .unwrap_or(false);
+            .is_some_and(crate::ui::metadata_panel::MetadataEditorState::has_changes);
         if has_unsaved_changes {
             return Task::none();
         }
@@ -300,7 +298,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
         if let (Some(image_path), Some(media_data)) = (
             ctx.media_navigator
                 .current_media_path()
-                .map(|p| p.to_path_buf()),
+                .map(std::path::Path::to_path_buf),
             ctx.viewer.media().cloned(),
         ) {
             // Editor only supports images in v0.2, not videos
@@ -339,10 +337,9 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                 }
             }
             return Task::none();
-        } else {
-            // Can't enter editor screen without an image
-            return Task::none();
         }
+        // Can't enter editor screen without an image
+        return Task::none();
     }
 
     // Handle Editor → Viewer transition
@@ -1068,7 +1065,7 @@ where
         if let Some(current_path) = ctx
             .media_navigator
             .current_media_path()
-            .map(|p| p.to_path_buf())
+            .map(std::path::Path::to_path_buf)
         {
             let (config, _) = config::load();
             let sort_order = config.display.sort_order.unwrap_or_default();
@@ -1192,7 +1189,7 @@ fn truncate_filename(name: &str) -> String {
         name.to_string()
     } else {
         let truncated: String = name.chars().take(MAX_FILENAME_LEN - 1).collect();
-        format!("{}…", truncated)
+        format!("{truncated}…")
     }
 }
 
@@ -1229,7 +1226,7 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
     let Some(current_path) = ctx
         .media_navigator
         .current_media_path()
-        .map(|p| p.to_path_buf())
+        .map(std::path::Path::to_path_buf)
     else {
         return Task::none();
     };
@@ -1414,7 +1411,7 @@ pub fn handle_file_dropped(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<M
             if let Some(first_path) = ctx
                 .media_navigator
                 .current_media_path()
-                .map(|p| p.to_path_buf())
+                .map(std::path::Path::to_path_buf)
             {
                 return load_media_from_path(ctx, first_path);
             }

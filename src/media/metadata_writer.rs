@@ -65,11 +65,11 @@ impl EditableMetadata {
             focal_length_35mm: meta.focal_length_35mm.clone().unwrap_or_default(),
             gps_latitude: meta
                 .gps_latitude
-                .map(|v| format!("{:.6}", v))
+                .map(|v| format!("{v:.6}"))
                 .unwrap_or_default(),
             gps_longitude: meta
                 .gps_longitude
-                .map(|v| format!("{:.6}", v))
+                .map(|v| format!("{v:.6}"))
                 .unwrap_or_default(),
             dc_title: meta.dc_title.clone().unwrap_or_default(),
             dc_creator: meta.dc_creator.clone().unwrap_or_default(),
@@ -554,8 +554,7 @@ pub fn is_format_supported<P: AsRef<Path>>(path: P) -> bool {
     path.as_ref()
         .extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| supported_extensions().contains(&ext.to_lowercase().as_str()))
-        .unwrap_or(false)
+        .is_some_and(|ext| supported_extensions().contains(&ext.to_lowercase().as_str()))
 }
 
 #[cfg(test)]

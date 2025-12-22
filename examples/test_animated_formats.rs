@@ -13,7 +13,7 @@ fn main() {
     }
 
     let file_path = &args[1];
-    println!("🔍 Test du fichier: {}\n", file_path);
+    println!("🔍 Test du fichier: {file_path}\n");
 
     // Test 1: Détection du type
     println!("1️⃣  Détection du type de média:");
@@ -35,7 +35,7 @@ fn main() {
             println!("   - La lecture d'animation sera implémentée dans les phases suivantes");
         }
         Err(e) => {
-            println!("   ❌ Erreur de chargement: {}", e);
+            println!("   ❌ Erreur de chargement: {e}");
         }
     }
 }
