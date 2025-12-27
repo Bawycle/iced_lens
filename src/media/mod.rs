@@ -22,7 +22,8 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 
 // Re-export commonly used types
-pub use image::{load_image, ImageData, SUPPORTED_EXTENSIONS as IMAGE_EXTENSIONS};
+pub use extensions::IMAGE_EXTENSIONS;
+pub use image::{load_image, ImageData};
 pub use image_transform::ResizeScale;
 pub use navigator::MediaNavigator;
 pub use skip_attempts::MaxSkipAttempts;
@@ -94,13 +95,61 @@ pub mod extensions {
     /// Video file extensions
     pub const VIDEO_EXTENSIONS: &[&str] = &["mp4", "m4v", "avi", "mov", "mkv", "webm"];
 
+    /// All supported extensions (images + videos) for file dialogs
+    pub const ALL_MEDIA_EXTENSIONS: &[&str] = &[
+        "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "ico", "mp4", "avi", "mov",
+        "mkv", "webm",
+    ];
+
+    /// Image format filters for save dialogs
+    pub const IMAGE_SAVE_FILTERS: &[(&str, &[&str])] = &[
+        ("JPEG", &["jpg", "jpeg"]),
+        ("PNG", &["png"]),
+        ("WebP", &["webp"]),
+        ("TIFF", &["tiff", "tif"]),
+    ];
+
+    /// Extensions that support EXIF metadata writing.
+    /// Includes formats from `IMAGE_EXTENSIONS` that support EXIF, plus additional formats.
+    pub const EXIF_WRITE_EXTENSIONS: &[&str] = &[
+        "jpg", "jpeg", "png", "webp", "tiff", "tif", "heic", "heif", "jxl", "avif",
+    ];
+
+    /// Extensions that support XMP metadata reading.
+    pub const XMP_READ_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "tiff", "tif"];
+
+    /// Extensions that support XMP metadata writing.
+    pub const XMP_WRITE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "tiff", "tif"];
+
     /// All supported extensions (images + videos)
+    #[must_use]
     pub fn all_supported_extensions() -> Vec<&'static str> {
         IMAGE_EXTENSIONS
             .iter()
             .chain(VIDEO_EXTENSIONS.iter())
             .copied()
             .collect()
+    }
+
+    /// Checks if a file extension supports XMP metadata reading.
+    #[must_use]
+    pub fn supports_xmp_read(ext: &str) -> bool {
+        XMP_READ_EXTENSIONS.contains(&ext.to_lowercase().as_str())
+    }
+
+    /// Checks if a file extension supports XMP metadata writing.
+    #[must_use]
+    pub fn supports_xmp_write(ext: &str) -> bool {
+        XMP_WRITE_EXTENSIONS.contains(&ext.to_lowercase().as_str())
+    }
+
+    /// Checks if a file path supports XMP metadata writing.
+    #[must_use]
+    pub fn path_supports_xmp_write<P: AsRef<std::path::Path>>(path: P) -> bool {
+        path.as_ref()
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(supports_xmp_write)
     }
 }
 
@@ -124,7 +173,7 @@ fn count_gif_frames<P: AsRef<Path>>(path: P) -> crate::error::Result<usize> {
 /// Animated WebP files contain "ANMF" (Animation Frame) chunks in their structure.
 /// This is a fast, reliable method that only reads the file header.
 ///
-/// Reference: https://stackoverflow.com/questions/45190469/how-to-identify-whether-webp-image-is-static-or-animated
+/// Reference: <https://stackoverflow.com/questions/45190469/how-to-identify-whether-webp-image-is-static-or-animated>
 fn is_webp_animated_by_marker<P: AsRef<Path>>(path: P) -> crate::error::Result<bool> {
     let mut file = File::open(path)?;
 
@@ -161,7 +210,7 @@ fn is_animated<P: AsRef<Path>>(path: P) -> crate::error::Result<bool> {
     let extension = path_ref
         .extension()
         .and_then(|s| s.to_str())
-        .map(|s| s.to_lowercase())
+        .map(str::to_lowercase)
         .unwrap_or_default();
 
     match extension.as_str() {
@@ -177,12 +226,12 @@ fn is_animated<P: AsRef<Path>>(path: P) -> crate::error::Result<bool> {
     }
 }
 
-/// Load media file (image or video) and return unified MediaData
+/// Load media file (image or video) and return unified `MediaData`
 ///
 /// Automatically detects the media type and loads it appropriately:
 /// - Images are loaded directly using `load_image()`
-/// - Videos are loaded as VideoData with thumbnail and metadata
-/// - Animated WebP files use dedicated webp-animation decoder (FFmpeg doesn't support them well)
+/// - Videos are loaded as `VideoData` with thumbnail and metadata
+/// - Animated WebP files use dedicated webp-animation decoder (`FFmpeg` doesn't support them well)
 ///
 /// # Errors
 /// Returns an error if:
@@ -206,7 +255,7 @@ pub fn load_media<P: AsRef<Path>>(path: P) -> crate::error::Result<MediaData> {
             let extension = path_ref
                 .extension()
                 .and_then(|s| s.to_str())
-                .map(|s| s.to_lowercase())
+                .map(str::to_lowercase)
                 .unwrap_or_default();
 
             if extension == "webp" {
@@ -288,7 +337,7 @@ pub fn detect_media_type<P: AsRef<Path>>(path: P) -> Option<MediaType> {
     let extension = path_ref
         .extension()
         .and_then(|s| s.to_str())
-        .map(|s| s.to_lowercase())?;
+        .map(str::to_lowercase)?;
 
     // For GIF and WebP, check if animated
     if extension == "gif" || extension == "webp" {
@@ -486,5 +535,43 @@ mod tests {
         let path = "tests/data/document.pdf";
         let result = super::load_media(path);
         assert!(result.is_err(), "Should fail on unsupported format");
+    }
+
+    #[test]
+    fn test_supports_xmp_read() {
+        assert!(extensions::supports_xmp_read("jpg"));
+        assert!(extensions::supports_xmp_read("JPEG"));
+        assert!(extensions::supports_xmp_read("png"));
+        assert!(extensions::supports_xmp_read("PNG"));
+        assert!(extensions::supports_xmp_read("webp"));
+        assert!(extensions::supports_xmp_read("tiff"));
+        assert!(extensions::supports_xmp_read("tif"));
+        assert!(!extensions::supports_xmp_read("gif"));
+        assert!(!extensions::supports_xmp_read("bmp"));
+    }
+
+    #[test]
+    fn test_supports_xmp_write() {
+        assert!(extensions::supports_xmp_write("jpg"));
+        assert!(extensions::supports_xmp_write("JPEG"));
+        assert!(extensions::supports_xmp_write("png"));
+        assert!(extensions::supports_xmp_write("PNG"));
+        assert!(extensions::supports_xmp_write("webp"));
+        assert!(extensions::supports_xmp_write("tiff"));
+        assert!(extensions::supports_xmp_write("tif"));
+        assert!(!extensions::supports_xmp_write("gif"));
+        assert!(!extensions::supports_xmp_write("bmp"));
+    }
+
+    #[test]
+    fn test_path_supports_xmp_write() {
+        assert!(extensions::path_supports_xmp_write("photo.jpg"));
+        assert!(extensions::path_supports_xmp_write("image.PNG"));
+        assert!(extensions::path_supports_xmp_write("/path/to/file.jpeg"));
+        assert!(extensions::path_supports_xmp_write("image.webp"));
+        assert!(extensions::path_supports_xmp_write("photo.tiff"));
+        assert!(extensions::path_supports_xmp_write("photo.tif"));
+        assert!(!extensions::path_supports_xmp_write("image.gif"));
+        assert!(!extensions::path_supports_xmp_write("no_extension"));
     }
 }

@@ -291,23 +291,25 @@ help-capture-formats = Formats d'export disponibles : PNG (sans perte), JPEG (fi
 # Section Édition des métadonnées
 # ─────────────────────────────────────────────────────────────────────────────
 help-section-metadata = Édition des métadonnées
-help-metadata-role = Consultez et modifiez les métadonnées EXIF intégrées dans vos fichiers image. Modifiez les informations de l'appareil photo, la date de prise de vue, les coordonnées GPS et les paramètres d'exposition.
+help-metadata-role = Consultez et modifiez les métadonnées intégrées dans vos fichiers image. Deux types sont pris en charge : Dublin Core (XMP) pour les informations descriptives comme le titre et l'auteur, et EXIF pour les données techniques de l'appareil photo.
 
 help-metadata-tool-view = Mode affichage
-help-metadata-tool-view-desc = Consultez les informations du fichier, les détails de l'appareil, les paramètres d'exposition et les coordonnées GPS dans le panneau d'informations.
+help-metadata-tool-view-desc = Appuyez sur I ou cliquez sur le bouton Info pour afficher toutes les métadonnées dans le panneau latéral.
 help-metadata-tool-edit = Mode édition
-help-metadata-tool-edit-desc = Cliquez sur le bouton Éditer pour modifier les champs de métadonnées. Les modifications sont validées en temps réel.
+help-metadata-tool-edit-desc = Cliquez sur Éditer pour modifier les champs. Utilisez « Ajouter un champ » pour ajouter des métadonnées. La validation se fait pendant la saisie.
 help-metadata-tool-save = Options d'enregistrement
 help-metadata-tool-save-desc = Enregistrer pour mettre à jour le fichier original, ou Enregistrer sous pour créer une copie avec les nouvelles métadonnées.
 
 help-metadata-fields-title = Champs modifiables
+help-metadata-field-dc = Dublin Core (XMP) : titre, auteur, description, mots-clés, copyright
 help-metadata-field-camera = Marque et modèle de l'appareil
-help-metadata-field-date = Date de prise de vue (format EXIF)
-help-metadata-field-exposure = Temps d'exposition, ouverture, ISO
+help-metadata-field-date = Date de prise de vue (avec sélecteur de date)
+help-metadata-field-exposure = Temps d'exposition, ouverture, sensibilité ISO
 help-metadata-field-focal = Focale et équivalent 35mm
-help-metadata-field-gps = Latitude et longitude GPS
+help-metadata-field-gps = Coordonnées GPS (latitude et longitude)
 
-help-metadata-note = Note : L'édition des métadonnées n'est disponible que pour les images. L'édition des métadonnées vidéo est prévue pour une future version.
+help-metadata-formats = Formats pris en charge : JPEG, PNG, WebP et TIFF supportent Dublin Core et EXIF. Les autres formats peuvent avoir un support limité ou en lecture seule.
+help-metadata-note = Note : Les fichiers vidéo affichent leurs métadonnées en lecture seule. Seuls les champs supportés par chaque format sont disponibles à l'édition.
 
 # Écran À propos
 about-title = À propos
@@ -418,6 +420,7 @@ metadata-validation-invalid-number = Nombre invalide
 notification-metadata-save-success = Métadonnées enregistrées avec succès
 notification-metadata-save-error = Impossible d'enregistrer les métadonnées
 notification-metadata-validation-error = Veuillez corriger les erreurs de validation avant d'enregistrer
+notification-metadata-xmp-unsupported = Impossible d'enregistrer le titre, l'auteur et la description dans ce format de fichier
 
 # Divulgation progressive des métadonnées
 metadata-add-field = Ajouter un champ de métadonnées...

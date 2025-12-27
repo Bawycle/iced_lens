@@ -291,23 +291,25 @@ help-capture-formats = Formati di esportazione supportati: PNG (senza perdita), 
 # Sezione modifica metadati
 # ─────────────────────────────────────────────────────────────────────────────
 help-section-metadata = Modifica metadati
-help-metadata-role = Visualizza e modifica i metadati EXIF incorporati nei tuoi file immagine. Modifica informazioni sulla fotocamera, data di acquisizione, coordinate GPS e impostazioni di esposizione.
+help-metadata-role = Visualizza e modifica i metadati incorporati nei tuoi file immagine. Sono supportati due tipi: Dublin Core (XMP) per informazioni descrittive come titolo e autore, e EXIF per dati tecnici della fotocamera.
 
 help-metadata-tool-view = Modalità visualizzazione
-help-metadata-tool-view-desc = Visualizza informazioni sul file, dettagli della fotocamera, impostazioni di esposizione e coordinate GPS nel pannello informazioni.
+help-metadata-tool-view-desc = Premi I o fai clic su Info per visualizzare tutti i metadati nel pannello laterale.
 help-metadata-tool-edit = Modalità modifica
-help-metadata-tool-edit-desc = Fai clic su Modifica per modificare i campi dei metadati. Le modifiche vengono validate in tempo reale.
+help-metadata-tool-edit-desc = Fai clic su Modifica per modificare i campi. Usa « Aggiungi campo » per aggiungere metadati. La validazione avviene durante la digitazione.
 help-metadata-tool-save = Opzioni di salvataggio
 help-metadata-tool-save-desc = Salva aggiorna il file originale, Salva con nome crea una copia con i nuovi metadati.
 
 help-metadata-fields-title = Campi modificabili
+help-metadata-field-dc = Dublin Core (XMP): titolo, autore, descrizione, parole chiave, copyright
 help-metadata-field-camera = Marca e modello della fotocamera
-help-metadata-field-date = Data di acquisizione (formato EXIF)
-help-metadata-field-exposure = Tempo di esposizione, apertura, ISO
+help-metadata-field-date = Data di acquisizione (con selettore data)
+help-metadata-field-exposure = Tempo di esposizione, apertura, sensibilità ISO
 help-metadata-field-focal = Lunghezza focale e equivalente 35mm
-help-metadata-field-gps = Latitudine e longitudine GPS
+help-metadata-field-gps = Coordinate GPS (latitudine e longitudine)
 
-help-metadata-note = Nota: La modifica dei metadati è disponibile solo per le immagini. La modifica dei metadati video è prevista per una futura versione.
+help-metadata-formats = Formati supportati: JPEG, PNG, WebP e TIFF supportano Dublin Core e EXIF. Altri formati potrebbero avere supporto limitato o in sola lettura.
+help-metadata-note = Nota: I file video mostrano i metadati in modalità sola lettura. Solo i campi supportati da ciascun formato sono disponibili per la modifica.
 
 # About screen
 about-title = Informazioni

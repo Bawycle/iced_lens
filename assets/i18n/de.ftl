@@ -291,23 +291,25 @@ help-capture-formats = Unterstützte Exportformate: PNG (verlustfrei), JPEG (kle
 # Metadaten-Bearbeitungs-Abschnitt
 # ─────────────────────────────────────────────────────────────────────────────
 help-section-metadata = Metadaten-Bearbeitung
-help-metadata-role = Sehen und bearbeiten Sie EXIF-Metadaten in Ihren Bilddateien. Ändern Sie Kamerainformationen, Aufnahmedatum, GPS-Koordinaten und Belichtungseinstellungen.
+help-metadata-role = Sehen und bearbeiten Sie Metadaten in Ihren Bilddateien. Zwei Typen werden unterstützt: Dublin Core (XMP) für beschreibende Informationen wie Titel und Autor, und EXIF für technische Kameradaten.
 
 help-metadata-tool-view = Anzeigemodus
-help-metadata-tool-view-desc = Sehen Sie Dateiinformationen, Kameradetails, Belichtungseinstellungen und GPS-Koordinaten im Info-Panel.
+help-metadata-tool-view-desc = Drücken Sie I oder klicken Sie auf Info, um alle Metadaten im Seitenbereich anzuzeigen.
 help-metadata-tool-edit = Bearbeitungsmodus
-help-metadata-tool-edit-desc = Klicken Sie auf Bearbeiten, um Metadatenfelder zu ändern. Änderungen werden in Echtzeit validiert.
+help-metadata-tool-edit-desc = Klicken Sie auf Bearbeiten, um Felder zu ändern. Verwenden Sie „Feld hinzufügen" für neue Metadaten. Die Validierung erfolgt während der Eingabe.
 help-metadata-tool-save = Speicheroptionen
 help-metadata-tool-save-desc = Speichern aktualisiert die Originaldatei, Speichern unter erstellt eine Kopie mit den neuen Metadaten.
 
 help-metadata-fields-title = Bearbeitbare Felder
+help-metadata-field-dc = Dublin Core (XMP): Titel, Autor, Beschreibung, Stichwörter, Copyright
 help-metadata-field-camera = Kamerahersteller und Modell
-help-metadata-field-date = Aufnahmedatum (EXIF-Format)
-help-metadata-field-exposure = Belichtungszeit, Blende, ISO
+help-metadata-field-date = Aufnahmedatum (mit Datumsauswahl)
+help-metadata-field-exposure = Belichtungszeit, Blende, ISO-Empfindlichkeit
 help-metadata-field-focal = Brennweite und 35mm-Äquivalent
-help-metadata-field-gps = GPS-Breiten- und Längengrad
+help-metadata-field-gps = GPS-Koordinaten (Breiten- und Längengrad)
 
-help-metadata-note = Hinweis: Metadaten-Bearbeitung ist nur für Bilder verfügbar. Video-Metadaten-Bearbeitung ist für eine zukünftige Version geplant.
+help-metadata-formats = Unterstützte Formate: JPEG, PNG, WebP und TIFF unterstützen Dublin Core und EXIF. Andere Formate haben möglicherweise eingeschränkte oder schreibgeschützte Unterstützung.
+help-metadata-note = Hinweis: Videodateien zeigen Metadaten nur im Lesemodus an. Nur die von jedem Format unterstützten Felder sind zur Bearbeitung verfügbar.
 
 # About screen
 about-title = Über

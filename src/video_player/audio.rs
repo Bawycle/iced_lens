@@ -209,9 +209,8 @@ fn handle_audio_command(
             #[allow(clippy::cast_possible_truncation)]
             let timestamp = (*target_secs * 1_000_000.0) as i64;
             if let Err(e) = ictx.seek(timestamp, ..timestamp) {
-                let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
-                    "Audio seek failed: {e}"
-                )));
+                let _ = event_tx
+                    .blocking_send(AudioDecoderEvent::Error(format!("Audio seek failed: {e}")));
                 state.seek_target_secs = None;
             } else {
                 decoder.flush();

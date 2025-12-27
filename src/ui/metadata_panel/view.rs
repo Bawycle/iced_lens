@@ -3,6 +3,7 @@
 
 use super::{Message, MetadataEditorState, MetadataField, PanelContext};
 use crate::i18n::fluent::I18n;
+use crate::media::extensions;
 use crate::media::metadata::{
     format_bitrate, format_file_size, format_gps_coordinates, ExtendedVideoMetadata, ImageMetadata,
     MediaMetadata,
@@ -22,6 +23,7 @@ use iced::{alignment::Vertical, Border, Element, Length, Padding, Theme};
 pub const PANEL_WIDTH: f32 = 290.0;
 
 /// Contextual data needed to render the metadata panel (legacy, for backward compatibility).
+#[derive(Clone, Copy)]
 pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
     pub metadata: Option<&'a MediaMetadata>,
@@ -29,7 +31,7 @@ pub struct ViewContext<'a> {
 }
 
 /// Render the metadata panel.
-pub fn panel<'a>(ctx: PanelContext<'a>) -> Element<'a, Message> {
+pub fn panel(ctx: PanelContext<'_>) -> Element<'_, Message> {
     let is_editing = ctx.editor_state.is_some();
     let title = Text::new(ctx.i18n.tr("metadata-panel-title")).size(typography::TITLE_SM);
 
@@ -214,7 +216,15 @@ fn build_edit_content<'a>(ctx: &PanelContext<'a>, _meta: &ImageMetadata) -> Elem
     }
 
     // Add field picker (only if there are available fields)
-    let available = editor.available_fields();
+    // Filter XMP fields based on format support
+    let supports_xmp = ctx
+        .current_path
+        .is_some_and(extensions::path_supports_xmp_write);
+    let available: Vec<MetadataField> = editor
+        .available_fields()
+        .into_iter()
+        .filter(|f| !f.is_xmp_field() || supports_xmp)
+        .collect();
     if !available.is_empty() {
         sections = sections.push(build_add_field_picker(ctx.i18n, &available));
     }
@@ -287,7 +297,7 @@ fn build_camera_section_edit<'a>(
     // Camera Make
     if editor.is_field_visible(&MetadataField::CameraMake) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-make"),
+            &i18n.tr("metadata-label-make"),
             &editor.edited.camera_make,
             MetadataField::CameraMake,
             None,
@@ -299,7 +309,7 @@ fn build_camera_section_edit<'a>(
     // Camera Model
     if editor.is_field_visible(&MetadataField::CameraModel) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-model"),
+            &i18n.tr("metadata-label-model"),
             &editor.edited.camera_model,
             MetadataField::CameraModel,
             None,
@@ -312,7 +322,7 @@ fn build_camera_section_edit<'a>(
     if editor.is_field_visible(&MetadataField::DateTaken) {
         rows = rows.push(build_date_field_with_remove(
             i18n,
-            i18n.tr("metadata-label-date-taken"),
+            &i18n.tr("metadata-label-date-taken"),
             &editor.edited.date_taken,
             editor.errors.date_taken.as_ref(),
         ));
@@ -340,7 +350,7 @@ fn build_exposure_section_edit<'a>(
     // Exposure Time
     if editor.is_field_visible(&MetadataField::ExposureTime) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-exposure"),
+            &i18n.tr("metadata-label-exposure"),
             &editor.edited.exposure_time,
             MetadataField::ExposureTime,
             Some("1/250".to_string()),
@@ -352,7 +362,7 @@ fn build_exposure_section_edit<'a>(
     // Aperture
     if editor.is_field_visible(&MetadataField::Aperture) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-aperture"),
+            &i18n.tr("metadata-label-aperture"),
             &editor.edited.aperture,
             MetadataField::Aperture,
             Some("f/2.8".to_string()),
@@ -364,7 +374,7 @@ fn build_exposure_section_edit<'a>(
     // ISO
     if editor.is_field_visible(&MetadataField::Iso) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-iso"),
+            &i18n.tr("metadata-label-iso"),
             &editor.edited.iso,
             MetadataField::Iso,
             Some("100".to_string()),
@@ -376,7 +386,7 @@ fn build_exposure_section_edit<'a>(
     // Focal Length
     if editor.is_field_visible(&MetadataField::FocalLength) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-focal-length"),
+            &i18n.tr("metadata-label-focal-length"),
             &editor.edited.focal_length,
             MetadataField::FocalLength,
             Some("50 mm".to_string()),
@@ -411,7 +421,7 @@ fn build_gps_section_edit<'a>(
 
     // Latitude (with remove button that removes both GPS fields)
     rows = rows.push(build_edit_field_with_remove(
-        i18n.tr("metadata-label-latitude"),
+        &i18n.tr("metadata-label-latitude"),
         &editor.edited.gps_latitude,
         MetadataField::GpsLatitude,
         Some("48.8566".to_string()),
@@ -420,7 +430,7 @@ fn build_gps_section_edit<'a>(
 
     // Longitude (no remove button, removing latitude removes both)
     rows = rows.push(build_edit_field(
-        i18n.tr("metadata-label-longitude"),
+        &i18n.tr("metadata-label-longitude"),
         &editor.edited.gps_longitude,
         MetadataField::GpsLongitude,
         Some("2.3522".to_string()),
@@ -444,7 +454,7 @@ fn build_dublin_core_section_edit<'a>(
     // Title
     if editor.is_field_visible(&MetadataField::DcTitle) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-dc-title"),
+            &i18n.tr("metadata-label-dc-title"),
             &editor.edited.dc_title,
             MetadataField::DcTitle,
             Some("Photo Title".to_string()),
@@ -456,7 +466,7 @@ fn build_dublin_core_section_edit<'a>(
     // Creator
     if editor.is_field_visible(&MetadataField::DcCreator) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-dc-creator"),
+            &i18n.tr("metadata-label-dc-creator"),
             &editor.edited.dc_creator,
             MetadataField::DcCreator,
             Some("John Doe".to_string()),
@@ -468,7 +478,7 @@ fn build_dublin_core_section_edit<'a>(
     // Description
     if editor.is_field_visible(&MetadataField::DcDescription) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-dc-description"),
+            &i18n.tr("metadata-label-dc-description"),
             &editor.edited.dc_description,
             MetadataField::DcDescription,
             Some("A beautiful sunset".to_string()),
@@ -480,7 +490,7 @@ fn build_dublin_core_section_edit<'a>(
     // Subject (Keywords)
     if editor.is_field_visible(&MetadataField::DcSubject) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-dc-subject"),
+            &i18n.tr("metadata-label-dc-subject"),
             &editor.edited.dc_subject,
             MetadataField::DcSubject,
             Some("sunset, nature, landscape".to_string()),
@@ -492,7 +502,7 @@ fn build_dublin_core_section_edit<'a>(
     // Rights (Copyright)
     if editor.is_field_visible(&MetadataField::DcRights) {
         rows = rows.push(build_edit_field_with_remove(
-            i18n.tr("metadata-label-dc-rights"),
+            &i18n.tr("metadata-label-dc-rights"),
             &editor.edited.dc_rights,
             MetadataField::DcRights,
             Some("(c) 2024 John Doe".to_string()),
@@ -514,7 +524,7 @@ fn build_dublin_core_section_edit<'a>(
 
 /// Build an editable field with label, input, and optional error.
 fn build_edit_field<'a>(
-    label: String,
+    label: &str,
     value: &str,
     field: MetadataField,
     placeholder: Option<String>,
@@ -547,7 +557,7 @@ fn build_edit_field<'a>(
 
 /// Build an editable field with a remove button.
 fn build_edit_field_with_remove<'a>(
-    label: String,
+    label: &str,
     value: &str,
     field: MetadataField,
     placeholder: Option<String>,
@@ -594,7 +604,7 @@ fn build_edit_field_with_remove<'a>(
 /// Includes a "Now" button for quick current date/time input.
 fn build_date_field_with_remove<'a>(
     i18n: &'a I18n,
-    label: String,
+    label: &str,
     value: &str,
     error: Option<&String>,
 ) -> Element<'a, Message> {
@@ -741,7 +751,7 @@ fn get_current_datetime_exif() -> String {
     Local::now().format("%Y:%m:%d %H:%M:%S").to_string()
 }
 
-/// Wrapper for MetadataField to implement Display for pick_list.
+/// Wrapper for `MetadataField` to implement Display for `pick_list`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FieldOption {
     field: MetadataField,
@@ -1138,7 +1148,8 @@ fn build_audio_section<'a>(i18n: &'a I18n, meta: &ExtendedVideoMetadata) -> Elem
 // Helper Functions
 // =============================================================================
 
-fn build_metadata_row<'a>(label: String, value: String) -> Element<'a, Message> {
+#[allow(clippy::needless_pass_by_value)] // label is consumed by format! and value is needed for Text
+fn build_metadata_row(label: String, value: String) -> Element<'static, Message> {
     Row::new()
         .spacing(spacing::SM)
         .push(
@@ -1154,11 +1165,11 @@ fn build_metadata_row<'a>(label: String, value: String) -> Element<'a, Message> 
         .into()
 }
 
-fn build_section<'a>(
+fn build_section(
     icon: Image<Handle>,
     title: String,
-    content: Element<'a, Message>,
-) -> Element<'a, Message> {
+    content: Element<'_, Message>,
+) -> Element<'_, Message> {
     let icon_sized = icons::sized(icon, sizing::ICON_SM);
 
     let header = Row::new()
@@ -1175,7 +1186,10 @@ fn build_section<'a>(
 }
 
 fn format_duration(duration_secs: f64) -> String {
-    let total_secs = duration_secs as u64;
+    // Clamp to non-negative and convert safely
+    // The cast is intentional: we want to truncate fractional seconds
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let total_secs = duration_secs.max(0.0).floor() as u64;
     let hours = total_secs / 3600;
     let minutes = (total_secs % 3600) / 60;
     let seconds = total_secs % 60;

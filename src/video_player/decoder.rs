@@ -911,7 +911,7 @@ impl AsyncDecoder {
                         | PacketDecodeResult::SeekTimeout
                         | PacketDecodeResult::FrameSkipped
                         | PacketDecodeResult::Error => continue,
-                        PacketDecodeResult::ChannelClosed => break
+                        PacketDecodeResult::ChannelClosed => break,
                     }
                 }
             }

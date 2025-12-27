@@ -264,7 +264,7 @@ fn view_image_editor<'a>(
 }
 
 fn view_help<'a>(help_state: &'a crate::ui::help::State, i18n: &'a I18n) -> Element<'a, Message> {
-    help::view(HelpViewContext {
+    help::view(&HelpViewContext {
         i18n,
         state: help_state,
     })

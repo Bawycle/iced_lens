@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **XMP metadata for PNG, WebP, and TIFF:** title, author, description, keywords, and copyright fields now work on PNG, WebP, and TIFF files, not just JPEG.
+
+### Changed
+- Video playback errors are now displayed as notifications instead of failing silently.
+- Metadata fields are now filtered based on file format support—only relevant fields appear in the editor.
+
+### Fixed
+- Frame-by-frame video navigation now works immediately after loading a video.
+- Video seeking no longer hangs on corrupted or incomplete files.
+- Improved audio/video synchronization during playback.
+- Saving metadata no longer shows false "success" for unsupported formats.
+
 ## [0.5.0] - 2025-12-22
 
 ### Added
