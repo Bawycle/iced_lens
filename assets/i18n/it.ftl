@@ -152,6 +152,8 @@ error-load-video-corrupted = Il file video sembra essere danneggiato o non valid
 error-load-video-no-video-stream = Nessuna traccia video trovata in questo file.
 error-load-video-decoding-failed = Decodifica video fallita: { $message }
 error-load-video-io = Impossibile leggere questo file. Verifica che esista ancora e che tu abbia il permesso di aprirlo.
+error-video-decoder-died = Il decoder video si è arrestato inaspettatamente. Prova a ricaricare il video.
+error-video-seek-timeout = La ricerca della posizione è scaduta. La posizione di destinazione potrebbe essere oltre la fine del video.
 
 # Navigation bar
 menu-settings = Impostazioni

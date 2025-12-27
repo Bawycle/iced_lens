@@ -13,6 +13,7 @@ use super::audio::{AudioDecoder, AudioDecoderCommand, AudioDecoderEvent};
 use super::audio_output::{AudioOutput, AudioSamples};
 use super::frame_cache::CacheConfig;
 use super::normalization::{LufsAnalyzer, SharedLufsCache};
+use super::sync::create_sync_clock;
 use super::webp_decoder::WebpAnimDecoder;
 use super::{AsyncDecoder, DecoderCommand, DecoderEvent};
 use iced::futures::SinkExt;
@@ -251,6 +252,16 @@ async fn run_playback_loop(
                 // Check if this is an animated WebP (requires special decoder)
                 let use_webp_decoder = is_animated_webp(&video_path);
 
+                // Create shared sync clock for A/V synchronization
+                // The clock is shared between audio and video decoders:
+                // - Audio decoder updates the clock with its PTS (audio is master)
+                // - Video decoder reads the clock to sync frames to audio
+                let sync_clock = if use_webp_decoder {
+                    None // WebP animations don't have audio, no sync needed
+                } else {
+                    Some(create_sync_clock())
+                };
+
                 // Try to create video decoder
                 let video_decoder: VideoDecoderKind = if use_webp_decoder {
                     // Use WebP decoder for animated WebP files
@@ -262,8 +273,13 @@ async fn run_playback_loop(
                         }
                     }
                 } else {
-                    // Use FFmpeg decoder for regular videos
-                    match AsyncDecoder::new(&video_path, cache_config, history_mb) {
+                    // Use FFmpeg decoder for regular videos with A/V sync
+                    match AsyncDecoder::new(
+                        &video_path,
+                        cache_config,
+                        history_mb,
+                        sync_clock.clone(),
+                    ) {
                         Ok(decoder) => VideoDecoderKind::Ffmpeg(decoder),
                         Err(e) => {
                             let _ = output.send(PlaybackMessage::Error(e.to_string())).await;
@@ -277,7 +293,7 @@ async fn run_playback_loop(
                 let audio_decoder = if use_webp_decoder {
                     None
                 } else {
-                    match AudioDecoder::new(&video_path) {
+                    match AudioDecoder::new(&video_path, sync_clock) {
                         Ok(Some(decoder)) => Some(decoder),
                         Ok(None) => {
                             // No audio stream in video - this is fine

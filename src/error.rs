@@ -31,12 +31,19 @@ pub enum VideoError {
     /// I/O error (file not found, permission denied, etc.)
     IoError(String),
 
+    /// Decoder thread terminated unexpectedly
+    DecoderDied,
+
+    /// Seek operation timed out (target may be beyond EOF)
+    SeekTimeout,
+
     /// Generic error with raw message
     Other(String),
 }
 
 impl VideoError {
     /// Returns the i18n message key for this error type.
+    #[must_use]
     pub fn i18n_key(&self) -> &'static str {
         match self {
             VideoError::UnsupportedFormat => "error-load-video-unsupported-format",
@@ -45,6 +52,8 @@ impl VideoError {
             VideoError::NoVideoStream => "error-load-video-no-video-stream",
             VideoError::DecodingFailed(_) => "error-load-video-decoding-failed",
             VideoError::IoError(_) => "error-load-video-io",
+            VideoError::DecoderDied => "error-video-decoder-died",
+            VideoError::SeekTimeout => "error-video-seek-timeout",
             VideoError::Other(_) => "error-load-video-general",
         }
     }
@@ -101,6 +110,19 @@ impl VideoError {
             return VideoError::CorruptedFile;
         }
 
+        // Seek timeout (specific pattern from decoder)
+        if msg_lower.contains("seek timeout") {
+            return VideoError::SeekTimeout;
+        }
+
+        // Decoder died (channel closed unexpectedly)
+        if msg_lower.contains("decoder died")
+            || msg_lower.contains("decoder stopped")
+            || msg_lower.contains("decoder not running")
+        {
+            return VideoError::DecoderDied;
+        }
+
         // Decoding failures
         if msg_lower.contains("packet")
             || msg_lower.contains("scaling")
@@ -140,6 +162,8 @@ impl fmt::Display for VideoError {
             VideoError::NoVideoStream => write!(f, "No video stream found"),
             VideoError::DecodingFailed(msg) => write!(f, "Decoding failed: {msg}"),
             VideoError::IoError(msg) => write!(f, "I/O error: {msg}"),
+            VideoError::DecoderDied => write!(f, "Video decoder stopped unexpectedly"),
+            VideoError::SeekTimeout => write!(f, "Seek operation timed out"),
             VideoError::Other(msg) => write!(f, "{msg}"),
         }
     }
@@ -287,5 +311,47 @@ mod tests {
         assert!(VideoError::UnsupportedFormat.i18n_args().is_empty());
         assert!(VideoError::CorruptedFile.i18n_args().is_empty());
         assert!(VideoError::NoVideoStream.i18n_args().is_empty());
+        assert!(VideoError::DecoderDied.i18n_args().is_empty());
+        assert!(VideoError::SeekTimeout.i18n_args().is_empty());
+    }
+
+    #[test]
+    fn video_error_from_message_seek_timeout() {
+        let err = VideoError::from_message("Seek timeout: target may be beyond end of file");
+        assert!(matches!(err, VideoError::SeekTimeout));
+    }
+
+    #[test]
+    fn video_error_from_message_decoder_died() {
+        let err = VideoError::from_message("Video decoder stopped unexpectedly");
+        assert!(matches!(err, VideoError::DecoderDied));
+    }
+
+    #[test]
+    fn video_error_decoder_died_i18n_key() {
+        assert_eq!(
+            VideoError::DecoderDied.i18n_key(),
+            "error-video-decoder-died"
+        );
+    }
+
+    #[test]
+    fn video_error_seek_timeout_i18n_key() {
+        assert_eq!(
+            VideoError::SeekTimeout.i18n_key(),
+            "error-video-seek-timeout"
+        );
+    }
+
+    #[test]
+    fn video_error_decoder_died_display() {
+        let err = VideoError::DecoderDied;
+        assert!(format!("{err}").contains("stopped unexpectedly"));
+    }
+
+    #[test]
+    fn video_error_seek_timeout_display() {
+        let err = VideoError::SeekTimeout;
+        assert!(format!("{err}").contains("timed out"));
     }
 }

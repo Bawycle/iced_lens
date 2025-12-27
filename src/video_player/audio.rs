@@ -5,6 +5,7 @@
 //! and audio playback using cpal.
 
 use crate::error::{Error, Result};
+use crate::video_player::sync::SharedSyncClock;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -147,12 +148,22 @@ impl AudioDecoder {
     ///
     /// Returns `None` if the file has no audio stream.
     ///
+    /// # Arguments
+    ///
+    /// * `video_path` - Path to the video file
+    /// * `sync_clock` - Optional shared sync clock for A/V synchronization.
+    ///   When provided, the audio decoder will update the clock with its PTS,
+    ///   allowing the video decoder to sync to audio timing.
+    ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - The video file does not exist
     /// - The file cannot be opened or parsed by `FFmpeg`
-    pub fn new<P: AsRef<Path>>(video_path: P) -> Result<Option<Self>> {
+    pub fn new<P: AsRef<Path>>(
+        video_path: P,
+        sync_clock: Option<SharedSyncClock>,
+    ) -> Result<Option<Self>> {
         let path = video_path.as_ref().to_path_buf();
 
         // Validate file exists
@@ -176,7 +187,7 @@ impl AudioDecoder {
 
         // Spawn the decoder task in a blocking thread
         tokio::task::spawn_blocking(move || {
-            if let Err(e) = Self::decoder_loop(path, command_rx, event_tx) {
+            if let Err(e) = Self::decoder_loop(path, command_rx, event_tx, sync_clock) {
                 eprintln!("Audio decoder task failed: {e}");
             }
         });
@@ -223,13 +234,14 @@ impl AudioDecoder {
 
     /// Main audio decoder loop running in a blocking thread.
     #[allow(clippy::too_many_lines)] // Refactoring planned in TODO.md
-    #[allow(clippy::needless_pass_by_value)] // PathBuf/Sender need ownership
+    #[allow(clippy::needless_pass_by_value)] // PathBuf/Sender/SyncClock need ownership for thread
     #[allow(clippy::cast_precision_loss)] // FFmpeg i64 timestamps have enough f64 precision
     #[allow(clippy::cast_possible_truncation)] // Timestamp conversions are within valid range
     fn decoder_loop(
         video_path: std::path::PathBuf,
         mut command_rx: mpsc::UnboundedReceiver<AudioDecoderCommand>,
         event_tx: mpsc::Sender<AudioDecoderEvent>,
+        sync_clock: Option<SharedSyncClock>,
     ) -> Result<()> {
         // Initialize FFmpeg
         crate::media::video::init_ffmpeg()?;
@@ -321,6 +333,11 @@ impl AudioDecoder {
                     // When Play follows Seek (for resume), we must preserve the seek target
                     // so precise seeking can complete. The target is cleared automatically
                     // when the frame at/after target PTS is decoded (line ~380).
+
+                    // Resume sync clock (it will be started/updated when first audio frame is decoded)
+                    if let Some(ref clock) = sync_clock {
+                        clock.resume();
+                    }
                 }
                 Ok(AudioDecoderCommand::Pause) => {
                     is_playing = false;
@@ -328,6 +345,11 @@ impl AudioDecoder {
                     first_pts = None;
                     // Clear seek target
                     seek_target_secs = None;
+
+                    // Pause sync clock
+                    if let Some(ref clock) = sync_clock {
+                        clock.pause();
+                    }
                 }
                 Ok(AudioDecoderCommand::Seek { target_secs }) => {
                     let timestamp = (target_secs * 1_000_000.0) as i64;
@@ -345,9 +367,18 @@ impl AudioDecoder {
                         seek_target_secs = Some(target_secs);
                         // Reset seek frame counter for timeout protection
                         seek_frames_skipped = 0;
+
+                        // Update sync clock seek position
+                        if let Some(ref clock) = sync_clock {
+                            clock.seek(target_secs);
+                        }
                     }
                 }
                 Ok(AudioDecoderCommand::Stop) | Err(mpsc::error::TryRecvError::Disconnected) => {
+                    // Stop sync clock
+                    if let Some(ref clock) = sync_clock {
+                        clock.stop();
+                    }
                     break;
                 }
                 Ok(AudioDecoderCommand::SetVolume(volume)) => {
@@ -467,6 +498,12 @@ impl AudioDecoder {
                                 }
                             }
                         }
+                    }
+
+                    // Update sync clock with audio PTS (audio is the master clock)
+                    // This allows the video decoder to sync its frames to the audio timeline
+                    if let Some(ref clock) = sync_clock {
+                        clock.update_audio_pts(pts_secs);
                     }
 
                     // Send decoded audio
@@ -638,14 +675,14 @@ mod tests {
         std::fs::write(&video_path, b"fake video data without audio").unwrap();
 
         // This should return Ok(None) or an error, not panic
-        let result = AudioDecoder::new(&video_path);
+        let result = AudioDecoder::new(&video_path, None);
         // We expect either Ok(None) for no audio or Err for invalid file
         assert!(result.is_ok() || result.is_err());
     }
 
     #[tokio::test]
     async fn audio_decoder_fails_for_nonexistent_file() {
-        let result = AudioDecoder::new("/nonexistent/video.mp4");
+        let result = AudioDecoder::new("/nonexistent/video.mp4", None);
         assert!(result.is_err());
     }
 }

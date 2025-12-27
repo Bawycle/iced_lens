@@ -6,6 +6,7 @@
 
 use crate::error::{Error, Result};
 use crate::video_player::frame_cache::{CacheConfig, FrameCache};
+use crate::video_player::sync::{calculate_sync_action, SharedSyncClock, SyncAction};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -14,6 +15,10 @@ use tokio::sync::mpsc;
 /// Prevents infinite loops on corrupted files or seeks beyond EOF.
 /// At 30fps, 1000 frames = ~33 seconds of video.
 const MAX_SEEK_FRAMES: u32 = 1000;
+
+/// Maximum consecutive frames to skip when video is behind audio.
+/// After this many skips, we display the next frame anyway to prevent freezing.
+const MAX_CONSECUTIVE_SKIPS: u32 = 5;
 
 /// Represents a decoded video frame ready for display.
 #[derive(Debug, Clone)]
@@ -121,6 +126,10 @@ impl AsyncDecoder {
     /// The `history_mb` parameter controls the maximum memory for frame history
     /// (used for backward frame stepping). Set to 0 to use a default based on `cache_config`.
     ///
+    /// The `sync_clock` parameter, if provided, enables A/V synchronization.
+    /// The decoder will use the audio clock to decide when to display, skip,
+    /// or wait for video frames.
+    ///
     /// # Errors
     ///
     /// Returns an error if:
@@ -131,6 +140,7 @@ impl AsyncDecoder {
         video_path: P,
         cache_config: CacheConfig,
         history_mb: u32,
+        sync_clock: Option<SharedSyncClock>,
     ) -> Result<Self> {
         let path = video_path.as_ref().to_path_buf();
 
@@ -152,9 +162,14 @@ impl AsyncDecoder {
         // Spawn the decoder task in a blocking thread
         // FFmpeg operations are not Send, so we use spawn_blocking
         tokio::task::spawn_blocking(move || {
-            if let Err(e) =
-                Self::decoder_loop_blocking(path, command_rx, event_tx, cache_config, history_mb)
-            {
+            if let Err(e) = Self::decoder_loop_blocking(
+                path,
+                command_rx,
+                event_tx,
+                cache_config,
+                history_mb,
+                sync_clock,
+            ) {
                 eprintln!("Decoder task failed: {e}");
             }
         });
@@ -198,6 +213,9 @@ impl AsyncDecoder {
     ///
     /// The frame cache is used to optimize seek operations by caching
     /// keyframes (I-frames) that can be independently decoded.
+    ///
+    /// If `sync_clock` is provided, frame pacing uses the audio clock for A/V sync.
+    /// Otherwise, falls back to wall-clock based timing.
     #[allow(clippy::too_many_lines)] // Refactoring planned in TODO.md
     #[allow(clippy::needless_pass_by_value)] // PathBuf/Sender need ownership
     fn decoder_loop_blocking(
@@ -206,6 +224,7 @@ impl AsyncDecoder {
         event_tx: mpsc::Sender<DecoderEvent>,
         cache_config: CacheConfig,
         history_mb: u32,
+        sync_clock: Option<SharedSyncClock>,
     ) -> Result<()> {
         // Initialize FFmpeg (with log level set to suppress warnings)
         crate::media::video::init_ffmpeg()?;
@@ -265,6 +284,9 @@ impl AsyncDecoder {
 
         // Playback speed (1.0 = normal, 0.25 = quarter speed, 2.0 = double speed)
         let mut playback_speed: f64 = 1.0;
+
+        // A/V sync: track consecutive frame skips to prevent freezing
+        let mut consecutive_skips: u32 = 0;
 
         // Frame cache for optimized seeking
         let mut frame_cache = FrameCache::new(cache_config);
@@ -497,14 +519,40 @@ impl AsyncDecoder {
                     if scaler.run(&buffered_frame, &mut rgb_frame).is_ok() {
                         let rgba_data = Self::extract_rgba_data(&rgb_frame);
 
-                        // Frame pacing during playback
+                        // Frame pacing during playback (same logic as main decode path)
                         if is_playing {
-                            if let Some(start_time) = playback_start_time {
-                                if first_pts.is_none() {
-                                    first_pts = Some(pts_secs);
+                            let adjusted_pts = if let Some(first) = first_pts {
+                                first + (pts_secs - first) / playback_speed
+                            } else {
+                                first_pts = Some(pts_secs);
+                                pts_secs
+                            };
+
+                            if let Some(ref clock) = sync_clock {
+                                if clock.is_playing() && clock.is_sync_enabled() {
+                                    let audio_time = clock.current_time_secs();
+                                    match calculate_sync_action(adjusted_pts, audio_time) {
+                                        SyncAction::Display => {
+                                            consecutive_skips = 0;
+                                        }
+                                        SyncAction::Wait(duration) => {
+                                            consecutive_skips = 0;
+                                            std::thread::sleep(duration);
+                                        }
+                                        SyncAction::Skip => {
+                                            consecutive_skips += 1;
+                                            if consecutive_skips < MAX_CONSECUTIVE_SKIPS {
+                                                continue;
+                                            }
+                                            consecutive_skips = 0;
+                                        }
+                                        SyncAction::Repeat => {
+                                            consecutive_skips = 0;
+                                        }
+                                    }
                                 }
+                            } else if let Some(start_time) = playback_start_time {
                                 if let Some(first) = first_pts {
-                                    // Divide by playback_speed: at 2x speed, delay is halved
                                     let frame_delay = (pts_secs - first) / playback_speed;
                                     let target_time = start_time
                                         + std::time::Duration::from_secs_f64(frame_delay);
@@ -623,23 +671,64 @@ impl AsyncDecoder {
                     // Extract RGBA data
                     let rgba_data = Self::extract_rgba_data(&rgb_frame);
 
-                    // Frame pacing: wait until the frame should be displayed (only during playback)
+                    // Frame pacing: decide when to display based on sync strategy
                     if is_playing {
-                        if let Some(start_time) = playback_start_time {
-                            // Store first frame PTS as reference
-                            if first_pts.is_none() {
-                                first_pts = Some(pts_secs);
-                            }
+                        // Adjust PTS for playback speed
+                        let adjusted_pts = if let Some(first) = first_pts {
+                            first + (pts_secs - first) / playback_speed
+                        } else {
+                            first_pts = Some(pts_secs);
+                            pts_secs
+                        };
 
+                        // A/V sync: use audio clock if available, otherwise wall clock
+                        if let Some(ref clock) = sync_clock {
+                            if clock.is_playing() && clock.is_sync_enabled() {
+                                let audio_time = clock.current_time_secs();
+                                match calculate_sync_action(adjusted_pts, audio_time) {
+                                    SyncAction::Display => {
+                                        // Frame is on time, display immediately
+                                        consecutive_skips = 0;
+                                    }
+                                    SyncAction::Wait(duration) => {
+                                        // Frame is early, wait before displaying
+                                        consecutive_skips = 0;
+                                        std::thread::sleep(duration);
+                                    }
+                                    SyncAction::Skip => {
+                                        // Frame is late, consider skipping
+                                        consecutive_skips += 1;
+                                        if consecutive_skips < MAX_CONSECUTIVE_SKIPS {
+                                            #[cfg(debug_assertions)]
+                                            eprintln!(
+                                                "[sync] Skipping frame (video behind by {:.3}s, skip #{})",
+                                                audio_time - adjusted_pts,
+                                                consecutive_skips
+                                            );
+                                            // Skip this frame, continue to decode next
+                                            continue;
+                                        }
+                                        // Too many skips, display anyway to prevent freezing
+                                        #[cfg(debug_assertions)]
+                                        eprintln!(
+                                            "[sync] Max skips reached, displaying frame (behind by {:.3}s)",
+                                            audio_time - adjusted_pts
+                                        );
+                                        consecutive_skips = 0;
+                                    }
+                                    SyncAction::Repeat => {
+                                        // No new frame ready - shouldn't happen in decode loop
+                                        consecutive_skips = 0;
+                                    }
+                                }
+                            }
+                        } else if let Some(start_time) = playback_start_time {
+                            // Fallback: wall clock timing (when no sync clock)
                             if let Some(first) = first_pts {
-                                // Calculate when this frame should be displayed relative to playback start
-                                // Divide by playback_speed: at 2x speed, delay is halved
                                 let frame_delay = (pts_secs - first) / playback_speed;
                                 let target_time =
                                     start_time + std::time::Duration::from_secs_f64(frame_delay);
                                 let now = std::time::Instant::now();
-
-                                // Wait until target time
                                 if target_time > now {
                                     std::thread::sleep(target_time - now);
                                 }
@@ -857,13 +946,13 @@ mod tests {
         let video_path = temp_dir.path().join("test.mp4");
         std::fs::write(&video_path, b"fake video data").unwrap();
 
-        let decoder = AsyncDecoder::new(&video_path, CacheConfig::default(), 0);
+        let decoder = AsyncDecoder::new(&video_path, CacheConfig::default(), 0, None);
         assert!(decoder.is_ok());
     }
 
     #[tokio::test]
     async fn decoder_fails_for_nonexistent_file() {
-        let result = AsyncDecoder::new("/nonexistent/video.mp4", CacheConfig::default(), 0);
+        let result = AsyncDecoder::new("/nonexistent/video.mp4", CacheConfig::default(), 0, None);
         assert!(result.is_err());
     }
 
@@ -873,7 +962,7 @@ mod tests {
         let video_path = temp_dir.path().join("test.mp4");
         std::fs::write(&video_path, b"fake video data").unwrap();
 
-        let decoder = AsyncDecoder::new(&video_path, CacheConfig::default(), 0).unwrap();
+        let decoder = AsyncDecoder::new(&video_path, CacheConfig::default(), 0, None).unwrap();
 
         // Send commands (should not error)
         assert!(decoder
@@ -897,7 +986,7 @@ mod tests {
             return;
         }
 
-        let mut decoder = AsyncDecoder::new(video_path, CacheConfig::default(), 0).unwrap();
+        let mut decoder = AsyncDecoder::new(video_path, CacheConfig::default(), 0, None).unwrap();
 
         // Send play command
         decoder

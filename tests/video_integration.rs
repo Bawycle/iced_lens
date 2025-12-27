@@ -189,7 +189,7 @@ fn test_video_decoding(path: &str, format_name: &str) {
     let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
     rt.block_on(async {
-        let decoder = AsyncDecoder::new(path, CacheConfig::disabled(), 0)
+        let decoder = AsyncDecoder::new(path, CacheConfig::disabled(), 0, None)
             .unwrap_or_else(|_| panic!("Should create decoder for {format_name}"));
 
         // Send play command
@@ -294,7 +294,7 @@ fn test_decode_corrupted_file() {
 
     rt.block_on(async {
         // Corrupted file should either fail to create decoder or produce an error event
-        if let Ok(mut decoder) = AsyncDecoder::new(path, CacheConfig::disabled(), 0) {
+        if let Ok(mut decoder) = AsyncDecoder::new(path, CacheConfig::disabled(), 0, None) {
             decoder
                 .send_command(DecoderCommand::Play {
                     resume_position_secs: None,
@@ -389,7 +389,7 @@ fn test_decode_performance() {
         rt.block_on(async {
             let start = std::time::Instant::now();
 
-            let Ok(decoder) = AsyncDecoder::new(path, CacheConfig::disabled(), 0) else {
+            let Ok(decoder) = AsyncDecoder::new(path, CacheConfig::disabled(), 0, None) else {
                 return;
             };
 
@@ -444,7 +444,7 @@ fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
     let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
     rt.block_on(async {
-        match AudioDecoder::new(path) {
+        match AudioDecoder::new(path, None) {
             Ok(Some(mut decoder)) => {
                 assert!(
                     expect_audio,
@@ -588,7 +588,7 @@ fn test_audio_stream_info_all_formats() {
         }
 
         rt.block_on(async {
-            match AudioDecoder::new(path) {
+            match AudioDecoder::new(path, None) {
                 Ok(Some(mut decoder)) => {
                     decoder
                         .send_command(AudioDecoderCommand::Play)
