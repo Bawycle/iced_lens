@@ -471,6 +471,11 @@ pub mod sections {
     pub fn editor() -> Image<Handle> {
         icons::rotate_right()
     }
+
+    /// Metadata editing section.
+    pub fn metadata() -> Image<Handle> {
+        icons::info()
+    }
 }
 
 // =============================================================================

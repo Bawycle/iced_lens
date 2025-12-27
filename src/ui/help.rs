@@ -23,15 +23,17 @@ pub enum HelpSection {
     Video,
     Capture,
     Editor,
+    Metadata,
 }
 
 impl HelpSection {
     /// All available sections in display order.
-    pub const ALL: [HelpSection; 4] = [
+    pub const ALL: [HelpSection; 5] = [
         HelpSection::Viewer,
         HelpSection::Video,
         HelpSection::Capture,
         HelpSection::Editor,
+        HelpSection::Metadata,
     ];
 }
 
@@ -50,6 +52,7 @@ impl Default for State {
 
 impl State {
     /// Create a new help state with all sections collapsed.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             expanded: std::collections::HashSet::new(),
@@ -57,6 +60,7 @@ impl State {
     }
 
     /// Check if a section is expanded.
+    #[must_use]
     pub fn is_expanded(&self, section: HelpSection) -> bool {
         self.expanded.contains(&section)
     }
@@ -78,7 +82,7 @@ pub struct ViewContext<'a> {
 }
 
 /// Messages emitted by the help screen.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Message {
     BackToViewer,
     ToggleSection(HelpSection),
@@ -92,6 +96,7 @@ pub enum Event {
 }
 
 /// Process a help screen message and return the corresponding event.
+#[must_use]
 pub fn update(state: &mut State, message: Message) -> Event {
     match message {
         Message::BackToViewer => Event::BackToViewer,
@@ -103,7 +108,8 @@ pub fn update(state: &mut State, message: Message) -> Event {
 }
 
 /// Render the help screen.
-pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
+#[must_use]
+pub fn view<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let back_button = button(
         text(format!("← {}", ctx.i18n.tr("help-back-to-viewer-button"))).size(typography::BODY),
     )
@@ -113,35 +119,43 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
 
     // Build collapsible sections
     let viewer_section = build_collapsible_section(
-        &ctx,
+        ctx,
         HelpSection::Viewer,
         action_icons::sections::viewer(),
         ctx.i18n.tr("help-section-viewer"),
-        build_viewer_content(&ctx),
+        build_viewer_content(ctx),
     );
 
     let video_section = build_collapsible_section(
-        &ctx,
+        ctx,
         HelpSection::Video,
         action_icons::sections::video(),
         ctx.i18n.tr("help-section-video"),
-        build_video_content(&ctx),
+        build_video_content(ctx),
     );
 
     let capture_section = build_collapsible_section(
-        &ctx,
+        ctx,
         HelpSection::Capture,
         action_icons::sections::capture(),
         ctx.i18n.tr("help-section-capture"),
-        build_capture_content(&ctx),
+        build_capture_content(ctx),
     );
 
     let editor_section = build_collapsible_section(
-        &ctx,
+        ctx,
         HelpSection::Editor,
         action_icons::sections::editor(),
         ctx.i18n.tr("help-section-editor"),
-        build_editor_content(&ctx),
+        build_editor_content(ctx),
+    );
+
+    let metadata_section = build_collapsible_section(
+        ctx,
+        HelpSection::Metadata,
+        action_icons::sections::metadata(),
+        ctx.i18n.tr("help-section-metadata"),
+        build_metadata_content(ctx),
     );
 
     let content = Column::new()
@@ -154,7 +168,8 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
         .push(viewer_section)
         .push(video_section)
         .push(capture_section)
-        .push(editor_section);
+        .push(editor_section)
+        .push(metadata_section);
 
     scrollable(content).into()
 }
@@ -240,31 +255,31 @@ fn build_viewer_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let tools_content = Column::new()
         .spacing(spacing::XS)
         .push(build_tool_item(
-            ctx.i18n.tr("help-viewer-tool-navigation"),
+            &ctx.i18n.tr("help-viewer-tool-navigation"),
             ctx.i18n.tr("help-viewer-tool-navigation-desc"),
         ))
         .push(build_tool_item_with_icon(
             action_icons::viewer::zoom_in(),
-            ctx.i18n.tr("help-viewer-tool-zoom"),
+            &ctx.i18n.tr("help-viewer-tool-zoom"),
             ctx.i18n.tr("help-viewer-tool-zoom-desc"),
         ))
         .push(build_tool_item(
-            ctx.i18n.tr("help-viewer-tool-pan"),
+            &ctx.i18n.tr("help-viewer-tool-pan"),
             ctx.i18n.tr("help-viewer-tool-pan-desc"),
         ))
         .push(build_tool_item_with_icon(
             action_icons::viewer::fit_to_window(),
-            ctx.i18n.tr("help-viewer-tool-fit"),
+            &ctx.i18n.tr("help-viewer-tool-fit"),
             ctx.i18n.tr("help-viewer-tool-fit-desc"),
         ))
         .push(build_tool_item_with_icon(
             action_icons::viewer::fullscreen(),
-            ctx.i18n.tr("help-viewer-tool-fullscreen"),
+            &ctx.i18n.tr("help-viewer-tool-fullscreen"),
             ctx.i18n.tr("help-viewer-tool-fullscreen-desc"),
         ))
         .push(build_tool_item_with_icon(
             action_icons::viewer::delete(),
-            ctx.i18n.tr("help-viewer-tool-delete"),
+            &ctx.i18n.tr("help-viewer-tool-delete"),
             ctx.i18n.tr("help-viewer-tool-delete-desc"),
         ));
 
@@ -323,31 +338,31 @@ fn build_video_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .spacing(spacing::XS)
         .push(build_tool_item_with_icon(
             action_icons::video::play(),
-            ctx.i18n.tr("help-video-tool-playback"),
+            &ctx.i18n.tr("help-video-tool-playback"),
             ctx.i18n.tr("help-video-tool-playback-desc"),
         ))
         .push(build_tool_item(
-            ctx.i18n.tr("help-video-tool-timeline"),
+            &ctx.i18n.tr("help-video-tool-timeline"),
             ctx.i18n.tr("help-video-tool-timeline-desc"),
         ))
         .push(build_tool_item_with_icon(
             action_icons::video::volume(),
-            ctx.i18n.tr("help-video-tool-volume"),
+            &ctx.i18n.tr("help-video-tool-volume"),
             ctx.i18n.tr("help-video-tool-volume-desc"),
         ))
         .push(build_tool_item_with_icon(
             action_icons::video::toggle_loop(),
-            ctx.i18n.tr("help-video-tool-loop"),
+            &ctx.i18n.tr("help-video-tool-loop"),
             ctx.i18n.tr("help-video-tool-loop-desc"),
         ))
         .push(build_tool_item_with_icon(
             action_icons::video::step_forward(),
-            ctx.i18n.tr("help-video-tool-stepping"),
+            &ctx.i18n.tr("help-video-tool-stepping"),
             ctx.i18n.tr("help-video-tool-stepping-desc"),
         ))
         .push(build_tool_item_with_icon(
             action_icons::video::capture_frame(),
-            ctx.i18n.tr("help-video-tool-capture"),
+            &ctx.i18n.tr("help-video-tool-capture"),
             ctx.i18n.tr("help-video-tool-capture-desc"),
         ));
 
@@ -422,104 +437,15 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let role = build_paragraph(ctx.i18n.tr("help-editor-role"));
     let workflow = build_paragraph(ctx.i18n.tr("help-editor-workflow"));
 
-    // Rotate tool
-    let rotate_title = build_tool_title(ctx.i18n.tr("help-editor-rotate-title"));
-    let rotate_content = Column::new()
-        .spacing(spacing::XXS)
-        .push(build_paragraph(ctx.i18n.tr("help-editor-rotate-desc")))
-        .push(build_bullet_with_icon(
-            action_icons::editor::rotate_left(),
-            ctx.i18n.tr("help-editor-rotate-left"),
-        ))
-        .push(build_bullet_with_icon(
-            action_icons::editor::rotate_right(),
-            ctx.i18n.tr("help-editor-rotate-right"),
-        ))
-        .push(build_bullet_with_icon(
-            action_icons::editor::flip_horizontal(),
-            ctx.i18n.tr("help-editor-flip-h"),
-        ))
-        .push(build_bullet_with_icon(
-            action_icons::editor::flip_vertical(),
-            ctx.i18n.tr("help-editor-flip-v"),
-        ));
-
-    // Crop tool
-    let crop_title = build_tool_title(ctx.i18n.tr("help-editor-crop-title"));
-    let crop_content = Column::new()
-        .spacing(spacing::XXS)
-        .push(build_paragraph(ctx.i18n.tr("help-editor-crop-desc")))
-        .push(build_paragraph(ctx.i18n.tr("help-editor-crop-ratios")))
-        .push(build_paragraph(ctx.i18n.tr("help-editor-crop-usage")));
-
-    // Resize tool
-    let resize_title = build_tool_title(ctx.i18n.tr("help-editor-resize-title"));
-    let resize_content = Column::new()
-        .spacing(spacing::XXS)
-        .push(build_paragraph(ctx.i18n.tr("help-editor-resize-desc")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-resize-scale")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-resize-dimensions")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-resize-lock")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-resize-presets")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-resize-ai-upscale")));
-
-    // Light tool (brightness/contrast)
-    let light_title = build_tool_title(ctx.i18n.tr("help-editor-light-title"));
-    let light_content = Column::new()
-        .spacing(spacing::XXS)
-        .push(build_paragraph(ctx.i18n.tr("help-editor-light-desc")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-light-brightness")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-light-contrast")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-light-preview")));
-
-    // AI Deblur tool
-    let deblur_title = build_tool_title(ctx.i18n.tr("help-editor-deblur-title"));
-    let deblur_content = Column::new()
-        .spacing(spacing::XXS)
-        .push(build_paragraph(ctx.i18n.tr("help-editor-deblur-desc")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-deblur-enable")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-deblur-lossless")));
-
-    // Save options
-    let save_title = build_tool_title(ctx.i18n.tr("help-editor-save-title"));
-    let save_content = Column::new()
-        .spacing(spacing::XXS)
-        .push(build_bullet(ctx.i18n.tr("help-editor-save-overwrite")))
-        .push(build_bullet(ctx.i18n.tr("help-editor-save-as")));
-
-    // Shortcuts
-    let shortcuts_title = build_subsection_title(ctx.i18n.tr("help-shortcuts-title"));
-    let shortcuts_content = Column::new()
-        .spacing(spacing::XXS)
-        .push(build_shortcut_row(
-            "Ctrl+S",
-            ctx.i18n.tr("help-editor-key-save"),
-        ))
-        .push(build_shortcut_row(
-            "Ctrl+Z",
-            ctx.i18n.tr("help-editor-key-undo"),
-        ))
-        .push(build_shortcut_row(
-            "Ctrl+Y",
-            ctx.i18n.tr("help-editor-key-redo"),
-        ))
-        .push(build_shortcut_row(
-            "Esc",
-            ctx.i18n.tr("help-editor-key-cancel"),
-        ));
-
-    // Mouse controls
-    let mouse_title = build_subsection_title(ctx.i18n.tr("help-editor-mouse-title"));
-    let mouse_content = Column::new()
-        .spacing(spacing::XXS)
-        .push(build_mouse_row(
-            ctx.i18n.tr("viewer-scroll-wheel"),
-            ctx.i18n.tr("help-editor-mouse-wheel"),
-        ))
-        .push(build_mouse_row(
-            ctx.i18n.tr("viewer-click-drag"),
-            ctx.i18n.tr("help-editor-mouse-drag"),
-        ));
+    // Build tool sections
+    let (rotate_title, rotate_content) = build_editor_rotate_tool(ctx);
+    let (crop_title, crop_content) = build_editor_crop_tool(ctx);
+    let (resize_title, resize_content) = build_editor_resize_tool(ctx);
+    let (light_title, light_content) = build_editor_light_tool(ctx);
+    let (deblur_title, deblur_content) = build_editor_deblur_tool(ctx);
+    let (save_title, save_content) = build_editor_save_options(ctx);
+    let (shortcuts_title, shortcuts_content) = build_editor_shortcuts(ctx);
+    let (mouse_title, mouse_content) = build_editor_mouse_controls(ctx);
 
     Column::new()
         .spacing(spacing::SM)
@@ -541,6 +467,198 @@ fn build_editor_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(shortcuts_content)
         .push(mouse_title)
         .push(mouse_content)
+        .into()
+}
+
+/// Build the rotate tool section for the editor help.
+fn build_editor_rotate_tool<'a>(
+    ctx: &ViewContext<'a>,
+) -> (Element<'a, Message>, Element<'a, Message>) {
+    let title = build_tool_title(ctx.i18n.tr("help-editor-rotate-title"));
+    let content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_paragraph(ctx.i18n.tr("help-editor-rotate-desc")))
+        .push(build_bullet_with_icon(
+            action_icons::editor::rotate_left(),
+            ctx.i18n.tr("help-editor-rotate-left"),
+        ))
+        .push(build_bullet_with_icon(
+            action_icons::editor::rotate_right(),
+            ctx.i18n.tr("help-editor-rotate-right"),
+        ))
+        .push(build_bullet_with_icon(
+            action_icons::editor::flip_horizontal(),
+            ctx.i18n.tr("help-editor-flip-h"),
+        ))
+        .push(build_bullet_with_icon(
+            action_icons::editor::flip_vertical(),
+            ctx.i18n.tr("help-editor-flip-v"),
+        ))
+        .into();
+    (title, content)
+}
+
+/// Build the crop tool section for the editor help.
+fn build_editor_crop_tool<'a>(
+    ctx: &ViewContext<'a>,
+) -> (Element<'a, Message>, Element<'a, Message>) {
+    let title = build_tool_title(ctx.i18n.tr("help-editor-crop-title"));
+    let content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_paragraph(ctx.i18n.tr("help-editor-crop-desc")))
+        .push(build_paragraph(ctx.i18n.tr("help-editor-crop-ratios")))
+        .push(build_paragraph(ctx.i18n.tr("help-editor-crop-usage")))
+        .into();
+    (title, content)
+}
+
+/// Build the resize tool section for the editor help.
+fn build_editor_resize_tool<'a>(
+    ctx: &ViewContext<'a>,
+) -> (Element<'a, Message>, Element<'a, Message>) {
+    let title = build_tool_title(ctx.i18n.tr("help-editor-resize-title"));
+    let content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_paragraph(ctx.i18n.tr("help-editor-resize-desc")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-resize-scale")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-resize-dimensions")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-resize-lock")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-resize-presets")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-resize-ai-upscale")))
+        .into();
+    (title, content)
+}
+
+/// Build the light adjustment tool section for the editor help.
+fn build_editor_light_tool<'a>(
+    ctx: &ViewContext<'a>,
+) -> (Element<'a, Message>, Element<'a, Message>) {
+    let title = build_tool_title(ctx.i18n.tr("help-editor-light-title"));
+    let content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_paragraph(ctx.i18n.tr("help-editor-light-desc")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-light-brightness")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-light-contrast")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-light-preview")))
+        .into();
+    (title, content)
+}
+
+/// Build the AI deblur tool section for the editor help.
+fn build_editor_deblur_tool<'a>(
+    ctx: &ViewContext<'a>,
+) -> (Element<'a, Message>, Element<'a, Message>) {
+    let title = build_tool_title(ctx.i18n.tr("help-editor-deblur-title"));
+    let content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_paragraph(ctx.i18n.tr("help-editor-deblur-desc")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-deblur-enable")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-deblur-lossless")))
+        .into();
+    (title, content)
+}
+
+/// Build the save options section for the editor help.
+fn build_editor_save_options<'a>(
+    ctx: &ViewContext<'a>,
+) -> (Element<'a, Message>, Element<'a, Message>) {
+    let title = build_tool_title(ctx.i18n.tr("help-editor-save-title"));
+    let content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_bullet(&ctx.i18n.tr("help-editor-save-overwrite")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-save-as")))
+        .into();
+    (title, content)
+}
+
+/// Build the keyboard shortcuts section for the editor help.
+fn build_editor_shortcuts<'a>(
+    ctx: &ViewContext<'a>,
+) -> (Element<'a, Message>, Element<'a, Message>) {
+    let title = build_subsection_title(ctx.i18n.tr("help-shortcuts-title"));
+    let content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_shortcut_row(
+            "Ctrl+S",
+            ctx.i18n.tr("help-editor-key-save"),
+        ))
+        .push(build_shortcut_row(
+            "Ctrl+Z",
+            ctx.i18n.tr("help-editor-key-undo"),
+        ))
+        .push(build_shortcut_row(
+            "Ctrl+Y",
+            ctx.i18n.tr("help-editor-key-redo"),
+        ))
+        .push(build_shortcut_row(
+            "Esc",
+            ctx.i18n.tr("help-editor-key-cancel"),
+        ))
+        .into();
+    (title, content)
+}
+
+/// Build the mouse controls section for the editor help.
+fn build_editor_mouse_controls<'a>(
+    ctx: &ViewContext<'a>,
+) -> (Element<'a, Message>, Element<'a, Message>) {
+    let title = build_subsection_title(ctx.i18n.tr("help-editor-mouse-title"));
+    let content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_mouse_row(
+            ctx.i18n.tr("viewer-scroll-wheel"),
+            ctx.i18n.tr("help-editor-mouse-wheel"),
+        ))
+        .push(build_mouse_row(
+            ctx.i18n.tr("viewer-click-drag"),
+            ctx.i18n.tr("help-editor-mouse-drag"),
+        ))
+        .into();
+    (title, content)
+}
+
+/// Build the metadata editing section content.
+fn build_metadata_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let role = build_paragraph(ctx.i18n.tr("help-metadata-role"));
+
+    let tools_title = build_subsection_title(ctx.i18n.tr("help-tools-title"));
+    let tools_content = Column::new()
+        .spacing(spacing::XS)
+        .push(build_tool_item(
+            &ctx.i18n.tr("help-metadata-tool-view"),
+            ctx.i18n.tr("help-metadata-tool-view-desc"),
+        ))
+        .push(build_tool_item(
+            &ctx.i18n.tr("help-metadata-tool-edit"),
+            ctx.i18n.tr("help-metadata-tool-edit-desc"),
+        ))
+        .push(build_tool_item(
+            &ctx.i18n.tr("help-metadata-tool-save"),
+            ctx.i18n.tr("help-metadata-tool-save-desc"),
+        ));
+
+    let fields_title = build_subsection_title(ctx.i18n.tr("help-metadata-fields-title"));
+    let fields_content = Column::new()
+        .spacing(spacing::XXS)
+        .push(build_bullet(&ctx.i18n.tr("help-metadata-field-dc")))
+        .push(build_bullet(&ctx.i18n.tr("help-metadata-field-camera")))
+        .push(build_bullet(&ctx.i18n.tr("help-metadata-field-date")))
+        .push(build_bullet(&ctx.i18n.tr("help-metadata-field-exposure")))
+        .push(build_bullet(&ctx.i18n.tr("help-metadata-field-focal")))
+        .push(build_bullet(&ctx.i18n.tr("help-metadata-field-gps")));
+
+    let formats = build_paragraph(ctx.i18n.tr("help-metadata-formats"));
+    let note = build_paragraph(ctx.i18n.tr("help-metadata-note"));
+
+    Column::new()
+        .spacing(spacing::SM)
+        .push(role)
+        .push(tools_title)
+        .push(tools_content)
+        .push(fields_title)
+        .push(fields_content)
+        .push(formats)
+        .push(note)
         .into()
 }
 
@@ -574,7 +692,7 @@ fn build_tool_title<'a>(title: String) -> Element<'a, Message> {
 }
 
 /// Build a tool item with name and description.
-fn build_tool_item<'a>(name: String, description: String) -> Element<'a, Message> {
+fn build_tool_item(name: &str, description: String) -> Element<'static, Message> {
     Row::new()
         .spacing(spacing::SM)
         .push(
@@ -593,11 +711,11 @@ fn build_tool_item<'a>(name: String, description: String) -> Element<'a, Message
 const HELP_ICON_SIZE: f32 = 18.0;
 
 /// Build a tool item with an icon, name, and description.
-fn build_tool_item_with_icon<'a>(
+fn build_tool_item_with_icon(
     icon: Image<Handle>,
-    name: String,
+    name: &str,
     description: String,
-) -> Element<'a, Message> {
+) -> Element<'static, Message> {
     let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE);
 
     Row::new()
@@ -618,7 +736,7 @@ fn build_tool_item_with_icon<'a>(
 }
 
 /// Build a bullet point with an icon.
-fn build_bullet_with_icon<'a>(icon: Image<Handle>, content: String) -> Element<'a, Message> {
+fn build_bullet_with_icon(icon: Image<Handle>, content: String) -> Element<'static, Message> {
     let icon_widget = action_icons::sized(icon, HELP_ICON_SIZE);
 
     Row::new()
@@ -631,15 +749,15 @@ fn build_bullet_with_icon<'a>(icon: Image<Handle>, content: String) -> Element<'
 }
 
 /// Build a bullet point.
-fn build_bullet<'a>(content: String) -> Element<'a, Message> {
+fn build_bullet(content: &str) -> Element<'static, Message> {
     Text::new(format!("  • {content}"))
         .size(typography::BODY)
         .into()
 }
 
 /// Build a numbered step (for instructions).
-fn build_numbered_step<'a>(number: &'a str, content: String) -> Element<'a, Message> {
-    let badge = Container::new(Text::new(number).size(typography::CAPTION))
+fn build_numbered_step(number: &str, content: String) -> Element<'static, Message> {
+    let badge = Container::new(Text::new(number.to_owned()).size(typography::CAPTION))
         .padding([spacing::XXS, spacing::XS])
         .style(|theme: &Theme| container::Style {
             background: Some(theme.extended_palette().primary.base.color.into()),
@@ -660,8 +778,8 @@ fn build_numbered_step<'a>(number: &'a str, content: String) -> Element<'a, Mess
 }
 
 /// Build a single shortcut row with key badge and description.
-fn build_shortcut_row<'a>(key: &'a str, description: String) -> Element<'a, Message> {
-    let key_badge = Container::new(Text::new(key).size(typography::CAPTION))
+fn build_shortcut_row(key: &str, description: String) -> Element<'static, Message> {
+    let key_badge = Container::new(Text::new(key.to_owned()).size(typography::CAPTION))
         .padding([spacing::XXS, spacing::XS])
         .style(|theme: &Theme| container::Style {
             background: Some(theme.extended_palette().background.strong.color.into()),
@@ -681,7 +799,7 @@ fn build_shortcut_row<'a>(key: &'a str, description: String) -> Element<'a, Mess
 }
 
 /// Build a single mouse interaction row with action badge and description.
-fn build_mouse_row<'a>(action: String, description: String) -> Element<'a, Message> {
+fn build_mouse_row(action: String, description: String) -> Element<'static, Message> {
     let action_badge = Container::new(Text::new(action).size(typography::CAPTION))
         .padding([spacing::XXS, spacing::XS])
         .style(|theme: &Theme| container::Style {
@@ -714,7 +832,7 @@ mod tests {
             i18n: &i18n,
             state: &state,
         };
-        let _element = view(ctx);
+        let _element = view(&ctx);
     }
 
     #[test]
@@ -729,10 +847,10 @@ mod tests {
         let mut state = State::new();
         assert!(!state.is_expanded(HelpSection::Viewer));
 
-        update(&mut state, Message::ToggleSection(HelpSection::Viewer));
+        let _ = update(&mut state, Message::ToggleSection(HelpSection::Viewer));
         assert!(state.is_expanded(HelpSection::Viewer));
 
-        update(&mut state, Message::ToggleSection(HelpSection::Viewer));
+        let _ = update(&mut state, Message::ToggleSection(HelpSection::Viewer));
         assert!(!state.is_expanded(HelpSection::Viewer));
     }
 
@@ -740,8 +858,8 @@ mod tests {
     fn multiple_sections_can_be_expanded() {
         let mut state = State::new();
 
-        update(&mut state, Message::ToggleSection(HelpSection::Viewer));
-        update(&mut state, Message::ToggleSection(HelpSection::Editor));
+        let _ = update(&mut state, Message::ToggleSection(HelpSection::Viewer));
+        let _ = update(&mut state, Message::ToggleSection(HelpSection::Editor));
 
         assert!(state.is_expanded(HelpSection::Viewer));
         assert!(state.is_expanded(HelpSection::Editor));

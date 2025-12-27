@@ -291,23 +291,25 @@ help-capture-formats = Supported export formats: PNG (lossless), JPEG (smaller f
 # Metadata Editing Section
 # ─────────────────────────────────────────────────────────────────────────────
 help-section-metadata = Metadata Editing
-help-metadata-role = View and edit EXIF metadata embedded in your image files. Modify camera information, date taken, GPS coordinates, and exposure settings.
+help-metadata-role = View and edit metadata embedded in your image files. Two types of metadata are supported: Dublin Core (XMP) for descriptive information like title and author, and EXIF for technical camera data.
 
 help-metadata-tool-view = View mode
-help-metadata-tool-view-desc = See file information, camera details, exposure settings, and GPS coordinates in the info panel.
+help-metadata-tool-view-desc = Press I or click the Info button to see all embedded metadata in the side panel.
 help-metadata-tool-edit = Edit mode
-help-metadata-tool-edit-desc = Click the Edit button to modify metadata fields. Changes are validated in real-time.
+help-metadata-tool-edit-desc = Click Edit to modify fields. Use "Add field" to add new metadata. Changes are validated as you type.
 help-metadata-tool-save = Save options
 help-metadata-tool-save-desc = Save to update the original file, or Save As to create a copy with the new metadata.
 
 help-metadata-fields-title = Editable Fields
+help-metadata-field-dc = Dublin Core (XMP): title, author, description, keywords, copyright
 help-metadata-field-camera = Camera make and model
-help-metadata-field-date = Date taken (EXIF format)
-help-metadata-field-exposure = Exposure time, aperture, ISO
+help-metadata-field-date = Date taken (with calendar picker)
+help-metadata-field-exposure = Exposure time, aperture, ISO sensitivity
 help-metadata-field-focal = Focal length and 35mm equivalent
-help-metadata-field-gps = GPS latitude and longitude
+help-metadata-field-gps = GPS coordinates (latitude and longitude)
 
-help-metadata-note = Note: Metadata editing is only available for images. Video metadata editing is planned for a future release.
+help-metadata-formats = Supported formats: JPEG, PNG, WebP, and TIFF support both Dublin Core and EXIF. Other formats may have limited or read-only support.
+help-metadata-note = Note: Video files display metadata in read-only mode. Only the fields supported by each format are available for editing.
 
 # About screen
 about-title = About
@@ -418,6 +420,7 @@ metadata-validation-invalid-number = Invalid number
 notification-metadata-save-success = Metadata saved successfully
 notification-metadata-save-error = Failed to save metadata
 notification-metadata-validation-error = Please fix validation errors before saving
+notification-metadata-xmp-unsupported = Cannot save title, author, and description to this file format
 
 # Metadata progressive disclosure
 metadata-add-field = Add metadata field...
