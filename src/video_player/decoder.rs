@@ -802,12 +802,19 @@ impl AsyncDecoder {
                             last_paused_frame = Some(output_frame.clone());
                         }
 
-                        let _ = event_tx.blocking_send(DecoderEvent::FrameReady(output_frame));
+                        // Send frame - break if channel closed
+                        if event_tx
+                            .blocking_send(DecoderEvent::FrameReady(output_frame))
+                            .is_err()
+                        {
+                            break; // Receiver dropped, exit decode loop
+                        }
                         frame_decoded = true;
                     }
                 }
 
                 if !frame_decoded {
+                    // Send end of stream - ignore error (we're exiting anyway)
                     let _ = event_tx.blocking_send(DecoderEvent::EndOfStream);
                 }
                 is_playing = false;
