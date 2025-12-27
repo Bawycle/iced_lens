@@ -4,6 +4,10 @@
 
 ## Bugs to Fix
 
+- [ ] Help screen expand/collapse icons render with blue rectangle on Windows (Unicode character issue) — replace with proper PNG icons like other UI elements (see [CONTRIBUTING.md](CONTRIBUTING.md#3-icons-srcuiiconsrs) for icon creation process)
+- [ ] XMP metadata (dc:title, etc.) not written to PNG files — `write_xmp_to_jpeg()` only supports JPEG but returns `Ok(())` anyway. Fix requires: (1) extend XMP writing to PNG (iTXt chunks) and other formats, (2) for unsupported formats: don't show XMP tags in the editable fields dropdown, and disable existing XMP fields (read-only) if they cannot be written back.
+- [ ] **Frame-by-frame bug**: Step forward/backward only works after play+pause, not immediately after loading a video — should work from initial loaded state
+
 
 ## Planned Features
 
@@ -46,6 +50,7 @@
 - [ ] Add video metadata editing support (Phase 2 - future work)
 
 ### Video Player
+- [ ] **Seeking audit**: Compare with VLC's smooth seeking and improve both UX and underlying logic (investigate keyframe-based seeking, buffering strategy, decoder pipeline, frame caching, etc.)
 
 ### Help
 - [ ] Allow text selection and copying in the help screen (blocked, pending native support in Iced 0.15.0)
@@ -54,6 +59,21 @@
 - [ ] Create a simple video editor allowing users to trim videos by removing segments. The editor should let users play the video, seek to any position, step forward/backward frame by frame, and change the playback speed.
 
 ## Code Quality / Refactoring
+
+## Packaging / Distribution
+
+### Flatpak
+- [ ] Create a Flatpak build script (`scripts/build-flatpak.sh`)
+- [ ] Write the Flatpak manifest
+- [ ] Add required metadata for Flathub:
+  - [ ] AppStream metadata file (`metainfo.xml`) with app description, screenshots, release notes
+  - [ ] Desktop entry file (`.desktop`)
+  - [ ] App icons in required sizes (64x64, 128x128, 256x256 PNG + scalable SVG)
+- [ ] Test Flatpak build locally with `flatpak-builder`
+- [ ] Prepare Flathub submission:
+  - [ ] Fork [flathub/flathub](https://github.com/flathub/flathub)
+  - [ ] Create PR with manifest following [Flathub submission guidelines](https://docs.flathub.org/docs/for-app-authors/submission/)
+  - [ ] Ensure app passes Flathub quality guidelines (no network at build time, proper permissions, etc.)
 
 ## Notes
 

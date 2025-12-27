@@ -1,0 +1,37 @@
+- Faits tout en anglais excepté me parler, parles moi en français.
+- Appliques les directives du fichier CONTRIBUTING.md
+- Applique les meilleurs pratiques actuelles en matière d'architecture logicielle, de développement logiciel, de design pattern, d'UX/UI design.
+- Certains principes sont très important à respecter :
+  - Une seule source de vérité
+  - Tu apppliques les principes de la programmation fonctionnelle mais de manière raisonnée
+  - Pour l'UI, tu respectes le pattern "Unidirectional Data Flow"
+  - Il est important que l'UI soit cohérent et harmonisé
+  - Tu ne choisis pas directement la solution de facilité, tu regardes avant tout, quelle est la meilleur pratique
+  - Prends toutes les mesures nécessaires pour ne pas engendrer des régressions
+  - Pas de "legacy code" !
+  - **Architecture Event-Driven** : Réagir aux événements plutôt que coupler les actions directement
+    - Chaque domaine (viewer, settings, metadata, etc.) gère son propre état via des messages
+    - L'app orchestre en réagissant aux Effects et en dispatchant des messages
+    - Pas de mutations d'état cross-domain directes (ex: ne pas faire `ctx.viewer.field = value` depuis un handler)
+    - Utiliser des messages comme `ClearMedia`, `MediaLoaded`, `StartLoadingMedia` pour communiquer entre domaines
+    - Exemple : au lieu de "suppression → efface état metadata", faire "suppression → MediaLoaded/ClearMedia → metadata réagit"
+  - **Newtype Pattern** : Utiliser des newtypes pour les valeurs bornées
+    - Préférer `Volume`, `ZoomPercent`, `PlaybackSpeed` aux primitifs avec `.clamp()`
+    - Les newtypes garantissent la validité au niveau du système de types
+    - Voir la table des newtypes existants dans CONTRIBUTING.md
+  - **Notifications vs ErrorDisplay** : Choisir le bon feedback utilisateur
+    - `Notification::success/warning/error()` pour les erreurs récupérables (toasts non-bloquants)
+    - `ErrorDisplay` uniquement pour les erreurs critiques bloquantes (rare)
+    - Les erreurs de chargement média utilisent des notifications, pas ErrorDisplay
+  - **Icons vs Action Icons** : Séparer apparence et sémantique
+    - `icons.rs` : icônes nommées par apparence visuelle (ex: `play()`, `cross()`)
+    - `action_icons.rs` : mapping sémantique action → icône (ex: `video::step_forward()`)
+    - Changer une icône d'action = modifier uniquement `action_icons.rs`
+  - **Design Tokens** : Pas de valeurs hardcodées
+    - Utiliser `design_tokens.rs` pour couleurs (`palette`), spacing, sizing, radius
+    - Utiliser `theming.rs` pour les couleurs sémantiques (light/dark mode)
+    - Jamais de `Color::from_rgb(...)` inline, toujours référencer les tokens
+  - **TDD** : Tests écrits avant ou avec l'implémentation
+    - Écrire les tests qui définissent le comportement attendu
+    - Implémenter le code pour faire passer les tests
+    - `cargo test` doit toujours passer avant commit
