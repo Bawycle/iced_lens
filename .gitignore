@@ -22,11 +22,9 @@ Thumbs.db
 
 # Gemini cli
 .gemini/
-GEMINI.md
 
 # Claude code
 .claude/
-CLAUDE.md
 
 # Added by cargo
 /target
