@@ -217,9 +217,12 @@ pub fn handle_viewer_message(
         component::Effect::OpenFileDialog => {
             handle_open_file_dialog(ctx.app_state.last_open_directory.clone())
         }
-        component::Effect::ShowErrorNotification { key } => {
-            ctx.notifications
-                .push(notifications::Notification::error(key));
+        component::Effect::ShowErrorNotification { key, args } => {
+            let mut notification = notifications::Notification::error(key);
+            for (arg_key, arg_value) in args {
+                notification = notification.with_arg(arg_key, arg_value);
+            }
+            ctx.notifications.push(notification);
             Task::none()
         }
         component::Effect::RetryNavigation {

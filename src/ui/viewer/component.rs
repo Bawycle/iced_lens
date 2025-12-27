@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Viewer component encapsulating state and update logic.
 
-use crate::error::Error;
+use crate::error::{Error, VideoError};
 use crate::i18n::fluent::I18n;
 use crate::media::navigator::NavigationInfo;
 use crate::media::{MaxSkipAttempts, MediaData};
@@ -113,6 +113,8 @@ pub enum Effect {
     ShowErrorNotification {
         /// The i18n key for the notification message.
         key: &'static str,
+        /// Optional arguments for the i18n message.
+        args: Vec<(&'static str, String)>,
     },
     /// Retry navigation after a failed load (auto-skip).
     /// App will navigate in the given direction and try to load the next media.
@@ -746,6 +748,7 @@ impl State {
                                 (
                                     Effect::ShowErrorNotification {
                                         key: notification_key,
+                                        args: vec![],
                                     },
                                     Task::none(),
                                 )
@@ -1145,11 +1148,22 @@ impl State {
                         }
                     }
                     PlaybackMessage::Error(msg) => {
-                        // Display error
-                        eprintln!("Playback error: {msg}");
+                        // Parse error message into typed VideoError for i18n support
+                        let video_error = VideoError::from_message(&msg);
+
+                        // Store error in player state for display
                         if let Some(ref mut player) = self.video_player {
                             player.set_error(msg);
                         }
+
+                        // Return notification effect
+                        return (
+                            Effect::ShowErrorNotification {
+                                key: video_error.i18n_key(),
+                                args: video_error.i18n_args(),
+                            },
+                            Task::none(),
+                        );
                     }
                     PlaybackMessage::AudioPts(pts_secs) => {
                         // Update sync clock with audio PTS for A/V synchronization

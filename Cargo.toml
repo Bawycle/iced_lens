@@ -4,7 +4,7 @@ version = "0.5.0"
 edition = "2021"
 authors = ["Bawycle"]
 description = "Privacy-first media viewer and editor with AI enhancement"
-repository = "https://codeberg.org/Bawycle/iced_lens"
+repository = "https://codeberg.org/Bawycle/iced_lens.git"
 homepage = "https://codeberg.org/Bawycle/iced_lens"
 license = "MPL-2.0"
 keywords = ["image", "viewer", "editor", "gui", "iced"]
@@ -63,6 +63,9 @@ image_rs = { package = "image", version = "0.25", default-features = false, feat
 criterion = { version = "0.8.1", features = ["html_reports"] }
 tempfile = "3.23.0"
 tokio = { version = "1.48", features = ["macros", "rt", "sync", "time"] }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
 
 [[bench]]
 name = "image_loading"

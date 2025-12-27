@@ -25,8 +25,29 @@
 //! ```
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
+
+/// Reference instant for converting `Instant` to/from atomic microseconds.
+/// All time measurements are relative to this instant, allowing storage in `AtomicU64`.
+static REFERENCE_INSTANT: OnceLock<Instant> = OnceLock::new();
+
+/// Converts an `Instant` to microseconds since the reference instant.
+#[allow(clippy::cast_possible_truncation)] // u128 microseconds won't overflow u64 for reasonable durations
+fn instant_to_us(instant: Instant) -> u64 {
+    let reference = REFERENCE_INSTANT.get_or_init(Instant::now);
+    instant.duration_since(*reference).as_micros() as u64
+}
+
+/// Converts microseconds since reference back to an `Instant`.
+/// Returns `None` for the sentinel value 0.
+fn us_to_instant(us: u64) -> Option<Instant> {
+    if us == 0 {
+        return None;
+    }
+    let reference = REFERENCE_INSTANT.get_or_init(Instant::now);
+    Some(*reference + Duration::from_micros(us))
+}
 
 /// Synchronization tolerance in seconds.
 /// If audio and video differ by more than this, sync correction is applied.
@@ -39,13 +60,16 @@ pub const MAX_FRAME_SKIP: u32 = 5;
 ///
 /// Tracks the current playback position based on audio output,
 /// allowing video frames to synchronize to the audio timeline.
+///
+/// This struct is fully lock-free, using atomics for all fields.
 #[derive(Debug)]
 pub struct SyncClock {
     /// Current audio PTS in microseconds (for atomic access).
     audio_pts_us: AtomicU64,
 
-    /// Playback start time (wall clock).
-    start_time: std::sync::Mutex<Option<Instant>>,
+    /// Playback start time as microseconds since `REFERENCE_INSTANT`.
+    /// 0 means no start time is set.
+    start_time_us: AtomicU64,
 
     /// Audio PTS at playback start.
     start_pts_us: AtomicU64,
@@ -65,10 +89,11 @@ impl Default for SyncClock {
 
 impl SyncClock {
     /// Creates a new sync clock.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             audio_pts_us: AtomicU64::new(0),
-            start_time: std::sync::Mutex::new(None),
+            start_time_us: AtomicU64::new(0),
             start_pts_us: AtomicU64::new(0),
             is_playing: AtomicBool::new(false),
             sync_enabled: AtomicBool::new(true),
@@ -76,11 +101,13 @@ impl SyncClock {
     }
 
     /// Starts the sync clock at the given audio PTS.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn start(&self, audio_pts_secs: f64) {
         let pts_us = (audio_pts_secs * 1_000_000.0) as u64;
         self.audio_pts_us.store(pts_us, Ordering::SeqCst);
         self.start_pts_us.store(pts_us, Ordering::SeqCst);
-        *self.start_time.lock().expect("SyncClock mutex poisoned") = Some(Instant::now());
+        self.start_time_us
+            .store(instant_to_us(Instant::now()), Ordering::SeqCst);
         self.is_playing.store(true, Ordering::SeqCst);
     }
 
@@ -93,7 +120,8 @@ impl SyncClock {
     pub fn resume(&self) {
         let current_pts_us = self.audio_pts_us.load(Ordering::SeqCst);
         self.start_pts_us.store(current_pts_us, Ordering::SeqCst);
-        *self.start_time.lock().expect("SyncClock mutex poisoned") = Some(Instant::now());
+        self.start_time_us
+            .store(instant_to_us(Instant::now()), Ordering::SeqCst);
         self.is_playing.store(true, Ordering::SeqCst);
     }
 
@@ -101,11 +129,12 @@ impl SyncClock {
     pub fn stop(&self) {
         self.audio_pts_us.store(0, Ordering::SeqCst);
         self.start_pts_us.store(0, Ordering::SeqCst);
-        *self.start_time.lock().expect("SyncClock mutex poisoned") = None;
+        self.start_time_us.store(0, Ordering::SeqCst);
         self.is_playing.store(false, Ordering::SeqCst);
     }
 
     /// Updates the audio PTS (called when audio buffer is played).
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn update_audio_pts(&self, pts_secs: f64) {
         let pts_us = (pts_secs * 1_000_000.0) as u64;
         self.audio_pts_us.store(pts_us, Ordering::SeqCst);
@@ -115,12 +144,14 @@ impl SyncClock {
     ///
     /// If playing, interpolates based on wall clock time since last audio update.
     /// If paused, returns the last known position.
+    #[must_use]
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
     pub fn current_time_secs(&self) -> f64 {
         let pts_us = self.audio_pts_us.load(Ordering::SeqCst);
 
         if self.is_playing.load(Ordering::SeqCst) {
             // Interpolate based on wall clock
-            if let Some(start) = *self.start_time.lock().expect("SyncClock mutex poisoned") {
+            if let Some(start) = us_to_instant(self.start_time_us.load(Ordering::SeqCst)) {
                 let start_pts_us = self.start_pts_us.load(Ordering::SeqCst);
                 let elapsed = start.elapsed();
                 let elapsed_us = elapsed.as_micros() as u64;
@@ -134,6 +165,7 @@ impl SyncClock {
     }
 
     /// Returns whether playback is active.
+    #[must_use]
     pub fn is_playing(&self) -> bool {
         self.is_playing.load(Ordering::SeqCst)
     }
@@ -144,17 +176,20 @@ impl SyncClock {
     }
 
     /// Returns whether sync correction is enabled.
+    #[must_use]
     pub fn is_sync_enabled(&self) -> bool {
         self.sync_enabled.load(Ordering::SeqCst)
     }
 
     /// Seeks to a specific position.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn seek(&self, target_secs: f64) {
         let pts_us = (target_secs * 1_000_000.0) as u64;
         self.audio_pts_us.store(pts_us, Ordering::SeqCst);
         self.start_pts_us.store(pts_us, Ordering::SeqCst);
         if self.is_playing.load(Ordering::SeqCst) {
-            *self.start_time.lock().expect("SyncClock mutex poisoned") = Some(Instant::now());
+            self.start_time_us
+                .store(instant_to_us(Instant::now()), Ordering::SeqCst);
         }
     }
 }
@@ -183,6 +218,7 @@ pub enum SyncAction {
 ///
 /// # Returns
 /// The action to take for this video frame.
+#[must_use]
 pub fn calculate_sync_action(video_pts_secs: f64, audio_time_secs: f64) -> SyncAction {
     let diff = video_pts_secs - audio_time_secs;
 
@@ -198,10 +234,11 @@ pub fn calculate_sync_action(video_pts_secs: f64, audio_time_secs: f64) -> SyncA
     }
 }
 
-/// Thread-safe wrapper around SyncClock for sharing between threads.
+/// Thread-safe wrapper around `SyncClock` for sharing between threads.
 pub type SharedSyncClock = Arc<SyncClock>;
 
 /// Creates a new shared sync clock.
+#[must_use]
 pub fn create_sync_clock() -> SharedSyncClock {
     Arc::new(SyncClock::new())
 }
