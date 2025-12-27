@@ -9,12 +9,6 @@ use std::fs;
 use std::path::Path;
 use tiny_skia;
 
-/// Supported image extensions for the viewer.
-/// These formats can be loaded and displayed by the application.
-pub const SUPPORTED_EXTENSIONS: &[&str] = &[
-    "jpg", "jpeg", "png", "gif", "tiff", "tif", "webp", "bmp", "ico", "svg",
-];
-
 #[derive(Debug, Clone)]
 pub struct ImageData {
     pub handle: image::Handle,
@@ -22,54 +16,61 @@ pub struct ImageData {
     pub height: u32,
 }
 
+/// Load an image from the given path and return its data.
+///
+/// Supports common raster formats (PNG, JPEG, GIF, etc.) as well as SVG.
+/// SVG files are rasterized to PNG format using resvg.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The file cannot be read ([`Error::Io`])
+/// - The image format is invalid or unsupported ([`Error::Io`])
+/// - For SVG files: parsing fails or dimensions are zero ([`Error::Svg`])
 pub fn load_image<P: AsRef<Path>>(path: P) -> Result<ImageData> {
     let path = path.as_ref();
     let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
-    match extension.to_lowercase().as_str() {
-        "svg" => {
-            let svg_data = fs::read(path)?;
-            let tree = usvg::Tree::from_data(&svg_data, &usvg::Options::default())
-                .map_err(|e| Error::Svg(e.to_string()))?;
+    if extension.eq_ignore_ascii_case("svg") {
+        let svg_data = fs::read(path)?;
+        let tree = usvg::Tree::from_data(&svg_data, &usvg::Options::default())
+            .map_err(|e| Error::Svg(e.to_string()))?;
 
-            let pixmap_size = tree.size().to_int_size();
-            let width = pixmap_size.width();
-            let height = pixmap_size.height();
-            if width == 0 || height == 0 {
-                return Err(Error::Svg("SVG has empty dimensions".into()));
-            }
-
-            let mut pixmap = tiny_skia::Pixmap::new(width, height)
-                .ok_or_else(|| Error::Svg("Failed to allocate SVG pixmap".into()))?;
-
-            resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
-
-            let png_data = pixmap.encode_png().map_err(|e| Error::Svg(e.to_string()))?;
-            let handle = image::Handle::from_bytes(png_data);
-            Ok(ImageData {
-                handle,
-                width,
-                height,
-            })
+        let pixmap_size = tree.size().to_int_size();
+        let width = pixmap_size.width();
+        let height = pixmap_size.height();
+        if width == 0 || height == 0 {
+            return Err(Error::Svg("SVG has empty dimensions".into()));
         }
-        _ => {
-            let img_bytes = fs::read(path).map_err(|e| Error::Io(e.to_string()))?;
 
-            let img =
-                image_rs::load_from_memory(&img_bytes).map_err(|e| Error::Io(e.to_string()))?;
+        let mut pixmap = tiny_skia::Pixmap::new(width, height)
+            .ok_or_else(|| Error::Svg("Failed to allocate SVG pixmap".into()))?;
 
-            let (width, height) = img.dimensions();
+        resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
 
-            let rgba_img = img.to_rgba8();
-            let pixels = rgba_img.into_vec();
+        let png_data = pixmap.encode_png().map_err(|e| Error::Svg(e.to_string()))?;
+        let handle = image::Handle::from_bytes(png_data);
+        Ok(ImageData {
+            handle,
+            width,
+            height,
+        })
+    } else {
+        let img_bytes = fs::read(path).map_err(|e| Error::Io(e.to_string()))?;
 
-            let handle = image::Handle::from_rgba(width, height, pixels);
-            Ok(ImageData {
-                handle,
-                width,
-                height,
-            })
-        }
+        let img = image_rs::load_from_memory(&img_bytes).map_err(|e| Error::Io(e.to_string()))?;
+
+        let (width, height) = img.dimensions();
+
+        let rgba_img = img.to_rgba8();
+        let pixels = rgba_img.into_vec();
+
+        let handle = image::Handle::from_rgba(width, height, pixels);
+        Ok(ImageData {
+            handle,
+            width,
+            height,
+        })
     }
 }
 

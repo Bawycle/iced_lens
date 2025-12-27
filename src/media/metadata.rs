@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Media metadata extraction for images (EXIF) and videos (FFmpeg).
+//! Media metadata extraction for images (EXIF) and videos (`FFmpeg`).
 //!
 //! This module provides unified metadata extraction for both images and videos,
 //! extracting technical information like dimensions, camera settings, GPS coordinates,
@@ -109,6 +109,7 @@ pub enum MediaMetadata {
 
 impl MediaMetadata {
     /// Returns file size if available.
+    #[must_use]
     pub fn file_size(&self) -> Option<u64> {
         match self {
             MediaMetadata::Image(m) => m.file_size,
@@ -117,6 +118,7 @@ impl MediaMetadata {
     }
 
     /// Returns dimensions (width, height).
+    #[must_use]
     pub fn dimensions(&self) -> (u32, u32) {
         match self {
             MediaMetadata::Image(m) => (m.width.unwrap_or(0), m.height.unwrap_or(0)),
@@ -129,6 +131,10 @@ impl MediaMetadata {
 ///
 /// Reads EXIF data from JPEG, PNG, WebP, TIFF, and HEIF files.
 /// Returns default metadata if EXIF data is not available.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be opened or read.
 pub fn extract_image_metadata<P: AsRef<Path>>(path: P) -> Result<ImageMetadata> {
     let path = path.as_ref();
     let mut metadata = ImageMetadata::default();
@@ -232,16 +238,22 @@ pub fn extract_image_metadata<P: AsRef<Path>>(path: P) -> Result<ImageMetadata> 
         extract_gps_coordinates(&exif, &mut metadata);
     }
 
-    // Try to extract XMP Dublin Core metadata (JPEG only for now)
+    // Try to extract XMP Dublin Core metadata
     if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-        if ext.eq_ignore_ascii_case("jpg") || ext.eq_ignore_ascii_case("jpeg") {
-            if let Some(dc) = xmp::extract_xmp_from_jpeg(path) {
-                metadata.dc_title = dc.title;
-                metadata.dc_creator = dc.creator;
-                metadata.dc_description = dc.description;
-                metadata.dc_subject = dc.subject;
-                metadata.dc_rights = dc.rights;
-            }
+        let dc = match ext.to_lowercase().as_str() {
+            "jpg" | "jpeg" => xmp::extract_xmp_from_jpeg(path),
+            "png" => xmp::extract_xmp_from_png(path),
+            "webp" => xmp::extract_xmp_from_webp(path),
+            "tiff" | "tif" => xmp::extract_xmp_from_tiff(path),
+            _ => None,
+        };
+
+        if let Some(dc) = dc {
+            metadata.dc_title = dc.title;
+            metadata.dc_creator = dc.creator;
+            metadata.dc_description = dc.description;
+            metadata.dc_subject = dc.subject;
+            metadata.dc_rights = dc.rights;
         }
     }
 
@@ -286,9 +298,13 @@ fn parse_gps_coordinate(value: &exif::Value) -> Option<f64> {
     }
 }
 
-/// Extract extended metadata from a video file using FFmpeg.
+/// Extract extended metadata from a video file using `FFmpeg`.
 ///
-/// Extends the basic VideoMetadata with codec names, container format, and bitrates.
+/// Extends the basic `VideoMetadata` with codec names, container format, and bitrates.
+///
+/// # Errors
+///
+/// Returns an error if `FFmpeg` initialization fails or the video file cannot be opened.
 pub fn extract_extended_video_metadata<P: AsRef<Path>>(path: P) -> Result<ExtendedVideoMetadata> {
     use crate::media::video::init_ffmpeg;
 
@@ -330,6 +346,9 @@ pub fn extract_extended_video_metadata<P: AsRef<Path>>(path: P) -> Result<Extend
         }
 
         // Extract duration
+        // Note: i64 to f64 conversion may lose precision for very large durations (>2^53 ticks),
+        // but this is acceptable for media duration values which are typically much smaller.
+        #[allow(clippy::cast_precision_loss)]
         let duration_secs = if video_stream.duration() > 0 {
             let time_base = video_stream.time_base();
             video_stream.duration() as f64 * f64::from(time_base.numerator())
@@ -351,7 +370,7 @@ pub fn extract_extended_video_metadata<P: AsRef<Path>>(path: P) -> Result<Extend
         let params = video_stream.parameters();
         let bit_rate = unsafe { (*params.as_ptr()).bit_rate };
         if bit_rate > 0 {
-            metadata.video_bitrate = Some(bit_rate as u64);
+            metadata.video_bitrate = Some(bit_rate.cast_unsigned());
         }
     }
 
@@ -376,7 +395,7 @@ pub fn extract_extended_video_metadata<P: AsRef<Path>>(path: P) -> Result<Extend
         let params = audio_stream.parameters();
         let bit_rate = unsafe { (*params.as_ptr()).bit_rate };
         if bit_rate > 0 {
-            metadata.audio_bitrate = Some(bit_rate as u64);
+            metadata.audio_bitrate = Some(bit_rate.cast_unsigned());
         }
     }
 
@@ -384,6 +403,11 @@ pub fn extract_extended_video_metadata<P: AsRef<Path>>(path: P) -> Result<Extend
 }
 
 /// Format file size in human-readable format.
+///
+/// Precision loss from u64 to f64 conversion is acceptable here since we only
+/// display 2 decimal places and file sizes beyond 2^53 bytes are impractical.
+#[must_use]
+#[allow(clippy::cast_precision_loss)]
 pub fn format_file_size(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
@@ -401,6 +425,11 @@ pub fn format_file_size(bytes: u64) -> String {
 }
 
 /// Format bitrate in human-readable format.
+///
+/// Precision loss from u64 to f64 conversion is acceptable here since we only
+/// display 2 decimal places and bitrates beyond 2^53 bps are impractical.
+#[must_use]
+#[allow(clippy::cast_precision_loss)]
 pub fn format_bitrate(bits_per_sec: u64) -> String {
     const KBPS: u64 = 1000;
     const MBPS: u64 = KBPS * 1000;
@@ -415,6 +444,7 @@ pub fn format_bitrate(bits_per_sec: u64) -> String {
 }
 
 /// Format GPS coordinates as decimal degrees string.
+#[must_use]
 pub fn format_gps_coordinates(lat: f64, lon: f64) -> String {
     let lat_dir = if lat >= 0.0 { "N" } else { "S" };
     let lon_dir = if lon >= 0.0 { "E" } else { "W" };
@@ -436,7 +466,7 @@ pub fn extract_metadata<P: AsRef<Path>>(path: P) -> Option<MediaMetadata> {
     let ext = path
         .extension()
         .and_then(|s| s.to_str())
-        .map(|s| s.to_lowercase())?;
+        .map(str::to_lowercase)?;
 
     // Check if it's a video file
     if matches!(
@@ -509,7 +539,10 @@ mod tests {
     fn extended_video_metadata_has_defaults() {
         let metadata = ExtendedVideoMetadata::default();
         assert_eq!(metadata.width, 0);
-        assert_eq!(metadata.duration_secs, 0.0);
+        assert!(
+            metadata.duration_secs.abs() < f64::EPSILON,
+            "duration_secs should be 0.0"
+        );
         assert!(metadata.video_codec.is_none());
     }
 

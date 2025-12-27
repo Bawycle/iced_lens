@@ -42,6 +42,7 @@ impl MetadataField {
     /// Returns all field variants for iteration.
     /// Dublin Core fields are listed first (user-facing metadata),
     /// followed by EXIF fields (technical metadata).
+    #[must_use]
     pub const fn all() -> &'static [MetadataField] {
         &[
             // Dublin Core / XMP fields (user-facing metadata first)
@@ -64,6 +65,7 @@ impl MetadataField {
     }
 
     /// Returns true if this field is a GPS coordinate.
+    #[must_use]
     pub const fn is_gps(&self) -> bool {
         matches!(
             self,
@@ -72,12 +74,26 @@ impl MetadataField {
     }
 
     /// Returns the paired GPS field, if this is a GPS field.
+    #[must_use]
     pub const fn gps_pair(&self) -> Option<MetadataField> {
         match self {
             MetadataField::GpsLatitude => Some(MetadataField::GpsLongitude),
             MetadataField::GpsLongitude => Some(MetadataField::GpsLatitude),
             _ => None,
         }
+    }
+
+    /// Returns true if this field is a Dublin Core / XMP field.
+    #[must_use]
+    pub const fn is_xmp_field(&self) -> bool {
+        matches!(
+            self,
+            MetadataField::DcTitle
+                | MetadataField::DcCreator
+                | MetadataField::DcDescription
+                | MetadataField::DcSubject
+                | MetadataField::DcRights
+        )
     }
 }
 
@@ -109,9 +125,9 @@ pub enum Event {
     None,
     /// Close the panel.
     Close,
-    /// Request to enter edit mode (app should create MetadataEditorState).
+    /// Request to enter edit mode (app should create `MetadataEditorState`).
     EnterEditModeRequested,
-    /// Request to exit edit mode (app should clear MetadataEditorState).
+    /// Request to exit edit mode (app should clear `MetadataEditorState`).
     ExitEditModeRequested,
     /// Request to save metadata to the specified path.
     SaveRequested(PathBuf),
@@ -120,12 +136,13 @@ pub enum Event {
 }
 
 /// Extended context for rendering the metadata panel with edit support.
+#[derive(Clone, Copy)]
 pub struct PanelContext<'a> {
     pub i18n: &'a I18n,
     pub metadata: Option<&'a MediaMetadata>,
     pub is_dark_theme: bool,
     /// Current file path (needed for save operations).
-    /// Uses media_navigator as single source of truth.
+    /// Uses `media_navigator` as single source of truth.
     pub current_path: Option<&'a Path>,
     /// Editor state when in edit mode.
     pub editor_state: Option<&'a MetadataEditorState>,
@@ -134,6 +151,7 @@ pub struct PanelContext<'a> {
 }
 
 /// Process a metadata panel message and return the corresponding event (new API).
+#[must_use]
 pub fn update_with_state(
     state: Option<&mut MetadataEditorState>,
     message: Message,
@@ -173,25 +191,27 @@ pub fn update_with_state(
 }
 
 /// Process a metadata panel message (legacy API for backward compatibility).
-pub fn update(message: Message) -> Event {
+#[must_use]
+pub fn update(message: &Message) -> Event {
     match message {
         Message::Close => Event::Close,
         // New messages return None for backward compatibility
         Message::EnterEditMode => Event::EnterEditModeRequested,
         Message::ExitEditMode => Event::ExitEditModeRequested,
-        Message::FieldChanged(_, _) => Event::None,
-        Message::Save => Event::None,
         Message::SaveAs => Event::SaveAsRequested,
-        Message::ShowField(_) => Event::None,
-        Message::RemoveField(_) => Event::None,
+        Message::FieldChanged(_, _)
+        | Message::Save
+        | Message::ShowField(_)
+        | Message::RemoveField(_) => Event::None,
     }
 }
 
 /// Render the metadata panel (new API with edit support).
 ///
 /// This is the main entry point for rendering. It delegates to either
-/// view mode or edit mode based on whether editor_state is present.
-pub fn panel<'a>(ctx: PanelContext<'a>) -> iced::Element<'a, Message> {
+/// view mode or edit mode based on whether `editor_state` is present.
+#[must_use]
+pub fn panel(ctx: PanelContext<'_>) -> iced::Element<'_, Message> {
     view::panel(ctx)
 }
 
@@ -199,7 +219,8 @@ pub fn panel<'a>(ctx: PanelContext<'a>) -> iced::Element<'a, Message> {
 ///
 /// This function maintains backward compatibility with the old `ViewContext`.
 /// For new code, prefer using `panel()` with `PanelContext`.
-pub fn view<'a>(ctx: ViewContext<'a>) -> iced::Element<'a, Message> {
+#[must_use]
+pub fn view(ctx: ViewContext<'_>) -> iced::Element<'_, Message> {
     // Convert legacy ViewContext to new PanelContext
     let is_image = matches!(ctx.metadata, Some(MediaMetadata::Image(_)));
     panel(PanelContext {

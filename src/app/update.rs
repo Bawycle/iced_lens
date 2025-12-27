@@ -36,6 +36,7 @@ pub enum NavigationMode {
 }
 
 /// Parameters for viewer area validation.
+#[allow(clippy::struct_excessive_bools)]
 pub struct ViewerAreaParams {
     /// Whether fullscreen mode is active.
     pub is_fullscreen: bool,
@@ -121,8 +122,8 @@ pub struct UpdateContext<'a> {
     pub notifications: &'a mut notifications::Manager,
 }
 
-impl<'a> UpdateContext<'a> {
-    /// Creates a PreferencesContext for persisting preferences.
+impl UpdateContext<'_> {
+    /// Creates a `PreferencesContext` for persisting preferences.
     pub fn preferences_context(&mut self) -> persistence::PreferencesContext<'_> {
         persistence::PreferencesContext {
             viewer: self.viewer,
@@ -191,11 +192,11 @@ pub fn handle_viewer_message(
             if has_unsaved_changes {
                 Task::none()
             } else {
-                toggle_fullscreen(ctx.fullscreen, ctx.window_id, ctx.info_panel_open)
+                toggle_fullscreen(ctx.fullscreen, ctx.window_id.as_ref(), ctx.info_panel_open)
             }
         }
         component::Effect::ExitFullscreen => {
-            update_fullscreen_mode(ctx.fullscreen, ctx.window_id, false)
+            update_fullscreen_mode(ctx.fullscreen, ctx.window_id.as_ref(), false)
         }
         component::Effect::OpenSettings => {
             *ctx.screen = Screen::Settings;
@@ -357,6 +358,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
 }
 
 /// Handles settings component messages.
+#[allow(clippy::too_many_lines)]
 pub fn handle_settings_message(
     ctx: &mut UpdateContext<'_>,
     message: settings::Message,
@@ -379,17 +381,17 @@ pub fn handle_settings_message(
             ctx.viewer.set_zoom_step_percent(value);
             persistence::persist_preferences(ctx.preferences_context())
         }
-        SettingsEvent::BackgroundThemeSelected(_) => {
+        SettingsEvent::BackgroundThemeSelected(_)
+        | SettingsEvent::SortOrderSelected(_)
+        | SettingsEvent::OverlayTimeoutChanged(_)
+        | SettingsEvent::FrameCacheMbChanged(_)
+        | SettingsEvent::FrameHistoryMbChanged(_)
+        | SettingsEvent::DeblurModelUrlChanged(_)
+        | SettingsEvent::UpscaleModelUrlChanged(_) => {
             persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::ThemeModeSelected(mode) => {
             *ctx.theme_mode = mode;
-            persistence::persist_preferences(ctx.preferences_context())
-        }
-        SettingsEvent::SortOrderSelected(_) => {
-            persistence::persist_preferences(ctx.preferences_context())
-        }
-        SettingsEvent::OverlayTimeoutChanged(_) => {
             persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::VideoAutoplayChanged(enabled) => {
@@ -399,12 +401,6 @@ pub fn handle_settings_message(
         }
         SettingsEvent::AudioNormalizationChanged(enabled) => {
             *ctx.audio_normalization = enabled;
-            persistence::persist_preferences(ctx.preferences_context())
-        }
-        SettingsEvent::FrameCacheMbChanged(_) => {
-            persistence::persist_preferences(ctx.preferences_context())
-        }
-        SettingsEvent::FrameHistoryMbChanged(_) => {
             persistence::persist_preferences(ctx.preferences_context())
         }
         SettingsEvent::KeyboardSeekStepChanged(step) => {
@@ -452,6 +448,7 @@ pub fn handle_settings_message(
             });
 
             // State for the stream
+            #[allow(clippy::items_after_statements)]
             enum DownloadPhase {
                 ReceivingProgress {
                     progress_rx: mpsc::Receiver<f32>,
@@ -529,9 +526,6 @@ pub fn handle_settings_message(
             let _ = std::fs::remove_file(crate::media::deblur::get_model_path());
             Task::none()
         }
-        SettingsEvent::DeblurModelUrlChanged(_) => {
-            persistence::persist_preferences(ctx.preferences_context())
-        }
         // AI Upscale settings events
         SettingsEvent::RequestEnableUpscale => {
             use iced::futures::channel::{mpsc, oneshot};
@@ -563,6 +557,7 @@ pub fn handle_settings_message(
             });
 
             // State for the stream
+            #[allow(clippy::items_after_statements)]
             enum UpscaleDownloadPhase {
                 ReceivingProgress {
                     progress_rx: mpsc::Receiver<f32>,
@@ -630,9 +625,6 @@ pub fn handle_settings_message(
             }
             let _ = std::fs::remove_file(crate::media::upscale::get_model_path());
             Task::none()
-        }
-        SettingsEvent::UpscaleModelUrlChanged(_) => {
-            persistence::persist_preferences(ctx.preferences_context())
         }
     }
 }
@@ -1003,12 +995,10 @@ pub fn handle_metadata_panel_message(
             }
 
             // Open Save As dialog
-            let dialog = rfd::AsyncFileDialog::new()
-                .set_title("Save Image As")
-                .add_filter("JPEG", &["jpg", "jpeg"])
-                .add_filter("PNG", &["png"])
-                .add_filter("WebP", &["webp"])
-                .add_filter("TIFF", &["tiff", "tif"]);
+            let mut dialog = rfd::AsyncFileDialog::new().set_title("Save Image As");
+            for (name, exts) in crate::media::extensions::IMAGE_SAVE_FILTERS {
+                dialog = dialog.add_filter(*name, exts);
+            }
 
             // Set initial directory from app state
             let dialog = if let Some(dir) = ctx.app_state.last_save_directory.as_ref() {
@@ -1049,7 +1039,7 @@ pub fn handle_metadata_panel_message(
 /// # Arguments
 /// * `ctx` - Update context with mutable references to app state
 /// * `direction` - Next or Previous
-/// * `mode` - AllMedia (viewer) or ImagesOnly (editor)
+/// * `mode` - `AllMedia` (viewer) or `ImagesOnly` (editor)
 /// * `skip_count` - Number of files to skip (0 for normal navigation, >0 for auto-skip retries)
 /// * `on_loaded` - Message constructor for the load result
 fn handle_navigation_with_skip<F>(
@@ -1154,8 +1144,8 @@ pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 /// Continues navigation in the same direction, preserving skip context
 /// for grouped notification when max attempts is reached.
 ///
-/// Uses `peek_nth_*` with skip_attempts to find the next file without
-/// modifying navigator state. The state is only updated via ConfirmNavigation
+/// Uses `peek_nth_*` with `skip_attempts` to find the next file without
+/// modifying navigator state. The state is only updated via `ConfirmNavigation`
 /// after a successful load.
 pub fn handle_retry_navigation(
     ctx: &mut UpdateContext<'_>,
@@ -1224,7 +1214,7 @@ pub fn format_skipped_files_message(i18n: &I18n, skipped_files: &[String]) -> St
 
 /// Handles deletion of the current media file.
 ///
-/// Uses media_navigator to find the next media to display after deletion.
+/// Uses `media_navigator` to find the next media to display after deletion.
 pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     let Some(current_path) = ctx
         .media_navigator
@@ -1255,8 +1245,7 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
 
             // Rescan directory after deletion
             let scan_seed = next_candidate
-                .as_ref()
-                .cloned()
+                .clone()
                 .unwrap_or_else(|| current_path.clone());
 
             let (config, _) = config::load();
@@ -1309,7 +1298,7 @@ pub fn handle_capture_frame(
 /// When entering fullscreen, automatically closes the info panel if it's open.
 fn toggle_fullscreen(
     fullscreen: &mut bool,
-    window_id: &Option<window::Id>,
+    window_id: Option<&window::Id>,
     info_panel_open: &mut bool,
 ) -> Task<Message> {
     let entering_fullscreen = !*fullscreen;
@@ -1322,14 +1311,14 @@ fn toggle_fullscreen(
 /// Updates fullscreen mode to the desired state.
 fn update_fullscreen_mode(
     fullscreen: &mut bool,
-    window_id: &Option<window::Id>,
+    window_id: Option<&window::Id>,
     desired: bool,
 ) -> Task<Message> {
     if *fullscreen == desired {
         return Task::none();
     }
 
-    let Some(window_id) = *window_id else {
+    let Some(window_id) = window_id else {
         return Task::none();
     };
 
@@ -1339,20 +1328,15 @@ fn update_fullscreen_mode(
     } else {
         window::Mode::Windowed
     };
-    window::set_mode(window_id, mode)
+    window::set_mode(*window_id, mode)
 }
 
 /// Handles the open file dialog request from empty state.
 pub fn handle_open_file_dialog(last_directory: Option<PathBuf>) -> Task<Message> {
     Task::perform(
         async move {
-            let mut dialog = rfd::AsyncFileDialog::new().add_filter(
-                "Media",
-                &[
-                    "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "ico", "mp4", "avi",
-                    "mov", "mkv", "webm",
-                ],
-            );
+            let mut dialog = rfd::AsyncFileDialog::new()
+                .add_filter("Media", crate::media::extensions::ALL_MEDIA_EXTENSIONS);
 
             if let Some(dir) = last_directory {
                 if dir.exists() {
