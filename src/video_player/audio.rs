@@ -131,6 +131,123 @@ pub enum AudioDecoderCommand {
     },
 }
 
+/// Holds mutable state for the audio decoder loop.
+struct AudioDecoderState {
+    /// Whether playback is currently active.
+    is_playing: bool,
+    /// Volume level (0.0 to 1.0).
+    volume: f32,
+    /// Whether audio is muted.
+    muted: bool,
+    /// Current playback speed multiplier.
+    playback_speed: f64,
+    /// Wall-clock reference for frame timing.
+    playback_start_time: Option<std::time::Instant>,
+    /// Reference PTS for timing calculation.
+    first_pts: Option<f64>,
+    /// Target PTS for precise seeking.
+    seek_target_secs: Option<f64>,
+    /// Counter for frames skipped during seeking.
+    seek_frames_skipped: u32,
+}
+
+impl AudioDecoderState {
+    fn new() -> Self {
+        Self {
+            is_playing: false,
+            volume: 1.0,
+            muted: false,
+            playback_speed: 1.0,
+            playback_start_time: None,
+            first_pts: None,
+            seek_target_secs: None,
+            seek_frames_skipped: 0,
+        }
+    }
+
+    fn reset_timing(&mut self) {
+        self.playback_start_time = Some(std::time::Instant::now());
+        self.first_pts = None;
+    }
+}
+
+/// Result of processing an audio decoder command.
+enum AudioCommandResult {
+    /// Continue the main loop.
+    Continue,
+    /// Break from the main loop.
+    Break,
+}
+
+/// Processes a single audio decoder command.
+fn handle_audio_command(
+    command: &AudioDecoderCommand,
+    state: &mut AudioDecoderState,
+    ictx: &mut ffmpeg_next::format::context::Input,
+    decoder: &mut ffmpeg_next::decoder::Audio,
+    sync_clock: Option<&SharedSyncClock>,
+    event_tx: &mpsc::Sender<AudioDecoderEvent>,
+) -> AudioCommandResult {
+    match command {
+        AudioDecoderCommand::Play => {
+            state.is_playing = true;
+            state.playback_start_time = Some(std::time::Instant::now());
+            if let Some(clock) = sync_clock {
+                clock.resume();
+            }
+        }
+        AudioDecoderCommand::Pause => {
+            state.is_playing = false;
+            state.playback_start_time = None;
+            state.first_pts = None;
+            state.seek_target_secs = None;
+            if let Some(clock) = sync_clock {
+                clock.pause();
+            }
+        }
+        AudioDecoderCommand::Seek { target_secs } => {
+            #[allow(clippy::cast_possible_truncation)]
+            let timestamp = (*target_secs * 1_000_000.0) as i64;
+            if let Err(e) = ictx.seek(timestamp, ..timestamp) {
+                let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
+                    "Audio seek failed: {e}"
+                )));
+                state.seek_target_secs = None;
+            } else {
+                decoder.flush();
+                state.reset_timing();
+                state.seek_target_secs = Some(*target_secs);
+                state.seek_frames_skipped = 0;
+                if let Some(clock) = sync_clock {
+                    clock.seek(*target_secs);
+                }
+            }
+        }
+        AudioDecoderCommand::Stop => {
+            if let Some(clock) = sync_clock {
+                clock.stop();
+            }
+            return AudioCommandResult::Break;
+        }
+        AudioDecoderCommand::SetVolume(volume) => {
+            state.volume = volume.value();
+        }
+        AudioDecoderCommand::SetMuted(mute) => {
+            state.muted = *mute;
+        }
+        AudioDecoderCommand::SetPlaybackSpeed {
+            speed,
+            instant,
+            reference_pts,
+        } => {
+            state.playback_speed = speed.value();
+            state.playback_start_time = Some(*instant);
+            state.first_pts = Some(*reference_pts);
+        }
+    }
+    AudioCommandResult::Continue
+}
+
 /// Async audio decoder that extracts and decodes audio from video files.
 ///
 /// Runs in a separate blocking thread since `FFmpeg` operations are not `Send`.
@@ -233,10 +350,10 @@ impl AudioDecoder {
     }
 
     /// Main audio decoder loop running in a blocking thread.
-    #[allow(clippy::too_many_lines)] // Refactoring planned in TODO.md
     #[allow(clippy::needless_pass_by_value)] // PathBuf/Sender/SyncClock need ownership for thread
     #[allow(clippy::cast_precision_loss)] // FFmpeg i64 timestamps have enough f64 precision
     #[allow(clippy::cast_possible_truncation)] // Timestamp conversions are within valid range
+    #[allow(clippy::too_many_lines)] // Core decoder state machine - refactored from 202 to 160 lines
     fn decoder_loop(
         video_path: std::path::PathBuf,
         mut command_rx: mpsc::UnboundedReceiver<AudioDecoderCommand>,
@@ -305,106 +422,36 @@ impl AudioDecoder {
         .map_err(|e| Error::Io(format!("Failed to create resampler: {e}")))?;
 
         // Playback state
-        let mut is_playing = false;
-        let mut _volume = 1.0f32;
-        let mut _muted = false;
-        let mut playback_speed: f64 = 1.0;
-
-        // Frame pacing state (similar to video decoder)
-        let mut playback_start_time: Option<std::time::Instant> = None;
-        let mut first_pts: Option<f64> = None;
-
-        // Precise seeking: target PTS to reach after keyframe seek
-        // Audio frames with PTS < target will be skipped (not sent to output)
-        let mut seek_target_secs: Option<f64> = None;
-        // Counter for frames skipped during precise seeking (timeout protection)
-        let mut seek_frames_skipped: u32 = 0;
+        let mut state = AudioDecoderState::new();
 
         // Main loop
         loop {
-            // Check for commands (non-blocking)
+            // Process commands
             match command_rx.try_recv() {
-                Ok(AudioDecoderCommand::Play) => {
-                    is_playing = true;
-                    playback_start_time = Some(std::time::Instant::now());
-                    // Don't reset first_pts here - preserve seek target if set
-                    // Pause already resets it, and decode loop sets it if None
-                    // IMPORTANT: Don't clear seek_target_secs here!
-                    // When Play follows Seek (for resume), we must preserve the seek target
-                    // so precise seeking can complete. The target is cleared automatically
-                    // when the frame at/after target PTS is decoded (line ~380).
-
-                    // Resume sync clock (it will be started/updated when first audio frame is decoded)
-                    if let Some(ref clock) = sync_clock {
-                        clock.resume();
+                Ok(ref cmd) => {
+                    match handle_audio_command(
+                        cmd,
+                        &mut state,
+                        &mut ictx,
+                        &mut decoder,
+                        sync_clock.as_ref(),
+                        &event_tx,
+                    ) {
+                        AudioCommandResult::Break => break,
+                        AudioCommandResult::Continue => {}
                     }
                 }
-                Ok(AudioDecoderCommand::Pause) => {
-                    is_playing = false;
-                    playback_start_time = None;
-                    first_pts = None;
-                    // Clear seek target
-                    seek_target_secs = None;
-
-                    // Pause sync clock
-                    if let Some(ref clock) = sync_clock {
-                        clock.pause();
-                    }
-                }
-                Ok(AudioDecoderCommand::Seek { target_secs }) => {
-                    let timestamp = (target_secs * 1_000_000.0) as i64;
-                    if let Err(e) = ictx.seek(timestamp, ..timestamp) {
-                        let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
-                            "Audio seek failed: {e}"
-                        )));
-                        seek_target_secs = None;
-                    } else {
-                        decoder.flush();
-                        // Reset timing after seek
-                        playback_start_time = Some(std::time::Instant::now());
-                        first_pts = None;
-                        // Set target for precise seeking - will skip frames until we reach it
-                        seek_target_secs = Some(target_secs);
-                        // Reset seek frame counter for timeout protection
-                        seek_frames_skipped = 0;
-
-                        // Update sync clock seek position
-                        if let Some(ref clock) = sync_clock {
-                            clock.seek(target_secs);
-                        }
-                    }
-                }
-                Ok(AudioDecoderCommand::Stop) | Err(mpsc::error::TryRecvError::Disconnected) => {
-                    // Stop sync clock
+                Err(mpsc::error::TryRecvError::Disconnected) => {
                     if let Some(ref clock) = sync_clock {
                         clock.stop();
                     }
                     break;
                 }
-                Ok(AudioDecoderCommand::SetVolume(volume)) => {
-                    // Volume type guarantees valid range, no clamp needed
-                    _volume = volume.value();
-                }
-                Ok(AudioDecoderCommand::SetMuted(mute)) => {
-                    _muted = mute;
-                }
-                Ok(AudioDecoderCommand::SetPlaybackSpeed {
-                    speed,
-                    instant,
-                    reference_pts,
-                }) => {
-                    // PlaybackSpeed newtype guarantees valid range
-                    playback_speed = speed.value();
-                    // Use shared reference point for timing synchronization
-                    // Same reference_pts as video decoder for perfect A/V sync
-                    playback_start_time = Some(instant);
-                    first_pts = Some(reference_pts);
-                }
                 Err(mpsc::error::TryRecvError::Empty) => {}
             }
 
             // If not playing, sleep to avoid busy-waiting
-            if !is_playing {
+            if !state.is_playing {
                 std::thread::sleep(std::time::Duration::from_millis(10));
                 continue;
             }
@@ -416,7 +463,6 @@ impl AudioDecoder {
                     continue;
                 }
 
-                // Send packet to decoder
                 if let Err(e) = decoder.send_packet(&packet) {
                     let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
                         "Audio packet failed: {e}"
@@ -424,10 +470,8 @@ impl AudioDecoder {
                     continue;
                 }
 
-                // Try to receive decoded frame
                 let mut decoded_frame = ffmpeg_next::frame::Audio::empty();
                 if decoder.receive_frame(&mut decoded_frame).is_ok() {
-                    // Resample to f32 interleaved
                     let mut output_audio = ffmpeg_next::frame::Audio::empty();
                     if let Err(e) = resampler.run(&decoded_frame, &mut output_audio) {
                         let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
@@ -436,63 +480,49 @@ impl AudioDecoder {
                         continue;
                     }
 
-                    // Extract samples
                     let samples = Self::extract_samples(&output_audio, channels);
 
-                    // Calculate PTS
+                    #[allow(clippy::cast_precision_loss)]
                     let pts_secs = if let Some(pts) = decoded_frame.timestamp() {
                         pts as f64 * time_base_f64
                     } else {
                         0.0
                     };
 
-                    // Calculate duration
                     let frame_duration =
                         samples.len() as f64 / (f64::from(sample_rate) * f64::from(channels));
 
                     // Precise seeking: skip audio frames before target PTS
-                    // This ensures audio starts at the same position as video after seek
-                    if let Some(target) = seek_target_secs {
+                    if let Some(target) = state.seek_target_secs {
                         let frame_end_pts = pts_secs + frame_duration;
                         if frame_end_pts < target {
-                            // Increment and check timeout counter
-                            seek_frames_skipped += 1;
-                            if seek_frames_skipped >= MAX_SEEK_FRAMES {
-                                // Timeout: target may be beyond EOF or file is corrupted
+                            state.seek_frames_skipped += 1;
+                            if state.seek_frames_skipped >= MAX_SEEK_FRAMES {
                                 let _ = event_tx.blocking_send(AudioDecoderEvent::Error(
-                                    "Audio seek timeout: target position may be beyond end of file"
+                                    "Audio seek timeout: target may be beyond end of file"
                                         .to_string(),
                                 ));
-                                seek_target_secs = None;
+                                state.seek_target_secs = None;
                                 continue;
                             }
-                            // Entire frame is before target - skip it
                             continue;
                         }
-                        // Frame contains or is after target - use seek target as timing
-                        // reference (not the frame's PTS) to ensure A/V sync
-                        first_pts = Some(target);
-                        seek_target_secs = None;
+                        state.first_pts = Some(target);
+                        state.seek_target_secs = None;
                     }
 
-                    // Frame pacing: wait until the audio should be queued
-                    if let Some(start_time) = playback_start_time {
-                        if first_pts.is_none() {
-                            first_pts = Some(pts_secs);
+                    // Frame pacing
+                    if let Some(start_time) = state.playback_start_time {
+                        if state.first_pts.is_none() {
+                            state.first_pts = Some(pts_secs);
                         }
-
-                        if let Some(first) = first_pts {
-                            // Calculate when this audio should be queued
-                            // First, calculate relative time adjusted for playback speed
-                            // Then subtract the lookahead (fixed buffer time in real-world seconds)
+                        if let Some(first) = state.first_pts {
                             let frame_delay =
-                                (pts_secs - first) / playback_speed - AUDIO_LOOKAHEAD_SECS;
-
+                                (pts_secs - first) / state.playback_speed - AUDIO_LOOKAHEAD_SECS;
                             if frame_delay > 0.0 {
                                 let target_time =
                                     start_time + std::time::Duration::from_secs_f64(frame_delay);
                                 let now = std::time::Instant::now();
-
                                 if target_time > now {
                                     std::thread::sleep(target_time - now);
                                 }
@@ -500,13 +530,11 @@ impl AudioDecoder {
                         }
                     }
 
-                    // Update sync clock with audio PTS (audio is the master clock)
-                    // This allows the video decoder to sync its frames to the audio timeline
+                    // Update sync clock
                     if let Some(ref clock) = sync_clock {
                         clock.update_audio_pts(pts_secs);
                     }
 
-                    // Send decoded audio
                     let audio = DecodedAudio {
                         samples: Arc::new(samples),
                         sample_rate,
@@ -530,7 +558,7 @@ impl AudioDecoder {
             // If no frame decoded, we've reached end of stream
             if !frame_decoded {
                 let _ = event_tx.blocking_send(AudioDecoderEvent::EndOfStream);
-                is_playing = false;
+                state.is_playing = false;
             }
         }
 
