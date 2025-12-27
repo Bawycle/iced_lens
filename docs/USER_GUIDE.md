@@ -260,10 +260,10 @@ Enhance image enlargements using the Real-ESRGAN neural network for sharper resu
 
 ### Supported Fields
 
-**Dublin Core / XMP:**
+**Dublin Core / XMP** (JPEG, PNG, WebP, TIFF):
 - Title, Creator, Description, Keywords, Copyright
 
-**EXIF:**
+**EXIF** (JPEG, PNG, WebP, TIFF, HEIC):
 - Camera make/model, date taken, exposure, aperture, ISO, focal length, GPS
 
 ### Usage
