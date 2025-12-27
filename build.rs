@@ -166,6 +166,7 @@ fn needs_light_variant(name: &str) -> bool {
         // Navigation (dark theme sidebar)
         "chevron_double_left"
             | "chevron_double_right"
+            | "chevron_down"
             | "chevron_left"
             | "chevron_right"
             // Editor (dark theme)

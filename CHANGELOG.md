@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Video seeking no longer hangs on corrupted or incomplete files.
 - Improved audio/video synchronization during playback.
 - Saving metadata no longer shows false "success" for unsupported formats.
+- Help screen expand/collapse icons no longer display with blue rectangles on Windows.
 
 ## [0.5.0] - 2025-12-22
 

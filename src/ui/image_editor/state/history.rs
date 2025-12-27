@@ -115,7 +115,7 @@ mod tests {
 
     fn editor_state(width: u32, height: u32) -> (TempDir, State) {
         let (dir, path, image) = create_test_image(width, height);
-        let state = State::new(path, image).expect("editor state");
+        let state = State::new(path, &image).expect("editor state");
         (dir, state)
     }
 

@@ -42,7 +42,7 @@ use std::sync::OnceLock;
 /// Macro to define an icon function with a cached handle.
 /// The handle is created once on first access and reused thereafter.
 ///
-/// Icons are generated from SVG sources at build time and placed in OUT_DIR.
+/// Icons are generated from SVG sources at build time and placed in `OUT_DIR`.
 macro_rules! define_icon {
     ($name:ident, dark, $filename:literal, $doc:literal) => {
         #[doc = $doc]
@@ -273,6 +273,12 @@ define_icon!(
     "chevron_left.png",
     "Single chevron left icon: chevron pointing left (<), used for navigation previous."
 );
+define_icon!(
+    chevron_down,
+    dark,
+    "chevron_down.png",
+    "Single chevron down icon: chevron pointing down (v), used for expand indicator."
+);
 
 // =============================================================================
 // Settings Section Icons
@@ -356,6 +362,12 @@ pub mod light {
         light,
         "chevron_left.png",
         "Single chevron left icon (white): for dark theme UI."
+    );
+    define_icon!(
+        chevron_down,
+        light,
+        "chevron_down.png",
+        "Single chevron down icon (white): for dark theme UI."
     );
     define_icon!(
         pencil,
@@ -617,6 +629,7 @@ mod tests {
         let _ = chevron_double_left();
         let _ = chevron_right();
         let _ = chevron_left();
+        let _ = chevron_down();
         let _ = warning();
         let _ = checkmark();
         let _ = cross();
@@ -642,6 +655,7 @@ mod tests {
         let _ = light::chevron_double_left();
         let _ = light::chevron_right();
         let _ = light::chevron_left();
+        let _ = light::chevron_down();
         let _ = light::pencil();
         let _ = light::triangle_minus();
         let _ = light::triangle_plus();

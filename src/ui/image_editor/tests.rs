@@ -22,7 +22,7 @@ fn create_test_image(width: u32, height: u32) -> (tempfile::TempDir, PathBuf, Im
 #[test]
 fn new_editor_state_has_no_changes() {
     let (_dir, path, img) = create_test_image(4, 3);
-    let state = State::new(path, img).expect("editor state");
+    let state = State::new(path, &img).expect("editor state");
 
     assert!(!state.has_unsaved_changes());
     assert!(!state.can_undo());
@@ -33,7 +33,7 @@ fn new_editor_state_has_no_changes() {
 #[test]
 fn new_editor_state_initializes_resize_state() {
     let (_dir, path, img) = create_test_image(4, 3);
-    let state = State::new(path, img).expect("editor state");
+    let state = State::new(path, &img).expect("editor state");
 
     assert_eq!(state.resize_state.width, 4);
     assert_eq!(state.resize_state.height, 3);
@@ -45,7 +45,7 @@ fn new_editor_state_initializes_resize_state() {
 #[test]
 fn sidebar_starts_expanded() {
     let (_dir, path, img) = create_test_image(4, 3);
-    let state = State::new(path, img).expect("editor state");
+    let state = State::new(path, &img).expect("editor state");
 
     assert!(state.is_sidebar_expanded());
 }
@@ -60,7 +60,7 @@ fn crop_ratio_variants_are_distinct() {
 #[test]
 fn apply_resize_updates_image_dimensions() {
     let (_dir, path, img) = create_test_image(8, 6);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
@@ -78,7 +78,7 @@ fn apply_resize_updates_image_dimensions() {
 #[test]
 fn cancel_clears_resize_preview() {
     let (_dir, path, img) = create_test_image(5, 4);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
@@ -105,7 +105,7 @@ fn cancel_clears_resize_preview() {
 #[test]
 fn resize_preview_updates_when_width_changes() {
     let (_dir, path, img) = create_test_image(100, 100);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
@@ -133,7 +133,7 @@ fn resize_preview_updates_when_width_changes() {
 #[test]
 fn resize_preview_updates_when_scale_changes() {
     let (_dir, path, img) = create_test_image(100, 80);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
@@ -156,7 +156,7 @@ fn resize_preview_updates_when_scale_changes() {
 #[test]
 fn resize_preview_clears_when_dimensions_match_original() {
     let (_dir, path, img) = create_test_image(100, 100);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
@@ -188,7 +188,7 @@ fn resize_preview_clears_when_dimensions_match_original() {
 #[test]
 fn resize_preview_updates_when_height_changes() {
     let (_dir, path, img) = create_test_image(100, 100);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
@@ -213,7 +213,7 @@ fn resize_preview_updates_when_height_changes() {
 #[test]
 fn resize_preview_works_with_tool_selected() {
     let (_dir, path, img) = create_test_image(100, 100);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
@@ -239,7 +239,7 @@ fn resize_preview_works_with_tool_selected() {
 #[test]
 fn crop_handle_detection_with_extended_hit_area() {
     let (_dir, path, img) = create_test_image(200, 200);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     // Setup crop state with known dimensions
     // Crop at (50, 50) with size 100x100
@@ -356,7 +356,7 @@ fn crop_handle_detection_with_extended_hit_area() {
 #[test]
 fn crop_handle_detection_at_image_edges() {
     let (_dir, path, img) = create_test_image(100, 100);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     // Crop that extends to image edges
     state.crop_state.x = 0;
@@ -416,7 +416,7 @@ fn crop_handle_detection_at_image_edges() {
 #[test]
 fn flip_horizontal_preserves_dimensions() {
     let (_dir, path, img) = create_test_image(8, 6);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     let original_width = state.current_image.width;
     let original_height = state.current_image.height;
@@ -436,7 +436,7 @@ fn flip_horizontal_preserves_dimensions() {
 #[test]
 fn flip_vertical_preserves_dimensions() {
     let (_dir, path, img) = create_test_image(8, 6);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     let original_width = state.current_image.width;
     let original_height = state.current_image.height;
@@ -456,7 +456,7 @@ fn flip_vertical_preserves_dimensions() {
 #[test]
 fn flip_horizontal_records_transformation() {
     let (_dir, path, img) = create_test_image(4, 4);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     assert!(!state.has_unsaved_changes(), "Should start with no changes");
 
@@ -473,7 +473,7 @@ fn flip_horizontal_records_transformation() {
 #[test]
 fn flip_vertical_records_transformation() {
     let (_dir, path, img) = create_test_image(4, 4);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     assert!(!state.has_unsaved_changes(), "Should start with no changes");
 
@@ -490,7 +490,7 @@ fn flip_vertical_records_transformation() {
 #[test]
 fn flip_horizontal_can_be_undone() {
     let (_dir, path, img) = create_test_image(8, 6);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     let original_width = state.current_image.width;
     let original_height = state.current_image.height;
@@ -514,7 +514,7 @@ fn flip_horizontal_can_be_undone() {
 #[test]
 fn flip_vertical_can_be_undone() {
     let (_dir, path, img) = create_test_image(8, 6);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     let original_width = state.current_image.width;
     let original_height = state.current_image.height;
@@ -538,7 +538,7 @@ fn flip_vertical_can_be_undone() {
 #[test]
 fn flip_operations_can_be_combined() {
     let (_dir, path, img) = create_test_image(8, 6);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     // Apply both flips
     state.update(Message::Sidebar(SidebarMessage::FlipHorizontal));
@@ -563,7 +563,7 @@ fn flip_operations_can_be_combined() {
 #[test]
 fn flip_combined_with_rotate() {
     let (_dir, path, img) = create_test_image(8, 6);
-    let mut state = State::new(path, img).expect("editor state");
+    let mut state = State::new(path, &img).expect("editor state");
 
     // Rotate then flip
     state.update(Message::Sidebar(SidebarMessage::RotateLeft));

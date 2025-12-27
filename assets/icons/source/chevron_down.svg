@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="64" height="64" fill="white">
+  <!-- License: LicenseRef-IcedLens-Icon (see ICON_LICENSE.md) -->
+  <!-- Single chevron pointing down (v) for expand indicator -->
+  <path d="M 6,12 L 16,22 L 26,12" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+</svg>

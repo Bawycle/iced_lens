@@ -79,6 +79,8 @@ impl State {
 pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
     pub state: &'a State,
+    /// True if the application is using dark theme.
+    pub is_dark_theme: bool,
 }
 
 /// Messages emitted by the help screen.
@@ -185,13 +187,18 @@ fn build_collapsible_section<'a>(
     let is_expanded = ctx.state.is_expanded(section);
     let icon_sized = action_icons::sized(icon, sizing::ICON_MD);
 
-    // Expand/collapse indicator
-    let indicator = Text::new(if is_expanded { "▼" } else { "▶" }).size(typography::BODY);
+    // Expand/collapse indicator (PNG icon instead of Unicode to avoid rendering issues on Windows)
+    let indicator = if is_expanded {
+        action_icons::collapse::expanded(ctx.is_dark_theme)
+    } else {
+        action_icons::collapse::collapsed(ctx.is_dark_theme)
+    };
+    let indicator_sized = action_icons::sized(indicator, sizing::ICON_SM);
 
     let header_content = Row::new()
         .spacing(spacing::SM)
         .align_y(Vertical::Center)
-        .push(indicator)
+        .push(indicator_sized)
         .push(icon_sized)
         .push(Text::new(title).size(typography::TITLE_SM));
 
@@ -831,6 +838,7 @@ mod tests {
         let ctx = ViewContext {
             i18n: &i18n,
             state: &state,
+            is_dark_theme: false,
         };
         let _element = view(&ctx);
     }

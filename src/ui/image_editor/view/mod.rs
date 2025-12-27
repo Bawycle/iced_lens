@@ -15,22 +15,22 @@ use canvas::CanvasModel;
 use sidebar::SidebarModel;
 use toolbar::ToolbarModel;
 
-pub fn render<'a>(state: &'a State, ctx: ViewContext<'a>) -> Element<'a, Message> {
+pub fn render<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let toolbar_model = ToolbarModel::from_state(state);
-    let toolbar = toolbar::view(&toolbar_model, &ctx);
+    let toolbar = toolbar::view(&toolbar_model, ctx);
 
     let mut main_row = Row::new().spacing(0.0);
 
     if state.sidebar_expanded {
-        let sidebar_model = SidebarModel::from_state(state, &ctx);
-        let sidebar = sidebar::expanded(sidebar_model, &ctx);
+        let sidebar_model = SidebarModel::from_state(state, ctx);
+        let sidebar = sidebar::expanded(&sidebar_model, ctx);
         main_row = main_row.push(sidebar);
     } else {
         main_row = main_row.push(sidebar::collapsed(ctx.is_dark_theme));
     }
 
     let canvas_model = CanvasModel::from_state(state);
-    let canvas = canvas::view(canvas_model, &ctx);
+    let canvas = canvas::view(canvas_model, ctx);
     main_row = main_row.push(canvas);
 
     let content = Column::new().push(toolbar).push(main_row);

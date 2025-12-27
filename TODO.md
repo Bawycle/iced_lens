@@ -4,7 +4,6 @@
 
 ## Bugs to Fix
 
-- [ ] Help screen expand/collapse icons render with blue rectangle on Windows (Unicode character issue) — replace with proper PNG icons like other UI elements (see [CONTRIBUTING.md](CONTRIBUTING.md#3-icons-srcuiiconsrs) for icon creation process)
 - [ ] XMP metadata (dc:title, etc.) not written to PNG files — `write_xmp_to_jpeg()` only supports JPEG but returns `Ok(())` anyway. Fix requires: (1) extend XMP writing to PNG (iTXt chunks) and other formats, (2) for unsupported formats: don't show XMP tags in the editable fields dropdown, and disable existing XMP fields (read-only) if they cannot be written back.
 
 

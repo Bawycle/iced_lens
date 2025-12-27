@@ -25,6 +25,9 @@ use iced::{
 };
 
 /// Context required to render the application view.
+// Allow excessive bools: UI context structs legitimately need multiple boolean flags
+// for distinct display states (fullscreen, menu, panel, theme).
+#[allow(clippy::struct_excessive_bools)]
 pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
     pub screen: Screen,
@@ -35,14 +38,14 @@ pub struct ViewContext<'a> {
     pub fullscreen: bool,
     pub menu_open: bool,
     pub info_panel_open: bool,
-    /// Navigation info from the central MediaNavigator (single source of truth).
+    /// Navigation info from the central `MediaNavigator` (single source of truth).
     pub navigation: NavigationInfo,
     /// Current media metadata for the info panel.
     pub current_metadata: Option<&'a MediaMetadata>,
     /// Metadata editor state when in edit mode.
     pub metadata_editor_state: Option<&'a MetadataEditorState>,
     /// Current media path for save operations.
-    /// Uses media_navigator as single source of truth.
+    /// Uses `media_navigator` as single source of truth.
     pub current_media_path: Option<&'a std::path::Path>,
     /// Whether the current media is an image (for edit button enablement).
     pub is_image: bool,
@@ -59,6 +62,8 @@ pub struct ViewContext<'a> {
 }
 
 /// Context required to render the viewer screen.
+// Allow excessive bools: viewer context has multiple distinct boolean display flags.
+#[allow(clippy::struct_excessive_bools)]
 struct ViewerViewContext<'a> {
     viewer: &'a component::State,
     i18n: &'a I18n,
@@ -75,6 +80,10 @@ struct ViewerViewContext<'a> {
 }
 
 /// Renders the current application view based on the active screen.
+// Allow pass-by-value: ViewContext contains references and is cheap to move.
+// Passing by reference would require complex lifetime annotations that conflict
+// with the returned Element's lifetime requirements.
+#[allow(clippy::needless_pass_by_value)]
 pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
     let current_view: Element<'_, Message> = match ctx.screen {
         Screen::Viewer => view_viewer(ViewerViewContext {
@@ -101,7 +110,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
             ctx.upscale_model_status,
             ctx.enable_upscale,
         ),
-        Screen::Help => view_help(ctx.help_state, ctx.i18n),
+        Screen::Help => view_help(ctx.help_state, ctx.i18n, ctx.is_dark_theme),
         Screen::About => view_about(ctx.i18n),
     };
 
@@ -121,6 +130,8 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
         .into()
 }
 
+// Allow pass-by-value: ViewerViewContext contains references and is cheap to move.
+#[allow(clippy::needless_pass_by_value)]
 fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
     let (config, _) = config::load();
     let overlay_timeout = crate::ui::state::OverlayTimeout::new(
@@ -132,7 +143,7 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
 
     let metadata_editor_has_changes = ctx
         .metadata_editor_state
-        .is_some_and(|editor| editor.has_changes());
+        .is_some_and(MetadataEditorState::has_changes);
 
     let viewer_content = ctx
         .viewer
@@ -245,7 +256,7 @@ fn view_image_editor<'a>(
 ) -> Element<'a, Message> {
     if let Some(editor_state) = image_editor {
         editor_state
-            .view(image_editor::ViewContext {
+            .view(&image_editor::ViewContext {
                 i18n,
                 background_theme: settings.background_theme(),
                 is_dark_theme,
@@ -263,10 +274,15 @@ fn view_image_editor<'a>(
     }
 }
 
-fn view_help<'a>(help_state: &'a crate::ui::help::State, i18n: &'a I18n) -> Element<'a, Message> {
+fn view_help<'a>(
+    help_state: &'a crate::ui::help::State,
+    i18n: &'a I18n,
+    is_dark_theme: bool,
+) -> Element<'a, Message> {
     help::view(&HelpViewContext {
         i18n,
         state: help_state,
+        is_dark_theme,
     })
     .map(Message::Help)
 }

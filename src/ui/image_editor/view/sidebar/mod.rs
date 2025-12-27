@@ -32,6 +32,9 @@ fn tip_cursor<'a, Msg: 'a>(
 
 const SIDEBAR_WIDTH: f32 = 310.0;
 
+// Allow excessive bools: this struct gathers multiple UI state flags for the sidebar.
+// Refactoring into separate sub-structs would reduce clarity without benefit.
+#[allow(clippy::struct_excessive_bools)]
 pub struct SidebarModel<'a> {
     pub active_tool: Option<EditorTool>,
     pub crop_state: &'a CropState,
@@ -79,7 +82,7 @@ impl<'a> SidebarModel<'a> {
     }
 }
 
-pub fn expanded<'a>(model: SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+pub fn expanded<'a>(model: &SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     // Right padding provides space for the scrollbar
     let mut scrollable_section = Column::new()
         .spacing(spacing::SM)
@@ -343,9 +346,12 @@ fn footer_section<'a>(
     let mut footer = Column::new().spacing(spacing::XS).push(rule::horizontal(1));
 
     // Navigation buttons - only for file mode, not captured frames
+    // Use PNG icons instead of Unicode to avoid rendering issues on Windows
     if !is_captured_frame {
+        let prev_icon =
+            action_icons::sized(action_icons::editor::navigate_previous(), sizing::ICON_MD);
         let prev_btn = button(
-            container(text("◀").size(typography::TITLE_MD))
+            container(prev_icon)
                 .center_x(Length::Fill)
                 .center_y(Length::Shrink),
         )
@@ -358,8 +364,9 @@ fn footer_section<'a>(
             prev_btn.on_press(SidebarMessage::NavigatePrevious.into())
         };
 
+        let next_icon = action_icons::sized(action_icons::editor::navigate_next(), sizing::ICON_MD);
         let next_btn = button(
-            container(text("▶").size(typography::TITLE_MD))
+            container(next_icon)
                 .center_x(Length::Fill)
                 .center_y(Length::Shrink),
         )

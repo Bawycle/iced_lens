@@ -62,56 +62,67 @@ pub mod video {
     use iced::widget::image::{Handle, Image};
 
     /// Play video.
+    #[must_use]
     pub fn play() -> Image<Handle> {
         icons::play()
     }
 
     /// Pause video.
+    #[must_use]
     pub fn pause() -> Image<Handle> {
         icons::pause()
     }
 
     /// Step forward one frame.
+    #[must_use]
     pub fn step_forward() -> Image<Handle> {
         icons::triangle_bar_right()
     }
 
     /// Step backward one frame.
+    #[must_use]
     pub fn step_backward() -> Image<Handle> {
         icons::triangle_bar_left()
     }
 
     /// Capture current frame as image.
+    #[must_use]
     pub fn capture_frame() -> Image<Handle> {
         icons::camera()
     }
 
     /// Toggle loop playback.
+    #[must_use]
     pub fn toggle_loop() -> Image<Handle> {
         icons::loop_icon()
     }
 
     /// Volume control (unmuted state).
+    #[must_use]
     pub fn volume() -> Image<Handle> {
         icons::volume()
     }
 
     /// Volume muted state.
+    #[must_use]
     pub fn volume_muted() -> Image<Handle> {
         icons::volume_mute()
     }
 
     /// More options / overflow menu.
+    #[must_use]
     pub fn more_options() -> Image<Handle> {
         icons::ellipsis_horizontal()
     }
 
     /// Decrease playback speed.
+    #[must_use]
     pub fn speed_down() -> Image<Handle> {
         icons::triangle_minus()
     }
 
     /// Increase playback speed.
+    #[must_use]
     pub fn speed_up() -> Image<Handle> {
         icons::triangle_plus()
     }
@@ -122,56 +133,67 @@ pub mod video {
         use iced::widget::image::{Handle, Image};
 
         /// Play video (light icon for toolbar).
+        #[must_use]
         pub fn play() -> Image<Handle> {
             icons::light::play()
         }
 
         /// Pause video (light icon for toolbar).
+        #[must_use]
         pub fn pause() -> Image<Handle> {
             icons::light::pause()
         }
 
         /// Step forward one frame (light icon for toolbar).
+        #[must_use]
         pub fn step_forward() -> Image<Handle> {
             icons::light::triangle_bar_right()
         }
 
         /// Step backward one frame (light icon for toolbar).
+        #[must_use]
         pub fn step_backward() -> Image<Handle> {
             icons::light::triangle_bar_left()
         }
 
         /// Capture current frame (light icon for toolbar).
+        #[must_use]
         pub fn capture_frame() -> Image<Handle> {
             icons::light::camera()
         }
 
         /// Toggle loop playback (light icon for toolbar).
+        #[must_use]
         pub fn toggle_loop() -> Image<Handle> {
             icons::light::loop_icon()
         }
 
         /// Volume control (light icon for toolbar).
+        #[must_use]
         pub fn volume() -> Image<Handle> {
             icons::light::volume()
         }
 
         /// Volume muted (light icon for toolbar).
+        #[must_use]
         pub fn volume_muted() -> Image<Handle> {
             icons::light::volume_mute()
         }
 
         /// More options (light icon for toolbar).
+        #[must_use]
         pub fn more_options() -> Image<Handle> {
             icons::light::ellipsis_horizontal()
         }
 
         /// Decrease playback speed (light icon for toolbar).
+        #[must_use]
         pub fn speed_down() -> Image<Handle> {
             icons::light::triangle_minus()
         }
 
         /// Increase playback speed (light icon for toolbar).
+        #[must_use]
         pub fn speed_up() -> Image<Handle> {
             icons::light::triangle_plus()
         }
@@ -188,23 +210,39 @@ pub mod editor {
     use iced::widget::image::{Handle, Image};
 
     /// Rotate image 90° counter-clockwise.
+    #[must_use]
     pub fn rotate_left() -> Image<Handle> {
         icons::rotate_left()
     }
 
     /// Rotate image 90° clockwise.
+    #[must_use]
     pub fn rotate_right() -> Image<Handle> {
         icons::rotate_right()
     }
 
     /// Flip image horizontally.
+    #[must_use]
     pub fn flip_horizontal() -> Image<Handle> {
         icons::flip_horizontal()
     }
 
     /// Flip image vertically.
+    #[must_use]
     pub fn flip_vertical() -> Image<Handle> {
         icons::flip_vertical()
+    }
+
+    /// Navigate to previous image in editor.
+    #[must_use]
+    pub fn navigate_previous() -> Image<Handle> {
+        icons::chevron_left()
+    }
+
+    /// Navigate to next image in editor.
+    #[must_use]
+    pub fn navigate_next() -> Image<Handle> {
+        icons::chevron_right()
     }
 }
 
@@ -218,36 +256,43 @@ pub mod viewer {
     use iced::widget::image::{Handle, Image};
 
     /// Zoom in.
+    #[must_use]
     pub fn zoom_in() -> Image<Handle> {
         icons::zoom_in()
     }
 
     /// Zoom out.
+    #[must_use]
     pub fn zoom_out() -> Image<Handle> {
         icons::zoom_out()
     }
 
     /// Reset zoom to original size.
+    #[must_use]
     pub fn zoom_reset() -> Image<Handle> {
         icons::refresh()
     }
 
     /// Fit image to window (enabled state).
+    #[must_use]
     pub fn fit_to_window() -> Image<Handle> {
         icons::compress()
     }
 
     /// Fit image to window (disabled state / expand).
+    #[must_use]
     pub fn expand() -> Image<Handle> {
         icons::expand()
     }
 
     /// Enter/exit fullscreen mode.
+    #[must_use]
     pub fn fullscreen() -> Image<Handle> {
         icons::fullscreen()
     }
 
     /// Delete current media file.
+    #[must_use]
     pub fn delete() -> Image<Handle> {
         icons::trash()
     }
@@ -258,36 +303,43 @@ pub mod viewer {
         use iced::widget::image::{Handle, Image};
 
         /// Zoom in (light icon for toolbar).
+        #[must_use]
         pub fn zoom_in() -> Image<Handle> {
             icons::light::zoom_in()
         }
 
         /// Zoom out (light icon for toolbar).
+        #[must_use]
         pub fn zoom_out() -> Image<Handle> {
             icons::light::zoom_out()
         }
 
         /// Reset zoom (light icon for toolbar).
+        #[must_use]
         pub fn zoom_reset() -> Image<Handle> {
             icons::light::refresh()
         }
 
         /// Fit to window (light icon for toolbar).
+        #[must_use]
         pub fn fit_to_window() -> Image<Handle> {
             icons::light::compress()
         }
 
         /// Expand (light icon for toolbar).
+        #[must_use]
         pub fn expand() -> Image<Handle> {
             icons::light::expand()
         }
 
         /// Fullscreen (light icon for toolbar).
+        #[must_use]
         pub fn fullscreen() -> Image<Handle> {
             icons::light::fullscreen()
         }
 
         /// Delete (light icon for toolbar).
+        #[must_use]
         pub fn delete() -> Image<Handle> {
             icons::light::trash()
         }
@@ -305,32 +357,38 @@ pub mod navigation {
     use iced::widget::image::{Handle, Image};
 
     /// Open hamburger menu (light icon for navbar button).
+    #[must_use]
     pub fn menu() -> Image<Handle> {
         icons::light::hamburger()
     }
 
     /// Open settings.
+    #[must_use]
     pub fn settings() -> Image<Handle> {
         icons::cog()
     }
 
     /// Open help.
+    #[must_use]
     pub fn help() -> Image<Handle> {
         icons::help()
     }
 
     /// Open about screen.
+    #[must_use]
     pub fn about() -> Image<Handle> {
         icons::info()
     }
 
     /// Close / dismiss.
+    #[must_use]
     pub fn close() -> Image<Handle> {
         icons::cross()
     }
 
     /// Edit action (e.g., edit metadata).
     /// Returns dark icon for light theme, light icon for dark theme.
+    #[must_use]
     pub fn edit(is_dark_theme: bool) -> Image<Handle> {
         if is_dark_theme {
             icons::light::pencil()
@@ -341,6 +399,7 @@ pub mod navigation {
 
     /// Collapse a left-side panel (chevron points left).
     /// Returns dark icon for light theme, light icon for dark theme.
+    #[must_use]
     pub fn collapse_left_panel(is_dark_theme: bool) -> Image<Handle> {
         if is_dark_theme {
             icons::light::chevron_double_left()
@@ -351,6 +410,7 @@ pub mod navigation {
 
     /// Expand a left-side panel (chevron points right).
     /// Returns dark icon for light theme, light icon for dark theme.
+    #[must_use]
     pub fn expand_left_panel(is_dark_theme: bool) -> Image<Handle> {
         if is_dark_theme {
             icons::light::chevron_double_right()
@@ -361,6 +421,7 @@ pub mod navigation {
 
     /// Collapse a right-side panel (chevron points right).
     /// Returns dark icon for light theme, light icon for dark theme.
+    #[must_use]
     pub fn collapse_right_panel(is_dark_theme: bool) -> Image<Handle> {
         if is_dark_theme {
             icons::light::chevron_double_right()
@@ -371,6 +432,7 @@ pub mod navigation {
 
     /// Expand a right-side panel (chevron points left).
     /// Returns dark icon for light theme, light icon for dark theme.
+    #[must_use]
     pub fn expand_right_panel(is_dark_theme: bool) -> Image<Handle> {
         if is_dark_theme {
             icons::light::chevron_double_left()
@@ -383,6 +445,7 @@ pub mod navigation {
     /// Returns appropriate icon based on background theme:
     /// - Dark background: light icon for visibility
     /// - Light/Checkerboard: dark icon for visibility
+    #[must_use]
     pub fn previous(background: BackgroundTheme) -> Image<Handle> {
         match background {
             BackgroundTheme::Dark => icons::overlay::chevron_left(),
@@ -394,6 +457,7 @@ pub mod navigation {
     /// Returns appropriate icon based on background theme:
     /// - Dark background: light icon for visibility
     /// - Light/Checkerboard: dark icon for visibility
+    #[must_use]
     pub fn next(background: BackgroundTheme) -> Image<Handle> {
         match background {
             BackgroundTheme::Dark => icons::overlay::chevron_right(),
@@ -405,6 +469,7 @@ pub mod navigation {
     /// Returns appropriate icon based on background theme:
     /// - Dark background: light icon for visibility
     /// - Light/Checkerboard: dark icon for visibility
+    #[must_use]
     pub fn loop_indicator(background: BackgroundTheme) -> Image<Handle> {
         match background {
             BackgroundTheme::Dark => icons::overlay::loop_icon(),
@@ -423,21 +488,25 @@ pub mod notification {
     use iced::widget::image::{Handle, Image};
 
     /// Success notification.
+    #[must_use]
     pub fn success() -> Image<Handle> {
         icons::checkmark()
     }
 
     /// Warning notification.
+    #[must_use]
     pub fn warning() -> Image<Handle> {
         icons::warning()
     }
 
     /// Error notification.
+    #[must_use]
     pub fn error() -> Image<Handle> {
         icons::warning()
     }
 
     /// Info notification.
+    #[must_use]
     pub fn info() -> Image<Handle> {
         icons::info()
     }
@@ -453,28 +522,63 @@ pub mod sections {
     use iced::widget::image::{Handle, Image};
 
     /// Image/video viewer section.
+    #[must_use]
     pub fn viewer() -> Image<Handle> {
         icons::image()
     }
 
     /// Video playback section.
+    #[must_use]
     pub fn video() -> Image<Handle> {
         icons::video_camera()
     }
 
     /// Frame capture section.
+    #[must_use]
     pub fn capture() -> Image<Handle> {
         icons::camera()
     }
 
     /// Image editor section.
+    #[must_use]
     pub fn editor() -> Image<Handle> {
         icons::rotate_right()
     }
 
     /// Metadata editing section.
+    #[must_use]
     pub fn metadata() -> Image<Handle> {
         icons::info()
+    }
+}
+
+// =============================================================================
+// Expand/Collapse Indicators
+// =============================================================================
+
+/// Icons for expand/collapse indicators in collapsible sections.
+pub mod collapse {
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
+
+    /// Section is expanded (chevron pointing down).
+    #[must_use]
+    pub fn expanded(is_dark_theme: bool) -> Image<Handle> {
+        if is_dark_theme {
+            icons::light::chevron_down()
+        } else {
+            icons::chevron_down()
+        }
+    }
+
+    /// Section is collapsed (chevron pointing right).
+    #[must_use]
+    pub fn collapsed(is_dark_theme: bool) -> Image<Handle> {
+        if is_dark_theme {
+            icons::light::chevron_right()
+        } else {
+            icons::chevron_right()
+        }
     }
 }
 
@@ -515,6 +619,8 @@ mod tests {
         let _ = editor::rotate_right();
         let _ = editor::flip_horizontal();
         let _ = editor::flip_vertical();
+        let _ = editor::navigate_previous();
+        let _ = editor::navigate_next();
     }
 
     #[test]
@@ -572,6 +678,15 @@ mod tests {
         let _ = sections::video();
         let _ = sections::capture();
         let _ = sections::editor();
+        let _ = sections::metadata();
+    }
+
+    #[test]
+    fn collapse_icons_load() {
+        let _ = collapse::expanded(false);
+        let _ = collapse::expanded(true);
+        let _ = collapse::collapsed(false);
+        let _ = collapse::collapsed(true);
     }
 
     #[test]

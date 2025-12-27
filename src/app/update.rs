@@ -329,7 +329,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                 ));
             }
 
-            match ImageEditorState::new(image_path, image_data) {
+            match ImageEditorState::new(image_path, &image_data) {
                 Ok(state) => {
                     *ctx.image_editor = Some(state);
                     *ctx.screen = target;

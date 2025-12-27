@@ -29,7 +29,11 @@ pub struct ViewContext<'a> {
 
 impl State {
     /// Create a new editor state for the given image file.
-    pub fn new(image_path: PathBuf, image: ImageData) -> Result<Self> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the image file cannot be opened or read.
+    pub fn new(image_path: PathBuf, image: &ImageData) -> Result<Self> {
         let working_image =
             image_rs::open(&image_path).map_err(|err| Error::Io(err.to_string()))?;
 
@@ -42,9 +46,9 @@ impl State {
             transformation_history: Vec::new(),
             history_index: 0,
             sidebar_expanded: true,
-            crop_state: state::CropState::from_image(&image),
+            crop_state: state::CropState::from_image(image),
             crop_modified: false,
-            resize_state: state::ResizeState::from_image(&image),
+            resize_state: state::ResizeState::from_image(image),
             adjustment_state: state::AdjustmentState::default(),
             deblur_state: state::DeblurState::default(),
             crop_base_image: None,
@@ -61,8 +65,12 @@ impl State {
     }
 
     /// Create a new editor state for a captured video frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frame cannot be converted to an image.
     pub fn from_captured_frame(
-        frame: ExportableFrame,
+        frame: &ExportableFrame,
         video_path: PathBuf,
         position_secs: f64,
     ) -> Result<Self> {
@@ -102,7 +110,7 @@ impl State {
     }
 
     /// Render the editor view.
-    pub fn view<'a>(&'a self, ctx: ViewContext<'a>) -> Element<'a, Message> {
+    pub fn view<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         view::render(self, ctx)
     }
 

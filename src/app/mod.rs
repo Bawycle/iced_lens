@@ -692,7 +692,7 @@ impl App {
                 video_path,
                 position_secs,
             } => {
-                match ImageEditorState::from_captured_frame(frame, video_path, position_secs) {
+                match ImageEditorState::from_captured_frame(&frame, video_path, position_secs) {
                     Ok(state) => {
                         self.image_editor = Some(state);
                         self.screen = Screen::ImageEditor;
@@ -1124,7 +1124,7 @@ impl App {
                 }
 
                 // Create a new ImageEditorState with the loaded image
-                match image_editor::State::new(path, image_data) {
+                match image_editor::State::new(path, &image_data) {
                     Ok(new_editor_state) => {
                         self.image_editor = Some(new_editor_state);
                     }
@@ -2069,7 +2069,7 @@ mod tests {
 
         // Create editor state with actual PNG file
         let editor_state =
-            image_editor::State::new(img_path, img_data).expect("create editor state");
+            image_editor::State::new(img_path, &img_data).expect("create editor state");
         app.image_editor = Some(editor_state);
         app.screen = Screen::ImageEditor;
 
@@ -2106,7 +2106,7 @@ mod tests {
         let mut app = App::default();
 
         // Create editor state from captured frame
-        let editor_state = image_editor::State::from_captured_frame(frame, video_path, 5.0)
+        let editor_state = image_editor::State::from_captured_frame(&frame, video_path, 5.0)
             .expect("create editor state from captured frame");
         app.image_editor = Some(editor_state);
         app.screen = Screen::ImageEditor;
@@ -2132,7 +2132,7 @@ mod tests {
         let mut app = App::default();
 
         // Create editor state from captured frame
-        let editor_state = image_editor::State::from_captured_frame(frame, video_path, 5.0)
+        let editor_state = image_editor::State::from_captured_frame(&frame, video_path, 5.0)
             .expect("create editor state from captured frame");
         app.image_editor = Some(editor_state);
         app.screen = Screen::ImageEditor;
