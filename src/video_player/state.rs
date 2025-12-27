@@ -235,12 +235,22 @@ impl VideoPlayer {
         self.history_position >= 1
     }
 
+    /// Returns the current history position for frame stepping.
+    ///
+    /// This is primarily used for testing to verify stepping behavior.
+    #[cfg(test)]
+    pub fn history_position(&self) -> usize {
+        self.history_position
+    }
+
     /// Returns whether forward stepping is available.
     ///
-    /// Forward stepping is available when the video is paused and
-    /// we haven't reached the end of the stream (last frame).
+    /// Forward stepping is available when the video is stopped, paused,
+    /// or seeking without resume, and we haven't reached the end of stream.
     pub fn can_step_forward(&self) -> bool {
-        self.state.is_effectively_paused() && !self.at_end_of_stream
+        let can_step = matches!(self.state, PlaybackState::Stopped)
+            || self.state.is_effectively_paused();
+        can_step && !self.at_end_of_stream
     }
 
     /// Marks that the end of stream has been reached.
@@ -618,8 +628,13 @@ impl VideoPlayer {
     /// frame in the video stream without seeking. This is the correct way to
     /// advance frame-by-frame since seek() only goes to keyframes.
     /// Increments history position (enables backward stepping after 2+ steps).
+    ///
+    /// Can be called from `Stopped` state - will transition to `Paused` first.
     pub fn step_frame(&mut self) {
-        if !self.state.is_paused() {
+        // Allow stepping from Stopped by transitioning to Paused first
+        if matches!(self.state, PlaybackState::Stopped) {
+            self.state = PlaybackState::Paused { position_secs: 0.0 };
+        } else if !self.state.is_paused() {
             return;
         }
 
@@ -1521,5 +1536,53 @@ mod tests {
             sync_time.abs() < 0.1,
             "Sync clock {sync_time} should be near 0"
         );
+    }
+
+    #[test]
+    fn step_frame_works_from_stopped_state() {
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        // Initially in Stopped state
+        assert!(matches!(player.state(), PlaybackState::Stopped));
+
+        // Step frame from Stopped state
+        player.step_frame();
+
+        // Should transition to Paused state
+        assert!(
+            player.state().is_paused(),
+            "Expected Paused state after step_frame from Stopped"
+        );
+        assert_eq!(player.state().position(), Some(0.0));
+
+        // History position should be incremented
+        assert_eq!(player.history_position(), 1);
+    }
+
+    #[test]
+    fn step_backward_after_stepping_from_stopped() {
+        let video = sample_video_data();
+        let mut player = VideoPlayer::new(&video).unwrap();
+
+        // Start from Stopped state and step forward twice
+        assert!(matches!(player.state(), PlaybackState::Stopped));
+
+        player.step_frame(); // Stopped -> Paused, history_position = 1
+        player.step_frame(); // history_position = 2
+
+        assert!(player.state().is_paused());
+        assert_eq!(player.history_position(), 2);
+
+        // Now step backward should work
+        player.step_backward();
+        assert_eq!(player.history_position(), 1);
+
+        player.step_backward();
+        assert_eq!(player.history_position(), 0);
+
+        // Can't go below 0
+        player.step_backward();
+        assert_eq!(player.history_position(), 0);
     }
 }
