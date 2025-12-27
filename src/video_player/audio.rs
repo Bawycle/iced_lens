@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Audio extraction and playback for video files.
 //!
-//! This module provides audio decoding from video files using FFmpeg,
+//! This module provides audio decoding from video files using `FFmpeg`,
 //! and audio playback using cpal.
 
 use crate::error::{Error, Result};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+
+/// Maximum number of audio frames to skip during precise seeking.
+/// Prevents infinite loops on corrupted files or seeks beyond EOF.
+const MAX_SEEK_FRAMES: u32 = 1000;
+
+/// Audio look-ahead buffer time in seconds.
+/// We queue audio ~200ms before it needs to play to ensure smooth playback.
+const AUDIO_LOOKAHEAD_SECS: f64 = 0.2;
 
 /// Audio sample format used for playback.
 /// We use f32 as it's the most common format for audio processing.
@@ -35,16 +43,19 @@ pub struct DecodedAudio {
 
 impl DecodedAudio {
     /// Returns the total number of samples (across all channels).
+    #[must_use]
     pub fn sample_count(&self) -> usize {
         self.samples.len()
     }
 
     /// Returns the number of frames (samples per channel).
+    #[must_use]
     pub fn frame_count(&self) -> usize {
         self.samples.len() / self.channels as usize
     }
 
     /// Returns the size in bytes.
+    #[must_use]
     pub fn size_bytes(&self) -> usize {
         self.samples.len() * std::mem::size_of::<f32>()
     }
@@ -121,7 +132,7 @@ pub enum AudioDecoderCommand {
 
 /// Async audio decoder that extracts and decodes audio from video files.
 ///
-/// Runs in a separate blocking thread since FFmpeg operations are not Send.
+/// Runs in a separate blocking thread since `FFmpeg` operations are not `Send`.
 pub struct AudioDecoder {
     /// Channel for sending commands to the decoder task.
     command_tx: mpsc::UnboundedSender<AudioDecoderCommand>,
@@ -134,13 +145,22 @@ pub struct AudioDecoder {
 impl AudioDecoder {
     /// Creates a new audio decoder for the given video file.
     ///
-    /// Returns None if the file has no audio stream.
+    /// Returns `None` if the file has no audio stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The video file does not exist
+    /// - The file cannot be opened or parsed by `FFmpeg`
     pub fn new<P: AsRef<Path>>(video_path: P) -> Result<Option<Self>> {
         let path = video_path.as_ref().to_path_buf();
 
         // Validate file exists
         if !path.exists() {
-            return Err(Error::Io(format!("Video file not found: {path:?}")));
+            return Err(Error::Io(format!(
+                "Video file not found: {}",
+                path.display()
+            )));
         }
 
         // Check if file has audio before spawning decoder task
@@ -181,6 +201,10 @@ impl AudioDecoder {
     }
 
     /// Sends a command to the decoder task.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder task is not running (channel closed).
     pub fn send_command(&self, command: AudioDecoderCommand) -> Result<()> {
         self.command_tx
             .send(command)
@@ -198,6 +222,10 @@ impl AudioDecoder {
     }
 
     /// Main audio decoder loop running in a blocking thread.
+    #[allow(clippy::too_many_lines)] // Refactoring planned in TODO.md
+    #[allow(clippy::needless_pass_by_value)] // PathBuf/Sender need ownership
+    #[allow(clippy::cast_precision_loss)] // FFmpeg i64 timestamps have enough f64 precision
+    #[allow(clippy::cast_possible_truncation)] // Timestamp conversions are within valid range
     fn decoder_loop(
         video_path: std::path::PathBuf,
         mut command_rx: mpsc::UnboundedReceiver<AudioDecoderCommand>,
@@ -277,6 +305,8 @@ impl AudioDecoder {
         // Precise seeking: target PTS to reach after keyframe seek
         // Audio frames with PTS < target will be skipped (not sent to output)
         let mut seek_target_secs: Option<f64> = None;
+        // Counter for frames skipped during precise seeking (timeout protection)
+        let mut seek_frames_skipped: u32 = 0;
 
         // Main loop
         loop {
@@ -313,9 +343,11 @@ impl AudioDecoder {
                         first_pts = None;
                         // Set target for precise seeking - will skip frames until we reach it
                         seek_target_secs = Some(target_secs);
+                        // Reset seek frame counter for timeout protection
+                        seek_frames_skipped = 0;
                     }
                 }
-                Ok(AudioDecoderCommand::Stop) => {
+                Ok(AudioDecoderCommand::Stop) | Err(mpsc::error::TryRecvError::Disconnected) => {
                     break;
                 }
                 Ok(AudioDecoderCommand::SetVolume(volume)) => {
@@ -336,9 +368,6 @@ impl AudioDecoder {
                     // Same reference_pts as video decoder for perfect A/V sync
                     playback_start_time = Some(instant);
                     first_pts = Some(reference_pts);
-                }
-                Err(mpsc::error::TryRecvError::Disconnected) => {
-                    break;
                 }
                 Err(mpsc::error::TryRecvError::Empty) => {}
             }
@@ -368,8 +397,8 @@ impl AudioDecoder {
                 let mut decoded_frame = ffmpeg_next::frame::Audio::empty();
                 if decoder.receive_frame(&mut decoded_frame).is_ok() {
                     // Resample to f32 interleaved
-                    let mut resampled = ffmpeg_next::frame::Audio::empty();
-                    if let Err(e) = resampler.run(&decoded_frame, &mut resampled) {
+                    let mut output_audio = ffmpeg_next::frame::Audio::empty();
+                    if let Err(e) = resampler.run(&decoded_frame, &mut output_audio) {
                         let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
                             "Resampling failed: {e}"
                         )));
@@ -377,7 +406,7 @@ impl AudioDecoder {
                     }
 
                     // Extract samples
-                    let samples = Self::extract_samples(&resampled, channels);
+                    let samples = Self::extract_samples(&output_audio, channels);
 
                     // Calculate PTS
                     let pts_secs = if let Some(pts) = decoded_frame.timestamp() {
@@ -388,13 +417,24 @@ impl AudioDecoder {
 
                     // Calculate duration
                     let frame_duration =
-                        samples.len() as f64 / (sample_rate as f64 * channels as f64);
+                        samples.len() as f64 / (f64::from(sample_rate) * f64::from(channels));
 
                     // Precise seeking: skip audio frames before target PTS
                     // This ensures audio starts at the same position as video after seek
                     if let Some(target) = seek_target_secs {
                         let frame_end_pts = pts_secs + frame_duration;
                         if frame_end_pts < target {
+                            // Increment and check timeout counter
+                            seek_frames_skipped += 1;
+                            if seek_frames_skipped >= MAX_SEEK_FRAMES {
+                                // Timeout: target may be beyond EOF or file is corrupted
+                                let _ = event_tx.blocking_send(AudioDecoderEvent::Error(
+                                    "Audio seek timeout: target position may be beyond end of file"
+                                        .to_string(),
+                                ));
+                                seek_target_secs = None;
+                                continue;
+                            }
                             // Entire frame is before target - skip it
                             continue;
                         }
@@ -405,8 +445,6 @@ impl AudioDecoder {
                     }
 
                     // Frame pacing: wait until the audio should be queued
-                    // We use a look-ahead of ~200ms to ensure buffer stays filled
-                    const AUDIO_LOOKAHEAD_SECS: f64 = 0.2;
                     if let Some(start_time) = playback_start_time {
                         if first_pts.is_none() {
                             first_pts = Some(pts_secs);

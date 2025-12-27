@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Async video frame decoder using FFmpeg.
+//! Async video frame decoder using `FFmpeg`.
 //!
 //! This module provides asynchronous video frame decoding via Tokio tasks,
 //! delivering frames through channels for non-blocking UI updates.
@@ -9,6 +9,11 @@ use crate::video_player::frame_cache::{CacheConfig, FrameCache};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+
+/// Maximum number of frames to skip during precise seeking.
+/// Prevents infinite loops on corrupted files or seeks beyond EOF.
+/// At 30fps, 1000 frames = ~33 seconds of video.
+const MAX_SEEK_FRAMES: u32 = 1000;
 
 /// Represents a decoded video frame ready for display.
 #[derive(Debug, Clone)]
@@ -29,6 +34,7 @@ pub struct DecodedFrame {
 
 impl DecodedFrame {
     /// Returns the total size in bytes.
+    #[must_use]
     pub fn size_bytes(&self) -> usize {
         self.rgba_data.len()
     }
@@ -88,7 +94,7 @@ pub enum DecoderEvent {
     Error(String),
 
     /// Frame history is exhausted (no more frames to step backward).
-    /// Sent when StepBackward is requested but no previous frame is available.
+    /// Sent when `StepBackward` is requested but no previous frame is available.
     HistoryExhausted,
 }
 
@@ -113,7 +119,14 @@ impl AsyncDecoder {
     /// caching or `CacheConfig::disabled()` to disable caching.
     ///
     /// The `history_mb` parameter controls the maximum memory for frame history
-    /// (used for backward frame stepping). Set to 0 to use a default based on cache_config.
+    /// (used for backward frame stepping). Set to 0 to use a default based on `cache_config`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The video file does not exist
+    /// - The file cannot be opened or parsed by `FFmpeg`
+    /// - No video stream is found in the file
     pub fn new<P: AsRef<Path>>(
         video_path: P,
         cache_config: CacheConfig,
@@ -123,7 +136,10 @@ impl AsyncDecoder {
 
         // Validate file exists
         if !path.exists() {
-            return Err(Error::Io(format!("Video file not found: {path:?}")));
+            return Err(Error::Io(format!(
+                "Video file not found: {}",
+                path.display()
+            )));
         }
 
         // Create channels for bidirectional communication
@@ -150,6 +166,10 @@ impl AsyncDecoder {
     }
 
     /// Sends a command to the decoder task.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder task is not running (channel closed).
     pub fn send_command(&self, command: DecoderCommand) -> Result<()> {
         self.command_tx
             .send(command)
@@ -172,12 +192,14 @@ impl AsyncDecoder {
 
     /// Main decoder loop running in a blocking thread.
     ///
-    /// This is the core decoding logic using FFmpeg for frame decoding.
+    /// This is the core decoding logic using `FFmpeg` for frame decoding.
     /// It maintains playback state and responds to commands.
-    /// Runs in a separate blocking thread since FFmpeg types are not Send.
+    /// Runs in a separate blocking thread since `FFmpeg` types are not `Send`.
     ///
     /// The frame cache is used to optimize seek operations by caching
     /// keyframes (I-frames) that can be independently decoded.
+    #[allow(clippy::too_many_lines)] // Refactoring planned in TODO.md
+    #[allow(clippy::needless_pass_by_value)] // PathBuf/Sender need ownership
     fn decoder_loop_blocking(
         video_path: std::path::PathBuf,
         mut command_rx: mpsc::UnboundedReceiver<DecoderCommand>,
@@ -238,6 +260,8 @@ impl AsyncDecoder {
         // Precise seeking: target PTS to reach after keyframe seek
         // When set, decoder skips frames until reaching this target
         let mut seek_target_secs: Option<f64> = None;
+        // Counter for frames skipped during precise seeking (timeout protection)
+        let mut seek_frames_skipped: u32 = 0;
 
         // Playback speed (1.0 = normal, 0.25 = quarter speed, 2.0 = double speed)
         let mut playback_speed: f64 = 1.0;
@@ -250,7 +274,10 @@ impl AsyncDecoder {
         let effective_history_mb = if history_mb > 0 {
             history_mb
         } else {
-            (cache_config.max_bytes / (1024 * 1024)).clamp(32, 512) as u32
+            // Safe: max_bytes is typically < 1GB, and clamp ensures result fits in u32
+            #[allow(clippy::cast_possible_truncation)]
+            let mb = (cache_config.max_bytes / (1024 * 1024)).clamp(32, 512) as u32;
+            mb
         };
         let mut frame_history = FrameHistory::new(effective_history_mb);
 
@@ -284,6 +311,8 @@ impl AsyncDecoder {
                     // Always do FFmpeg seek to position demuxer correctly
                     // FFmpeg seeks to the nearest keyframe BEFORE the target
                     // Convert seconds to AV_TIME_BASE (microseconds)
+                    // Safe: video duration in seconds * 1M fits in i64 for any reasonable video
+                    #[allow(clippy::cast_possible_truncation)]
                     let timestamp = (target_secs * 1_000_000.0) as i64;
                     if let Err(e) = ictx.seek(timestamp, ..timestamp) {
                         let _ = event_tx
@@ -301,6 +330,8 @@ impl AsyncDecoder {
                         // Set precise seek target - decoder will skip frames until reaching this PTS
                         // This enables frame-accurate seeking instead of keyframe-only seeking
                         seek_target_secs = Some(target_secs);
+                        // Reset seek frame counter for timeout protection
+                        seek_frames_skipped = 0;
 
                         let _ = event_tx.blocking_send(DecoderEvent::Buffering);
 
@@ -329,13 +360,13 @@ impl AsyncDecoder {
                         // (this happens when user stepped backward and now wants to go forward)
                         if let Some(next_frame) = frame_history.step_forward() {
                             // Re-emit the frame from history
-                            let decoded = DecodedFrame {
+                            let output_frame = DecodedFrame {
                                 rgba_data: Arc::clone(&next_frame.rgba_data),
                                 width: next_frame.width,
                                 height: next_frame.height,
                                 pts_secs: next_frame.pts_secs,
                             };
-                            let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
+                            let _ = event_tx.blocking_send(DecoderEvent::FrameReady(output_frame));
                         } else {
                             // At end of history - need to decode a new frame
                             decode_single_frame = true;
@@ -349,13 +380,13 @@ impl AsyncDecoder {
                         seek_target_secs = None;
                         if let Some(prev_frame) = frame_history.step_back() {
                             // Send the previous frame
-                            let decoded = DecodedFrame {
+                            let output_frame = DecodedFrame {
                                 rgba_data: Arc::clone(&prev_frame.rgba_data),
                                 width: prev_frame.width,
                                 height: prev_frame.height,
                                 pts_secs: prev_frame.pts_secs,
                             };
-                            let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
+                            let _ = event_tx.blocking_send(DecoderEvent::FrameReady(output_frame));
                         } else {
                             // No more frames in history - notify UI to disable button
                             let _ = event_tx.blocking_send(DecoderEvent::HistoryExhausted);
@@ -406,6 +437,8 @@ impl AsyncDecoder {
             let mut buffered_frame = ffmpeg_next::frame::Video::empty();
             if decoder.receive_frame(&mut buffered_frame).is_ok() {
                 // Process the buffered frame
+                // FFmpeg timestamps are i64 but f64 has enough precision for video (52-bit mantissa)
+                #[allow(clippy::cast_precision_loss)]
                 let pts_secs = if let Some(pts) = buffered_frame.timestamp() {
                     pts as f64 * time_base_f64
                 } else {
@@ -430,7 +463,7 @@ impl AsyncDecoder {
                         if scaler.run(&buffered_frame, &mut rgb_frame).is_ok() {
                             let rgba_data = Self::extract_rgba_data(&rgb_frame);
 
-                            let decoded = DecodedFrame {
+                            let output_frame = DecodedFrame {
                                 rgba_data: Arc::new(rgba_data),
                                 width,
                                 height,
@@ -438,19 +471,19 @@ impl AsyncDecoder {
                             };
 
                             if is_keyframe {
-                                frame_cache.insert(decoded.clone(), true);
+                                frame_cache.insert(output_frame.clone(), true);
                             }
 
                             if !is_playing && !in_stepping_mode {
-                                last_paused_frame = Some(decoded.clone());
+                                last_paused_frame = Some(output_frame.clone());
                             }
 
                             if in_stepping_mode {
-                                frame_history.push(decoded.clone());
+                                frame_history.push(output_frame.clone());
                             }
 
                             if event_tx
-                                .blocking_send(DecoderEvent::FrameReady(decoded))
+                                .blocking_send(DecoderEvent::FrameReady(output_frame))
                                 .is_ok()
                             {
                                 frame_decoded = true;
@@ -483,7 +516,7 @@ impl AsyncDecoder {
                             }
                         }
 
-                        let decoded = DecodedFrame {
+                        let output_frame = DecodedFrame {
                             rgba_data: Arc::new(rgba_data),
                             width,
                             height,
@@ -491,19 +524,19 @@ impl AsyncDecoder {
                         };
 
                         if is_keyframe {
-                            frame_cache.insert(decoded.clone(), true);
+                            frame_cache.insert(output_frame.clone(), true);
                         }
 
                         if !is_playing && !in_stepping_mode {
-                            last_paused_frame = Some(decoded.clone());
+                            last_paused_frame = Some(output_frame.clone());
                         }
 
                         if in_stepping_mode {
-                            frame_history.push(decoded.clone());
+                            frame_history.push(output_frame.clone());
                         }
 
                         if event_tx
-                            .blocking_send(DecoderEvent::FrameReady(decoded))
+                            .blocking_send(DecoderEvent::FrameReady(output_frame))
                             .is_ok()
                         {
                             frame_decoded = true;
@@ -534,6 +567,8 @@ impl AsyncDecoder {
                 let mut decoded_frame = ffmpeg_next::frame::Video::empty();
                 if decoder.receive_frame(&mut decoded_frame).is_ok() {
                     // Calculate PTS FIRST (before scaling) for seek target comparison
+                    // FFmpeg timestamps are i64 but f64 has enough precision for video
+                    #[allow(clippy::cast_precision_loss)]
                     let pts_secs = if let Some(pts) = decoded_frame.timestamp() {
                         pts as f64 * time_base_f64
                     } else {
@@ -546,6 +581,26 @@ impl AsyncDecoder {
                     // Only scale and emit frames at or after the seek target
                     if let Some(target) = seek_target_secs {
                         if pts_secs < target {
+                            // Increment and check timeout counter
+                            seek_frames_skipped += 1;
+                            if seek_frames_skipped >= MAX_SEEK_FRAMES {
+                                // Timeout: target may be beyond EOF or file is corrupted
+                                let _ = event_tx.blocking_send(DecoderEvent::Error(
+                                    "Seek timeout: target position may be beyond end of file"
+                                        .to_string(),
+                                ));
+                                seek_target_secs = None;
+                                // Use last decoded frame if available
+                                if let Some((_frame, pts, _keyframe)) = last_decoded_for_seek.take()
+                                {
+                                    first_pts = Some(pts);
+                                    // Continue with this frame instead of skipping
+                                    // Re-assign for the rest of this iteration
+                                    // Note: we can't easily use decoded_frame here since it's moved,
+                                    // so we break and let the next iteration handle it
+                                }
+                                continue;
+                            }
                             // Frame is before target - save it (in case we hit end of stream)
                             // but don't scale or emit yet, continue decoding
                             last_decoded_for_seek = Some((decoded_frame, pts_secs, is_keyframe));
@@ -593,7 +648,7 @@ impl AsyncDecoder {
                     }
 
                     // Send frame event
-                    let decoded = DecodedFrame {
+                    let output_frame = DecodedFrame {
                         rgba_data: Arc::new(rgba_data),
                         width,
                         height,
@@ -603,22 +658,22 @@ impl AsyncDecoder {
                     // Cache keyframes for optimized seeking
                     // Only keyframes can be independently decoded, so they're ideal for caching
                     if is_keyframe {
-                        frame_cache.insert(decoded.clone(), true);
+                        frame_cache.insert(output_frame.clone(), true);
                     }
 
                     // Store the frame shown while paused (for stepping mode history)
                     // This allows backward stepping to return to the frame shown before stepping started
                     if !is_playing && !in_stepping_mode {
-                        last_paused_frame = Some(decoded.clone());
+                        last_paused_frame = Some(output_frame.clone());
                     }
 
                     // Store frame in history during stepping mode for backward navigation
                     if in_stepping_mode {
-                        frame_history.push(decoded.clone());
+                        frame_history.push(output_frame.clone());
                     }
 
                     if event_tx
-                        .blocking_send(DecoderEvent::FrameReady(decoded))
+                        .blocking_send(DecoderEvent::FrameReady(output_frame))
                         .is_err()
                     {
                         // Event channel closed
@@ -643,7 +698,7 @@ impl AsyncDecoder {
                     let mut rgb_frame = ffmpeg_next::frame::Video::empty();
                     if scaler.run(&last_frame, &mut rgb_frame).is_ok() {
                         let rgba_data = Self::extract_rgba_data(&rgb_frame);
-                        let decoded = DecodedFrame {
+                        let output_frame = DecodedFrame {
                             rgba_data: Arc::new(rgba_data),
                             width,
                             height,
@@ -651,14 +706,14 @@ impl AsyncDecoder {
                         };
 
                         if is_keyframe {
-                            frame_cache.insert(decoded.clone(), true);
+                            frame_cache.insert(output_frame.clone(), true);
                         }
 
                         if !is_playing && !in_stepping_mode {
-                            last_paused_frame = Some(decoded.clone());
+                            last_paused_frame = Some(output_frame.clone());
                         }
 
-                        let _ = event_tx.blocking_send(DecoderEvent::FrameReady(decoded));
+                        let _ = event_tx.blocking_send(DecoderEvent::FrameReady(output_frame));
                         frame_decoded = true;
                     }
                 }
@@ -677,6 +732,7 @@ impl AsyncDecoder {
     }
 
     /// Extracts RGBA data from a decoded frame, handling stride correctly.
+    #[allow(clippy::cast_possible_truncation)] // stride is always < u32::MAX for video frames
     fn extract_rgba_data(frame: &ffmpeg_next::frame::Video) -> Vec<u8> {
         let width = frame.width();
         let height = frame.height();

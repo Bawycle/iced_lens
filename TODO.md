@@ -60,6 +60,8 @@
 
 ## Code Quality / Refactoring
 
+- [ ] **Refactor decoder loops**: `decoder_loop_blocking()` in `decoder.rs` (352 lines) and `decoder_loop()` in `audio.rs` (188 lines) exceed Clippy's 100-line limit. Extract sub-functions for: command handling, packet decoding, frame pacing, seeking logic.
+
 ## Packaging / Distribution
 
 ### Flatpak

@@ -52,33 +52,38 @@ pub enum PlaybackState {
 
 impl PlaybackState {
     /// Returns the current playback position in seconds, if available.
+    #[must_use]
     pub fn position(&self) -> Option<f64> {
         match self {
             Self::Stopped => Some(0.0),
-            Self::Playing { position_secs } => Some(*position_secs),
-            Self::Paused { position_secs } => Some(*position_secs),
+            Self::Playing { position_secs }
+            | Self::Paused { position_secs }
+            | Self::Buffering { position_secs } => Some(*position_secs),
             Self::Seeking { target_secs, .. } => Some(*target_secs),
-            Self::Buffering { position_secs } => Some(*position_secs),
             Self::Error { .. } => None,
         }
     }
 
     /// Returns true if the video is currently playing.
+    #[must_use]
     pub fn is_playing(&self) -> bool {
         matches!(self, Self::Playing { .. })
     }
 
     /// Returns true if the video is paused.
+    #[must_use]
     pub fn is_paused(&self) -> bool {
         matches!(self, Self::Paused { .. })
     }
 
     /// Returns true if the video is in an error state.
+    #[must_use]
     pub fn is_error(&self) -> bool {
         matches!(self, Self::Error { .. })
     }
 
     /// Returns the error message if in error state.
+    #[must_use]
     pub fn error_message(&self) -> Option<&str> {
         match self {
             Self::Error { message } => Some(message),
@@ -91,11 +96,11 @@ impl PlaybackState {
     /// This is useful for determining keyboard shortcut behavior:
     /// - Arrow keys should seek while video is "actively playing" (including during seek)
     /// - Arrow keys should navigate when video is paused or stopped
+    #[must_use]
     pub fn is_playing_or_will_resume(&self) -> bool {
         match self {
-            Self::Playing { .. } => true,
+            Self::Playing { .. } | Self::Buffering { .. } => true,
             Self::Seeking { resume_playing, .. } => *resume_playing,
-            Self::Buffering { .. } => true, // Buffering implies playback will continue
             _ => false,
         }
     }
@@ -105,6 +110,7 @@ impl PlaybackState {
     /// This is useful for frame-by-frame stepping which should work when:
     /// - Video is paused
     /// - Video is seeking but will stay paused after seek completes
+    #[must_use]
     pub fn is_effectively_paused(&self) -> bool {
         match self {
             Self::Paused { .. } => true,
@@ -116,12 +122,13 @@ impl PlaybackState {
     /// Returns the effective position for operations like frame stepping.
     ///
     /// Returns the current position when paused, or the target position when seeking.
+    #[must_use]
     pub fn effective_position(&self) -> Option<f64> {
         match self {
-            Self::Paused { position_secs } => Some(*position_secs),
+            Self::Paused { position_secs }
+            | Self::Playing { position_secs }
+            | Self::Buffering { position_secs } => Some(*position_secs),
             Self::Seeking { target_secs, .. } => Some(*target_secs),
-            Self::Playing { position_secs } => Some(*position_secs),
-            Self::Buffering { position_secs } => Some(*position_secs),
             _ => None,
         }
     }
@@ -147,12 +154,12 @@ pub struct VideoPlayer {
 
     /// Current position in frame history (1-indexed).
     /// 0 = not in stepping mode, 1 = first frame, 2+ = can step backward.
-    /// Reset to 0 on play/seek/stop, incremented on step_frame,
-    /// decremented on step_backward.
+    /// Reset to 0 on play/seek/stop, incremented on `step_frame`,
+    /// decremented on `step_backward`.
     history_position: usize,
 
     /// Whether we've reached the end of the video stream.
-    /// Set to true when EndOfStream is received, reset to false on seek/play.
+    /// Set to true when `EndOfStream` is received, reset to false on seek/play.
     at_end_of_stream: bool,
 
     /// Current playback speed (guaranteed within valid range).
@@ -167,8 +174,13 @@ pub struct VideoPlayer {
 impl VideoPlayer {
     /// Creates a new video player for the given video data.
     ///
-    /// The player starts in the Stopped state, showing the thumbnail.
+    /// The player starts in the `Stopped` state, showing the thumbnail.
     /// Command sender is set when subscription starts.
+    ///
+    /// # Errors
+    ///
+    /// This function is infallible in the current implementation but returns
+    /// `Result` for API consistency and future extensibility.
     pub fn new(video_data: &VideoData) -> Result<Self> {
         Ok(Self {
             state: PlaybackState::Stopped,
@@ -221,8 +233,8 @@ impl VideoPlayer {
 
     /// Returns whether the player is in stepping mode.
     ///
-    /// Stepping mode is entered when step_frame() is called, and exited
-    /// when play(), seek(), or stop() is called.
+    /// Stepping mode is entered when `step_frame()` is called, and exited
+    /// when `play()`, `seek()`, or `stop()` is called.
     pub fn is_in_stepping_mode(&self) -> bool {
         self.history_position > 0
     }
@@ -248,21 +260,21 @@ impl VideoPlayer {
     /// Forward stepping is available when the video is stopped, paused,
     /// or seeking without resume, and we haven't reached the end of stream.
     pub fn can_step_forward(&self) -> bool {
-        let can_step = matches!(self.state, PlaybackState::Stopped)
-            || self.state.is_effectively_paused();
+        let can_step =
+            matches!(self.state, PlaybackState::Stopped) || self.state.is_effectively_paused();
         can_step && !self.at_end_of_stream
     }
 
     /// Marks that the end of stream has been reached.
     ///
-    /// Called when EndOfStream event is received from the decoder.
+    /// Called when `EndOfStream` event is received from the decoder.
     pub fn set_at_end_of_stream(&mut self) {
         self.at_end_of_stream = true;
     }
 
     /// Resets the history position to indicate no backward stepping is available.
     ///
-    /// Called when HistoryExhausted event is received from the decoder,
+    /// Called when `HistoryExhausted` event is received from the decoder,
     /// indicating that the frame history buffer has been exhausted.
     pub fn reset_history_position(&mut self) {
         self.history_position = 0;
@@ -296,12 +308,8 @@ impl VideoPlayer {
                 self.state = PlaybackState::Playing { position_secs: pos };
                 pos
             }
-            PlaybackState::Playing { .. } => {
-                // Already playing, no-op
-                return;
-            }
+            // Already playing or other states (Seeking, Buffering, Error) - no transition
             _ => {
-                // Other states (Seeking, Buffering, Error) - no transition
                 return;
             }
         };
@@ -516,7 +524,7 @@ impl VideoPlayer {
 
     /// Completes seeking and transitions to appropriate state.
     ///
-    /// If currently seeking, transitions to Playing or Paused based on resume_playing flag.
+    /// If currently seeking, transitions to `Playing` or `Paused` based on `resume_playing` flag.
     pub fn complete_seek(&mut self) {
         if let PlaybackState::Seeking {
             target_secs,
@@ -580,7 +588,7 @@ impl VideoPlayer {
 
     /// Sets the playback speed.
     ///
-    /// Sends SetPlaybackSpeed command to both video and audio decoders.
+    /// Sends `SetPlaybackSpeed` command to both video and audio decoders.
     /// Auto-mutes audio when speed > 2.0x (audio becomes unintelligible).
     fn set_playback_speed(&mut self, speed: super::PlaybackSpeed) {
         self.playback_speed = speed;
@@ -619,14 +627,16 @@ impl VideoPlayer {
 
     /// Returns true if audio is available for this video.
     pub fn has_audio(&self) -> bool {
-        self.command_sender.as_ref().is_some_and(|s| s.has_audio())
+        self.command_sender
+            .as_ref()
+            .is_some_and(super::subscription::DecoderCommandSender::has_audio)
     }
 
     /// Steps forward one frame by decoding the next frame sequentially.
     ///
-    /// This sends a StepFrame command to the decoder, which decodes the next
+    /// This sends a `StepFrame` command to the decoder, which decodes the next
     /// frame in the video stream without seeking. This is the correct way to
-    /// advance frame-by-frame since seek() only goes to keyframes.
+    /// advance frame-by-frame since `seek()` only goes to keyframes.
     /// Increments history position (enables backward stepping after 2+ steps).
     ///
     /// Can be called from `Stopped` state - will transition to `Paused` first.
@@ -649,7 +659,7 @@ impl VideoPlayer {
 
     /// Steps backward one frame by retrieving from frame history.
     ///
-    /// This sends a StepBackward command to the decoder, which retrieves the
+    /// This sends a `StepBackward` command to the decoder, which retrieves the
     /// previous frame from the frame history buffer. Frame history is only
     /// populated during stepping mode to save memory.
     /// Decrements history position (minimum 0 - can't go before initial frame).
