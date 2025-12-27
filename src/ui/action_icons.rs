@@ -212,37 +212,37 @@ pub mod editor {
     /// Rotate image 90° counter-clockwise.
     #[must_use]
     pub fn rotate_left() -> Image<Handle> {
-        icons::rotate_left()
+        icons::light::rotate_left()
     }
 
     /// Rotate image 90° clockwise.
     #[must_use]
     pub fn rotate_right() -> Image<Handle> {
-        icons::rotate_right()
+        icons::light::rotate_right()
     }
 
     /// Flip image horizontally.
     #[must_use]
     pub fn flip_horizontal() -> Image<Handle> {
-        icons::flip_horizontal()
+        icons::light::flip_horizontal()
     }
 
     /// Flip image vertically.
     #[must_use]
     pub fn flip_vertical() -> Image<Handle> {
-        icons::flip_vertical()
+        icons::light::flip_vertical()
     }
 
     /// Navigate to previous image in editor.
     #[must_use]
     pub fn navigate_previous() -> Image<Handle> {
-        icons::chevron_left()
+        icons::light::chevron_left()
     }
 
     /// Navigate to next image in editor.
     #[must_use]
     pub fn navigate_next() -> Image<Handle> {
-        icons::chevron_right()
+        icons::light::chevron_right()
     }
 }
 

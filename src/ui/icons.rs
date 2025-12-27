@@ -387,6 +387,30 @@ pub mod light {
         "triangle_plus.png",
         "Triangle with plus (white): for dark theme UI."
     );
+    define_icon!(
+        rotate_left,
+        light,
+        "rotate_left.png",
+        "Rotate left icon (white): for dark theme UI."
+    );
+    define_icon!(
+        rotate_right,
+        light,
+        "rotate_right.png",
+        "Rotate right icon (white): for dark theme UI."
+    );
+    define_icon!(
+        flip_horizontal,
+        light,
+        "flip_horizontal.png",
+        "Flip horizontal icon (white): for dark theme UI."
+    );
+    define_icon!(
+        flip_vertical,
+        light,
+        "flip_vertical.png",
+        "Flip vertical icon (white): for dark theme UI."
+    );
 
     // Navbar icons
     define_icon!(

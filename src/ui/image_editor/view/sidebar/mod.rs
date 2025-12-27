@@ -267,7 +267,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let icon_size = 28.0;
 
     let rotate_left_btn = tip_cursor(
-        button(icons::sized(icons::rotate_left(), icon_size))
+        button(icons::sized(action_icons::editor::rotate_left(), icon_size))
             .on_press(SidebarMessage::RotateLeft.into())
             .padding(spacing::XS)
             .width(Length::Fill),
@@ -275,7 +275,7 @@ fn rotate_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     );
 
     let rotate_right_btn = tip_cursor(
-        button(icons::sized(icons::rotate_right(), icon_size))
+        button(icons::sized(action_icons::editor::rotate_right(), icon_size))
             .on_press(SidebarMessage::RotateRight.into())
             .padding(spacing::XS)
             .width(Length::Fill),
@@ -304,7 +304,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let icon_size = 28.0;
 
     let flip_horizontal_btn = tip_cursor(
-        button(icons::sized(icons::flip_horizontal(), icon_size))
+        button(icons::sized(action_icons::editor::flip_horizontal(), icon_size))
             .on_press(SidebarMessage::FlipHorizontal.into())
             .padding(spacing::XS)
             .width(Length::Fill),
@@ -312,7 +312,7 @@ fn flip_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     );
 
     let flip_vertical_btn = tip_cursor(
-        button(icons::sized(icons::flip_vertical(), icon_size))
+        button(icons::sized(action_icons::editor::flip_vertical(), icon_size))
             .on_press(SidebarMessage::FlipVertical.into())
             .padding(spacing::XS)
             .width(Length::Fill),

@@ -173,6 +173,10 @@ fn needs_light_variant(name: &str) -> bool {
             | "pencil"
             | "triangle_minus"
             | "triangle_plus"
+            | "rotate_left"
+            | "rotate_right"
+            | "flip_horizontal"
+            | "flip_vertical"
             // Video toolbar
             | "play"
             | "pause"
