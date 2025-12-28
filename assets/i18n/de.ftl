@@ -31,6 +31,8 @@ viewer-delete-tooltip = Aktuelles Bild löschen
 viewer-zoom-in-tooltip = Vergrößern
 viewer-zoom-out-tooltip = Verkleinern
 viewer-fullscreen-tooltip = Vollbild umschalten
+viewer-rotate-cw-tooltip = Im Uhrzeigersinn drehen
+viewer-rotate-ccw-tooltip = Gegen Uhrzeigersinn drehen
 viewer-fullscreen-disabled-unsaved = Änderungen zuerst speichern oder abbrechen
 viewer-double-click = Doppelklick
 viewer-scroll-wheel = Mausrad
@@ -194,6 +196,8 @@ help-viewer-key-edit = Bild im Editor öffnen
 help-viewer-key-fullscreen = Vollbild betreten/verlassen
 help-viewer-key-exit-fullscreen = Vollbildmodus verlassen
 help-viewer-key-info = Dateiinformationsbereich umschalten
+help-viewer-key-rotate-cw = Im Uhrzeigersinn drehen
+help-viewer-key-rotate-ccw = Gegen den Uhrzeigersinn drehen
 
 help-mouse-title = Mausinteraktionen
 help-viewer-mouse-doubleclick = Doppelklick auf Bild/Video zum Umschalten des Vollbildmodus

@@ -6,11 +6,13 @@
 
 pub mod drag;
 pub mod overlay_timeout;
+pub mod rotation;
 pub mod viewport;
 pub mod zoom;
 
 // Re-export commonly used types for convenience
 pub use drag::DragState;
 pub use overlay_timeout::OverlayTimeout;
+pub use rotation::RotationAngle;
 pub use viewport::ViewportState;
 pub use zoom::{ZoomPercent, ZoomState, ZoomStep};

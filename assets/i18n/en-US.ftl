@@ -31,6 +31,8 @@ viewer-delete-tooltip = Delete the current image
 viewer-zoom-in-tooltip = Zoom in
 viewer-zoom-out-tooltip = Zoom out
 viewer-fullscreen-tooltip = Toggle fullscreen
+viewer-rotate-cw-tooltip = Rotate clockwise
+viewer-rotate-ccw-tooltip = Rotate counter-clockwise
 viewer-fullscreen-disabled-unsaved = Save or cancel metadata changes first
 viewer-double-click = Double-click
 viewer-scroll-wheel = Scroll wheel
@@ -194,6 +196,8 @@ help-viewer-key-edit = Open image in editor
 help-viewer-key-fullscreen = Enter/exit fullscreen
 help-viewer-key-exit-fullscreen = Exit fullscreen mode
 help-viewer-key-info = Toggle file information panel
+help-viewer-key-rotate-cw = Rotate clockwise
+help-viewer-key-rotate-ccw = Rotate counter-clockwise
 
 help-mouse-title = Mouse Interactions
 help-viewer-mouse-doubleclick = Double-click on image/video to toggle fullscreen

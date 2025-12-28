@@ -306,6 +306,14 @@ fn build_viewer_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(build_shortcut_row(
             "Esc",
             ctx.i18n.tr("help-viewer-key-exit-fullscreen"),
+        ))
+        .push(build_shortcut_row(
+            "R",
+            ctx.i18n.tr("help-viewer-key-rotate-cw"),
+        ))
+        .push(build_shortcut_row(
+            "Shift+R",
+            ctx.i18n.tr("help-viewer-key-rotate-ccw"),
         ));
 
     let mouse_title = build_subsection_title(ctx.i18n.tr("help-mouse-title"));

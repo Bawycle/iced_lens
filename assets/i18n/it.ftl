@@ -31,6 +31,8 @@ viewer-delete-tooltip = Elimina l'immagine corrente
 viewer-zoom-in-tooltip = Ingrandisci
 viewer-zoom-out-tooltip = Riduci
 viewer-fullscreen-tooltip = Attiva/disattiva schermo intero
+viewer-rotate-cw-tooltip = Ruota in senso orario
+viewer-rotate-ccw-tooltip = Ruota in senso antiorario
 viewer-fullscreen-disabled-unsaved = Salva o annulla prima le modifiche
 viewer-double-click = Doppio clic
 viewer-scroll-wheel = Rotella del mouse
@@ -194,6 +196,8 @@ help-viewer-key-edit = Apri l'immagine nell'editor
 help-viewer-key-fullscreen = Entra/esci da schermo intero
 help-viewer-key-exit-fullscreen = Esci dalla modalità a schermo intero
 help-viewer-key-info = Attiva/disattiva pannello informazioni file
+help-viewer-key-rotate-cw = Ruota in senso orario
+help-viewer-key-rotate-ccw = Ruota in senso antiorario
 
 help-mouse-title = Interazioni con il mouse
 help-viewer-mouse-doubleclick = Doppio clic su immagine/video per attivare/disattivare schermo intero

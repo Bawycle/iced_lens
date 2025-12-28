@@ -107,18 +107,10 @@ impl ExportableFrame {
 
     /// Converts to ImageData for display in the UI.
     ///
-    /// Note: This clones the underlying pixel data since `Handle::from_rgba`
+    /// Note: This clones the underlying pixel data since `from_rgba`
     /// requires ownership of the data.
     pub fn to_image_data(&self) -> crate::media::ImageData {
-        crate::media::ImageData {
-            handle: iced::widget::image::Handle::from_rgba(
-                self.width,
-                self.height,
-                (*self.rgba_data).clone(),
-            ),
-            width: self.width,
-            height: self.height,
-        }
+        crate::media::ImageData::from_rgba(self.width, self.height, (*self.rgba_data).clone())
     }
 
     /// Exports the frame to a file.

@@ -3,7 +3,6 @@
 
 use crate::error::{Error, Result};
 use crate::media::ImageData;
-use iced::widget::image;
 use std::path::Path;
 use std::sync::Once;
 
@@ -137,14 +136,7 @@ pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
         rgba_bytes.extend_from_slice(&data[row_start..row_end]);
     }
 
-    // Create image handle
-    let handle = image::Handle::from_rgba(width, height, rgba_bytes);
-
-    Ok(ImageData {
-        handle,
-        width,
-        height,
-    })
+    Ok(ImageData::from_rgba(width, height, rgba_bytes))
 }
 
 /// Extract video metadata (dimensions, duration, FPS, audio presence)

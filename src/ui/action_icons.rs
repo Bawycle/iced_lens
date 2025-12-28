@@ -343,6 +343,18 @@ pub mod viewer {
         pub fn delete() -> Image<Handle> {
             icons::light::trash()
         }
+
+        /// Rotate clockwise (light icon for toolbar).
+        #[must_use]
+        pub fn rotate_clockwise() -> Image<Handle> {
+            icons::light::rotate_right()
+        }
+
+        /// Rotate counter-clockwise (light icon for toolbar).
+        #[must_use]
+        pub fn rotate_counterclockwise() -> Image<Handle> {
+            icons::light::rotate_left()
+        }
     }
 }
 
@@ -553,6 +565,46 @@ pub mod sections {
 }
 
 // =============================================================================
+// HUD Overlay Icons
+// =============================================================================
+
+/// Icons for HUD overlay indicators (light variants for dark backgrounds).
+pub mod hud {
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
+
+    /// Position indicator (crosshair).
+    #[must_use]
+    pub fn position() -> Image<Handle> {
+        icons::overlay::crosshair()
+    }
+
+    /// Zoom level indicator (magnifier).
+    #[must_use]
+    pub fn zoom() -> Image<Handle> {
+        icons::overlay::magnifier()
+    }
+
+    /// Video without audio indicator.
+    #[must_use]
+    pub fn video_no_audio() -> Image<Handle> {
+        icons::overlay::video_camera()
+    }
+
+    /// Video with audio indicator.
+    #[must_use]
+    pub fn video_with_audio() -> Image<Handle> {
+        icons::overlay::video_camera_audio()
+    }
+
+    /// Rotation indicator.
+    #[must_use]
+    pub fn rotation() -> Image<Handle> {
+        icons::overlay::rotate_right()
+    }
+}
+
+// =============================================================================
 // Expand/Collapse Indicators
 // =============================================================================
 
@@ -679,6 +731,15 @@ mod tests {
         let _ = sections::capture();
         let _ = sections::editor();
         let _ = sections::metadata();
+    }
+
+    #[test]
+    fn hud_icons_load() {
+        let _ = hud::position();
+        let _ = hud::zoom();
+        let _ = hud::video_no_audio();
+        let _ = hud::video_with_audio();
+        let _ = hud::rotation();
     }
 
     #[test]

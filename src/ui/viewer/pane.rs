@@ -8,6 +8,7 @@ use crate::ui::action_icons;
 use crate::ui::components::checkerboard;
 use crate::ui::design_tokens::{opacity, radius, sizing, spacing, typography};
 use crate::ui::icons;
+use crate::ui::state::RotationAngle;
 use crate::ui::styles;
 use crate::ui::theme;
 use crate::ui::viewer::{component::Message, HudIconKind, HudLine};
@@ -30,10 +31,11 @@ pub struct ViewContext<'a> {
     pub i18n: &'a crate::i18n::fluent::I18n,
 }
 
+#[allow(clippy::struct_excessive_bools)] // UI view model with many visual state flags
 pub struct ViewModel<'a> {
     pub media: &'a MediaData,
     pub zoom_percent: f32,
-    /// Manual zoom percentage (used when fit_to_window is disabled).
+    /// Manual zoom percentage (used when `fit_to_window` is disabled).
     pub manual_zoom_percent: f32,
     /// Whether fit-to-window mode is enabled.
     pub fit_to_window: bool,
@@ -56,14 +58,20 @@ pub struct ViewModel<'a> {
     pub video_error: Option<&'a str>,
     /// Whether metadata editor has unsaved changes (disables navigation).
     pub metadata_editor_has_changes: bool,
+    /// Current rotation angle for temporary rotation.
+    pub rotation: RotationAngle,
+    /// Cached rotated image (pre-computed to avoid flickering).
+    pub rotated_image_cache: Option<&'a crate::media::ImageData>,
 }
 
+#[must_use]
 pub fn view<'a>(ctx: ViewContext<'a>, model: ViewModel<'a>) -> Element<'a, Message> {
     // Use responsive widget to get the available size and calculate fit-to-window zoom
     responsive(move |available_size: Size| view_inner(&ctx, &model, available_size)).into()
 }
 
 /// Calculate the zoom percentage needed to fit media within available space.
+#[allow(clippy::cast_precision_loss)] // u32 to f32 for image dimensions is acceptable
 fn calculate_fit_zoom(media_width: u32, media_height: u32, available: Size) -> f32 {
     if media_width == 0 || media_height == 0 || available.width <= 0.0 || available.height <= 0.0 {
         return crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT;
@@ -93,22 +101,32 @@ fn calculate_centering_padding(media_size: Size, available: Size) -> Padding {
     }
 }
 
+#[allow(clippy::too_many_lines)] // Complex view with navigation, HUD, overlays, and video controls
+#[allow(clippy::cast_precision_loss)] // u32 to f32 for dimensions: f32 is exact up to 16M (covers all images)
 fn view_inner<'a>(
     ctx: &ViewContext<'a>,
     model: &ViewModel<'a>,
     available_size: Size,
 ) -> Element<'a, Message> {
+    // Get effective dimensions accounting for rotation
+    // When rotated 90° or 270°, width and height are swapped for layout calculations
+    let (effective_width, effective_height) = if model.rotation.swaps_dimensions() {
+        (model.media.height(), model.media.width())
+    } else {
+        (model.media.width(), model.media.height())
+    };
+
     // Calculate effective zoom: use fit-to-window calculation or manual zoom
     let effective_zoom = if model.fit_to_window {
-        calculate_fit_zoom(model.media.width(), model.media.height(), available_size)
+        calculate_fit_zoom(effective_width, effective_height, available_size)
     } else {
         model.manual_zoom_percent
     };
 
-    // Calculate scaled media size
+    // Calculate scaled media size (using effective dimensions for rotated media)
     let scale = effective_zoom / 100.0;
-    let scaled_width = model.media.width() as f32 * scale;
-    let scaled_height = model.media.height() as f32 * scale;
+    let scaled_width = effective_width as f32 * scale;
+    let scaled_height = effective_height as f32 * scale;
     let scaled_size = Size::new(scaled_width, scaled_height);
 
     // Calculate padding based on current available size (from responsive widget)
@@ -144,14 +162,25 @@ fn view_inner<'a>(
         if shader.has_frame() && is_current_media_video {
             // Show the shader frame (whether playing or paused)
             // Pass the calculated display dimensions - pane owns the sizing logic
+            // Note: Video rotation not supported - rotation is disabled for videos
             shader.view_sized(scaled_width, scaled_height)
         } else {
             // No frame yet, or current media is an image - show static media
-            super::view_media(model.media, effective_zoom)
+            // Use cached rotated image if available to avoid recomputing on every render
+            if let Some(rotated_image) = model.rotated_image_cache {
+                super::view_image(rotated_image, effective_zoom)
+            } else {
+                super::view_media(model.media, effective_zoom)
+            }
         }
     } else {
         // Not a video or no shader, show static media
-        super::view_media(model.media, effective_zoom)
+        // Use cached rotated image if available to avoid recomputing on every render
+        if let Some(rotated_image) = model.rotated_image_cache {
+            super::view_image(rotated_image, effective_zoom)
+        } else {
+            super::view_media(model.media, effective_zoom)
+        }
     };
 
     let media_container = Container::new(media_viewer).padding(effective_padding);
@@ -503,15 +532,16 @@ fn view_inner<'a>(
         let mut hud_column: Column<'_, Message> = Column::new().spacing(spacing::XXS);
         for hud_line in &ctx.hud_lines {
             let icon = match hud_line.icon {
-                HudIconKind::Position => icons::overlay::crosshair(),
-                HudIconKind::Zoom => icons::overlay::magnifier(),
+                HudIconKind::Position => action_icons::hud::position(),
+                HudIconKind::Zoom => action_icons::hud::zoom(),
                 HudIconKind::Video { has_audio } => {
                     if has_audio {
-                        icons::overlay::video_camera_audio()
+                        action_icons::hud::video_with_audio()
                     } else {
-                        icons::overlay::video_camera()
+                        action_icons::hud::video_no_audio()
                     }
                 }
+                HudIconKind::Rotation => action_icons::hud::rotation(),
             };
 
             let styled_icon = icons::sized(icon, HUD_ICON_SIZE);

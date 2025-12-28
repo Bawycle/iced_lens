@@ -313,11 +313,7 @@ fn load_animated_webp(path: &Path) -> crate::error::Result<MediaData> {
     let rgba_data = first_frame.data().to_vec();
 
     // Create thumbnail ImageData
-    let thumbnail = ImageData {
-        handle: iced::widget::image::Handle::from_rgba(width, height, rgba_data),
-        width,
-        height,
-    };
+    let thumbnail = ImageData::from_rgba(width, height, rgba_data);
 
     let video_data = VideoData {
         thumbnail,
@@ -403,14 +399,9 @@ mod tests {
 
     #[test]
     fn test_media_data_accessors() {
-        use iced::widget::image;
-
-        // Create mock image data
-        let img_data = ImageData {
-            handle: image::Handle::from_bytes(vec![]),
-            width: 1920,
-            height: 1080,
-        };
+        // Create mock image data with 1920x1080 pixels
+        let pixels = vec![0_u8; 1920 * 1080 * 4];
+        let img_data = ImageData::from_rgba(1920, 1080, pixels);
 
         let media = MediaData::Image(img_data);
 

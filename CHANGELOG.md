@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **XMP metadata for PNG, WebP, and TIFF:** title, author, description, keywords, and copyright fields now work on PNG, WebP, and TIFF files, not just JPEG.
+- **Temporary rotation in viewer:** rotate images 90° clockwise (`R`) or counter-clockwise (`Shift+R`). Rotation is session-only and resets when navigating to another image.
 
 ### Changed
 - Video playback errors are now displayed as notifications instead of failing silently.

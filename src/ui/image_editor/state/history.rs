@@ -95,7 +95,6 @@ impl State {
 mod tests {
     use super::*;
     use crate::media::ImageData;
-    use iced::widget::image;
     use image_rs::{Rgba, RgbaImage};
     use tempfile::TempDir;
 
@@ -105,11 +104,7 @@ mod tests {
         let rgba = RgbaImage::from_pixel(width, height, Rgba([0, 0, 0, 255]));
         rgba.save(&path).expect("write png");
         let pixels = vec![0; (width * height * 4) as usize];
-        let image = ImageData {
-            handle: image::Handle::from_rgba(width, height, pixels),
-            width,
-            height,
-        };
+        let image = ImageData::from_rgba(width, height, pixels);
         (temp_dir, path, image)
     }
 

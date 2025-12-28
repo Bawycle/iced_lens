@@ -689,12 +689,9 @@ mod tests {
     use crate::media::ImageData;
 
     fn sample_video_data() -> VideoData {
+        let pixels = vec![0_u8; 1920 * 1080 * 4];
         VideoData {
-            thumbnail: ImageData {
-                handle: iced::widget::image::Handle::from_bytes(vec![]),
-                width: 1920,
-                height: 1080,
-            },
+            thumbnail: ImageData::from_rgba(1920, 1080, pixels),
             width: 1920,
             height: 1080,
             duration_secs: 120.0,

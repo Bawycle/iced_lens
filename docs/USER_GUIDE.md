@@ -111,6 +111,8 @@ iced_lens --lang fr image.png
 | `Esc` | Exit fullscreen |
 | `←` / `→` | Navigate media / seek video |
 | `↑` / `↓` | Increase / decrease volume |
+| `R` | Rotate image clockwise (temporary, images only) |
+| `Shift+R` | Rotate image counter-clockwise (temporary, images only) |
 | `Space` | Play/pause video |
 | `M` | Toggle mute |
 | `J` | Decrease playback speed |

@@ -7,6 +7,7 @@ use image_rs::{GenericImageView, ImageError};
 use resvg::usvg;
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 use tiny_skia;
 
 #[derive(Debug, Clone)]
@@ -14,6 +15,105 @@ pub struct ImageData {
     pub handle: image::Handle,
     pub width: u32,
     pub height: u32,
+    /// Original RGBA bytes for rotation support.
+    /// Stored in Arc to avoid expensive cloning.
+    rgba_bytes: Arc<Vec<u8>>,
+}
+
+impl ImageData {
+    /// Creates a new `ImageData` from RGBA pixels.
+    ///
+    /// The pixels are stored in an Arc for shared ownership, and a copy is
+    /// made for the Handle.
+    #[must_use]
+    pub fn from_rgba(width: u32, height: u32, pixels: Vec<u8>) -> Self {
+        let rgba_bytes = Arc::new(pixels);
+        let handle = image::Handle::from_rgba(width, height, rgba_bytes.to_vec());
+        Self {
+            handle,
+            width,
+            height,
+            rgba_bytes,
+        }
+    }
+
+    /// Creates a new `ImageData` from encoded bytes (PNG, JPEG, etc.).
+    ///
+    /// This is used for SVGs and other formats where the raw bytes are available.
+    /// The RGBA bytes are extracted from the provided raw pixels.
+    #[must_use]
+    pub fn from_encoded_with_rgba(
+        encoded_bytes: Vec<u8>,
+        width: u32,
+        height: u32,
+        rgba_pixels: Vec<u8>,
+    ) -> Self {
+        let rgba_bytes = Arc::new(rgba_pixels);
+        let handle = image::Handle::from_bytes(encoded_bytes);
+        Self {
+            handle,
+            width,
+            height,
+            rgba_bytes,
+        }
+    }
+
+    /// Returns a reference to the original RGBA bytes.
+    pub fn rgba_bytes(&self) -> &[u8] {
+        &self.rgba_bytes
+    }
+
+    /// Creates a rotated version of this image.
+    ///
+    /// The rotation is applied using 90° increments:
+    /// - 90°: rotate clockwise
+    /// - 180°: rotate upside down
+    /// - 270°: rotate counter-clockwise
+    ///
+    /// Returns the original image if rotation is 0°.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal RGBA bytes are invalid (should never happen
+    /// as bytes are validated at construction).
+    #[must_use]
+    pub fn rotated(&self, degrees: u16) -> Self {
+        if degrees == 0 {
+            return self.clone();
+        }
+
+        // Create DynamicImage from RGBA bytes
+        let img = image_rs::RgbaImage::from_raw(self.width, self.height, self.rgba_bytes.to_vec())
+            .expect("RGBA bytes should be valid");
+        let dynamic = image_rs::DynamicImage::ImageRgba8(img);
+
+        // Apply rotation
+        let rotated = match degrees {
+            90 => dynamic.rotate90(),
+            180 => dynamic.rotate180(),
+            270 => dynamic.rotate270(),
+            _ => dynamic, // Should not happen with RotationAngle newtype
+        };
+
+        // Get new dimensions
+        let (new_width, new_height) = rotated.dimensions();
+
+        // Convert back to RGBA bytes
+        let rgba_img = rotated.to_rgba8();
+        let pixels = rgba_img.into_vec();
+
+        // Store pixels in Arc (shared ownership), then create handle from clone
+        // This avoids double-allocation: Arc owns the data, Handle gets a copy
+        let rgba_bytes = Arc::new(pixels);
+        let handle = image::Handle::from_rgba(new_width, new_height, rgba_bytes.to_vec());
+
+        Self {
+            handle,
+            width: new_width,
+            height: new_height,
+            rgba_bytes,
+        }
+    }
 }
 
 /// Load an image from the given path and return its data.
@@ -48,13 +148,15 @@ pub fn load_image<P: AsRef<Path>>(path: P) -> Result<ImageData> {
 
         resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
 
+        let rgba_pixels = pixmap.data().to_vec();
         let png_data = pixmap.encode_png().map_err(|e| Error::Svg(e.to_string()))?;
-        let handle = image::Handle::from_bytes(png_data);
-        Ok(ImageData {
-            handle,
+
+        Ok(ImageData::from_encoded_with_rgba(
+            png_data,
             width,
             height,
-        })
+            rgba_pixels,
+        ))
     } else {
         let img_bytes = fs::read(path).map_err(|e| Error::Io(e.to_string()))?;
 
@@ -65,12 +167,7 @@ pub fn load_image<P: AsRef<Path>>(path: P) -> Result<ImageData> {
         let rgba_img = img.to_rgba8();
         let pixels = rgba_img.into_vec();
 
-        let handle = image::Handle::from_rgba(width, height, pixels);
-        Ok(ImageData {
-            handle,
-            width,
-            height,
-        })
+        Ok(ImageData::from_rgba(width, height, pixels))
     }
 }
 

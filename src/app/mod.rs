@@ -1276,7 +1276,6 @@ mod tests {
         ZOOM_STEP_RANGE_KEY,
     };
     use crate::ui::viewer::controls;
-    use iced::widget::image::Handle;
     use iced::widget::scrollable::AbsoluteOffset;
     use iced::{event, keyboard, mouse, window, Point, Rectangle, Size};
     use std::fs;
@@ -1309,11 +1308,7 @@ mod tests {
 
     fn sample_image_data() -> ImageData {
         let pixels = vec![255_u8; 4];
-        ImageData {
-            handle: Handle::from_rgba(1, 1, pixels),
-            width: 1,
-            height: 1,
-        }
+        ImageData::from_rgba(1, 1, pixels)
     }
 
     fn sample_media_data() -> MediaData {
@@ -1323,11 +1318,7 @@ mod tests {
     fn build_image(width: u32, height: u32) -> ImageData {
         let pixel_count = (width * height * 4) as usize;
         let pixels = vec![255; pixel_count];
-        ImageData {
-            handle: Handle::from_rgba(width, height, pixels),
-            width,
-            height,
-        }
+        ImageData::from_rgba(width, height, pixels)
     }
 
     fn build_media(width: u32, height: u32) -> MediaData {
@@ -1343,11 +1334,7 @@ mod tests {
         let img = RgbaImage::from_pixel(width, height, Rgba([0, 0, 0, 255]));
         img.save(&path).expect("write png");
         let pixels = vec![0; (width * height * 4) as usize];
-        let image = ImageData {
-            handle: Handle::from_rgba(width, height, pixels),
-            width,
-            height,
-        };
+        let image = ImageData::from_rgba(width, height, pixels);
         (temp_dir, path, image)
     }
 

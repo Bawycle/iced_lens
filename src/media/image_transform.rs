@@ -117,13 +117,7 @@ pub fn dynamic_to_image_data(dynamic: &DynamicImage) -> Result<ImageData> {
     let rgba_img = dynamic.to_rgba8();
     let pixels = rgba_img.into_vec();
 
-    let handle = iced::widget::image::Handle::from_rgba(width, height, pixels);
-
-    Ok(ImageData {
-        handle,
-        width,
-        height,
-    })
+    Ok(ImageData::from_rgba(width, height, pixels))
 }
 
 /// Resize the image to the provided dimensions using a high-quality filter.

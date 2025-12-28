@@ -9,7 +9,6 @@ _(No known bugs)_
 ## Planned Features
 
 ### Viewer
-- [ ] Temporary rotation in viewer (90° increments, session-only) — currently complex to implement
 
 #### Media Filters for Navigation
 - [ ] Add filterable navigation to show only matching media in the current directory

@@ -31,6 +31,8 @@ viewer-delete-tooltip = Supprimer l'image affichée
 viewer-zoom-in-tooltip = Zoom avant
 viewer-zoom-out-tooltip = Zoom arrière
 viewer-fullscreen-tooltip = Basculer en plein écran
+viewer-rotate-cw-tooltip = Rotation horaire
+viewer-rotate-ccw-tooltip = Rotation anti-horaire
 viewer-fullscreen-disabled-unsaved = Enregistrez ou annulez d'abord les modifications
 viewer-double-click = Double-clic
 viewer-scroll-wheel = Molette
@@ -194,6 +196,8 @@ help-viewer-key-edit = Ouvrir l'image dans l'éditeur
 help-viewer-key-fullscreen = Entrer/quitter le plein écran
 help-viewer-key-exit-fullscreen = Quitter le mode plein écran
 help-viewer-key-info = Afficher/masquer le panneau d'informations
+help-viewer-key-rotate-cw = Rotation horaire
+help-viewer-key-rotate-ccw = Rotation antihoraire
 
 help-mouse-title = Interactions souris
 help-viewer-mouse-doubleclick = Double-clic sur l'image/vidéo pour basculer en plein écran

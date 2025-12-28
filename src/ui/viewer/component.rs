@@ -5,7 +5,7 @@ use crate::error::{Error, VideoError};
 use crate::i18n::fluent::I18n;
 use crate::media::navigator::NavigationInfo;
 use crate::media::{MaxSkipAttempts, MediaData};
-use crate::ui::state::{DragState, ViewportState, ZoomState, ZoomStep};
+use crate::ui::state::{DragState, RotationAngle, ViewportState, ZoomState, ZoomStep};
 use crate::ui::viewer::{
     self, controls, pane, state as geometry, video_controls, HudIconKind, HudLine,
 };
@@ -54,6 +54,10 @@ pub enum Message {
     SpinnerTick,
     /// Request to open file dialog from empty state.
     OpenFileRequested,
+    /// Rotate current media 90° clockwise (temporary, session-only).
+    RotateClockwise,
+    /// Rotate current media 90° counter-clockwise (temporary, session-only).
+    RotateCounterClockwise,
 }
 
 /// Direction of navigation for auto-skip retry.
@@ -103,7 +107,7 @@ pub enum Effect {
         position_secs: f64,
     },
     /// Request to delete the current media file.
-    /// App will handle the actual deletion using media_navigator.
+    /// App will handle the actual deletion using `media_navigator`.
     RequestDelete,
     /// Toggle the info/metadata panel.
     ToggleInfoPanel,
@@ -132,7 +136,7 @@ pub enum Effect {
         skipped_files: Vec<String>,
     },
     /// Confirm navigation after successful media load.
-    /// App will update MediaNavigator's position to the loaded path.
+    /// App will update `MediaNavigator`'s position to the loaded path.
     ConfirmNavigation {
         /// Path to confirm as the current position.
         path: PathBuf,
@@ -154,18 +158,20 @@ impl ErrorState {
         self.friendly_text = i18n.tr(self.friendly_key);
     }
 
+    #[must_use]
     pub fn details(&self) -> &str {
         &self.details
     }
 }
 
 /// Environment information required to render the viewer.
+#[allow(clippy::struct_field_names)] // Fields describe their content, not the struct
 pub struct ViewEnv<'a> {
     pub i18n: &'a I18n,
     pub background_theme: crate::config::BackgroundTheme,
     pub is_fullscreen: bool,
     pub overlay_hide_delay: std::time::Duration,
-    /// Navigation state from the central MediaNavigator.
+    /// Navigation state from the central `MediaNavigator`.
     /// This is the single source of truth for navigation info.
     pub navigation: NavigationInfo,
     /// Whether metadata editor has unsaved changes (disables navigation).
@@ -173,6 +179,7 @@ pub struct ViewEnv<'a> {
 }
 
 /// Complete viewer component state.
+#[allow(clippy::struct_excessive_bools)] // Complex UI state requires multiple boolean flags
 pub struct State {
     media: Option<MediaData>,
     error: Option<ErrorState>,
@@ -232,6 +239,13 @@ pub struct State {
 
     /// Keyboard seek step (arrow keys during video playback).
     keyboard_seek_step: KeyboardSeekStep,
+
+    /// Current temporary rotation angle (resets on navigation).
+    current_rotation: RotationAngle,
+
+    /// Cached rotated image to avoid recomputing on every render.
+    /// Contains (`rotation_angle`, `rotated_image_data`).
+    rotated_image_cache: Option<(RotationAngle, crate::media::ImageData)>,
 }
 
 // Manual Default impl required: video_fit_to_window defaults to true (not false),
@@ -271,11 +285,14 @@ impl Default for State {
             overflow_menu_open: false,
             last_keyboard_seek: None,
             keyboard_seek_step: KeyboardSeekStep::default(),
+            current_rotation: RotationAngle::default(),
+            rotated_image_cache: None,
         }
     }
 }
 
 impl State {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -316,6 +333,63 @@ impl State {
         &mut self.drag
     }
 
+    /// Returns the current temporary rotation angle.
+    pub fn current_rotation(&self) -> RotationAngle {
+        self.current_rotation
+    }
+
+    /// Returns true if the current media is an image (not a video).
+    fn is_current_media_image(&self) -> bool {
+        matches!(self.media, Some(MediaData::Image(_)))
+    }
+
+    /// Updates the rotation and rebuilds the cache.
+    fn apply_rotation(&mut self, new_rotation: RotationAngle) {
+        self.current_rotation = new_rotation;
+        self.rebuild_rotation_cache();
+    }
+
+    /// Rebuilds the cached rotated image based on current rotation.
+    fn rebuild_rotation_cache(&mut self) {
+        // Only cache for images, and only when rotation is non-zero
+        if let Some(MediaData::Image(ref image_data)) = self.media {
+            if self.current_rotation.is_rotated() {
+                let rotated = image_data.rotated(self.current_rotation.degrees());
+                self.rotated_image_cache = Some((self.current_rotation, rotated));
+            } else {
+                self.rotated_image_cache = None;
+            }
+        } else {
+            self.rotated_image_cache = None;
+        }
+    }
+
+    /// Rotates the current media 90° clockwise (images only).
+    pub fn rotate_clockwise(&mut self) {
+        // Rotation only applies to images, not videos
+        if !self.is_current_media_image() {
+            return;
+        }
+        self.apply_rotation(self.current_rotation.rotate_clockwise());
+    }
+
+    /// Rotates the current media 90° counter-clockwise (images only).
+    pub fn rotate_counterclockwise(&mut self) {
+        // Rotation only applies to images, not videos
+        if !self.is_current_media_image() {
+            return;
+        }
+        self.apply_rotation(self.current_rotation.rotate_counterclockwise());
+    }
+
+    /// Returns the cached rotated image if available.
+    pub fn rotated_image_cache(&self) -> Option<&crate::media::ImageData> {
+        self.rotated_image_cache
+            .as_ref()
+            .filter(|(angle, _)| *angle == self.current_rotation)
+            .map(|(_, image)| image)
+    }
+
     pub fn set_cursor_position(&mut self, position: Option<Point>) {
         self.cursor_position = position;
     }
@@ -345,8 +419,8 @@ impl State {
     }
 
     /// Returns the effective fit-to-window setting.
-    /// For videos, uses the separate video_fit_to_window (not persisted).
-    /// For images, uses zoom.fit_to_window (persisted).
+    /// For videos, uses the separate `video_fit_to_window` (not persisted).
+    /// For images, uses `zoom.fit_to_window` (persisted).
     pub fn fit_to_window(&self) -> bool {
         if self.is_video() {
             self.video_fit_to_window
@@ -485,7 +559,7 @@ impl State {
 
     /// Starts loading a new media file.
     ///
-    /// Sets loading indicators that will be cleared by the MediaLoaded message handler.
+    /// Sets loading indicators that will be cleared by the `MediaLoaded` message handler.
     /// This encapsulates the loading state management that was previously scattered
     /// across multiple app handlers.
     pub fn start_loading(&mut self) {
@@ -576,6 +650,7 @@ impl State {
         iced::Subscription::batch([video_subscription, spinner_subscription])
     }
 
+    #[allow(clippy::too_many_lines)] // Message handler with many variants, inherent complexity
     pub fn handle_message(&mut self, message: Message, _i18n: &I18n) -> (Effect, Task<Message>) {
         match message {
             Message::StartLoadingMedia => {
@@ -608,6 +683,10 @@ impl State {
                 self.zoom = ZoomState::default();
                 self.viewport = ViewportState::default();
 
+                // Reset temporary rotation and cache
+                self.current_rotation = RotationAngle::default();
+                self.rotated_image_cache = None;
+
                 (Effect::None, Task::none())
             }
             Message::MediaLoaded(result) => {
@@ -631,6 +710,10 @@ impl State {
                 }
                 // Reset video fit-to-window to default for new media
                 self.video_fit_to_window = true;
+
+                // Reset temporary rotation and cache for new media
+                self.current_rotation = RotationAngle::default();
+                self.rotated_image_cache = None;
 
                 match result {
                     Ok(media) => {
@@ -740,10 +823,9 @@ impl State {
                                 // Direct open: clear path and show error notification
                                 self.current_media_path = None;
                                 let notification_key = match &error {
-                                    Error::Io(_) => "notification-load-error-io",
                                     Error::Svg(_) => "notification-load-error-svg",
                                     Error::Video(_) => "notification-load-error-video",
-                                    Error::Config(_) => "notification-load-error-io", // Fallback
+                                    Error::Io(_) | Error::Config(_) => "notification-load-error-io",
                                 };
                                 (
                                     Effect::ShowErrorNotification {
@@ -815,6 +897,14 @@ impl State {
             Message::OpenSettings => (Effect::OpenSettings, Task::none()),
             Message::EnterEditor => (Effect::EnterEditor, Task::none()),
             Message::OpenFileRequested => (Effect::OpenFileDialog, Task::none()),
+            Message::RotateClockwise => {
+                self.rotate_clockwise();
+                (Effect::None, Task::none())
+            }
+            Message::RotateCounterClockwise => {
+                self.rotate_counterclockwise();
+                (Effect::None, Task::none())
+            }
             Message::InitiatePlayback => {
                 // Reset overlay timer on interaction
                 self.last_overlay_interaction = Some(Instant::now());
@@ -933,7 +1023,7 @@ impl State {
                         let now = Instant::now();
                         let should_seek = match self.last_keyboard_seek {
                             Some(last) => {
-                                now.duration_since(last).as_millis() >= SEEK_DEBOUNCE_MS as u128
+                                now.duration_since(last).as_millis() >= u128::from(SEEK_DEBOUNCE_MS)
                             }
                             None => true,
                         };
@@ -1185,6 +1275,8 @@ impl State {
         }
     }
 
+    #[allow(clippy::too_many_lines)] // Complex UI view with many contextual elements
+    #[allow(clippy::needless_pass_by_value)] // ViewEnv is small (references only)
     pub fn view<'a>(&'a self, env: ViewEnv<'a>) -> Element<'a, Message> {
         let geometry_state = self.geometry_state();
 
@@ -1207,6 +1299,12 @@ impl State {
             None
         };
 
+        let rotation_line = if self.current_rotation.is_rotated() {
+            Some(format_rotation_indicator(self.current_rotation))
+        } else {
+            None
+        };
+
         let media_type_line = self
             .media
             .as_ref()
@@ -1215,6 +1313,7 @@ impl State {
         let hud_lines = position_line
             .into_iter()
             .chain(zoom_line)
+            .chain(rotation_line)
             .chain(media_type_line)
             .collect::<Vec<HudLine>>();
 
@@ -1230,7 +1329,7 @@ impl State {
         // For center video overlay (play/pause button), use auto-hide in both modes when playing
         let is_currently_playing = self.video_player.is_some()
             && matches!(
-                self.video_player.as_ref().map(|p| p.state()),
+                self.video_player.as_ref().map(crate::video_player::VideoPlayer::state),
                 Some(
                     crate::video_player::PlaybackState::Playing { .. }
                         | crate::video_player::PlaybackState::Buffering { .. }
@@ -1252,6 +1351,7 @@ impl State {
             controls_context: controls::ViewContext {
                 i18n: env.i18n,
                 metadata_editor_has_changes: env.metadata_editor_has_changes,
+                is_video: self.is_video(),
             },
             zoom: &self.zoom,
             effective_fit_to_window,
@@ -1309,6 +1409,8 @@ impl State {
                     .as_ref()
                     .and_then(|p| p.state().error_message()),
                 metadata_editor_has_changes: env.metadata_editor_has_changes,
+                rotation: self.current_rotation,
+                rotated_image_cache: self.rotated_image_cache(),
             },
             controls_visible: if env.is_fullscreen {
                 // In fullscreen, auto-hide controls after configured delay
@@ -1338,7 +1440,8 @@ impl State {
                         let speed = player.playback_speed();
                         let auto_muted = player.is_speed_auto_muted();
                         match state {
-                            crate::video_player::PlaybackState::Playing { position_secs } => (
+                            crate::video_player::PlaybackState::Playing { position_secs }
+                            | crate::video_player::PlaybackState::Buffering { position_secs } => (
                                 true,
                                 *position_secs,
                                 self.video_loop,
@@ -1353,15 +1456,6 @@ impl State {
                                 self.video_loop,
                                 can_step_back,
                                 can_step_fwd,
-                                speed,
-                                auto_muted,
-                            ),
-                            crate::video_player::PlaybackState::Buffering { position_secs } => (
-                                true,
-                                *position_secs,
-                                self.video_loop,
-                                false,
-                                false,
                                 speed,
                                 auto_muted,
                             ),
@@ -1483,9 +1577,18 @@ impl State {
                 (Effect::ToggleFullscreen, Task::none())
             }
             DeleteCurrentImage => (Effect::None, Task::none()),
+            RotateClockwise => {
+                self.rotate_clockwise();
+                (Effect::None, Task::none())
+            }
+            RotateCounterClockwise => {
+                self.rotate_counterclockwise();
+                (Effect::None, Task::none())
+            }
         }
     }
 
+    #[allow(clippy::too_many_lines)] // Event handler for multiple event types
     fn handle_raw_event(&mut self, event: event::Event) -> (Effect, Task<Message>) {
         match event {
             event::Event::Window(window_event) => {
@@ -1788,6 +1891,22 @@ impl State {
                     // I key: Toggle info/metadata panel
                     (Effect::ToggleInfoPanel, Task::none())
                 }
+                keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(ref c),
+                    modifiers,
+                    ..
+                } if (c.as_str() == "r" || c.as_str() == "R")
+                    && !modifiers.command()
+                    && !modifiers.alt() =>
+                {
+                    // R key: Rotate clockwise
+                    // Shift+R: Rotate counter-clockwise
+                    if modifiers.shift() {
+                        self.handle_message(Message::RotateCounterClockwise, &I18n::default())
+                    } else {
+                        self.handle_message(Message::RotateClockwise, &I18n::default())
+                    }
+                }
                 keyboard::Event::ModifiersChanged(modifiers) => {
                     if modifiers.command() {
                         // no-op currently, but keep placeholder for shortcut support
@@ -1843,9 +1962,11 @@ impl State {
         };
 
         let geometry_state = self.geometry_state();
-        if let (Some(viewport), Some(size)) =
-            (self.viewport.bounds, geometry_state.scaled_media_size())
-        {
+        // Use rotation-aware size for correct clamping when image is rotated
+        if let (Some(viewport), Some(size)) = (
+            self.viewport.bounds,
+            geometry_state.scaled_media_size_rotated(self.current_rotation),
+        ) {
             let max_offset_x = (size.width - viewport.width).max(0.0);
             let max_offset_y = (size.height - viewport.height).max(0.0);
 
@@ -1933,6 +2054,7 @@ impl State {
 
     /// Calculates the zoom percentage needed to fit the current image inside
     /// the viewport. Returns `None` until viewport bounds are known.
+    #[allow(clippy::cast_precision_loss)] // u32 to f32 for image dimensions is acceptable
     pub fn compute_fit_zoom_percent(&self) -> Option<f32> {
         let media = self.media.as_ref()?;
         let viewport = self.viewport.bounds?;
@@ -2017,6 +2139,13 @@ fn format_zoom_indicator(_i18n: &I18n, zoom_percent: f32) -> HudLine {
     }
 }
 
+fn format_rotation_indicator(rotation: RotationAngle) -> HudLine {
+    HudLine {
+        icon: HudIconKind::Rotation,
+        text: format!("{}°", rotation.degrees()),
+    }
+}
+
 /// Generates HUD indicator for videos without audio.
 ///
 /// Only shows an indicator when a video has no audio track.
@@ -2058,15 +2187,10 @@ mod tests {
     #[test]
     fn format_media_indicator_shows_no_audio_for_silent_video() {
         use crate::media::{ImageData, VideoData};
-        use iced::widget::image::Handle;
 
         let i18n = I18n::default();
         let pixels = vec![255_u8; 4];
-        let thumbnail = ImageData {
-            handle: Handle::from_rgba(1, 1, pixels),
-            width: 1,
-            height: 1,
-        };
+        let thumbnail = ImageData::from_rgba(1, 1, pixels);
 
         let video_data = VideoData {
             thumbnail,
@@ -2087,15 +2211,10 @@ mod tests {
     #[test]
     fn format_media_indicator_returns_none_for_video_with_audio() {
         use crate::media::{ImageData, VideoData};
-        use iced::widget::image::Handle;
 
         let i18n = I18n::default();
         let pixels = vec![255_u8; 4];
-        let thumbnail = ImageData {
-            handle: Handle::from_rgba(1, 1, pixels),
-            width: 1,
-            height: 1,
-        };
+        let thumbnail = ImageData::from_rgba(1, 1, pixels);
 
         let video_data = VideoData {
             thumbnail,
@@ -2121,7 +2240,11 @@ mod tests {
 
         // Simulate starting to load media
         state.is_loading_media = true;
-        state.loading_started_at = Some(Instant::now() - LOADING_TIMEOUT - Duration::from_secs(1));
+        state.loading_started_at = Some(
+            Instant::now()
+                .checked_sub(LOADING_TIMEOUT + Duration::from_secs(1))
+                .expect("instant subtraction"),
+        );
 
         // Check timeout should return true (caller pushes notification)
         let timed_out = state.check_loading_timeout();
@@ -2140,7 +2263,11 @@ mod tests {
 
         // Simulate starting to load media (but not timed out yet)
         state.is_loading_media = true;
-        state.loading_started_at = Some(Instant::now() - Duration::from_secs(5));
+        state.loading_started_at = Some(
+            Instant::now()
+                .checked_sub(Duration::from_secs(5))
+                .expect("instant subtraction"),
+        );
 
         // Check timeout should NOT trigger yet
         let timed_out = state.check_loading_timeout();
@@ -2155,6 +2282,8 @@ mod tests {
 
     #[test]
     fn loading_state_resets_on_successful_load() {
+        use crate::media::ImageData;
+
         let i18n = I18n::default();
         let mut state = State::new();
 
@@ -2163,15 +2292,8 @@ mod tests {
         state.loading_started_at = Some(Instant::now());
 
         // Simulate successful load (MediaLoaded with Ok result)
-        use crate::media::ImageData;
-        use iced::widget::image::Handle;
-
-        let pixels = vec![255_u8; 4];
-        let image_data = ImageData {
-            handle: Handle::from_rgba(1, 1, pixels),
-            width: 100,
-            height: 100,
-        };
+        let pixels = vec![255_u8; 100 * 100 * 4];
+        let image_data = ImageData::from_rgba(100, 100, pixels);
 
         let (_effect, _task) = state.handle_message(
             Message::MediaLoaded(Ok(MediaData::Image(image_data))),
@@ -2192,15 +2314,10 @@ mod tests {
     #[test]
     fn format_media_indicator_returns_none_for_images() {
         use crate::media::ImageData;
-        use iced::widget::image::Handle;
 
         let i18n = I18n::default();
-        let pixels = vec![255_u8; 4];
-        let image_data = ImageData {
-            handle: Handle::from_rgba(1, 1, pixels),
-            width: 100,
-            height: 100,
-        };
+        let pixels = vec![255_u8; 100 * 100 * 4];
+        let image_data = ImageData::from_rgba(100, 100, pixels);
 
         let media = MediaData::Image(image_data);
         let indicator = format_media_indicator(&i18n, &media);

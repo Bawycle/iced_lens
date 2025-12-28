@@ -28,6 +28,8 @@ pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
     /// Whether metadata editor has unsaved changes (disables fullscreen).
     pub metadata_editor_has_changes: bool,
+    /// Whether the current media is a video (rotation is disabled for videos).
+    pub is_video: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -40,8 +42,13 @@ pub enum Message {
     SetFitToWindow(bool),
     ToggleFullscreen,
     DeleteCurrentImage,
+    RotateClockwise,
+    RotateCounterClockwise,
 }
 
+#[allow(clippy::too_many_lines)] // UI builder with many widgets, inherent complexity
+#[allow(clippy::needless_pass_by_value)] // ViewContext is small and Copy would require lifetime changes
+#[allow(clippy::similar_names)] // rotate_cw/ccw are intentionally similar (clockwise/counter-clockwise)
 pub fn view<'a>(
     ctx: ViewContext<'a>,
     zoom: &'a ZoomState,
@@ -149,6 +156,45 @@ pub fn view<'a>(
         ctx.i18n.tr("viewer-delete-tooltip"),
     );
 
+    // Rotation only works for images, not videos
+    let rotate_ccw_content: Element<'_, Message> = if ctx.is_video {
+        button(icons::fill(
+            action_icons::viewer::toolbar::rotate_counterclockwise(),
+        ))
+        .padding(spacing::XXS)
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE))
+        .style(styles::button::disabled())
+        .into()
+    } else {
+        button(icons::fill(
+            action_icons::viewer::toolbar::rotate_counterclockwise(),
+        ))
+        .on_press(Message::RotateCounterClockwise)
+        .padding(spacing::XXS)
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE))
+        .into()
+    };
+    let rotate_ccw_button = tip(rotate_ccw_content, ctx.i18n.tr("viewer-rotate-ccw-tooltip"));
+
+    let rotate_cw_content: Element<'_, Message> = if ctx.is_video {
+        button(icons::fill(action_icons::viewer::toolbar::rotate_clockwise()))
+            .padding(spacing::XXS)
+            .width(Length::Fixed(shared_styles::ICON_SIZE))
+            .height(Length::Fixed(shared_styles::ICON_SIZE))
+            .style(styles::button::disabled())
+            .into()
+    } else {
+        button(icons::fill(action_icons::viewer::toolbar::rotate_clockwise()))
+            .on_press(Message::RotateClockwise)
+            .padding(spacing::XXS)
+            .width(Length::Fixed(shared_styles::ICON_SIZE))
+            .height(Length::Fixed(shared_styles::ICON_SIZE))
+            .into()
+    };
+    let rotate_cw_button = tip(rotate_cw_content, ctx.i18n.tr("viewer-rotate-cw-tooltip"));
+
     let zoom_controls_row = Row::new()
         .spacing(shared_styles::CONTROL_SPACING)
         .padding([0.0, shared_styles::CONTROL_PADDING])
@@ -161,6 +207,9 @@ pub fn view<'a>(
         .push(reset_button)
         .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
         .push(fit_toggle)
+        .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
+        .push(rotate_ccw_button)
+        .push(rotate_cw_button)
         .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
         .push(delete_button)
         .push(fullscreen_toggle);
@@ -193,6 +242,7 @@ mod tests {
             ViewContext {
                 i18n: &i18n,
                 metadata_editor_has_changes: false,
+                is_video: false,
             },
             &zoom,
             true,

@@ -593,6 +593,12 @@ pub mod overlay {
         "chevron_left.png",
         "Single chevron left icon (white): for navigation previous on dark backgrounds."
     );
+    define_icon!(
+        rotate_right,
+        light,
+        "rotate_right.png",
+        "Rotate right icon (white): for HUD on dark backgrounds."
+    );
 }
 
 // =============================================================================

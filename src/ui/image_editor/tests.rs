@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use super::*;
-use iced::widget::image;
 use image_rs::{Rgba, RgbaImage};
 use tempfile::tempdir;
 
@@ -11,11 +10,7 @@ fn create_test_image(width: u32, height: u32) -> (tempfile::TempDir, PathBuf, Im
     let img = RgbaImage::from_pixel(width, height, Rgba([0, 0, 0, 255]));
     img.save(&path).expect("write png");
     let pixels = vec![0; (width * height * 4) as usize];
-    let image = ImageData {
-        handle: image::Handle::from_rgba(width, height, pixels),
-        width,
-        height,
-    };
+    let image = ImageData::from_rgba(width, height, pixels);
     (temp_dir, path, image)
 }
 

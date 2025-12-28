@@ -2,6 +2,7 @@
 //! Derived viewer state helpers used to keep `App` lean.
 
 use crate::media::MediaData;
+use crate::ui::state::rotation::RotationAngle;
 use crate::ui::state::viewport::ViewportState;
 use crate::ui::state::zoom::{clamp_zoom, DEFAULT_ZOOM_PERCENT};
 use iced::{Padding, Point, Rectangle, Size};
@@ -62,11 +63,32 @@ impl<'a> ViewerState<'a> {
     }
 
     /// Returns the scaled media dimensions for the current zoom level.
+    #[allow(clippy::cast_precision_loss)] // u32 to f32 for dimensions: f32 is exact up to 16M
     pub fn scaled_media_size(&self) -> Option<Size> {
         let media = self.media?;
         let scale = (self.zoom_percent / 100.0).max(0.01);
         let width = (media.width() as f32 * scale).max(1.0);
         let height = (media.height() as f32 * scale).max(1.0);
+        Some(Size::new(width, height))
+    }
+
+    /// Returns the scaled media dimensions accounting for rotation.
+    ///
+    /// When rotated 90° or 270°, width and height are swapped.
+    #[allow(clippy::cast_precision_loss)] // u32 to f32 for dimensions: f32 is exact up to 16M
+    pub fn scaled_media_size_rotated(&self, rotation: RotationAngle) -> Option<Size> {
+        let media = self.media?;
+        let scale = (self.zoom_percent / 100.0).max(0.01);
+
+        // Get effective dimensions based on rotation
+        let (effective_width, effective_height) = if rotation.swaps_dimensions() {
+            (media.height(), media.width())
+        } else {
+            (media.width(), media.height())
+        };
+
+        let width = (effective_width as f32 * scale).max(1.0);
+        let height = (effective_height as f32 * scale).max(1.0);
         Some(Size::new(width, height))
     }
 
@@ -183,16 +205,11 @@ fn intersect_rectangles(a: Rectangle, b: Rectangle) -> Option<Rectangle> {
 mod tests {
     use super::*;
     use crate::media::{ImageData, MediaData};
-    use iced::widget::image::Handle;
     use iced::widget::scrollable::AbsoluteOffset;
 
     fn sample_media() -> MediaData {
         let pixels = vec![255_u8; 4];
-        let image_data = ImageData {
-            handle: Handle::from_rgba(1, 1, pixels),
-            width: 1,
-            height: 1,
-        };
+        let image_data = ImageData::from_rgba(1, 1, pixels);
         MediaData::Image(image_data)
     }
 

@@ -17,7 +17,7 @@ use crate::i18n::fluent::I18n;
 use crate::media::MediaData;
 use crate::ui::components::error_display::{centered_error_view, ErrorDisplay, ErrorSeverity};
 use crate::ui::design_tokens::{sizing, spacing};
-use crate::ui::state::ZoomState;
+use crate::ui::state::{RotationAngle, ZoomState};
 use crate::ui::styles;
 use crate::ui::theme;
 use crate::ui::widgets::AnimatedSpinner;
@@ -30,6 +30,7 @@ pub enum HudIconKind {
     Position,
     Zoom,
     Video { has_audio: bool },
+    Rotation,
 }
 
 /// A single HUD entry combining an icon kind and descriptive text.
@@ -40,18 +41,43 @@ pub struct HudLine {
 }
 
 pub fn view_media(media_data: &MediaData, zoom_percent: f32) -> Element<'_, Message> {
-    // Extract the image handle (either from Image or Video thumbnail)
+    view_media_with_rotation(media_data, zoom_percent, RotationAngle::ZERO)
+}
+
+/// Renders media with optional rotation.
+///
+/// For images, creates a rotated version of the image data.
+/// For videos, rotation is not yet supported (shows thumbnail without rotation).
+#[allow(clippy::cast_precision_loss)] // u32 to f32 for dimensions: f32 is exact up to 16M
+pub fn view_media_with_rotation(
+    media_data: &MediaData,
+    zoom_percent: f32,
+    rotation: RotationAngle,
+) -> Element<'_, Message> {
+    // Apply rotation to get effective dimensions and handle
     let (handle, width, height) = match media_data {
-        MediaData::Image(image_data) => (
-            image_data.handle.clone(),
-            image_data.width,
-            image_data.height,
-        ),
-        MediaData::Video(video_data) => (
-            video_data.thumbnail.handle.clone(),
-            video_data.thumbnail.width,
-            video_data.thumbnail.height,
-        ),
+        MediaData::Image(image_data) => {
+            if rotation.is_rotated() {
+                // Create rotated version of the image
+                let rotated = image_data.rotated(rotation.degrees());
+                (rotated.handle.clone(), rotated.width, rotated.height)
+            } else {
+                (
+                    image_data.handle.clone(),
+                    image_data.width,
+                    image_data.height,
+                )
+            }
+        }
+        MediaData::Video(video_data) => {
+            // Video rotation not yet supported - show unrotated thumbnail
+            // TODO: Support video rotation in shader
+            (
+                video_data.thumbnail.handle.clone(),
+                video_data.thumbnail.width,
+                video_data.thumbnail.height,
+            )
+        }
     };
 
     let scale = (zoom_percent / 100.0).max(0.01);
@@ -59,6 +85,19 @@ pub fn view_media(media_data: &MediaData, zoom_percent: f32) -> Element<'_, Mess
     let scaled_height = (height as f32 * scale).max(1.0);
 
     Image::new(handle)
+        .width(Length::Fixed(scaled_width))
+        .height(Length::Fixed(scaled_height))
+        .into()
+}
+
+/// Renders an image directly from `ImageData` (used for cached rotated images).
+#[allow(clippy::cast_precision_loss)] // u32 to f32 for dimensions: f32 is exact up to 16M
+pub fn view_image(image_data: &crate::media::ImageData, zoom_percent: f32) -> Element<'_, Message> {
+    let scale = (zoom_percent / 100.0).max(0.01);
+    let scaled_width = (image_data.width as f32 * scale).max(1.0);
+    let scaled_height = (image_data.height as f32 * scale).max(1.0);
+
+    Image::new(image_data.handle.clone())
         .width(Length::Fixed(scaled_width))
         .height(Length::Fixed(scaled_height))
         .into()
@@ -78,11 +117,12 @@ pub struct ErrorContext<'a> {
     pub show_details: bool,
 }
 
+#[allow(clippy::struct_excessive_bools)] // UI context requires multiple boolean visual flags
 pub struct ImageContext<'a> {
     pub i18n: &'a I18n,
     pub controls_context: controls::ViewContext<'a>,
     pub zoom: &'a ZoomState,
-    /// Effective fit-to-window state (may differ from zoom.fit_to_window for videos).
+    /// Effective fit-to-window state (may differ from `zoom.fit_to_window` for videos).
     pub effective_fit_to_window: bool,
     pub pane_context: pane::ViewContext<'a>,
     pub pane_model: pane::ViewModel<'a>,
@@ -93,6 +133,7 @@ pub struct ImageContext<'a> {
     pub is_video: bool,
 }
 
+#[must_use]
 pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
     if let Some(error) = ctx.error {
         return error_view(ctx.i18n, error);
@@ -111,6 +152,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
     empty_state::view(ctx.i18n)
 }
 
+#[allow(clippy::needless_pass_by_value)] // ErrorContext is small (references only)
 fn error_view<'a>(i18n: &'a I18n, error: ErrorContext<'a>) -> Element<'a, Message> {
     let error_display = ErrorDisplay::new(ErrorSeverity::Error)
         .title(i18n.tr("error-load-image-heading"))
@@ -127,7 +169,7 @@ fn error_view<'a>(i18n: &'a I18n, error: ErrorContext<'a>) -> Element<'a, Messag
     centered_error_view(error_display)
 }
 
-fn loading_view<'a>(i18n: &'a I18n, rotation: f32) -> Element<'a, Message> {
+fn loading_view(i18n: &I18n, rotation: f32) -> Element<'_, Message> {
     let spinner = AnimatedSpinner::new(theme::overlay_arrow_light_color(), rotation).into_element();
 
     let loading_text = Text::new(i18n.tr("media-loading")).size(sizing::ICON_SM);
@@ -227,16 +269,11 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
 mod tests {
     use super::*;
     use crate::media::{ImageData, MediaData};
-    use iced::widget::image::Handle;
 
     #[test]
     fn view_media_produces_element() {
-        let pixels = vec![0_u8, 0, 0, 255];
-        let image_data = ImageData {
-            handle: Handle::from_rgba(1, 1, pixels),
-            width: 1,
-            height: 1,
-        };
+        let pixels = vec![0_u8; 4];
+        let image_data = ImageData::from_rgba(1, 1, pixels);
         let media_data = MediaData::Image(image_data);
 
         let _element = view_media(&media_data, 100.0);
