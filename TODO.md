@@ -10,7 +10,8 @@
   - **Diagnostic logs added**: `[STARTUP]` messages in main.rs, app/mod.rs, media/mod.rs, media/video.rs
   - **Finding**: All startup logs complete successfully (App::new, media loading, ONNX validation)
   - **Likely cause**: Issue occurs AFTER App::new() returns, during first render or event loop
-  - **Next steps**: Add logging in `App::view()`, `App::subscription()`, `App::update()` to isolate
+  - **Event loop logging added**: `view()`, `subscription()`, `update()` now log first 5-10 calls with timing
+  - **Next steps**: Run app multiple times, check logs when hang occurs to identify which function blocks
 
 ## Planned Features
 

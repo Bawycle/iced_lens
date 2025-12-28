@@ -35,6 +35,12 @@ use crate::video_player::{create_lufs_cache, SharedLufsCache};
 use i18n::fluent::I18n;
 use iced::{window, Element, Subscription, Task, Theme};
 use std::fmt;
+use std::sync::atomic::{AtomicU32, Ordering};
+
+// Diagnostic counters for startup hang investigation
+static VIEW_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
+static UPDATE_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
+static SUBSCRIPTION_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
 
 /// Root Iced application state that bridges UI components, localization, and
 /// persisted preferences.
@@ -571,6 +577,11 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
+        let count = SUBSCRIPTION_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+        if count < 5 {
+            eprintln!("[STARTUP] subscription() call #{}", count + 1);
+        }
+
         let event_sub = subscription::create_event_subscription(self.screen);
         let tick_sub = subscription::create_tick_subscription(
             self.fullscreen,
@@ -597,6 +608,11 @@ impl App {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
+        let count = UPDATE_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+        if count < 10 {
+            eprintln!("[STARTUP] update() call #{}: {:?}", count + 1, std::mem::discriminant(&message));
+        }
+
         // Track window size from resize events before creating context
         // (must be done before borrowing self.window_size)
         if let Message::Viewer(component::Message::RawEvent {
@@ -1279,6 +1295,11 @@ impl App {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        let count = VIEW_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+        if count < 5 {
+            eprintln!("[STARTUP] view() call #{}, screen={:?}", count + 1, self.screen);
+        }
+
         let is_dark_theme = self.theme_mode.is_dark();
         let is_image = matches!(
             self.current_metadata,
