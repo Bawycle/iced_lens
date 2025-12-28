@@ -62,7 +62,7 @@ image_rs = { package = "image", version = "0.25", default-features = false, feat
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
-tempfile = "3.23.0"
+tempfile = "3.24.0"
 tokio = { version = "1.48", features = ["macros", "rt", "sync", "time"] }
 
 [lints.clippy]
