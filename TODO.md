@@ -4,8 +4,7 @@
 
 ## Bugs to Fix
 
-- [ ] XMP metadata (dc:title, etc.) not written to PNG files — `write_xmp_to_jpeg()` only supports JPEG but returns `Ok(())` anyway. Fix requires: (1) extend XMP writing to PNG (iTXt chunks) and other formats, (2) for unsupported formats: don't show XMP tags in the editable fields dropdown, and disable existing XMP fields (read-only) if they cannot be written back.
-
+_(No known bugs)_
 
 ## Planned Features
 
@@ -48,7 +47,8 @@
 - [ ] Add video metadata editing support (Phase 2 - future work)
 
 ### Video Player
-- [ ] **Seeking audit**: Compare with VLC's smooth seeking and improve both UX and underlying logic (investigate keyframe-based seeking, buffering strategy, decoder pipeline, frame caching, etc.)
+
+_(No pending items)_
 
 ### Help
 - [ ] Allow text selection and copying in the help screen (blocked, pending native support in Iced 0.15.0)
