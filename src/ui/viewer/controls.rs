@@ -179,19 +179,23 @@ pub fn view<'a>(
     let rotate_ccw_button = tip(rotate_ccw_content, ctx.i18n.tr("viewer-rotate-ccw-tooltip"));
 
     let rotate_cw_content: Element<'_, Message> = if ctx.is_video {
-        button(icons::fill(action_icons::viewer::toolbar::rotate_clockwise()))
-            .padding(spacing::XXS)
-            .width(Length::Fixed(shared_styles::ICON_SIZE))
-            .height(Length::Fixed(shared_styles::ICON_SIZE))
-            .style(styles::button::disabled())
-            .into()
+        button(icons::fill(
+            action_icons::viewer::toolbar::rotate_clockwise(),
+        ))
+        .padding(spacing::XXS)
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE))
+        .style(styles::button::disabled())
+        .into()
     } else {
-        button(icons::fill(action_icons::viewer::toolbar::rotate_clockwise()))
-            .on_press(Message::RotateClockwise)
-            .padding(spacing::XXS)
-            .width(Length::Fixed(shared_styles::ICON_SIZE))
-            .height(Length::Fixed(shared_styles::ICON_SIZE))
-            .into()
+        button(icons::fill(
+            action_icons::viewer::toolbar::rotate_clockwise(),
+        ))
+        .on_press(Message::RotateClockwise)
+        .padding(spacing::XXS)
+        .width(Length::Fixed(shared_styles::ICON_SIZE))
+        .height(Length::Fixed(shared_styles::ICON_SIZE))
+        .into()
     };
     let rotate_cw_button = tip(rotate_cw_content, ctx.i18n.tr("viewer-rotate-cw-tooltip"));
 

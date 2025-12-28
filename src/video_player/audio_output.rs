@@ -116,6 +116,11 @@ impl AudioOutput {
     ///
     /// Returns the configured sample rate and channel count that the caller
     /// should use for resampling audio to match the output device.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no audio output device is found, if the device
+    /// configuration cannot be retrieved, or if the audio stream fails to start.
     pub fn new(initial_volume: f32) -> Result<Self> {
         // Get the default audio host and device
         let host = cpal::default_host();
@@ -128,7 +133,7 @@ impl AudioOutput {
             .default_output_config()
             .map_err(|e| Error::Io(format!("Failed to get audio config: {e}")))?;
 
-        let sample_rate = supported_config.sample_rate().0;
+        let sample_rate = supported_config.sample_rate();
         let channels = supported_config.channels();
 
         // Create shared state
@@ -240,8 +245,6 @@ impl AudioOutput {
         buffer: Arc<std::sync::Mutex<Vec<f32>>>,
         shared_state: Arc<SharedState>,
     ) -> Result<cpal::Stream> {
-        let _channels = config.channels as usize;
-
         let stream = device
             .build_output_stream(
                 config,
@@ -259,15 +262,12 @@ impl AudioOutput {
                     }
 
                     // Get samples from buffer
-                    let mut buf = match buffer.lock() {
-                        Ok(b) => b,
-                        Err(_) => {
-                            // Mutex poisoned, output silence
-                            for sample in data.iter_mut() {
-                                *sample = T::from_sample(0.0f32);
-                            }
-                            return;
+                    let Ok(mut buf) = buffer.lock() else {
+                        // Mutex poisoned, output silence
+                        for sample in data.iter_mut() {
+                            *sample = T::from_sample(0.0f32);
                         }
+                        return;
                     };
 
                     // Apply perceptual volume curve (quadratic) for natural-feeling control.
@@ -306,6 +306,10 @@ impl AudioOutput {
     }
 
     /// Sends a command to the audio output.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio output channel is closed.
     pub fn send_command(&self, command: AudioOutputCommand) -> Result<()> {
         self.command_tx
             .send(command)
@@ -313,57 +317,89 @@ impl AudioOutput {
     }
 
     /// Queues audio samples for playback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio output channel is closed.
     pub fn play(&self, samples: AudioSamples) -> Result<()> {
         self.send_command(AudioOutputCommand::Play(samples))
     }
 
     /// Pauses audio playback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio output channel is closed.
     pub fn pause(&self) -> Result<()> {
         self.send_command(AudioOutputCommand::Pause)
     }
 
     /// Resumes audio playback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio output channel is closed.
     pub fn resume(&self) -> Result<()> {
         self.send_command(AudioOutputCommand::Resume)
     }
 
     /// Stops playback and clears the buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio output channel is closed.
     pub fn stop(&self) -> Result<()> {
         self.send_command(AudioOutputCommand::Stop)
     }
 
     /// Clears the audio buffer without changing pause state.
     /// Used during seek to discard old audio without interrupting playback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio output channel is closed.
     pub fn clear_buffer(&self) -> Result<()> {
         self.send_command(AudioOutputCommand::ClearBuffer)
     }
 
     /// Sets the volume.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio output channel is closed.
     pub fn set_volume(&self, volume: super::Volume) -> Result<()> {
         self.send_command(AudioOutputCommand::SetVolume(volume))
     }
 
     /// Sets the mute state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio output channel is closed.
     pub fn set_muted(&self, muted: bool) -> Result<()> {
         self.send_command(AudioOutputCommand::SetMuted(muted))
     }
 
     /// Returns the current volume.
+    #[must_use]
     pub fn volume(&self) -> f32 {
         self.shared_state.volume()
     }
 
     /// Returns whether audio is muted.
+    #[must_use]
     pub fn is_muted(&self) -> bool {
         self.shared_state.is_muted()
     }
 
     /// Returns the output sample rate.
+    #[must_use]
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate
     }
 
     /// Returns the number of output channels.
+    #[must_use]
     pub fn channels(&self) -> u16 {
         self.channels
     }
@@ -421,7 +457,7 @@ mod tests {
     // and are better suited for integration tests or manual testing.
     // The following test is marked as ignored by default.
     #[tokio::test]
-    #[ignore]
+    #[ignore = "requires audio hardware"]
     async fn audio_output_can_be_created() {
         let result = AudioOutput::new(0.8);
         // This may fail on CI without audio hardware, so we just check it doesn't panic
