@@ -3,7 +3,7 @@
 //!
 //! Provides consistent styling for sliders across the application.
 
-use crate::ui::design_tokens::palette;
+use crate::ui::design_tokens::{opacity, palette};
 use iced::widget::slider;
 use iced::{Background, Border, Color, Theme};
 
@@ -18,15 +18,33 @@ pub fn disabled() -> impl Fn(&Theme, slider::Status) -> slider::Style {
         // Low contrast appearance, clearly non-interactive
         let (rail_bg, handle_bg, handle_border) = if is_light {
             (
-                Color::from_rgba(0.85, 0.85, 0.85, 0.6), // Semi-transparent light gray
-                Color::from_rgba(0.9, 0.9, 0.9, 0.7),    // Faded handle
-                Color::from_rgba(0.7, 0.7, 0.7, 0.3),    // Very subtle border
+                Color {
+                    a: 0.6,
+                    ..palette::GRAY_100
+                },
+                Color {
+                    a: opacity::DISABLED_DARK,
+                    ..palette::DISABLED_LIGHT_BG
+                },
+                Color {
+                    a: opacity::DISABLED_BORDER,
+                    ..palette::GRAY_200
+                },
             )
         } else {
             (
-                Color::from_rgba(0.3, 0.3, 0.3, 0.6), // Semi-transparent dark gray
-                Color::from_rgba(0.35, 0.35, 0.35, 0.7), // Faded handle
-                Color::from_rgba(0.4, 0.4, 0.4, 0.5), // Subtle but visible border
+                Color {
+                    a: 0.6,
+                    ..palette::GRAY_700
+                },
+                Color {
+                    a: opacity::DISABLED_DARK,
+                    ..palette::DISABLED_DARK_BORDER
+                },
+                Color {
+                    a: opacity::OVERLAY_MEDIUM,
+                    ..palette::GRAY_400
+                },
             )
         };
 

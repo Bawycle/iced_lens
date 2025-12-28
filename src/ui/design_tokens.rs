@@ -59,6 +59,17 @@ pub mod palette {
     pub const GRAY_200: Color = Color::from_rgb(0.75, 0.75, 0.75);
     pub const GRAY_100: Color = Color::from_rgb(0.85, 0.85, 0.85);
 
+    // Disabled state colors
+    // Use with opacity::DISABLED_* for semi-transparent variants
+    /// Disabled background - Light theme (rgb 0.9, near `GRAY_100`)
+    pub const DISABLED_LIGHT_BG: Color = Color::from_rgb(0.9, 0.9, 0.9);
+
+    /// Disabled background - Dark theme (rgb 0.25, between `GRAY_900` and `GRAY_700`)
+    pub const DISABLED_DARK_BG: Color = Color::from_rgb(0.25, 0.25, 0.25);
+
+    /// Disabled border/handle - Dark theme (rgb 0.35)
+    pub const DISABLED_DARK_BORDER: Color = Color::from_rgb(0.35, 0.35, 0.35);
+
     // Brand colors (blue scale)
     pub const PRIMARY_100: Color = Color::from_rgb(0.85, 0.92, 1.0); // Very light blue
     pub const PRIMARY_200: Color = Color::from_rgb(0.7, 0.84, 0.98); // Light blue
@@ -90,6 +101,16 @@ pub mod opacity {
 
     /// Surface background - Semi-transparent panels and containers
     pub const SURFACE: f32 = 0.95;
+
+    // Disabled states
+    /// Disabled element - Very faded, clearly non-interactive (light theme)
+    pub const DISABLED_LIGHT: f32 = 0.5;
+
+    /// Disabled element - More visible for dark backgrounds
+    pub const DISABLED_DARK: f32 = 0.7;
+
+    /// Disabled border - Subtle
+    pub const DISABLED_BORDER: f32 = 0.3;
 }
 
 // ============================================================================
@@ -131,20 +152,20 @@ pub mod sizing {
     pub const TOAST_WIDTH: f32 = 320.0;
 
     // Layout heights
-    /// Navbar height (SM padding top + ICON_MD + SM padding bottom)
+    /// Navbar height (SM padding top + `ICON_MD` + SM padding bottom)
     pub const NAVBAR_HEIGHT: f32 = 48.0;
 
     /// Hamburger dropdown menu height when open (3 menu items + container padding)
-    /// Each item: ICON_SM (16) + vertical padding XS×2 (16) = 32px
+    /// Each item: `ICON_SM` (16) + vertical padding XS×2 (16) = 32px
     /// Container: XS padding (8) × 2 + 3 items × 32px + XXS spacing×2 = 112px
     pub const HAMBURGER_MENU_HEIGHT: f32 = 112.0;
 
     /// Media toolbar height (zoom controls) at bottom of viewer
-    /// ICON_LG (32) + XXS padding×2 (8) + row padding SM (12) ≈ 52px
+    /// `ICON_LG` (32) + XXS padding×2 (8) + row padding SM (12) ≈ 52px
     pub const MEDIA_TOOLBAR_HEIGHT: f32 = 52.0;
 
     /// Video toolbar height at bottom of viewer
-    /// BUTTON_HEIGHT (36) + XS padding×2 (16) ≈ 52px
+    /// `BUTTON_HEIGHT` (36) + XS padding×2 (16) ≈ 52px
     pub const VIDEO_TOOLBAR_HEIGHT: f32 = 52.0;
 
     // Crop overlay handles
@@ -286,7 +307,7 @@ mod tests {
 
     #[test]
     fn spacing_scale_is_consistent() {
-        assert_eq!(spacing::MD, spacing::XS * 2.0);
-        assert_eq!(spacing::LG, spacing::MD * 1.5);
+        assert!((spacing::MD - spacing::XS * 2.0).abs() < f32::EPSILON);
+        assert!((spacing::LG - spacing::MD * 1.5).abs() < f32::EPSILON);
     }
 }

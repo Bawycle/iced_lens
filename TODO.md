@@ -57,11 +57,7 @@ _(No pending items)_
 
 ## Code Quality / Refactoring
 
-### Design Tokens
-- [ ] Refactor hardcoded colors in disabled styles to use design tokens
-  - `src/ui/styles/button.rs`: `disabled()` uses `Color::from_rgba()` inline
-  - `src/ui/styles/slider.rs`: `disabled()` uses `Color::from_rgba()` inline
-  - Should create palette constants like `DISABLED_LIGHT_BG`, `DISABLED_DARK_BG`, etc.
+_(No pending items)_
 
 ## Packaging / Distribution
 

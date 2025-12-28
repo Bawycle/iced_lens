@@ -10,6 +10,7 @@ use iced::widget::button;
 use iced::{Background, Border, Color, Theme};
 
 /// Style pour bouton primaire (action principale).
+#[must_use]
 pub fn primary(_theme: &Theme, status: button::Status) -> button::Style {
     match status {
         button::Status::Active | button::Status::Pressed => button::Style {
@@ -118,15 +119,27 @@ pub fn disabled() -> impl Fn(&Theme, button::Status) -> button::Style {
         // Low contrast appearance, clearly non-interactive
         let (bg_color, text_color, border_color) = if is_light {
             (
-                Color::from_rgba(0.9, 0.9, 0.9, 0.5), // Semi-transparent light gray
-                palette::GRAY_400,                    // Faded text
-                Color::from_rgba(0.7, 0.7, 0.7, 0.3), // Very subtle border
+                Color {
+                    a: opacity::DISABLED_LIGHT,
+                    ..palette::DISABLED_LIGHT_BG
+                },
+                palette::GRAY_400,
+                Color {
+                    a: opacity::DISABLED_BORDER,
+                    ..palette::GRAY_200
+                },
             )
         } else {
             (
-                Color::from_rgba(0.25, 0.25, 0.25, 0.7), // More visible dark gray
-                palette::GRAY_400,                       // Faded but readable text
-                Color::from_rgba(0.35, 0.35, 0.35, 0.5), // Subtle but visible border
+                Color {
+                    a: opacity::DISABLED_DARK,
+                    ..palette::DISABLED_DARK_BG
+                },
+                palette::GRAY_400,
+                Color {
+                    a: opacity::OVERLAY_MEDIUM,
+                    ..palette::DISABLED_DARK_BORDER
+                },
             )
         };
 
@@ -148,6 +161,7 @@ pub fn disabled() -> impl Fn(&Theme, button::Status) -> button::Style {
 ///
 /// Use this when one option is selected among multiple mutually exclusive choices.
 /// For on/off toggle buttons, use `toggle_active` instead.
+#[must_use]
 pub fn selected(theme: &Theme, status: button::Status) -> button::Style {
     let is_light = matches!(theme, Theme::Light);
 
@@ -197,6 +211,7 @@ pub fn selected(theme: &Theme, status: button::Status) -> button::Style {
 /// Use this for non-selected options in mutually exclusive choice groups.
 /// Has clear visual distinction from disabled buttons: solid border, full contrast text.
 /// For on/off toggle buttons in inactive state, use the default button style.
+#[must_use]
 pub fn unselected(theme: &Theme, status: button::Status) -> button::Style {
     let is_light = matches!(theme, Theme::Light);
 
@@ -231,7 +246,7 @@ pub fn unselected(theme: &Theme, status: button::Status) -> button::Style {
             let hover_bg = if is_light {
                 palette::GRAY_200
             } else {
-                Color::from_rgb(0.35, 0.35, 0.35)
+                palette::DISABLED_DARK_BORDER
             };
             button::Style {
                 background: Some(Background::Color(hover_bg)),
