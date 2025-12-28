@@ -127,6 +127,7 @@ video-play-tooltip = Play (Space)
 video-pause-tooltip = Pause (Space)
 video-mute-tooltip = Mute (M)
 video-unmute-tooltip = Unmute (M)
+video-no-audio-tooltip = No audio track
 video-loop-tooltip = Loop
 video-capture-tooltip = Capture current frame
 video-step-forward-tooltip = Step forward one frame (.)

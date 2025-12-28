@@ -127,6 +127,7 @@ video-play-tooltip = Riproduci (Spazio)
 video-pause-tooltip = Pausa (Spazio)
 video-mute-tooltip = Silenzia (M)
 video-unmute-tooltip = Attiva audio (M)
+video-no-audio-tooltip = Nessuna traccia audio
 video-loop-tooltip = Ripeti
 video-capture-tooltip = Cattura fotogramma corrente
 video-step-forward-tooltip = Avanza di un fotogramma (.)

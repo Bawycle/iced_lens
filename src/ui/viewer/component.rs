@@ -1481,6 +1481,7 @@ impl State {
                         can_step_forward,
                         playback_speed,
                         speed_auto_muted,
+                        has_audio: video_data.has_audio,
                     })
                 } else {
                     None

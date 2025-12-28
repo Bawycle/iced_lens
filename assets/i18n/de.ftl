@@ -127,6 +127,7 @@ video-play-tooltip = Wiedergabe (Leertaste)
 video-pause-tooltip = Pause (Leertaste)
 video-mute-tooltip = Stummschalten (M)
 video-unmute-tooltip = Ton einschalten (M)
+video-no-audio-tooltip = Keine Audiospur
 video-loop-tooltip = Wiederholen
 video-capture-tooltip = Aktuelles Bild aufnehmen
 video-step-forward-tooltip = Ein Bild vorwärts (.)

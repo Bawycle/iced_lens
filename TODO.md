@@ -57,6 +57,8 @@ _(No pending items)_
 
 ## Code Quality / Refactoring
 
+_(No pending items)_
+
 ## Packaging / Distribution
 
 ### Flatpak
