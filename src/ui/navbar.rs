@@ -127,12 +127,23 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
 
 /// Build the top bar with hamburger menu button, edit button, filter button, and info button.
 fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
-    let menu_button = button(icons::sized(
-        action_icons::navigation::menu(),
-        sizing::ICON_MD,
-    ))
-    .on_press(Message::ToggleMenu)
-    .padding(spacing::XS);
+    // Menu button with active style when menu is open
+    let menu_button = if ctx.menu_open {
+        button(icons::sized(
+            action_icons::navigation::menu(),
+            sizing::ICON_MD,
+        ))
+        .on_press(Message::ToggleMenu)
+        .padding(spacing::XS)
+        .style(styles::button::selected)
+    } else {
+        button(icons::sized(
+            action_icons::navigation::menu(),
+            sizing::ICON_MD,
+        ))
+        .on_press(Message::ToggleMenu)
+        .padding(spacing::XS)
+    };
 
     let edit_label = ctx.i18n.tr("navbar-edit-button");
     let edit_button = if ctx.metadata_editor_has_changes {
