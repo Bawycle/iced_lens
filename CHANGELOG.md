@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Video playback errors are now displayed as notifications instead of failing silently.
 - Audio controls (mute button, volume slider) are now disabled with a grayed appearance when media has no audio track (videos without audio, animated GIFs/WebPs). A tooltip explains "No audio track".
 - Metadata fields are now filtered based on file format support—only relevant fields appear in the editor.
+- Toolbar buttons reorganized for better UX: zoom and fit-to-window grouped together, rotation buttons after, fullscreen before delete (isolated as destructive action).
 
 ### Fixed
 - Frame-by-frame video navigation now works immediately after loading a video.
