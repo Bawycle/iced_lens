@@ -1329,7 +1329,9 @@ impl State {
         // For center video overlay (play/pause button), use auto-hide in both modes when playing
         let is_currently_playing = self.video_player.is_some()
             && matches!(
-                self.video_player.as_ref().map(crate::video_player::VideoPlayer::state),
+                self.video_player
+                    .as_ref()
+                    .map(crate::video_player::VideoPlayer::state),
                 Some(
                     crate::video_player::PlaybackState::Playing { .. }
                         | crate::video_player::PlaybackState::Buffering { .. }
