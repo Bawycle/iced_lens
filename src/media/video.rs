@@ -18,8 +18,12 @@ pub fn init_ffmpeg() -> Result<()> {
     let mut init_result: Result<()> = Ok(());
 
     FFMPEG_INIT.call_once(|| {
+        eprintln!("[STARTUP] FFmpeg: initializing...");
+        let start = std::time::Instant::now();
+
         // Initialize FFmpeg
         if let Err(e) = ffmpeg_next::init() {
+            eprintln!("[STARTUP] FFmpeg: initialization FAILED in {:?}", start.elapsed());
             init_result = Err(Error::Io(format!("FFmpeg initialization failed: {e}")));
             return;
         }
@@ -29,6 +33,8 @@ pub fn init_ffmpeg() -> Result<()> {
         unsafe {
             ffmpeg_next::ffi::av_log_set_level(ffmpeg_next::ffi::AV_LOG_ERROR);
         }
+
+        eprintln!("[STARTUP] FFmpeg: initialized in {:?}", start.elapsed());
     });
 
     init_result

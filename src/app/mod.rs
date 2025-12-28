@@ -173,8 +173,14 @@ impl App {
     /// Initializes application state and optionally kicks off asynchronous image
     /// loading based on `Flags` received from the launcher.
     fn new(flags: Flags) -> (Self, Task<Message>) {
+        let startup_time = std::time::Instant::now();
+        eprintln!("[STARTUP] App::new() started");
+
         let (config, config_warning) = config::load();
+        eprintln!("[STARTUP] Config loaded in {:?}", startup_time.elapsed());
+
         let i18n = I18n::new(flags.lang.clone(), flags.i18n_dir.clone(), &config);
+        eprintln!("[STARTUP] I18n loaded in {:?}", startup_time.elapsed());
 
         let mut app = App {
             i18n,
@@ -220,7 +226,9 @@ impl App {
         app.frame_cache_mb = frame_cache_mb;
         app.frame_history_mb = frame_history_mb;
         // Load application state (last save directory, deblur enabled, etc.)
+        eprintln!("[STARTUP] Loading app state...");
         let (app_state, state_warning) = persisted_state::AppState::load();
+        eprintln!("[STARTUP] App state loaded in {:?}", startup_time.elapsed());
 
         // Read AI settings before moving app_state (enable flags come from persisted state)
         let enable_deblur = app_state.enable_deblur;
@@ -319,8 +327,11 @@ impl App {
                 .push(notifications::Notification::warning(&key));
         }
 
+        eprintln!("[STARTUP] Settings applied in {:?}", startup_time.elapsed());
+
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
+            eprintln!("[STARTUP] Scanning directory for: {:?}", path);
 
             // Determine if path is a directory or a file and resolve the media path
             let resolved_path = if path.is_dir() {
@@ -352,6 +363,8 @@ impl App {
                 Some(path)
             };
 
+            eprintln!("[STARTUP] Directory scanned in {:?}", startup_time.elapsed());
+
             if let Some(media_path) = resolved_path {
                 // Synchronize viewer state
                 app.viewer.current_media_path = Some(media_path.clone());
@@ -371,6 +384,13 @@ impl App {
             Task::none()
         };
 
+        eprintln!(
+            "[STARTUP] Media task prepared in {:?}, deblur_validation={}, upscale_validation={}",
+            startup_time.elapsed(),
+            needs_deblur_startup_validation,
+            needs_upscale_startup_validation
+        );
+
         // If deblur was enabled and model exists, start validation in background
         // Use spawn_blocking to avoid blocking the tokio runtime during CPU-intensive ONNX inference
         let deblur_validation_task = if needs_deblur_startup_validation {
@@ -378,9 +398,13 @@ impl App {
             Task::perform(
                 async move {
                     tokio::task::spawn_blocking(move || {
+                        eprintln!("[STARTUP] Deblur validation: starting...");
                         let mut manager = media::deblur::DeblurManager::new();
+                        eprintln!("[STARTUP] Deblur validation: loading session...");
                         manager.load_session(Some(&cancel_token))?;
+                        eprintln!("[STARTUP] Deblur validation: validating model...");
                         media::deblur::validate_model(&mut manager, Some(&cancel_token))?;
+                        eprintln!("[STARTUP] Deblur validation: completed");
                         Ok::<(), media::deblur::DeblurError>(())
                     })
                     .await
@@ -407,9 +431,13 @@ impl App {
             Task::perform(
                 async move {
                     tokio::task::spawn_blocking(move || {
+                        eprintln!("[STARTUP] Upscale validation: starting...");
                         let mut manager = media::upscale::UpscaleManager::new();
+                        eprintln!("[STARTUP] Upscale validation: loading session...");
                         manager.load_session(Some(&cancel_token))?;
+                        eprintln!("[STARTUP] Upscale validation: validating model...");
                         media::upscale::validate_model(&mut manager, Some(&cancel_token))?;
+                        eprintln!("[STARTUP] Upscale validation: completed");
                         Ok::<(), media::upscale::UpscaleError>(())
                     })
                     .await
@@ -433,6 +461,7 @@ impl App {
         // Combine tasks
         let combined_task = Task::batch([task, deblur_validation_task, upscale_validation_task]);
 
+        eprintln!("[STARTUP] App::new() completed in {:?}", startup_time.elapsed());
         (app, combined_task)
     }
 
