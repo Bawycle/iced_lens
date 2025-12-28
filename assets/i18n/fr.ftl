@@ -127,6 +127,7 @@ video-play-tooltip = Lecture (Espace)
 video-pause-tooltip = Pause (Espace)
 video-mute-tooltip = Couper le son (M)
 video-unmute-tooltip = Remettre le son (M)
+video-no-audio-tooltip = Aucune piste audio
 video-loop-tooltip = Boucle
 video-capture-tooltip = Capturer l'image actuelle
 video-step-forward-tooltip = Avancer d'une image (.)

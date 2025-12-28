@@ -116,6 +116,10 @@ pub struct PlaybackState {
 
     /// Whether audio is auto-muted due to high speed (>2x).
     pub speed_auto_muted: bool,
+
+    /// Whether this media has an audio track.
+    /// When false, audio controls (mute button, volume slider) are disabled.
+    pub has_audio: bool,
 }
 
 impl Default for PlaybackState {
@@ -133,6 +137,7 @@ impl Default for PlaybackState {
             can_step_forward: false,
             playback_speed: 1.0,
             speed_auto_muted: false,
+            has_audio: true,
         }
     }
 }
@@ -193,42 +198,77 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     ))
     .size(sizing::ICON_SM);
 
-    // Volume button with tooltip - shows mute icon when muted
+    // Volume button with tooltip - shows mute icon when muted, disabled when no audio
     let volume_icon = if state.muted || state.volume == 0.0 {
         icons::sized(action_icons::video::toolbar::volume_muted(), icon_size)
     } else {
         icons::sized(action_icons::video::toolbar::volume(), icon_size)
     };
-    let volume_tooltip = if state.muted {
-        ctx.i18n.tr("video-unmute-tooltip")
-    } else {
-        ctx.i18n.tr("video-mute-tooltip")
-    };
-    let volume_button = button(volume_icon)
-        .on_press(Message::ToggleMute)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height));
 
-    // Apply active style when muted (highlighted like fit-to-window button)
-    let volume_button_content: Element<'_, Message> = if state.muted {
-        volume_button.style(styles::button::selected).into()
-    } else {
-        volume_button.into()
-    };
+    let volume_button_content: Element<'_, Message> = if state.has_audio {
+        // Has audio: normal volume button with mute/unmute functionality
+        let volume_tooltip = if state.muted {
+            ctx.i18n.tr("video-unmute-tooltip")
+        } else {
+            ctx.i18n.tr("video-mute-tooltip")
+        };
+        let volume_button = button(volume_icon)
+            .on_press(Message::ToggleMute)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height));
 
-    let volume_button_tooltip = tip(volume_button_content, volume_tooltip);
+        // Apply active style when muted (highlighted like fit-to-window button)
+        let styled_button: Element<'_, Message> = if state.muted {
+            volume_button.style(styles::button::selected).into()
+        } else {
+            volume_button.into()
+        };
+        tip(styled_button, volume_tooltip).into()
+    } else {
+        // No audio: disabled button with explanatory tooltip
+        let volume_button = button(volume_icon)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .style(styles::button::disabled());
+        tip(volume_button, ctx.i18n.tr("video-no-audio-tooltip")).into()
+    };
 
     // Volume slider with percentage display
-    let volume_slider = slider(0.0..=config::MAX_VOLUME, state.volume, |v| {
-        Message::SetVolume(Volume::new(v))
-    })
-    .width(Length::Fixed(80.0))
-    .step(0.01);
+    // Disabled when no audio track
+    let current_volume = state.volume; // Copy for closure capture
+    let volume_slider: Element<'_, Message> = if state.has_audio {
+        slider(0.0..=config::MAX_VOLUME, current_volume, |v| {
+            Message::SetVolume(Volume::new(v))
+        })
+        .width(Length::Fixed(80.0))
+        .step(0.01)
+        .into()
+    } else {
+        slider(0.0..=config::MAX_VOLUME, current_volume, move |_v| {
+            // No-op: slider is disabled, but we need a message for type inference
+            Message::SetVolume(Volume::new(current_volume))
+        })
+        .width(Length::Fixed(80.0))
+        .step(0.01)
+        .style(styles::slider::disabled())
+        .into()
+    };
 
-    let volume_percent = text(format_volume_percent(state.volume))
-        .size(sizing::ICON_SM)
-        .width(Length::Fixed(40.0)); // Fixed width prevents layout shift
+    // Volume percentage text - grayed when no audio
+    let volume_percent: Element<'_, Message> = if state.has_audio {
+        text(format_volume_percent(state.volume))
+            .size(sizing::ICON_SM)
+            .width(Length::Fixed(40.0))
+            .into()
+    } else {
+        text(format_volume_percent(state.volume))
+            .size(sizing::ICON_SM)
+            .width(Length::Fixed(40.0))
+            .style(styles::slider::disabled_text_style)
+            .into()
+    };
 
     // More button (overflow menu toggle)
     let more_button_base = button(icons::sized(
@@ -272,7 +312,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
         play_pause_button,
         timeline,
         time_display,
-        volume_button_tooltip,
+        volume_button_content,
         volume_slider,
         volume_percent,
         loop_button,
@@ -555,6 +595,7 @@ mod tests {
             can_step_forward: false,
             playback_speed: 1.0,
             speed_auto_muted: false,
+            has_audio: true,
         };
 
         // Position is in seconds
@@ -579,6 +620,7 @@ mod tests {
             can_step_forward: false,
             playback_speed: 1.0,
             speed_auto_muted: false,
+            has_audio: true,
         };
 
         // When duration is zero, position is still valid
@@ -605,6 +647,7 @@ mod tests {
             can_step_forward: false,
             playback_speed: 1.0,
             speed_auto_muted: false,
+            has_audio: true,
         };
 
         // When seek_preview_position is set, it should be used instead of playback position
