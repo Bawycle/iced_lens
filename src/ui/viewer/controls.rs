@@ -199,24 +199,30 @@ pub fn view<'a>(
     };
     let rotate_cw_button = tip(rotate_cw_content, ctx.i18n.tr("viewer-rotate-cw-tooltip"));
 
+    // Layout: [Zoom controls + Fit] | [Rotation] | [Fullscreen] | [Delete]
+    // Grouped by: Scale → Orientation → Display mode → Destructive action
     let zoom_controls_row = Row::new()
         .spacing(shared_styles::CONTROL_SPACING)
         .padding([0.0, shared_styles::CONTROL_PADDING])
         .align_y(Vertical::Center)
+        // Scale group: zoom input, +/-, reset, fit-to-window
         .push(zoom_label)
         .push(zoom_input)
         .push(zoom_percent_label)
         .push(zoom_out_button)
         .push(zoom_in_button)
         .push(reset_button)
-        .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
         .push(fit_toggle)
         .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
+        // Orientation group: rotation
         .push(rotate_ccw_button)
         .push(rotate_cw_button)
         .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
-        .push(delete_button)
-        .push(fullscreen_toggle);
+        // Display mode
+        .push(fullscreen_toggle)
+        .push(Space::new().width(Length::Fixed(shared_styles::CONTROL_PADDING)))
+        // Destructive action (isolated)
+        .push(delete_button);
 
     let mut zoom_controls = Column::new().spacing(spacing::XXS).push(zoom_controls_row);
 
