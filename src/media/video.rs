@@ -23,7 +23,10 @@ pub fn init_ffmpeg() -> Result<()> {
 
         // Initialize FFmpeg
         if let Err(e) = ffmpeg_next::init() {
-            eprintln!("[STARTUP] FFmpeg: initialization FAILED in {:?}", start.elapsed());
+            eprintln!(
+                "[STARTUP] FFmpeg: initialization FAILED in {:?}",
+                start.elapsed()
+            );
             init_result = Err(Error::Io(format!("FFmpeg initialization failed: {e}")));
             return;
         }

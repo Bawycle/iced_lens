@@ -202,6 +202,12 @@ define_icon!(
     "Trash icon: garbage bin (used for delete)."
 );
 define_icon!(pencil, dark, "pencil.png", "Pencil icon: for edit actions.");
+define_icon!(
+    funnel,
+    dark,
+    "funnel.png",
+    "Funnel icon: filter/sort indicator."
+);
 
 // =============================================================================
 // Transform Icons (Editor)
@@ -514,6 +520,12 @@ pub mod light {
         "trash.png",
         "Delete icon (white): for toolbar."
     );
+    define_icon!(
+        funnel,
+        light,
+        "funnel.png",
+        "Filter icon (white): for toolbar."
+    );
 
     // Notification icons
     define_icon!(
@@ -637,6 +649,7 @@ mod tests {
         let _ = fullscreen();
         let _ = trash();
         let _ = pencil();
+        let _ = funnel();
         let _ = rotate_left();
         let _ = rotate_right();
         let _ = flip_horizontal();
@@ -709,6 +722,7 @@ mod tests {
         let _ = light::expand();
         let _ = light::fullscreen();
         let _ = light::trash();
+        let _ = light::funnel();
         // Notifications
         let _ = light::checkmark();
     }

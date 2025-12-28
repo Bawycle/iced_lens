@@ -18,9 +18,10 @@ use crate::ui::metadata_panel::{self, MetadataEditorState, PanelContext as Metad
 use crate::ui::navbar::{self, ViewContext as NavbarViewContext};
 use crate::ui::notifications::{Manager as NotificationManager, Toast};
 use crate::ui::settings::{State as SettingsState, ViewContext as SettingsViewContext};
-use crate::ui::viewer::component;
+use crate::ui::design_tokens::spacing;
+use crate::ui::viewer::{component, filter_dropdown};
 use iced::{
-    widget::{Container, Row, Stack, Text},
+    widget::{mouse_area, Container, Row, Stack, Text},
     Element, Length,
 };
 
@@ -59,6 +60,12 @@ pub struct ViewContext<'a> {
     pub upscale_model_status: &'a UpscaleModelStatus,
     /// Whether AI upscaling is enabled for resize operations.
     pub enable_upscale: bool,
+    /// Current media filter (from navigator).
+    pub filter: &'a crate::media::filter::MediaFilter,
+    /// Total count of media files in directory.
+    pub total_count: usize,
+    /// Filtered count of media files.
+    pub filtered_count: usize,
 }
 
 /// Context required to render the viewer screen.
@@ -77,6 +84,11 @@ struct ViewerViewContext<'a> {
     current_media_path: Option<&'a std::path::Path>,
     is_image: bool,
     is_dark_theme: bool,
+    filter: &'a crate::media::filter::MediaFilter,
+    /// Total count of media files in directory.
+    total_count: usize,
+    /// Filtered count of media files.
+    filtered_count: usize,
 }
 
 /// Renders the current application view based on the active screen.
@@ -99,6 +111,9 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
             current_media_path: ctx.current_media_path,
             is_image: ctx.is_image,
             is_dark_theme: ctx.is_dark_theme,
+            filter: ctx.filter,
+            total_count: ctx.total_count,
+            filtered_count: ctx.filtered_count,
         }),
         Screen::Settings => view_settings(ctx.settings, ctx.i18n),
         Screen::ImageEditor => view_image_editor(
@@ -121,13 +136,67 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
     // Render toast notifications as an overlay
     let toast_overlay = Toast::view_overlay(ctx.notifications, ctx.i18n).map(Message::Notification);
 
-    // Stack the main content with the toast overlay
-    Stack::new()
-        .push(main_content)
-        .push(toast_overlay)
+    // Build filter dropdown overlay (only on Viewer screen, not in fullscreen)
+    let filter_overlay: Option<Element<'_, Message>> =
+        if matches!(ctx.screen, Screen::Viewer) && !ctx.fullscreen {
+            let filter_dropdown_state = ctx.viewer.filter_dropdown_state();
+            if filter_dropdown_state.is_open {
+                filter_dropdown::view_panel(filter_dropdown::ViewContext {
+                    i18n: ctx.i18n,
+                    filter: ctx.filter,
+                    state: filter_dropdown_state,
+                    total_count: ctx.total_count,
+                    filtered_count: ctx.filtered_count,
+                })
+                .map(|panel| {
+                    let mapped_panel =
+                        panel.map(|msg| Message::Navbar(navbar::Message::FilterDropdown(msg)));
+
+                    // Position panel below navbar, aligned to left
+                    let navbar_height = spacing::SM * 2.0 + 32.0;
+
+                    // Wrap panel in mouse_area to prevent clicks from closing dropdown
+                    let panel_with_click_guard = mouse_area(mapped_panel).on_press(
+                        Message::Navbar(navbar::Message::FilterDropdown(
+                            filter_dropdown::Message::ConsumeClick,
+                        )),
+                    );
+
+                    Container::new(panel_with_click_guard)
+                        .width(Length::Shrink)
+                        .padding(iced::Padding {
+                            top: navbar_height,
+                            right: 0.0,
+                            bottom: 0.0,
+                            left: spacing::SM,
+                        })
+                        .into()
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+    // Stack the main content with overlays
+    let mut stack = Stack::new()
         .width(Length::Fill)
         .height(Length::Fill)
-        .into()
+        .push(main_content);
+
+    // Add click-outside overlay and filter panel if open
+    if let Some(panel) = filter_overlay {
+        // Full-screen click catcher to close dropdown when clicking outside
+        let click_outside = mouse_area(Container::new(Text::new("")).width(Length::Fill).height(Length::Fill))
+            .on_press(Message::Navbar(navbar::Message::FilterDropdown(
+                filter_dropdown::Message::CloseDropdown,
+            )));
+        stack = stack.push(click_outside);
+        stack = stack.push(panel);
+    }
+
+    stack.push(toast_overlay).into()
 }
 
 // Allow pass-by-value: ViewerViewContext contains references and is cheap to move.
@@ -154,6 +223,7 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
             overlay_hide_delay: overlay_timeout.as_duration(),
             navigation: ctx.navigation,
             metadata_editor_has_changes,
+            filter: ctx.filter,
         })
         .map(Message::Viewer);
 
@@ -206,6 +276,10 @@ fn view_viewer(ctx: ViewerViewContext<'_>) -> Element<'_, Message> {
             info_panel_open: ctx.info_panel_open,
             has_media,
             metadata_editor_has_changes,
+            filter: ctx.filter,
+            filter_dropdown: ctx.viewer.filter_dropdown_state(),
+            total_count: ctx.total_count,
+            filtered_count: ctx.filtered_count,
         })
         .map(Message::Navbar);
 

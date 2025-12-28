@@ -197,6 +197,7 @@ fn needs_light_variant(name: &str) -> bool {
             | "expand"
             | "fullscreen"
             | "trash"
+            | "funnel"
             // HUD indicators
             | "crosshair"
             | "magnifier"

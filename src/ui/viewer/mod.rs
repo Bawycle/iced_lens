@@ -4,6 +4,7 @@
 pub mod component;
 pub mod controls;
 pub mod empty_state;
+pub mod filter_dropdown;
 pub mod pane;
 pub mod shared_styles;
 pub mod state;
@@ -237,12 +238,8 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
 
         stack.into()
     } else {
-        // Windowed mode: normal column layout
-        // Note: Navigation bar (hamburger menu, edit button) is now handled at app level
-        let mut column = Column::new()
-            .spacing(spacing::MD)
-            .width(Length::Fill)
-            .height(Length::Fill);
+        // Windowed mode: vertical layout with controls above pane
+        let mut controls_column = Column::new().spacing(spacing::MD).width(Length::Fill);
 
         // Add zoom controls and video controls
         if ctx.controls_visible {
@@ -253,15 +250,15 @@ fn image_view(ctx: ImageContext<'_>) -> Element<'_, Message> {
                 ctx.is_fullscreen,
             )
             .map(Message::Controls);
-            column = column.push(controls_view);
+            controls_column = controls_column.push(controls_view);
 
             // Add video controls if video is playing/paused
             if let Some(video_controls) = video_controls_view {
-                column = column.push(video_controls);
+                controls_column = controls_column.push(video_controls);
             }
         }
 
-        column.push(pane_view).into()
+        controls_column.push(pane_view).into()
     }
 }
 

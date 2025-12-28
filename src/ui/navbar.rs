@@ -6,10 +6,12 @@
 //! Help, and About screens.
 
 use crate::i18n::fluent::I18n;
+use crate::media::filter::MediaFilter;
 use crate::ui::action_icons;
 use crate::ui::design_tokens::{radius, sizing, spacing};
 use crate::ui::icons;
 use crate::ui::styles;
+use crate::ui::viewer::filter_dropdown::{self, FilterDropdownState};
 use iced::widget::image::{Handle, Image};
 use iced::{
     alignment::{Horizontal, Vertical},
@@ -18,6 +20,7 @@ use iced::{
 };
 
 /// Contextual data needed to render the navbar.
+#[allow(clippy::struct_excessive_bools)]
 pub struct ViewContext<'a> {
     pub i18n: &'a I18n,
     pub menu_open: bool,
@@ -27,6 +30,14 @@ pub struct ViewContext<'a> {
     pub has_media: bool,
     /// Whether metadata editor has unsaved changes (disables edit button).
     pub metadata_editor_has_changes: bool,
+    /// Current media filter.
+    pub filter: &'a MediaFilter,
+    /// Filter dropdown state.
+    pub filter_dropdown: &'a FilterDropdownState,
+    /// Total count of media files in directory.
+    pub total_count: usize,
+    /// Filtered count of media files.
+    pub filtered_count: usize,
 }
 
 /// Messages emitted by the navbar.
@@ -39,6 +50,8 @@ pub enum Message {
     OpenAbout,
     EnterEditor,
     ToggleInfoPanel,
+    /// Filter dropdown messages.
+    FilterDropdown(filter_dropdown::Message),
 }
 
 /// Events propagated to the parent application.
@@ -50,6 +63,8 @@ pub enum Event {
     OpenAbout,
     EnterEditor,
     ToggleInfoPanel,
+    /// Filter dropdown message to be handled by the app.
+    FilterChanged(filter_dropdown::Message),
 }
 
 /// Process a navbar message and return the corresponding event.
@@ -83,14 +98,21 @@ pub fn update(message: Message, menu_open: &mut bool) -> Event {
             *menu_open = false;
             Event::ToggleInfoPanel
         }
+        Message::FilterDropdown(filter_msg) => {
+            // Close hamburger menu when interacting with filter
+            *menu_open = false;
+            Event::FilterChanged(filter_msg)
+        }
     }
 }
 
 /// Render the navigation bar.
+/// Note: The filter dropdown panel is rendered as an overlay in app/view.rs,
+/// not here, to avoid layout shifts when the dropdown opens.
 pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     let mut content = Column::new().width(Length::Fill);
 
-    // Top bar with hamburger menu and edit button
+    // Top bar with hamburger menu, edit button, and filter button
     let top_bar = build_top_bar(&ctx);
     content = content.push(top_bar);
 
@@ -103,7 +125,7 @@ pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
     content.into()
 }
 
-/// Build the top bar with hamburger menu button, edit button, and info button.
+/// Build the top bar with hamburger menu button, edit button, filter button, and info button.
 fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let menu_button = button(icons::sized(
         action_icons::navigation::menu(),
@@ -121,6 +143,16 @@ fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     } else {
         button(Text::new(edit_label)).style(styles::button::disabled())
     };
+
+    // Filter button
+    let filter_button = filter_dropdown::view_button(&filter_dropdown::ViewContext {
+        i18n: ctx.i18n,
+        filter: ctx.filter,
+        state: ctx.filter_dropdown,
+        total_count: ctx.total_count,
+        filtered_count: ctx.filtered_count,
+    })
+    .map(Message::FilterDropdown);
 
     // Info button with toggle styling (highlighted when panel is open)
     // Disabled when:
@@ -149,6 +181,7 @@ fn build_top_bar<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .align_y(Vertical::Center)
         .push(menu_button)
         .push(edit_button)
+        .push(filter_button)
         .push(info_button);
 
     Container::new(row)
@@ -254,10 +287,13 @@ fn menu_item_style(theme: &Theme, status: button::Status) -> button::Style {
 mod tests {
     use super::*;
     use crate::i18n::fluent::I18n;
+    use crate::media::filter::MediaFilter;
 
     #[test]
     fn navbar_view_renders() {
         let i18n = I18n::default();
+        let filter = MediaFilter::default();
+        let filter_dropdown = FilterDropdownState::new();
         let ctx = ViewContext {
             i18n: &i18n,
             menu_open: false,
@@ -265,6 +301,10 @@ mod tests {
             info_panel_open: false,
             has_media: true,
             metadata_editor_has_changes: false,
+            filter: &filter,
+            filter_dropdown: &filter_dropdown,
+            total_count: 10,
+            filtered_count: 10,
         };
         let _element = view(ctx);
     }
@@ -272,6 +312,8 @@ mod tests {
     #[test]
     fn navbar_view_renders_with_menu_open() {
         let i18n = I18n::default();
+        let filter = MediaFilter::default();
+        let filter_dropdown = FilterDropdownState::new();
         let ctx = ViewContext {
             i18n: &i18n,
             menu_open: true,
@@ -279,6 +321,10 @@ mod tests {
             info_panel_open: false,
             has_media: true,
             metadata_editor_has_changes: false,
+            filter: &filter,
+            filter_dropdown: &filter_dropdown,
+            total_count: 10,
+            filtered_count: 10,
         };
         let _element = view(ctx);
     }
@@ -286,6 +332,8 @@ mod tests {
     #[test]
     fn navbar_view_renders_with_info_panel_open() {
         let i18n = I18n::default();
+        let filter = MediaFilter::default();
+        let filter_dropdown = FilterDropdownState::new();
         let ctx = ViewContext {
             i18n: &i18n,
             menu_open: false,
@@ -293,6 +341,10 @@ mod tests {
             info_panel_open: true,
             has_media: true,
             metadata_editor_has_changes: false,
+            filter: &filter,
+            filter_dropdown: &filter_dropdown,
+            total_count: 10,
+            filtered_count: 10,
         };
         let _element = view(ctx);
     }
@@ -300,6 +352,8 @@ mod tests {
     #[test]
     fn navbar_view_renders_without_media() {
         let i18n = I18n::default();
+        let filter = MediaFilter::default();
+        let filter_dropdown = FilterDropdownState::new();
         let ctx = ViewContext {
             i18n: &i18n,
             menu_open: false,
@@ -307,6 +361,10 @@ mod tests {
             info_panel_open: false,
             has_media: false,
             metadata_editor_has_changes: false,
+            filter: &filter,
+            filter_dropdown: &filter_dropdown,
+            total_count: 0,
+            filtered_count: 0,
         };
         let _element = view(ctx);
     }

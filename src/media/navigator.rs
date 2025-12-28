@@ -8,6 +8,7 @@
 use crate::config::SortOrder;
 use crate::directory_scanner::MediaList;
 use crate::error::Result;
+use crate::media::filter::MediaFilter;
 use crate::media::{detect_media_type, MediaType};
 use std::path::{Path, PathBuf};
 
@@ -30,6 +31,11 @@ pub struct NavigationInfo {
     pub current_index: Option<usize>,
     /// Total number of media items in the list.
     pub total_count: usize,
+    /// Number of media items matching the current filter.
+    /// Same as `total_count` when no filter is active.
+    pub filtered_count: usize,
+    /// Whether a filter is currently active.
+    pub filter_active: bool,
 }
 
 /// Manages navigation through a list of media files in a directory.
@@ -37,12 +43,20 @@ pub struct NavigationInfo {
 /// This component encapsulates both the media list and the current media path,
 /// providing a single source of truth for media navigation shared between
 /// viewer and editor components.
+///
+/// # Filtering
+///
+/// The navigator supports media filtering via [`MediaFilter`]. When a filter is active,
+/// the `peek_*_filtered` methods will only return paths that match the filter criteria.
+/// The editor uses `peek_*_image` methods which ignore user filters entirely.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MediaNavigator {
     /// List of media files in the current directory
     media_list: MediaList,
     /// Path to the currently selected media
     current_media_path: Option<PathBuf>,
+    /// Current filter criteria for navigation
+    filter: MediaFilter,
 }
 
 impl MediaNavigator {
@@ -51,6 +65,7 @@ impl MediaNavigator {
         Self {
             media_list: MediaList::new(),
             current_media_path: None,
+            filter: MediaFilter::default(),
         }
     }
 
@@ -68,6 +83,8 @@ impl MediaNavigator {
     /// Returns `Ok(Some(path))` with the first media file path if any media is found,
     /// or `Ok(None)` if the directory contains no supported media files.
     /// Returns an error if the directory cannot be read.
+    ///
+    /// If a filter is active, returns the first media that matches the filter.
     pub fn scan_from_directory(
         &mut self,
         directory: &Path,
@@ -75,8 +92,19 @@ impl MediaNavigator {
     ) -> Result<Option<PathBuf>> {
         self.media_list = MediaList::scan_directory_direct(directory, sort_order)?;
 
-        if let Some(first_path) = self.media_list.first() {
-            let path = first_path.to_path_buf();
+        // Find the first media matching the active filter (or first overall if no filter)
+        let first_matching = if self.filter.is_active() {
+            let total = self.media_list.len();
+            (0..total)
+                .filter_map(|i| self.media_list.get(i))
+                .find(|path| self.filter.matches(path))
+                .map(std::path::Path::to_path_buf)
+        } else {
+            self.media_list.first().map(std::path::Path::to_path_buf)
+        };
+
+        if let Some(path) = first_matching {
+            self.media_list.set_current(&path);
             self.current_media_path = Some(path.clone());
             Ok(Some(path))
         } else {
@@ -273,6 +301,148 @@ impl MediaNavigator {
             at_last: self.is_at_last(),
             current_index: self.current_index(),
             total_count: self.len(),
+            filtered_count: self.filtered_count(),
+            filter_active: self.filter.is_active(),
+        }
+    }
+
+    // =========================================================================
+    // Filter Methods
+    // =========================================================================
+
+    /// Returns a reference to the current filter.
+    pub fn filter(&self) -> &MediaFilter {
+        &self.filter
+    }
+
+    /// Sets the filter criteria for navigation.
+    ///
+    /// After setting a filter, use `peek_*_filtered` methods to navigate
+    /// only through media that match the filter criteria.
+    pub fn set_filter(&mut self, filter: MediaFilter) {
+        self.filter = filter;
+    }
+
+    /// Clears all filter criteria (resets to match all media).
+    pub fn clear_filter(&mut self) {
+        self.filter.clear();
+    }
+
+    /// Returns the number of media files matching the current filter.
+    ///
+    /// Returns total count when no filter is active.
+    pub fn filtered_count(&self) -> usize {
+        if !self.filter.is_active() {
+            return self.len();
+        }
+
+        let total = self.len();
+        (0..total)
+            .filter_map(|i| self.media_list.get(i))
+            .filter(|path| self.filter.matches(path))
+            .count()
+    }
+
+    /// Returns the next media path matching the filter WITHOUT updating position.
+    ///
+    /// Use this for filtered navigation in the viewer.
+    /// Returns `None` if no media matches the filter.
+    /// Wraps around when reaching the end.
+    pub fn peek_next_filtered(&self) -> Option<PathBuf> {
+        self.peek_nth_next_filtered(0)
+    }
+
+    /// Returns the previous media path matching the filter WITHOUT updating position.
+    ///
+    /// Use this for filtered navigation in the viewer.
+    /// Returns `None` if no media matches the filter.
+    /// Wraps around when reaching the start.
+    pub fn peek_previous_filtered(&self) -> Option<PathBuf> {
+        self.peek_nth_previous_filtered(0)
+    }
+
+    /// Returns the n-th next media path matching the filter WITHOUT updating position.
+    ///
+    /// `skip_count = 0` returns immediate next match, `skip_count = 1` skips one match, etc.
+    /// Non-matching media are skipped and don't count toward skip_count.
+    /// Returns `None` if no media matches the filter.
+    /// Wraps around when reaching the end.
+    pub fn peek_nth_next_filtered(&self, skip_count: usize) -> Option<PathBuf> {
+        // If no filter is active, use the unfiltered navigation
+        if !self.filter.is_active() {
+            return self.peek_nth_next(skip_count);
+        }
+
+        let current_index = self.media_list.current_index()?;
+        let total = self.len();
+
+        if total == 0 {
+            return None;
+        }
+
+        let mut matches_found = 0;
+        // Try up to `total` times to find enough matches (avoid infinite loop)
+        for offset in 1..=total {
+            let candidate_index = (current_index + offset) % total;
+            if let Some(path) = self.media_list.get(candidate_index) {
+                if self.filter.matches(path) {
+                    if matches_found == skip_count {
+                        return Some(path.to_path_buf());
+                    }
+                    matches_found += 1;
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the n-th previous media path matching the filter WITHOUT updating position.
+    ///
+    /// `skip_count = 0` returns immediate previous match, `skip_count = 1` skips one match, etc.
+    /// Non-matching media are skipped and don't count toward skip_count.
+    /// Returns `None` if no media matches the filter.
+    /// Wraps around when reaching the start.
+    pub fn peek_nth_previous_filtered(&self, skip_count: usize) -> Option<PathBuf> {
+        // If no filter is active, use the unfiltered navigation
+        if !self.filter.is_active() {
+            return self.peek_nth_previous(skip_count);
+        }
+
+        let current_index = self.media_list.current_index()?;
+        let total = self.len();
+
+        if total == 0 {
+            return None;
+        }
+
+        let mut matches_found = 0;
+        // Try up to `total` times to find enough matches (avoid infinite loop)
+        for offset in 1..=total {
+            let candidate_index = if offset > current_index {
+                total - (offset - current_index)
+            } else {
+                current_index - offset
+            };
+            if let Some(path) = self.media_list.get(candidate_index) {
+                if self.filter.matches(path) {
+                    if matches_found == skip_count {
+                        return Some(path.to_path_buf());
+                    }
+                    matches_found += 1;
+                }
+            }
+        }
+        None
+    }
+
+    /// Checks if the current media matches the active filter.
+    ///
+    /// Returns `true` if no filter is active or if the current media matches.
+    /// Returns `false` if filtered out or if there's no current media.
+    pub fn current_matches_filter(&self) -> bool {
+        match &self.current_media_path {
+            Some(path) => self.filter.matches(path),
+            None => false,
         }
     }
 }
@@ -655,5 +825,288 @@ mod tests {
         assert_eq!(next.as_path(), img_c.as_path());
         nav.confirm_navigation(&next);
         assert_eq!(nav.current_media_path(), Some(img_c.as_path()));
+    }
+
+    // -------------------------------------------------------------------------
+    // Filter tests
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn filter_default_is_inactive() {
+        let nav = MediaNavigator::new();
+        assert!(!nav.filter().is_active());
+    }
+
+    #[test]
+    fn set_filter_and_clear_filter() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let mut nav = MediaNavigator::new();
+        let filter = MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        };
+
+        nav.set_filter(filter);
+        assert!(nav.filter().is_active());
+
+        nav.clear_filter();
+        assert!(!nav.filter().is_active());
+    }
+
+    #[test]
+    fn filtered_count_with_no_filter() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let _img2 = create_test_image(temp_dir.path(), "c.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // No filter active, filtered_count should equal total count
+        assert_eq!(nav.filtered_count(), 3);
+        assert_eq!(nav.filtered_count(), nav.len());
+    }
+
+    #[test]
+    fn filtered_count_with_images_only_filter() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let _img2 = create_test_image(temp_dir.path(), "c.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        nav.set_filter(MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        });
+
+        assert_eq!(nav.filtered_count(), 2); // Only images
+    }
+
+    #[test]
+    fn peek_next_filtered_skips_non_matching() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let _vid2 = create_test_video(temp_dir.path(), "c.mp4");
+        let img2 = create_test_image(temp_dir.path(), "d.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        nav.set_filter(MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        });
+
+        // Should skip b.mp4 and c.mp4, return d.png
+        let next = nav.peek_next_filtered();
+        assert_eq!(next.as_deref(), Some(img2.as_path()));
+        // State should not change (pessimistic update)
+        assert_eq!(nav.current_media_path(), Some(img1.as_path()));
+    }
+
+    #[test]
+    fn peek_previous_filtered_skips_non_matching() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let _vid2 = create_test_video(temp_dir.path(), "c.mp4");
+        let img2 = create_test_image(temp_dir.path(), "d.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img2, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        nav.set_filter(MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        });
+
+        // Should skip c.mp4 and b.mp4, return a.jpg
+        let prev = nav.peek_previous_filtered();
+        assert_eq!(prev.as_deref(), Some(img1.as_path()));
+        // State should not change (pessimistic update)
+        assert_eq!(nav.current_media_path(), Some(img2.as_path()));
+    }
+
+    #[test]
+    fn peek_next_filtered_without_filter_uses_unfiltered() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let vid1 = create_test_video(temp_dir.path(), "b.mp4");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // No filter set, should behave like peek_next
+        let next = nav.peek_next_filtered();
+        assert_eq!(next.as_deref(), Some(vid1.as_path()));
+    }
+
+    #[test]
+    fn peek_filtered_returns_none_when_no_matches() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let vid1 = create_test_video(temp_dir.path(), "a.mp4");
+        let _vid2 = create_test_video(temp_dir.path(), "b.mp4");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&vid1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        nav.set_filter(MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        });
+
+        // No images in list, should return None
+        assert_eq!(nav.peek_next_filtered(), None);
+        assert_eq!(nav.peek_previous_filtered(), None);
+    }
+
+    #[test]
+    fn current_matches_filter_with_no_filter() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let vid1 = create_test_video(temp_dir.path(), "a.mp4");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&vid1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // No filter, any media should match
+        assert!(nav.current_matches_filter());
+    }
+
+    #[test]
+    fn current_matches_filter_with_active_filter() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let vid1 = create_test_video(temp_dir.path(), "b.mp4");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        nav.set_filter(MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        });
+
+        // Current is image, should match
+        assert!(nav.current_matches_filter());
+
+        // Change to video
+        nav.set_current_media_path(vid1);
+        // Current is video, should not match images-only filter
+        assert!(!nav.current_matches_filter());
+    }
+
+    #[test]
+    fn navigation_info_includes_filter_data() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let img1 = create_test_image(temp_dir.path(), "a.jpg");
+        let _vid1 = create_test_video(temp_dir.path(), "b.mp4");
+        let _img2 = create_test_image(temp_dir.path(), "c.png");
+
+        let mut nav = MediaNavigator::new();
+        nav.scan_directory(&img1, SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // No filter
+        let info = nav.navigation_info();
+        assert!(!info.filter_active);
+        assert_eq!(info.filtered_count, 3);
+        assert_eq!(info.total_count, 3);
+
+        // With filter
+        nav.set_filter(MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        });
+
+        let info = nav.navigation_info();
+        assert!(info.filter_active);
+        assert_eq!(info.filtered_count, 2);
+        assert_eq!(info.total_count, 3);
+    }
+
+    #[test]
+    fn scan_from_directory_respects_active_filter() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        // Create files in alphabetical order: video first, then images
+        let _vid1 = create_test_video(temp_dir.path(), "a.mp4");
+        let _vid2 = create_test_video(temp_dir.path(), "b.mp4");
+        let img1 = create_test_image(temp_dir.path(), "c.jpg");
+        let _img2 = create_test_image(temp_dir.path(), "d.png");
+
+        let mut nav = MediaNavigator::new();
+
+        // Set filter BEFORE scanning
+        nav.set_filter(MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        });
+
+        let result = nav
+            .scan_from_directory(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // Should return first IMAGE (c.jpg), not first file (a.mp4)
+        assert_eq!(result, Some(img1.clone()));
+        assert_eq!(nav.current_media_path(), Some(img1.as_path()));
+        // Total should still be 4
+        assert_eq!(nav.len(), 4);
+        // Filtered count should be 2
+        assert_eq!(nav.filtered_count(), 2);
+    }
+
+    #[test]
+    fn scan_from_directory_with_filter_returns_none_when_no_matches() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let _vid1 = create_test_video(temp_dir.path(), "a.mp4");
+        let _vid2 = create_test_video(temp_dir.path(), "b.mp4");
+
+        let mut nav = MediaNavigator::new();
+
+        // Set images-only filter
+        nav.set_filter(MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        });
+
+        let result = nav
+            .scan_from_directory(temp_dir.path(), SortOrder::Alphabetical)
+            .expect("scan failed");
+
+        // No images in directory, should return None
+        assert_eq!(result, None);
+        assert_eq!(nav.current_media_path(), None);
+        // Directory still has 2 videos
+        assert_eq!(nav.len(), 2);
+        assert_eq!(nav.filtered_count(), 0);
     }
 }

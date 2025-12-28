@@ -154,6 +154,16 @@ On macOS, use `Cmd` instead of `Ctrl`.
 - Directory is rescanned on each navigation (reflects file changes)
 - Corrupted or unloadable files are automatically skipped (configurable limit in Settings)
 
+### Media Filters
+
+Filter the current directory to show only matching files:
+
+- **Media type**: Images only, Videos only, or All
+- **Orientation**: Landscape, Portrait, or Square
+- **Date range**: Filter by file modification date (start and/or end)
+
+Access filters via the filter dropdown in the toolbar. When filters are active, an indicator shows how many files match. Filters can optionally persist across sessions (Settings → Display).
+
 ### Fullscreen
 
 - Enter via F11, double-click, or toolbar button

@@ -18,6 +18,7 @@ exif = { package = "kamadak-exif", version = "0.6" }
 ffmpeg-next = "8.0"
 fluent-bundle = "0.16.0"
 iced = { version = "0.14.0", features = ["tokio", "svg", "image", "advanced", "canvas", "wgpu"] }
+iced_aw = { version = "0.13.0", default-features = false, features = ["date_picker"] }
 image_rs = { package = "image", version = "0.25", features = ["jpeg", "png", "gif", "tiff", "webp", "bmp", "ico"] }
 pico-args = "0.5.0"
 resvg = "0.45.1"

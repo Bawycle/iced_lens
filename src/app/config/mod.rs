@@ -46,6 +46,7 @@ pub use defaults::*;
 
 use crate::app::paths;
 use crate::error::{Error, Result};
+use crate::media::filter::MediaFilter;
 use crate::ui::theming::ThemeMode;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -132,6 +133,16 @@ pub struct DisplayConfig {
         skip_serializing_if = "Option::is_none"
     )]
     pub max_skip_attempts: Option<u32>,
+
+    /// Whether to persist media filters across sessions.
+    /// When enabled, the current filter is saved and restored on restart.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persist_filters: Option<bool>,
+
+    /// Persisted media filter (only saved when `persist_filters` is true).
+    /// Uses the [`MediaFilter`] structure for filtering by media type and date range.
+    #[serde(default, skip_serializing_if = "skip_serializing_filter")]
+    pub filter: Option<MediaFilter>,
 }
 
 impl Default for DisplayConfig {
@@ -142,6 +153,8 @@ impl Default for DisplayConfig {
             background_theme: Some(BackgroundTheme::default()),
             sort_order: Some(SortOrder::default()),
             max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
+            persist_filters: Some(false),
+            filter: None,
         }
     }
 }
@@ -342,6 +355,8 @@ impl From<LegacyConfig> for Config {
                 background_theme: legacy.background_theme,
                 sort_order: legacy.sort_order,
                 max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
+                persist_filters: Some(false),
+                filter: None,
             },
             video: VideoConfig {
                 autoplay: legacy.video_autoplay,
@@ -403,6 +418,14 @@ fn default_overlay_timeout_secs() -> Option<u32> {
 
 fn default_max_skip_attempts() -> Option<u32> {
     Some(DEFAULT_MAX_SKIP_ATTEMPTS)
+}
+
+/// Skip serializing filter if None or if no filter is active.
+fn skip_serializing_filter(filter: &Option<MediaFilter>) -> bool {
+    match filter {
+        None => true,
+        Some(f) => !f.is_active(),
+    }
 }
 
 fn default_deblur_model_url() -> Option<String> {
@@ -549,6 +572,8 @@ mod tests {
                 background_theme: Some(BackgroundTheme::Light),
                 sort_order: Some(SortOrder::Alphabetical),
                 max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
+                persist_filters: Some(false),
+                filter: None,
             },
             video: VideoConfig {
                 autoplay: Some(false),
@@ -605,6 +630,8 @@ mod tests {
                 background_theme: Some(BackgroundTheme::Checkerboard),
                 sort_order: Some(SortOrder::CreatedDate),
                 max_skip_attempts: Some(DEFAULT_MAX_SKIP_ATTEMPTS),
+                persist_filters: Some(false),
+                filter: None,
             },
             video: VideoConfig {
                 autoplay: Some(true),
@@ -763,6 +790,8 @@ mod tests {
                 background_theme: Some(BackgroundTheme::Light),
                 sort_order: Some(SortOrder::CreatedDate),
                 max_skip_attempts: Some(10),
+                persist_filters: Some(false),
+                filter: None,
             },
             video: VideoConfig {
                 autoplay: Some(true),
@@ -1019,5 +1048,66 @@ zoom_step = 25.0
             content.contains("language = \"ja\""),
             "should have language in general section"
         );
+    }
+
+    // =========================================================================
+    // Filter Persistence Tests
+    // =========================================================================
+
+    #[test]
+    fn filter_not_saved_when_inactive() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let config_path = temp_dir.path().join("settings.toml");
+
+        let config = Config {
+            display: DisplayConfig {
+                persist_filters: Some(true),
+                filter: Some(MediaFilter::default()), // Default filter is not active
+                ..DisplayConfig::default()
+            },
+            ..Config::default()
+        };
+
+        save_to_path(&config, &config_path).expect("save config");
+        let content = fs::read_to_string(&config_path).expect("read config");
+
+        // Filter should not be serialized when not active
+        assert!(
+            !content.contains("[display.filter]"),
+            "inactive filter should not be serialized"
+        );
+    }
+
+    #[test]
+    fn filter_saved_and_loaded_when_active() {
+        use crate::media::filter::MediaTypeFilter;
+
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let config_path = temp_dir.path().join("settings.toml");
+
+        let active_filter = MediaFilter {
+            media_type: MediaTypeFilter::ImagesOnly,
+            date_range: None,
+        };
+
+        let config = Config {
+            display: DisplayConfig {
+                persist_filters: Some(true),
+                filter: Some(active_filter.clone()),
+                ..DisplayConfig::default()
+            },
+            ..Config::default()
+        };
+
+        save_to_path(&config, &config_path).expect("save config");
+        let loaded = load_from_path(&config_path).expect("load config");
+
+        assert_eq!(loaded.display.filter, Some(active_filter));
+    }
+
+    #[test]
+    fn persist_filters_defaults_to_false() {
+        let config = Config::default();
+        assert_eq!(config.display.persist_filters, Some(false));
     }
 }

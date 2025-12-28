@@ -68,6 +68,8 @@ pub struct StateConfig {
     pub enable_upscale: bool,
     pub upscale_model_url: String,
     pub upscale_model_status: UpscaleModelStatus,
+    // Filter settings
+    pub persist_filters: bool,
 }
 
 impl Default for StateConfig {
@@ -90,6 +92,7 @@ impl Default for StateConfig {
             enable_upscale: false,
             upscale_model_url: DEFAULT_UPSCALE_MODEL_URL.to_string(),
             upscale_model_status: UpscaleModelStatus::NotDownloaded,
+            persist_filters: false,
         }
     }
 }
@@ -120,6 +123,8 @@ pub struct State {
     enable_upscale: bool,
     upscale_model_url: String,
     upscale_model_status: UpscaleModelStatus,
+    // Filter settings
+    persist_filters: bool,
 }
 
 /// Messages emitted directly by the settings widgets.
@@ -148,6 +153,8 @@ pub enum Message {
     RequestEnableUpscale,
     DisableUpscale,
     UpscaleModelUrlChanged(String),
+    // Filter messages
+    PersistFiltersChanged(bool),
 }
 
 /// Events propagated to the parent application for side effects.
@@ -181,6 +188,8 @@ pub enum Event {
     /// User requested to disable upscale.
     DisableUpscale,
     UpscaleModelUrlChanged(String),
+    // Filter events
+    PersistFiltersChanged(bool),
 }
 
 /// Language option for the pick_list widget.
@@ -271,6 +280,7 @@ impl State {
             enable_upscale: config.enable_upscale,
             upscale_model_url: config.upscale_model_url,
             upscale_model_status: config.upscale_model_status,
+            persist_filters: config.persist_filters,
         }
     }
 
@@ -368,6 +378,11 @@ impl State {
     /// successfully downloaded and validated, not in response to user UI action.
     pub fn set_enable_upscale(&mut self, enabled: bool) {
         self.enable_upscale = enabled;
+    }
+
+    /// Returns whether filter persistence is enabled.
+    pub fn persist_filters(&self) -> bool {
+        self.persist_filters
     }
 
     pub(crate) fn zoom_step_input_value(&self) -> &str {
@@ -625,12 +640,39 @@ impl State {
             skip_control.into(),
         );
 
+        // Persist filters toggle
+        let mut persist_filters_row = Row::new().spacing(spacing::XS);
+        for (enabled, key) in [
+            (false, "settings-persist-filters-disabled"),
+            (true, "settings-persist-filters-enabled"),
+        ] {
+            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
+                .on_press(Message::PersistFiltersChanged(enabled))
+                .style(if self.persist_filters == enabled {
+                    button_styles::selected
+                } else {
+                    button_styles::unselected
+                });
+            persist_filters_row = persist_filters_row.push(btn);
+        }
+
+        let persist_filters_setting = self.build_setting_row(
+            ctx.i18n.tr("settings-persist-filters-label"),
+            Some(
+                Text::new(ctx.i18n.tr("settings-persist-filters-hint"))
+                    .size(typography::BODY_SM)
+                    .into(),
+            ),
+            persist_filters_row.into(),
+        );
+
         let content = Column::new()
             .spacing(spacing::MD)
             .push(background_setting)
             .push(zoom_setting)
             .push(sort_setting)
-            .push(skip_setting);
+            .push(skip_setting)
+            .push(persist_filters_setting);
 
         build_section(
             icons::image(),
@@ -1249,6 +1291,11 @@ impl State {
                 self.upscale_model_url = url.clone();
                 Event::UpscaleModelUrlChanged(url)
             }
+            Message::PersistFiltersChanged(enabled) => update_if_changed(
+                &mut self.persist_filters,
+                enabled,
+                Event::PersistFiltersChanged,
+            ),
         }
     }
 
