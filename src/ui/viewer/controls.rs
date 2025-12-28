@@ -201,10 +201,13 @@ pub fn view<'a>(
 
     // Layout: [Zoom controls + Fit] | [Rotation] | [Fullscreen] | [Delete]
     // Grouped by: Scale → Orientation → Display mode → Destructive action
+    // Row fills width with Space::Fill at start to push controls to the right edge.
     let zoom_controls_row = Row::new()
+        .width(Length::Fill)
         .spacing(shared_styles::CONTROL_SPACING)
         .padding([0.0, shared_styles::CONTROL_PADDING])
         .align_y(Vertical::Center)
+        .push(Space::new().width(Length::Fill))
         // Scale group: zoom input, +/-, reset, fit-to-window
         .push(zoom_label)
         .push(zoom_input)

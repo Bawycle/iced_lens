@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Media filters:** filter navigation by media type (images/videos), orientation (landscape/portrait/square), and date range. Access via the filter dropdown in the toolbar. Filters can optionally persist across sessions (Settings → Display).
 - **XMP metadata for PNG, WebP, and TIFF:** title, author, description, keywords, and copyright fields now work on PNG, WebP, and TIFF files, not just JPEG.
 - **Temporary rotation in viewer:** rotate images 90° clockwise (`R`) or counter-clockwise (`Shift+R`). Rotation is session-only and resets when navigating to another image.
 

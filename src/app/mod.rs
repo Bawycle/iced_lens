@@ -133,6 +133,7 @@ pub fn run(flags: Flags) -> iced::Result {
     iced::application(boot, App::update, App::view)
         .title(App::title)
         .theme(App::theme)
+        .font(iced_aw::ICED_AW_FONT_BYTES)
         .window(window_settings_with_locale())
         .subscription(App::subscription)
         .run()
@@ -273,6 +274,7 @@ impl App {
             .display
             .max_skip_attempts
             .unwrap_or(config::DEFAULT_MAX_SKIP_ATTEMPTS);
+        let persist_filters = config.display.persist_filters.unwrap_or(false);
         app.settings = SettingsState::new(SettingsConfig {
             zoom_step_percent: app.viewer.zoom_step_percent(),
             background_theme: theme,
@@ -291,6 +293,7 @@ impl App {
             enable_upscale,
             upscale_model_url,
             upscale_model_status,
+            persist_filters,
         });
         app.video_autoplay = video_autoplay;
         app.audio_normalization = audio_normalization;
@@ -315,6 +318,13 @@ impl App {
         if let Some(max_skip) = config.display.max_skip_attempts {
             app.viewer
                 .set_max_skip_attempts(MaxSkipAttempts::new(max_skip));
+        }
+
+        // Restore persisted filter if enabled
+        if persist_filters {
+            if let Some(filter) = config.display.filter {
+                app.media_navigator.set_filter(filter);
+            }
         }
 
         // Show warnings for config/state loading issues
@@ -363,7 +373,10 @@ impl App {
                 Some(path)
             };
 
-            eprintln!("[STARTUP] Directory scanned in {:?}", startup_time.elapsed());
+            eprintln!(
+                "[STARTUP] Directory scanned in {:?}",
+                startup_time.elapsed()
+            );
 
             if let Some(media_path) = resolved_path {
                 // Synchronize viewer state
@@ -461,7 +474,10 @@ impl App {
         // Combine tasks
         let combined_task = Task::batch([task, deblur_validation_task, upscale_validation_task]);
 
-        eprintln!("[STARTUP] App::new() completed in {:?}", startup_time.elapsed());
+        eprintln!(
+            "[STARTUP] App::new() completed in {:?}",
+            startup_time.elapsed()
+        );
         (app, combined_task)
     }
 
@@ -1289,6 +1305,9 @@ impl App {
             deblur_model_status: self.settings.deblur_model_status(),
             upscale_model_status: self.settings.upscale_model_status(),
             enable_upscale: self.app_state.enable_upscale,
+            filter: self.media_navigator.filter(),
+            total_count: self.media_navigator.navigation_info().total_count,
+            filtered_count: self.media_navigator.navigation_info().filtered_count,
         })
     }
 }
@@ -1731,6 +1750,7 @@ mod tests {
             let viewer = component::State::new();
             let settings_state = SettingsState::default();
             let mut notifs = notifications::Manager::new();
+            let nav = MediaNavigator::default();
             let _ = persistence::persist_preferences(persistence::PreferencesContext {
                 viewer: &viewer,
                 settings: &settings_state,
@@ -1741,6 +1761,7 @@ mod tests {
                 frame_history_mb: crate::video_player::FrameHistoryMb::default().value(),
                 keyboard_seek_step_secs: config::DEFAULT_KEYBOARD_SEEK_STEP_SECS,
                 notifications: &mut notifs,
+                media_navigator: &nav,
             });
             // Test passes if we reach here without panicking
         });

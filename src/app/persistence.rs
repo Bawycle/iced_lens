@@ -27,6 +27,7 @@ pub struct PreferencesContext<'a> {
     pub frame_history_mb: u32,
     pub keyboard_seek_step_secs: f64,
     pub notifications: &'a mut notifications::Manager,
+    pub media_navigator: &'a MediaNavigator,
 }
 
 /// Persists the current viewer + settings preferences to disk.
@@ -50,6 +51,18 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
     cfg.display.background_theme = Some(ctx.settings.background_theme());
     cfg.display.sort_order = Some(ctx.settings.sort_order());
     cfg.display.max_skip_attempts = Some(ctx.settings.max_skip_attempts());
+    cfg.display.persist_filters = Some(ctx.settings.persist_filters());
+    // Save filter if persistence is enabled
+    if ctx.settings.persist_filters() {
+        let filter = ctx.media_navigator.filter().clone();
+        if filter.is_active() {
+            cfg.display.filter = Some(filter);
+        } else {
+            cfg.display.filter = None;
+        }
+    } else {
+        cfg.display.filter = None;
+    }
     cfg.fullscreen.overlay_timeout_secs = Some(ctx.settings.overlay_timeout_secs());
     cfg.general.theme_mode = ctx.theme_mode;
     cfg.video.autoplay = Some(ctx.video_autoplay);

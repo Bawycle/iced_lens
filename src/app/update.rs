@@ -19,7 +19,7 @@ use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent, MetadataEdito
 use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
-use crate::ui::viewer::component;
+use crate::ui::viewer::{component, filter_dropdown};
 use crate::video_player::KeyboardSeekStep;
 // Re-export NavigationDirection from viewer component (single source of truth)
 pub use crate::ui::viewer::NavigationDirection;
@@ -136,6 +136,7 @@ impl UpdateContext<'_> {
             frame_history_mb: self.settings.frame_history_mb(),
             keyboard_seek_step_secs: self.settings.keyboard_seek_step_secs(),
             notifications: self.notifications,
+            media_navigator: self.media_navigator,
         }
     }
 }
@@ -258,6 +259,7 @@ pub fn handle_viewer_message(
             }
             Task::none()
         }
+        component::Effect::FilterChanged(filter_msg) => handle_filter_changed(ctx, filter_msg),
         component::Effect::None => Task::none(),
     };
     Task::batch([viewer_task, side_effect])
@@ -626,6 +628,10 @@ pub fn handle_settings_message(
             let _ = std::fs::remove_file(crate::media::upscale::get_model_path());
             Task::none()
         }
+        SettingsEvent::PersistFiltersChanged(_enabled) => {
+            // Setting is already updated in settings state, just persist to config
+            persistence::persist_preferences(ctx.preferences_context())
+        }
     }
 }
 
@@ -884,6 +890,30 @@ pub fn handle_navbar_message(
             *ctx.info_panel_open = !*ctx.info_panel_open;
             Task::none()
         }
+        NavbarEvent::FilterChanged(filter_msg) => {
+            // Route filter messages: local ones to viewer, filter changes to handler
+            match filter_msg {
+                filter_dropdown::Message::ToggleDropdown
+                | filter_dropdown::Message::CloseDropdown
+                | filter_dropdown::Message::ConsumeClick
+                | filter_dropdown::Message::DateSegmentChanged { .. } => {
+                    // These are local dropdown state messages - forward to viewer component
+                    let (effect, task) = ctx.viewer.handle_message(
+                        component::Message::FilterDropdown(filter_msg),
+                        ctx.i18n,
+                    );
+                    // Handle any effects from the viewer
+                    // Only FilterChanged and None are expected from FilterDropdown messages
+                    let effect_task = match effect {
+                        component::Effect::FilterChanged(msg) => handle_filter_changed(ctx, msg),
+                        _ => Task::none(),
+                    };
+                    Task::batch([task.map(Message::Viewer), effect_task])
+                }
+                // All other messages are filter changes - handle directly
+                _ => handle_filter_changed(ctx, filter_msg),
+            }
+        }
     }
 }
 
@@ -1069,12 +1099,14 @@ where
     }
 
     // Peek based on direction, mode, and skip_count (pessimistic update: don't change position yet)
+    // For AllMedia mode, use filtered navigation which respects active filters
+    // (automatically falls back to unfiltered when no filter is active)
     let next_path = match (direction, mode) {
         (NavigationDirection::Next, NavigationMode::AllMedia) => {
-            ctx.media_navigator.peek_nth_next(skip_count)
+            ctx.media_navigator.peek_nth_next_filtered(skip_count)
         }
         (NavigationDirection::Previous, NavigationMode::AllMedia) => {
-            ctx.media_navigator.peek_nth_previous(skip_count)
+            ctx.media_navigator.peek_nth_previous_filtered(skip_count)
         }
         (NavigationDirection::Next, NavigationMode::ImagesOnly) => {
             ctx.media_navigator.peek_nth_next_image(skip_count)
@@ -1431,4 +1463,79 @@ fn load_media_from_path(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<Mess
     Task::perform(async move { media::load_media(&path) }, |result| {
         Message::Viewer(component::Message::MediaLoaded(result))
     })
+}
+
+/// Handles filter dropdown messages from the viewer.
+#[allow(clippy::needless_pass_by_value)] // Message is small and matched/destructured
+fn handle_filter_changed(
+    ctx: &mut UpdateContext<'_>,
+    msg: filter_dropdown::Message,
+) -> Task<Message> {
+    use crate::media::filter::{DateRangeFilter, MediaFilter};
+    use filter_dropdown::DateTarget;
+
+    // Clone current filter to modify
+    let mut filter = ctx.media_navigator.filter().clone();
+
+    match msg {
+        filter_dropdown::Message::ToggleDropdown
+        | filter_dropdown::Message::CloseDropdown
+        | filter_dropdown::Message::ConsumeClick
+        | filter_dropdown::Message::DateSegmentChanged { .. } => {
+            // These are handled locally in the viewer component
+            unreachable!("Local messages should be handled in component")
+        }
+        filter_dropdown::Message::MediaTypeChanged(media_type) => {
+            filter.media_type = media_type;
+        }
+        filter_dropdown::Message::ToggleDateFilter(enabled) => {
+            if enabled {
+                // Enable date filter with default values (no bounds = filter by field only)
+                filter.date_range = Some(DateRangeFilter::default());
+            } else {
+                filter.date_range = None;
+            }
+        }
+        filter_dropdown::Message::DateFieldChanged(field) => {
+            if let Some(ref mut date_range) = filter.date_range {
+                date_range.field = field;
+            }
+        }
+        filter_dropdown::Message::DateSubmit(target) => {
+            // Get the date from the viewer's dropdown state
+            let date_state = ctx.viewer.filter_dropdown_state().date_state(target);
+            let date = date_state.to_system_time();
+
+            if let Some(ref mut date_range) = filter.date_range {
+                match target {
+                    DateTarget::Start => date_range.start = date,
+                    DateTarget::End => date_range.end = date,
+                }
+            }
+        }
+        filter_dropdown::Message::ClearDate(target) => {
+            if let Some(ref mut date_range) = filter.date_range {
+                match target {
+                    DateTarget::Start => date_range.start = None,
+                    DateTarget::End => date_range.end = None,
+                }
+            }
+        }
+        filter_dropdown::Message::ResetFilters => {
+            filter = MediaFilter::default();
+        }
+    }
+
+    // Update the navigator's filter
+    ctx.media_navigator.set_filter(filter);
+
+    // Persist if filter persistence is enabled
+    let (cfg, _) = config::load();
+    let should_persist = cfg.display.persist_filters.unwrap_or(false);
+
+    if should_persist {
+        persistence::persist_preferences(ctx.preferences_context())
+    } else {
+        Task::none()
+    }
 }

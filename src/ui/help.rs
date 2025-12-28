@@ -285,6 +285,11 @@ fn build_viewer_content<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
             ctx.i18n.tr("help-viewer-tool-fullscreen-desc"),
         ))
         .push(build_tool_item_with_icon(
+            action_icons::viewer::toolbar::filter(),
+            &ctx.i18n.tr("help-viewer-tool-filter"),
+            ctx.i18n.tr("help-viewer-tool-filter-desc"),
+        ))
+        .push(build_tool_item_with_icon(
             action_icons::viewer::delete(),
             &ctx.i18n.tr("help-viewer-tool-delete"),
             ctx.i18n.tr("help-viewer-tool-delete-desc"),

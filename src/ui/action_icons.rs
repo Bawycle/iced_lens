@@ -53,6 +53,22 @@
 use super::icons;
 
 // =============================================================================
+// Common Actions
+// =============================================================================
+
+/// Icons for common UI actions.
+pub mod common {
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
+
+    /// Clear/remove a value.
+    #[must_use]
+    pub fn clear() -> Image<Handle> {
+        icons::cross()
+    }
+}
+
+// =============================================================================
 // Video Playback Actions
 // =============================================================================
 
@@ -354,6 +370,19 @@ pub mod viewer {
         #[must_use]
         pub fn rotate_counterclockwise() -> Image<Handle> {
             icons::light::rotate_left()
+        }
+
+        /// Filter icon (light icon for toolbar).
+        #[must_use]
+        pub fn filter() -> Image<Handle> {
+            icons::light::funnel()
+        }
+
+        /// Filter active icon (light icon for toolbar).
+        /// Shows when a filter is currently applied.
+        #[must_use]
+        pub fn filter_active() -> Image<Handle> {
+            icons::light::funnel()
         }
     }
 }

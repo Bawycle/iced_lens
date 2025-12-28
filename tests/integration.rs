@@ -32,6 +32,8 @@ fn test_language_change_via_config() {
             background_theme: Some(config::BackgroundTheme::Dark),
             sort_order: Some(config::SortOrder::Alphabetical),
             max_skip_attempts: Some(config::DEFAULT_MAX_SKIP_ATTEMPTS),
+            persist_filters: Some(false),
+            filter: None,
         },
         video: VideoConfig {
             autoplay: Some(false),
@@ -69,6 +71,8 @@ fn test_language_change_via_config() {
             background_theme: Some(config::BackgroundTheme::Dark),
             sort_order: Some(config::SortOrder::Alphabetical),
             max_skip_attempts: Some(config::DEFAULT_MAX_SKIP_ATTEMPTS),
+            persist_filters: Some(false),
+            filter: None,
         },
         video: VideoConfig {
             autoplay: Some(false),

@@ -5,6 +5,7 @@
 //! both image and video files.
 
 pub mod deblur;
+pub mod filter;
 pub mod frame_export;
 pub mod image;
 pub mod image_transform;
@@ -23,6 +24,7 @@ use std::path::Path;
 
 // Re-export commonly used types
 pub use extensions::IMAGE_EXTENSIONS;
+pub use filter::{DateFilterField, DateRangeFilter, MediaFilter, MediaTypeFilter};
 pub use image::{load_image, ImageData};
 pub use image_transform::ResizeScale;
 pub use navigator::MediaNavigator;
@@ -245,13 +247,20 @@ pub fn load_media<P: AsRef<Path>>(path: P) -> crate::error::Result<MediaData> {
     // Detect media type
     let media_type = detect_media_type(path_ref)
         .ok_or_else(|| crate::error::Error::Io("Unsupported file format".to_string()))?;
-    eprintln!("[STARTUP] load_media: detected {:?} in {:?}", media_type, start.elapsed());
+    eprintln!(
+        "[STARTUP] load_media: detected {:?} in {:?}",
+        media_type,
+        start.elapsed()
+    );
 
     match media_type {
         MediaType::Image => {
             // Load as image
             let image_data = image::load_image(path_ref)?;
-            eprintln!("[STARTUP] load_media: image loaded in {:?}", start.elapsed());
+            eprintln!(
+                "[STARTUP] load_media: image loaded in {:?}",
+                start.elapsed()
+            );
             Ok(MediaData::Image(image_data))
         }
         MediaType::Video => {
@@ -275,7 +284,10 @@ pub fn load_media<P: AsRef<Path>>(path: P) -> crate::error::Result<MediaData> {
                 video::extract_video_metadata(path_ref),
             ) {
                 (Ok(thumbnail), Ok(metadata)) => {
-                    eprintln!("[STARTUP] load_media: video loaded in {:?}", start.elapsed());
+                    eprintln!(
+                        "[STARTUP] load_media: video loaded in {:?}",
+                        start.elapsed()
+                    );
                     let video_data = VideoData {
                         thumbnail,
                         width: metadata.width,

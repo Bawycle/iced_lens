@@ -7,7 +7,7 @@ use crate::media::navigator::NavigationInfo;
 use crate::media::{MaxSkipAttempts, MediaData};
 use crate::ui::state::{DragState, RotationAngle, ViewportState, ZoomState, ZoomStep};
 use crate::ui::viewer::{
-    self, controls, pane, state as geometry, video_controls, HudIconKind, HudLine,
+    self, controls, filter_dropdown, pane, state as geometry, video_controls, HudIconKind, HudLine,
 };
 use crate::ui::widgets::VideoShader;
 use crate::video_player::{
@@ -58,6 +58,8 @@ pub enum Message {
     RotateClockwise,
     /// Rotate current media 90° counter-clockwise (temporary, session-only).
     RotateCounterClockwise,
+    /// Filter dropdown messages (routed from navbar).
+    FilterDropdown(filter_dropdown::Message),
 }
 
 /// Direction of navigation for auto-skip retry.
@@ -143,6 +145,8 @@ pub enum Effect {
         /// Filenames that were skipped during navigation (if any).
         skipped_files: Vec<String>,
     },
+    /// Filter changed via dropdown. App should update navigator's filter.
+    FilterChanged(filter_dropdown::Message),
 }
 
 #[derive(Debug, Clone)]
@@ -176,6 +180,8 @@ pub struct ViewEnv<'a> {
     pub navigation: NavigationInfo,
     /// Whether metadata editor has unsaved changes (disables navigation).
     pub metadata_editor_has_changes: bool,
+    /// Current media filter (reference to navigator's filter).
+    pub filter: &'a crate::media::filter::MediaFilter,
 }
 
 /// Complete viewer component state.
@@ -246,6 +252,9 @@ pub struct State {
     /// Cached rotated image to avoid recomputing on every render.
     /// Contains (`rotation_angle`, `rotated_image_data`).
     rotated_image_cache: Option<(RotationAngle, crate::media::ImageData)>,
+
+    /// Filter dropdown UI state.
+    filter_dropdown: filter_dropdown::FilterDropdownState,
 }
 
 // Manual Default impl required: video_fit_to_window defaults to true (not false),
@@ -287,6 +296,7 @@ impl Default for State {
             keyboard_seek_step: KeyboardSeekStep::default(),
             current_rotation: RotationAngle::default(),
             rotated_image_cache: None,
+            filter_dropdown: filter_dropdown::FilterDropdownState::default(),
         }
     }
 }
@@ -331,6 +341,16 @@ impl State {
 
     pub fn drag_state_mut(&mut self) -> &mut DragState {
         &mut self.drag
+    }
+
+    /// Closes the filter dropdown panel.
+    pub fn close_filter_dropdown(&mut self) {
+        self.filter_dropdown.close();
+    }
+
+    /// Returns a reference to the filter dropdown state.
+    pub fn filter_dropdown_state(&self) -> &filter_dropdown::FilterDropdownState {
+        &self.filter_dropdown
     }
 
     /// Returns the current temporary rotation angle.
@@ -1271,6 +1291,60 @@ impl State {
                 }
 
                 (Effect::None, Task::none())
+            }
+            Message::FilterDropdown(msg) => {
+                use filter_dropdown::Message as FdMsg;
+                match msg {
+                    FdMsg::ToggleDropdown => {
+                        // Handle locally - toggle dropdown open/close
+                        self.filter_dropdown.toggle();
+                        (Effect::None, Task::none())
+                    }
+                    FdMsg::CloseDropdown => {
+                        // Handle locally - close dropdown (e.g., click outside)
+                        self.filter_dropdown.close();
+                        (Effect::None, Task::none())
+                    }
+                    FdMsg::ConsumeClick => {
+                        // No-op - just consume the click to prevent propagation
+                        (Effect::None, Task::none())
+                    }
+                    FdMsg::DateSegmentChanged {
+                        target,
+                        segment,
+                        value,
+                    } => {
+                        // Handle locally - update segment value
+                        let _ = self.filter_dropdown.set_segment(target, segment, value);
+
+                        // Check if the complete date is now valid and submit automatically
+                        let date_state = self.filter_dropdown.date_state(target);
+                        if date_state.is_complete_and_valid() {
+                            return (
+                                Effect::FilterChanged(FdMsg::DateSubmit(target)),
+                                Task::none(),
+                            );
+                        }
+
+                        (Effect::None, Task::none())
+                    }
+                    FdMsg::DateSubmit(target) => {
+                        // Forward to app if valid, otherwise just update locally
+                        let date_state = self.filter_dropdown.date_state(target);
+                        if date_state.is_complete_and_valid() {
+                            (Effect::FilterChanged(FdMsg::DateSubmit(target)), Task::none())
+                        } else {
+                            (Effect::None, Task::none())
+                        }
+                    }
+                    FdMsg::ClearDate(target) => {
+                        // Clear local input and forward to app
+                        self.filter_dropdown.clear_date(target);
+                        (Effect::FilterChanged(FdMsg::ClearDate(target)), Task::none())
+                    }
+                    // Forward other filter changes to app (it owns the navigator/filter)
+                    other => (Effect::FilterChanged(other), Task::none()),
+                }
             }
         }
     }

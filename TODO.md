@@ -4,14 +4,21 @@
 
 ## Bugs to Fix
 
-_(No known bugs)_
+### Random startup hang (black window, unresponsive)
+- [ ] Investigate random freeze at startup where window appears black and unresponsive
+  - **Symptoms**: Window shows black background, nothing renders, close button doesn't respond, must force kill
+  - **Diagnostic logs added**: `[STARTUP]` messages in main.rs, app/mod.rs, media/mod.rs, media/video.rs
+  - **Finding**: All startup logs complete successfully (App::new, media loading, ONNX validation)
+  - **Likely cause**: Issue occurs AFTER App::new() returns, during first render or event loop
+  - **Next steps**: Add logging in `App::view()`, `App::subscription()`, `App::update()` to isolate
 
 ## Planned Features
 
 ### Viewer
 
 #### Media Filters for Navigation
-- [ ] Add filterable navigation to show only matching media in the current directory
+- [x] Add filterable navigation to show only matching media in the current directory
+- [ ] Add auto-focus between segmented date input fields (blocked, requires `text_input::focus(id)` Task API, expected in future iced versions)
 
 **Filter categories to consider:**
 
