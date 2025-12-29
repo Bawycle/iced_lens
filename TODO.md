@@ -63,27 +63,6 @@ _(No pending items)_
 ### Video Editor
 - [ ] Create a simple video editor allowing users to trim videos by removing segments. The editor should let users play the video, seek to any position, step forward/backward frame by frame, and change the playback speed.
 
-## Code Quality / Refactoring
-
-### Clippy Pedantic Warnings (37 remaining)
-- [ ] Treat each warning case-by-case following current best practices:
-
-| Category | Count | Recommended Action |
-|----------|------:|-------------------|
-| `too_many_lines` | 12 | Keep as technical debt markers; refactor opportunistically |
-| `cast_precision_loss` | 8 | Local `#[allow]` with comment explaining why it's safe |
-| `struct_excessive_bools` | 5 | `#[allow]` if bools are orthogonal states, else refactor to enum |
-| `struct_field_names` | 5 | Global `#[allow]` in lib.rs (style choice) |
-| `missing_fields_in_debug` | 3 | Use `.finish_non_exhaustive()` to be explicit |
-| `similar_names` | 2 | Global `#[allow]` in lib.rs (style choice) |
-| `too_many_arguments` | 1 | Consider parameter struct if function grows |
-| `unnecessary_wraps` | 1 | Evaluate if Option is truly needed |
-
-**Principles:**
-- Explicit `#[allow]` with justification > silent ignore
-- Global allows for style choices, local allows for specific exceptions
-- `too_many_lines` warnings remain visible as refactoring candidates
-
 ## Packaging / Distribution
 
 ### Flatpak
