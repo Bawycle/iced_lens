@@ -182,7 +182,7 @@ pub fn handle_viewer_message(
     let viewer_task = task.map(Message::Viewer);
     let side_effect = match effect {
         component::Effect::PersistPreferences => {
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
         component::Effect::ToggleFullscreen => {
             // Guard: cannot toggle fullscreen when metadata editor has unsaved changes
@@ -285,7 +285,7 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
             Ok(Some(value)) => {
                 ctx.viewer.set_zoom_step_percent(value);
                 *ctx.screen = target;
-                return persistence::persist_preferences(ctx.preferences_context());
+                return persistence::persist_preferences(&mut ctx.preferences_context());
             }
             Ok(None) => {
                 *ctx.screen = target;
@@ -374,14 +374,14 @@ pub fn handle_settings_message(
         SettingsEvent::BackToViewerWithZoomChange(value) => {
             ctx.viewer.set_zoom_step_percent(value);
             *ctx.screen = Screen::Viewer;
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
         SettingsEvent::LanguageSelected(locale) => {
-            persistence::apply_language_change(ctx.i18n, ctx.viewer, locale, ctx.notifications)
+            persistence::apply_language_change(ctx.i18n, ctx.viewer, &locale, ctx.notifications)
         }
         SettingsEvent::ZoomStepChanged(value) => {
             ctx.viewer.set_zoom_step_percent(value);
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
         SettingsEvent::BackgroundThemeSelected(_)
         | SettingsEvent::SortOrderSelected(_)
@@ -390,30 +390,30 @@ pub fn handle_settings_message(
         | SettingsEvent::FrameHistoryMbChanged(_)
         | SettingsEvent::DeblurModelUrlChanged(_)
         | SettingsEvent::UpscaleModelUrlChanged(_) => {
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
         SettingsEvent::ThemeModeSelected(mode) => {
             *ctx.theme_mode = mode;
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
         SettingsEvent::VideoAutoplayChanged(enabled) => {
             *ctx.video_autoplay = enabled;
             ctx.viewer.set_video_autoplay(enabled);
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
         SettingsEvent::AudioNormalizationChanged(enabled) => {
             *ctx.audio_normalization = enabled;
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
         SettingsEvent::KeyboardSeekStepChanged(step) => {
             ctx.viewer
                 .set_keyboard_seek_step(KeyboardSeekStep::new(step));
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
         SettingsEvent::MaxSkipAttemptsChanged(attempts) => {
             ctx.viewer
                 .set_max_skip_attempts(MaxSkipAttempts::new(attempts));
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
         // AI settings events
         SettingsEvent::RequestEnableDeblur => {
@@ -630,7 +630,7 @@ pub fn handle_settings_message(
         }
         SettingsEvent::PersistFiltersChanged(_enabled) => {
             // Setting is already updated in settings state, just persist to config
-            persistence::persist_preferences(ctx.preferences_context())
+            persistence::persist_preferences(&mut ctx.preferences_context())
         }
     }
 }
@@ -929,7 +929,7 @@ pub fn handle_help_message(ctx: &mut UpdateContext<'_>, message: help::Message) 
 }
 
 /// Handles about screen messages.
-pub fn handle_about_message(ctx: &mut UpdateContext<'_>, message: about::Message) -> Task<Message> {
+pub fn handle_about_message(ctx: &mut UpdateContext<'_>, message: &about::Message) -> Task<Message> {
     match about::update(message) {
         AboutEvent::None => Task::none(),
         AboutEvent::BackToViewer => {
@@ -1534,7 +1534,7 @@ fn handle_filter_changed(
     let should_persist = cfg.display.persist_filters.unwrap_or(false);
 
     if should_persist {
-        persistence::persist_preferences(ctx.preferences_context())
+        persistence::persist_preferences(&mut ctx.preferences_context())
     } else {
         Task::none()
     }

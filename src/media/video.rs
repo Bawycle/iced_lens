@@ -6,14 +6,18 @@ use crate::media::ImageData;
 use std::path::Path;
 use std::sync::Once;
 
-/// Static flag to ensure FFmpeg is initialized only once.
+/// Static flag to ensure `FFmpeg` is initialized only once.
 static FFMPEG_INIT: Once = Once::new();
 
-/// Initialize FFmpeg with appropriate log level.
+/// Initialize `FFmpeg` with appropriate log level.
 ///
 /// This function is safe to call multiple times - initialization will only
-/// happen once thanks to `std::sync::Once`. It sets the FFmpeg log level
+/// happen once thanks to `std::sync::Once`. It sets the `FFmpeg` log level
 /// to ERROR to suppress warning messages like "Detected creation time before 1970".
+///
+/// # Errors
+///
+/// Returns an error if `FFmpeg` initialization fails.
 pub fn init_ffmpeg() -> Result<()> {
     let mut init_result: Result<()> = Ok(());
 
@@ -62,6 +66,11 @@ pub struct VideoMetadata {
 ///
 /// Opens the video file, seeks to the first frame, decodes it, and converts
 /// it to RGBA format for display.
+///
+/// # Errors
+///
+/// Returns an error if `FFmpeg` initialization fails, the video file cannot be
+/// opened, no video stream is found, or frame decoding fails.
 pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
     // Initialize FFmpeg (with log level set to suppress warnings)
     init_ffmpeg()?;
@@ -115,6 +124,7 @@ pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
                 .send_packet(&packet)
                 .map_err(|e| Error::Io(format!("Failed to send packet: {e}")))?;
 
+            #[allow(clippy::similar_names)] // decoder vs decoded is intentional
             let mut decoded = ffmpeg_next::frame::Video::empty();
             if decoder.receive_frame(&mut decoded).is_ok() {
                 // Convert to RGBA
@@ -139,9 +149,11 @@ pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
 
     // Copy frame data (handle stride)
     let mut rgba_bytes = Vec::with_capacity((width * height * 4) as usize);
-    for y in 0..height {
-        let row_start = (y * stride as u32) as usize;
-        let row_end = row_start + (width * 4) as usize;
+    // stride is usize; convert width to usize for consistent arithmetic
+    let width_usize = width as usize;
+    for y in 0..height as usize {
+        let row_start = y * stride;
+        let row_end = row_start + width_usize * 4;
         rgba_bytes.extend_from_slice(&data[row_start..row_end]);
     }
 
@@ -152,6 +164,11 @@ pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
 ///
 /// Opens the video file and extracts metadata without decoding frames.
 /// This is faster than thumbnail extraction as it only reads container metadata.
+///
+/// # Errors
+///
+/// Returns an error if `FFmpeg` initialization fails, the video file cannot be
+/// opened, or no video stream is found.
 pub fn extract_video_metadata<P: AsRef<Path>>(path: P) -> Result<VideoMetadata> {
     // Initialize FFmpeg (with log level set to suppress warnings)
     init_ffmpeg()?;
@@ -187,13 +204,19 @@ pub fn extract_video_metadata<P: AsRef<Path>>(path: P) -> Result<VideoMetadata> 
     }
 
     // Extract duration (convert from time_base to seconds)
+    // Note: i64 to f64 conversion is safe here - precision loss only occurs for
+    // durations > 2^53 time units (centuries of video at any reasonable time base)
     let duration_secs = if video_stream.duration() > 0 {
         let time_base = video_stream.time_base();
-        video_stream.duration() as f64 * f64::from(time_base.numerator())
-            / f64::from(time_base.denominator())
+        let duration = video_stream.duration();
+        #[allow(clippy::cast_precision_loss)] // Duration values are within f64 precise range
+        let duration_f = duration as f64;
+        duration_f * f64::from(time_base.numerator()) / f64::from(time_base.denominator())
     } else if ictx.duration() > 0 {
-        // Fallback to container duration
-        ictx.duration() as f64 / f64::from(ffmpeg_next::ffi::AV_TIME_BASE)
+        // Fallback to container duration (in AV_TIME_BASE units = microseconds)
+        #[allow(clippy::cast_precision_loss)] // Duration values are within f64 precise range
+        let duration_f = ictx.duration() as f64;
+        duration_f / f64::from(ffmpeg_next::ffi::AV_TIME_BASE)
     } else {
         0.0
     };

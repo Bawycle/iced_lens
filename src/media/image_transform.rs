@@ -31,16 +31,19 @@ pub struct ResizeScale(f32);
 
 impl ResizeScale {
     /// Creates a new resize scale, clamping the value to the valid range.
+    #[must_use] 
     pub fn new(percent: f32) -> Self {
         Self(percent.clamp(MIN_RESIZE_SCALE_PERCENT, MAX_RESIZE_SCALE_PERCENT))
     }
 
     /// Returns the raw percentage value.
+    #[must_use] 
     pub fn value(self) -> f32 {
         self.0
     }
 
     /// Returns the scale as a multiplier (e.g., 100% → 1.0, 200% → 2.0).
+    #[must_use] 
     pub fn as_factor(self) -> f32 {
         self.0 / 100.0
     }
@@ -48,34 +51,55 @@ impl ResizeScale {
     /// Applies the scale to the given dimensions, returning the new dimensions.
     ///
     /// Both dimensions are guaranteed to be at least 1 pixel.
+    #[must_use] 
     pub fn apply_to_dimensions(self, width: u32, height: u32) -> (u32, u32) {
-        let factor = self.as_factor();
-        let new_width = (width as f32 * factor).round().max(1.0) as u32;
-        let new_height = (height as f32 * factor).round().max(1.0) as u32;
+        let factor = f64::from(self.as_factor());
+        // Use f64 for intermediate calculation to avoid precision loss with large dimensions
+        let new_width = (f64::from(width) * factor).round().max(1.0);
+        let new_height = (f64::from(height) * factor).round().max(1.0);
+        // Saturate to u32::MAX for safety (though images this large are impractical)
+        // The conditional guarantees value is <= u32::MAX, so cast is safe
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let new_width = if new_width > f64::from(u32::MAX) {
+            u32::MAX
+        } else {
+            new_width as u32
+        };
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let new_height = if new_height > f64::from(u32::MAX) {
+            u32::MAX
+        } else {
+            new_height as u32
+        };
         (new_width, new_height)
     }
 
     /// Returns whether the scale is at the minimum value.
+    #[must_use] 
     pub fn is_min(self) -> bool {
         self.0 <= MIN_RESIZE_SCALE_PERCENT
     }
 
     /// Returns whether the scale is at the maximum value.
+    #[must_use] 
     pub fn is_max(self) -> bool {
         self.0 >= MAX_RESIZE_SCALE_PERCENT
     }
 
     /// Returns whether the scale represents 100% (no resize).
+    #[must_use] 
     pub fn is_original(self) -> bool {
         (self.0 - DEFAULT_RESIZE_SCALE_PERCENT).abs() < f32::EPSILON
     }
 
     /// Returns whether this scale represents an enlargement (> 100%).
+    #[must_use] 
     pub fn is_enlargement(self) -> bool {
         self.0 > DEFAULT_RESIZE_SCALE_PERCENT
     }
 
     /// Returns whether this scale represents a reduction (< 100%).
+    #[must_use] 
     pub fn is_reduction(self) -> bool {
         self.0 < DEFAULT_RESIZE_SCALE_PERCENT
     }
@@ -92,26 +116,35 @@ impl Default for ResizeScale {
 // ==========================================================================
 
 /// Rotate an image 90 degrees counter-clockwise (left).
+#[must_use] 
 pub fn rotate_left(image: &DynamicImage) -> DynamicImage {
     image.rotate270()
 }
 
 /// Rotate an image 90 degrees clockwise (right).
+#[must_use] 
 pub fn rotate_right(image: &DynamicImage) -> DynamicImage {
     image.rotate90()
 }
 
 /// Flip an image horizontally (mirror left-to-right).
+#[must_use] 
 pub fn flip_horizontal(image: &DynamicImage) -> DynamicImage {
     image.fliph()
 }
 
 /// Flip an image vertically (mirror top-to-bottom).
+#[must_use] 
 pub fn flip_vertical(image: &DynamicImage) -> DynamicImage {
     image.flipv()
 }
 
-/// Convert DynamicImage back to ImageData for display.
+/// Convert `DynamicImage` back to `ImageData` for display.
+///
+/// # Errors
+///
+/// This function currently does not return errors, but returns `Result`
+/// for API consistency with other image operations.
 pub fn dynamic_to_image_data(dynamic: &DynamicImage) -> Result<ImageData> {
     let (width, height) = dynamic.dimensions();
     let rgba_img = dynamic.to_rgba8();
@@ -121,6 +154,7 @@ pub fn dynamic_to_image_data(dynamic: &DynamicImage) -> Result<ImageData> {
 }
 
 /// Resize the image to the provided dimensions using a high-quality filter.
+#[must_use] 
 pub fn resize(image: &DynamicImage, width: u32, height: u32) -> DynamicImage {
     let width = width.max(1);
     let height = height.max(1);
@@ -137,6 +171,7 @@ pub fn resize(image: &DynamicImage, width: u32, height: u32) -> DynamicImage {
 /// Note: When `value` is zero, this function returns a cloned image to maintain
 /// a consistent return type. Callers that frequently pass zero may want to check
 /// the value before calling to avoid unnecessary clones.
+#[must_use] 
 pub fn adjust_brightness(image: &DynamicImage, value: i32) -> DynamicImage {
     if value == 0 {
         return image.clone();
@@ -157,13 +192,17 @@ pub fn adjust_brightness(image: &DynamicImage, value: i32) -> DynamicImage {
 /// Note: When `value` is zero, this function returns a cloned image to maintain
 /// a consistent return type. Callers that frequently pass zero may want to check
 /// the value before calling to avoid unnecessary clones.
+#[must_use] 
 pub fn adjust_contrast(image: &DynamicImage, value: i32) -> DynamicImage {
     if value == 0 {
         return image.clone();
     }
     // Convert -100..+100 to a factor: -100 -> -100.0, 0 -> 0.0, +100 -> +100.0
     // The image crate's contrast function interprets this as percentage adjustment
-    let factor = value as f32;
+    // Clamp to valid range and convert safely via i16 (range -100..100 fits in i16)
+    #[allow(clippy::cast_possible_truncation)]
+    let clamped = value.clamp(-100, 100) as i16;
+    let factor = f32::from(clamped);
     image.adjust_contrast(factor)
 }
 
@@ -171,6 +210,7 @@ pub fn adjust_contrast(image: &DynamicImage, value: i32) -> DynamicImage {
 ///
 /// The rectangle coordinates are clamped to the image boundaries.
 /// If the resulting crop area is invalid (zero width or height), returns None.
+#[must_use] 
 pub fn crop(image: &DynamicImage, x: u32, y: u32, width: u32, height: u32) -> Option<DynamicImage> {
     let img_width = image.width();
     let img_height = image.height();

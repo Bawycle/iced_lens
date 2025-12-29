@@ -42,6 +42,7 @@ pub enum ErrorSeverity {
 
 impl ErrorSeverity {
     /// Returns the primary color for this severity level.
+    #[must_use] 
     pub fn color(&self) -> Color {
         match self {
             ErrorSeverity::Error => palette::ERROR_500,
@@ -51,6 +52,7 @@ impl ErrorSeverity {
     }
 
     /// Returns the appropriate icon for this severity level.
+    #[must_use] 
     pub fn icon(&self) -> Image<Handle> {
         // Warning icon is used for all severity levels as it's the most recognizable
         // The color differentiation handles the severity communication
@@ -58,7 +60,7 @@ impl ErrorSeverity {
     }
 }
 
-/// Configuration for the ErrorDisplay component.
+/// Configuration for the `ErrorDisplay` component.
 #[derive(Debug, Clone)]
 pub struct ErrorDisplay<Message> {
     severity: ErrorSeverity,
@@ -94,6 +96,7 @@ impl<Message> Default for ErrorDisplay<Message> {
 
 impl<Message: Clone + 'static> ErrorDisplay<Message> {
     /// Creates a new error display with the given severity.
+    #[must_use] 
     pub fn new(severity: ErrorSeverity) -> Self {
         Self {
             severity,
@@ -102,30 +105,35 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
     }
 
     /// Sets the title (main heading).
+    #[must_use]
     pub fn title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
     }
 
     /// Sets the message (user-friendly explanation).
+    #[must_use]
     pub fn message(mut self, message: impl Into<String>) -> Self {
         self.message = Some(message.into());
         self
     }
 
     /// Sets the technical details (collapsible).
+    #[must_use]
     pub fn details(mut self, details: impl Into<String>) -> Self {
         self.details = Some(details.into());
         self
     }
 
     /// Sets whether details are currently shown.
+    #[must_use]
     pub fn details_visible(mut self, visible: bool) -> Self {
         self.show_details = visible;
         self
     }
 
     /// Sets the action button label and message.
+    #[must_use]
     pub fn action(mut self, label: impl Into<String>, message: Message) -> Self {
         self.action_label = Some(label.into());
         self.action_message = Some(message);
@@ -133,12 +141,14 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
     }
 
     /// Sets the message to emit when toggling details visibility.
+    #[must_use]
     pub fn on_toggle_details(mut self, message: Message) -> Self {
         self.toggle_details_message = Some(message);
         self
     }
 
     /// Sets the localized labels for the details toggle.
+    #[must_use]
     pub fn details_labels(
         mut self,
         show_label: impl Into<String>,
@@ -169,8 +179,8 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
             .width(Length::Fill);
 
         // Title
-        if let Some(title_text) = self.title {
-            let title = Text::new(title_text)
+        if let Some(ref title_text) = self.title {
+            let title = Text::new(title_text.clone())
                 .size(20)
                 .style(move |_theme: &Theme| text::Style {
                     color: Some(accent_color),
@@ -179,8 +189,8 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
         }
 
         // Message
-        if let Some(message_text) = self.message {
-            let message = Text::new(message_text).size(14);
+        if let Some(ref message_text) = self.message {
+            let message = Text::new(message_text.clone()).size(14);
             content = content.push(
                 Container::new(message)
                     .width(Length::Fill)
@@ -189,9 +199,9 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
         }
 
         // Action button
-        if let (Some(label), Some(msg)) = (self.action_label, self.action_message) {
-            let action_btn = button(Text::new(label))
-                .on_press(msg)
+        if let (Some(ref label), Some(ref msg)) = (&self.action_label, &self.action_message) {
+            let action_btn = button(Text::new(label.clone()))
+                .on_press(msg.clone())
                 .style(button_styles::selected);
             content = content.push(
                 Container::new(action_btn)
@@ -201,54 +211,7 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
         }
 
         // Details toggle and content
-        if self.details.is_some() {
-            let toggle_label = if self.show_details {
-                self.hide_details_label
-            } else {
-                self.show_details_label
-            };
-
-            if let Some(toggle_msg) = self.toggle_details_message {
-                let toggle_btn = button(Text::new(toggle_label).size(13)).on_press(toggle_msg);
-                content = content.push(
-                    Container::new(toggle_btn)
-                        .padding(spacing::XS)
-                        .align_x(alignment::Horizontal::Center),
-                );
-            }
-
-            if self.show_details {
-                if let Some(details_text) = self.details {
-                    // Use theme-aware secondary text color for details
-                    let details_heading =
-                        Text::new(self.details_heading_label)
-                            .size(14)
-                            .style(|theme: &Theme| text::Style {
-                                color: Some(theme.extended_palette().secondary.base.text),
-                            });
-
-                    let details_body =
-                        Text::new(details_text)
-                            .size(12)
-                            .style(|theme: &Theme| text::Style {
-                                color: Some(theme.extended_palette().secondary.base.text),
-                            });
-
-                    let details_column = Column::new()
-                        .spacing(spacing::XS)
-                        .width(Length::Fill)
-                        .push(rule::horizontal(1))
-                        .push(details_heading)
-                        .push(details_body);
-
-                    content = content.push(
-                        Container::new(details_column)
-                            .width(Length::Fill)
-                            .padding(spacing::SM),
-                    );
-                }
-            }
-        }
+        content = self.build_details_section(content);
 
         // Combine icon and content
         let main_row = Row::new()
@@ -279,11 +242,72 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
             })
             .into()
     }
+
+    /// Builds the collapsible details section if details are configured.
+    fn build_details_section(
+        &self,
+        mut content: Column<'static, Message>,
+    ) -> Column<'static, Message> {
+        if self.details.is_none() {
+            return content;
+        }
+
+        let toggle_label = if self.show_details {
+            &self.hide_details_label
+        } else {
+            &self.show_details_label
+        };
+
+        if let Some(ref toggle_msg) = self.toggle_details_message {
+            let toggle_btn =
+                button(Text::new(toggle_label.clone()).size(13)).on_press(toggle_msg.clone());
+            content = content.push(
+                Container::new(toggle_btn)
+                    .padding(spacing::XS)
+                    .align_x(alignment::Horizontal::Center),
+            );
+        }
+
+        if self.show_details {
+            if let Some(ref details_text) = self.details {
+                let heading_label = self.details_heading_label.clone();
+                let details_clone = details_text.clone();
+
+                let details_heading = Text::new(heading_label).size(14).style(
+                    |theme: &Theme| text::Style {
+                        color: Some(theme.extended_palette().secondary.base.text),
+                    },
+                );
+
+                let details_body = Text::new(details_clone).size(12).style(
+                    |theme: &Theme| text::Style {
+                        color: Some(theme.extended_palette().secondary.base.text),
+                    },
+                );
+
+                let details_column = Column::new()
+                    .spacing(spacing::XS)
+                    .width(Length::Fill)
+                    .push(rule::horizontal(1))
+                    .push(details_heading)
+                    .push(details_body);
+
+                content = content.push(
+                    Container::new(details_column)
+                        .width(Length::Fill)
+                        .padding(spacing::SM),
+                );
+            }
+        }
+
+        content
+    }
 }
 
 /// Simplified error view for common use cases.
 ///
 /// Creates a centered error display that fills its container.
+#[must_use]
 pub fn centered_error_view<Message: Clone + 'static>(
     error_display: ErrorDisplay<Message>,
 ) -> Element<'static, Message> {

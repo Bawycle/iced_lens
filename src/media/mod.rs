@@ -241,7 +241,7 @@ fn is_animated<P: AsRef<Path>>(path: P) -> crate::error::Result<bool> {
 /// - The file cannot be read or decoded
 pub fn load_media<P: AsRef<Path>>(path: P) -> crate::error::Result<MediaData> {
     let path_ref = path.as_ref();
-    eprintln!("[STARTUP] load_media: {:?}", path_ref);
+    eprintln!("[STARTUP] load_media: {}", path_ref.display());
     let start = std::time::Instant::now();
 
     // Detect media type

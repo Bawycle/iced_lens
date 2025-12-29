@@ -76,6 +76,7 @@ impl Default for CacheConfig {
 
 impl CacheConfig {
     /// Creates a new cache configuration with specified limits.
+    #[must_use] 
     pub fn new(max_bytes: usize, max_frames: usize) -> Self {
         Self {
             max_bytes: max_bytes.clamp(MIN_CACHE_SIZE_BYTES, MAX_CACHE_SIZE_BYTES),
@@ -85,6 +86,7 @@ impl CacheConfig {
     }
 
     /// Creates a disabled cache configuration.
+    #[must_use] 
     pub fn disabled() -> Self {
         Self {
             enabled: false,
@@ -117,6 +119,7 @@ pub struct CacheStats {
 
 impl CacheStats {
     /// Returns the cache hit rate as a percentage (0.0 - 100.0).
+    #[must_use] 
     pub fn hit_rate(&self) -> f64 {
         let total = self.hits + self.misses;
         if total == 0 {
@@ -167,6 +170,12 @@ pub struct FrameCache {
 
 impl FrameCache {
     /// Creates a new frame cache with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the compile-time default `DEFAULT_MAX_FRAMES` is zero,
+    /// which would indicate a build configuration error.
+    #[must_use]
     pub fn new(config: CacheConfig) -> Self {
         let capacity = NonZeroUsize::new(config.max_frames).unwrap_or(
             NonZeroUsize::new(DEFAULT_MAX_FRAMES).expect("DEFAULT_MAX_FRAMES must be non-zero"),
@@ -181,11 +190,13 @@ impl FrameCache {
     }
 
     /// Creates a new frame cache with default configuration.
+    #[must_use] 
     pub fn with_defaults() -> Self {
         Self::new(CacheConfig::default())
     }
 
     /// Returns whether caching is enabled.
+    #[must_use] 
     pub fn is_enabled(&self) -> bool {
         self.config.enabled
     }
@@ -278,7 +289,7 @@ impl FrameCache {
         let mut best_distance = i64::MAX;
 
         // Note: This iterates without updating LRU order (peek)
-        for (&pts, entry) in self.cache.iter() {
+        for (&pts, entry) in &self.cache {
             let distance = (pts - target_micros).abs();
             if distance < best_distance && distance <= PTS_TOLERANCE_MICROS {
                 best_distance = distance;
@@ -309,7 +320,7 @@ impl FrameCache {
 
         let mut best_match: Option<(i64, Arc<DecodedFrame>)> = None;
 
-        for (&pts, entry) in self.cache.iter() {
+        for (&pts, entry) in &self.cache {
             if pts <= target_micros {
                 let should_update = match &best_match {
                     None => true,
@@ -332,6 +343,7 @@ impl FrameCache {
     }
 
     /// Checks if a frame is cached for the given PTS.
+    #[must_use] 
     pub fn contains(&self, pts_secs: f64) -> bool {
         if !self.config.enabled {
             return false;
@@ -349,26 +361,31 @@ impl FrameCache {
     }
 
     /// Returns the current cache statistics.
+    #[must_use] 
     pub fn stats(&self) -> CacheStats {
         self.stats
     }
 
     /// Returns the current number of cached frames.
+    #[must_use] 
     pub fn len(&self) -> usize {
         self.cache.len()
     }
 
     /// Returns whether the cache is empty.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.cache.is_empty()
     }
 
     /// Returns the current memory usage in bytes.
+    #[must_use] 
     pub fn memory_usage(&self) -> usize {
         self.current_bytes
     }
 
     /// Returns the cache configuration.
+    #[must_use] 
     pub fn config(&self) -> &CacheConfig {
         &self.config
     }
@@ -376,6 +393,11 @@ impl FrameCache {
     /// Updates the cache configuration.
     ///
     /// If the new limits are smaller, excess frames will be evicted.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the compile-time default `DEFAULT_MAX_FRAMES` is zero,
+    /// which would indicate a build configuration error.
     pub fn set_config(&mut self, config: CacheConfig) {
         self.config = config;
 

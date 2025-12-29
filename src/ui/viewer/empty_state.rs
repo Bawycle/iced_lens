@@ -19,7 +19,7 @@ use iced::{alignment, Color, Element, Length};
 /// This view is displayed when the application starts without a file argument
 /// or when no media is currently loaded. It provides a welcoming interface
 /// with instructions and a button to open files.
-pub fn view<'a>(i18n: &'a I18n) -> Element<'a, Message> {
+pub fn view(i18n: &I18n) -> Element<'_, Message> {
     // Large icon
     let icon = icons::sized(icons::image(), sizing::ICON_XL * 2.0);
 

@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Crop overlay renderer for interactive crop selection.
+//!
+//! Uses f32 for canvas coordinates and u32 for pixel positions.
+//! Precision loss in conversions is acceptable for typical image sizes.
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
 
 use crate::ui::design_tokens::sizing;
 use crate::ui::image_editor::{CanvasMessage, Message};
@@ -74,13 +80,6 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
         use iced::widget::Action;
 
         match event {
-            // If cursor leaves the canvas, end any drag operation
-            iced::Event::Mouse(iced::mouse::Event::CursorLeft) => {
-                return Some(
-                    Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseUp))
-                        .and_capture(),
-                );
-            }
             iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)) => {
                 if let Some(cursor_position) = cursor.position_in(bounds) {
                     if let Some((img_x, img_y)) =
@@ -119,7 +118,11 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
                     }
                 }
             }
-            iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
+            // End drag operation on mouse up or cursor leaving canvas
+            iced::Event::Mouse(
+                iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)
+                | iced::mouse::Event::CursorLeft,
+            ) => {
                 return Some(
                     Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseUp))
                         .and_capture(),

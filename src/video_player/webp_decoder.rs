@@ -4,7 +4,7 @@
 //! This module provides asynchronous animated WebP frame decoding via Tokio tasks,
 //! delivering frames through channels for non-blocking UI updates.
 //!
-//! FFmpeg doesn't support animated WebP well, so we use the dedicated webp-animation
+//! `FFmpeg` doesn't support animated WebP well, so we use the dedicated webp-animation
 //! crate which wraps Google's libwebp library.
 
 use super::decoder::{DecodedFrame, DecoderCommand, DecoderEvent};
@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 
 /// Async animated WebP decoder that runs in a Tokio task.
 ///
-/// This decoder handles animated WebP files that FFmpeg cannot decode properly.
+/// This decoder handles animated WebP files that `FFmpeg` cannot decode properly.
 /// It provides the same interface as `AsyncDecoder` for seamless integration.
 #[derive(Debug)]
 pub struct WebpAnimDecoder {
@@ -31,12 +31,16 @@ impl WebpAnimDecoder {
     ///
     /// Spawns a Tokio task that handles decoding in the background.
     /// Returns the decoder handle with channels for communication.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file does not exist or cannot be read.
     pub fn new<P: AsRef<Path>>(webp_path: P) -> Result<Self> {
         let path = webp_path.as_ref().to_path_buf();
 
         // Validate file exists
         if !path.exists() {
-            return Err(Error::Io(format!("WebP file not found: {path:?}")));
+            return Err(Error::Io(format!("WebP file not found: {}", path.display())));
         }
 
         // Read the entire file into memory (WebP decoder requires full buffer)
@@ -62,6 +66,10 @@ impl WebpAnimDecoder {
     }
 
     /// Sends a command to the decoder task.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder task is not running.
     pub fn send_command(&self, command: DecoderCommand) -> Result<()> {
         self.command_tx
             .send(command)
@@ -74,6 +82,7 @@ impl WebpAnimDecoder {
     }
 
     /// Main decoder loop running in a blocking thread.
+    #[allow(clippy::needless_pass_by_value)] // Vec and Sender are consumed
     fn decoder_loop_blocking(
         webp_data: Vec<u8>,
         mut command_rx: mpsc::UnboundedReceiver<DecoderCommand>,
@@ -88,7 +97,7 @@ impl WebpAnimDecoder {
         // Collect all frames into memory with their timestamps
         // WebP animations are typically short, so this is acceptable
         let mut frames: Vec<(Vec<u8>, i32)> = Vec::new();
-        for frame in decoder.into_iter() {
+        for frame in decoder {
             let data = frame.data().to_vec();
             let timestamp_ms = frame.timestamp();
             frames.push((data, timestamp_ms));
@@ -135,6 +144,8 @@ impl WebpAnimDecoder {
                 }
                 Ok(DecoderCommand::Seek { target_secs }) => {
                     // Find the frame closest to target time
+                    // WebP animations are typically short, so i32 ms is sufficient (~24 days max)
+                    #[allow(clippy::cast_possible_truncation)]
                     let target_ms = (target_secs * 1000.0) as i32;
                     let mut accumulated_ms = 0i32;
                     current_frame_idx = 0;
@@ -171,7 +182,7 @@ impl WebpAnimDecoder {
                         decode_single_frame = true;
                     }
                 }
-                Ok(DecoderCommand::Stop) => {
+                Ok(DecoderCommand::Stop) | Err(mpsc::error::TryRecvError::Disconnected) => {
                     break;
                 }
                 Ok(DecoderCommand::SetPlaybackSpeed {
@@ -186,9 +197,6 @@ impl WebpAnimDecoder {
                     if is_playing {
                         playback_start_time = Some(instant);
                     }
-                }
-                Err(mpsc::error::TryRecvError::Disconnected) => {
-                    break;
                 }
                 Err(mpsc::error::TryRecvError::Empty) => {
                     // No commands, continue
@@ -221,7 +229,7 @@ impl WebpAnimDecoder {
             // Calculate PTS for this frame
             let pts_secs: f64 = frame_durations_ms[..current_frame_idx]
                 .iter()
-                .map(|&d| d as f64 / 1000.0)
+                .map(|&d| f64::from(d) / 1000.0)
                 .sum();
 
             // Frame pacing: wait until the frame should be displayed
@@ -237,6 +245,7 @@ impl WebpAnimDecoder {
             }
 
             // Send frame event
+            #[allow(clippy::similar_names)] // decoder vs decoded is intentional
             let decoded = DecodedFrame {
                 rgba_data: Arc::new(rgba_data.clone()),
                 width,
@@ -266,7 +275,11 @@ impl WebpAnimDecoder {
 
     /// Returns metadata for an animated WebP file.
     ///
-    /// This is used to populate VideoData when loading the media.
+    /// This is used to populate `VideoData` when loading the media.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or is not a valid WebP.
     pub fn get_metadata<P: AsRef<Path>>(webp_path: P) -> Result<WebpMetadata> {
         let webp_data = std::fs::read(webp_path.as_ref())
             .map_err(|e| Error::Io(format!("Failed to read WebP file: {e}")))?;
@@ -280,12 +293,12 @@ impl WebpAnimDecoder {
         let mut last_timestamp_ms = 0i32;
         let mut frame_count = 0usize;
 
-        for frame in decoder.into_iter() {
+        for frame in decoder {
             last_timestamp_ms = frame.timestamp();
             frame_count += 1;
         }
 
-        let duration_secs = last_timestamp_ms as f64 / 1000.0;
+        let duration_secs = f64::from(last_timestamp_ms) / 1000.0;
         let fps = if duration_secs > 0.0 {
             frame_count as f64 / duration_secs
         } else {

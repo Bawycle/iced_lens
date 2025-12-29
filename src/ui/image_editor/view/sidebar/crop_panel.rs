@@ -84,7 +84,7 @@ pub fn panel<'a>(crop: &'a CropState, ctx: &ViewContext<'a>) -> Element<'a, Mess
     .into()
 }
 
-fn ratio_button<'a>(crop: &'a CropState, label: String, ratio: CropRatio) -> Element<'a, Message> {
+fn ratio_button(crop: &CropState, label: String, ratio: CropRatio) -> Element<'_, Message> {
     let is_selected = crop.ratio == ratio;
     button(text(label).size(typography::CAPTION))
         .on_press(SidebarMessage::SetCropRatio(ratio).into())

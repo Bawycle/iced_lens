@@ -52,7 +52,8 @@ impl<Message> Default for VideoShader<Message> {
 }
 
 impl<Message> VideoShader<Message> {
-    /// Creates a new VideoShader with no frame.
+    /// Creates a new `VideoShader` with no frame.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             frame: None,
@@ -80,6 +81,7 @@ impl<Message> VideoShader<Message> {
     }
 
     /// Returns true if a frame is loaded.
+    #[must_use] 
     pub fn has_frame(&self) -> bool {
         self.frame.is_some()
     }
@@ -88,6 +90,7 @@ impl<Message> VideoShader<Message> {
     ///
     /// This can be used to save the current frame to a file.
     /// Uses `Arc::clone` to share the frame data without copying the pixels.
+    #[must_use] 
     pub fn exportable_frame(&self) -> Option<ExportableFrame> {
         self.frame
             .as_ref()
@@ -95,16 +98,19 @@ impl<Message> VideoShader<Message> {
     }
 
     /// Returns the current frame data if available.
+    #[must_use] 
     pub fn frame(&self) -> Option<&FrameData> {
         self.frame.as_ref()
     }
 
     /// Returns the raw RGBA data for frame export.
+    #[must_use] 
     pub fn raw_rgba_data(&self) -> Option<&Arc<Vec<u8>>> {
         self.frame.as_ref().map(|f| &f.rgba)
     }
 
     /// Returns the frame dimensions (native, unscaled).
+    #[must_use] 
     pub fn dimensions(&self) -> Option<(u32, u32)> {
         self.frame.as_ref().map(|f| (f.width, f.height))
     }
@@ -114,6 +120,7 @@ impl<Message> VideoShader<Message> {
     /// The caller (pane) is responsible for calculating the correct display dimensions
     /// based on zoom level and fit-to-window settings. This ensures a single source
     /// of truth for display sizing.
+    #[must_use] 
     pub fn view_sized(&self, display_width: f32, display_height: f32) -> Element<'_, Message>
     where
         Message: 'static,
@@ -316,7 +323,7 @@ impl shader::Pipeline for VideoPipeline {
 }
 
 impl VideoPipeline {
-    /// Store the widget's physical bounds for use in render().
+    /// Store the widget's physical bounds for use in `render()`.
     /// This converts logical bounds to physical pixels using the viewport's scale factor.
     fn store_physical_bounds(&mut self, bounds: &Rectangle, viewport: &Viewport) {
         let scale = viewport.scale_factor();
@@ -453,7 +460,7 @@ impl VideoPipeline {
 /// WGSL shader for video frame rendering.
 ///
 /// This shader renders a fullscreen quad that fills the entire viewport.
-/// The viewport is set to the widget's clip_bounds in the render() method,
+/// The viewport is set to the widget's `clip_bounds` in the `render()` method,
 /// so the quad automatically fills the correct area on screen.
 const VIDEO_SHADER: &str = r"
 struct VertexOutput {

@@ -21,6 +21,7 @@ pub struct ValidationErrors {
 
 impl ValidationErrors {
     /// Returns true if there are any validation errors.
+    #[must_use] 
     pub fn has_errors(&self) -> bool {
         self.date_taken.is_some()
             || self.exposure_time.is_some()
@@ -48,6 +49,7 @@ pub struct MetadataEditorState {
 
 impl MetadataEditorState {
     /// Creates a new editor state from image metadata.
+    #[must_use] 
     pub fn from_image_metadata(meta: &ImageMetadata) -> Self {
         let editable = EditableMetadata::from_image_metadata(meta);
         let visible = Self::visible_fields_from_data(&editable);
@@ -60,6 +62,7 @@ impl MetadataEditorState {
     }
 
     /// Creates an empty editor state (for images without EXIF data).
+    #[must_use] 
     pub fn new_empty() -> Self {
         Self {
             edited: EditableMetadata::default(),
@@ -135,17 +138,17 @@ impl MetadataEditorState {
     /// For GPS fields, both latitude and longitude are removed together.
     pub fn remove_field(&mut self, field: MetadataField) {
         self.visible_fields.remove(&field);
-        self.clear_field_value(&field);
+        self.clear_field_value(field);
 
         // GPS fields are treated as a pair
         if let Some(pair) = field.gps_pair() {
             self.visible_fields.remove(&pair);
-            self.clear_field_value(&pair);
+            self.clear_field_value(pair);
         }
     }
 
     /// Clears the value of a specific field.
-    fn clear_field_value(&mut self, field: &MetadataField) {
+    fn clear_field_value(&mut self, field: MetadataField) {
         match field {
             // EXIF fields
             MetadataField::CameraMake => self.edited.camera_make.clear(),
@@ -193,6 +196,7 @@ impl MetadataEditorState {
     }
 
     /// Returns fields that are not currently visible (available for adding).
+    #[must_use] 
     pub fn available_fields(&self) -> Vec<MetadataField> {
         MetadataField::all()
             .iter()
@@ -207,11 +211,13 @@ impl MetadataEditorState {
     }
 
     /// Returns true if a field is currently visible.
+    #[must_use] 
     pub fn is_field_visible(&self, field: &MetadataField) -> bool {
         self.visible_fields.contains(field)
     }
 
     /// Returns true if any field has been modified from the original.
+    #[must_use] 
     pub fn has_changes(&self) -> bool {
         // EXIF fields
         self.edited.camera_make != self.original.camera_make
@@ -250,69 +256,69 @@ impl MetadataEditorState {
             MetadataField::CameraMake => self.edited.camera_make = value,
             MetadataField::CameraModel => self.edited.camera_model = value,
             MetadataField::DateTaken => {
-                self.edited.date_taken = value.clone();
+                self.edited.date_taken.clone_from(&value);
                 // Only validate if changed from original
-                self.errors.date_taken = if value != self.original.date_taken {
-                    validate_date(&value)
-                } else {
+                self.errors.date_taken = if value == self.original.date_taken {
                     None
+                } else {
+                    validate_date(&value)
                 };
             }
             MetadataField::ExposureTime => {
-                self.edited.exposure_time = value.clone();
-                self.errors.exposure_time = if value != self.original.exposure_time {
-                    validate_exposure_time(&value)
-                } else {
+                self.edited.exposure_time.clone_from(&value);
+                self.errors.exposure_time = if value == self.original.exposure_time {
                     None
+                } else {
+                    validate_exposure_time(&value)
                 };
             }
             MetadataField::Aperture => {
-                self.edited.aperture = value.clone();
-                self.errors.aperture = if value != self.original.aperture {
-                    validate_aperture(&value)
-                } else {
+                self.edited.aperture.clone_from(&value);
+                self.errors.aperture = if value == self.original.aperture {
                     None
+                } else {
+                    validate_aperture(&value)
                 };
             }
             MetadataField::Iso => {
-                self.edited.iso = value.clone();
-                self.errors.iso = if value != self.original.iso {
-                    validate_iso(&value)
-                } else {
+                self.edited.iso.clone_from(&value);
+                self.errors.iso = if value == self.original.iso {
                     None
+                } else {
+                    validate_iso(&value)
                 };
             }
             MetadataField::Flash => self.edited.flash = value,
             MetadataField::FocalLength => {
-                self.edited.focal_length = value.clone();
-                self.errors.focal_length = if value != self.original.focal_length {
-                    validate_focal_length(&value)
-                } else {
+                self.edited.focal_length.clone_from(&value);
+                self.errors.focal_length = if value == self.original.focal_length {
                     None
+                } else {
+                    validate_focal_length(&value)
                 };
             }
             MetadataField::FocalLength35mm => {
-                self.edited.focal_length_35mm = value.clone();
-                self.errors.focal_length_35mm = if value != self.original.focal_length_35mm {
-                    validate_focal_length(&value)
-                } else {
+                self.edited.focal_length_35mm.clone_from(&value);
+                self.errors.focal_length_35mm = if value == self.original.focal_length_35mm {
                     None
+                } else {
+                    validate_focal_length(&value)
                 };
             }
             MetadataField::GpsLatitude => {
-                self.edited.gps_latitude = value.clone();
-                self.errors.gps_latitude = if value != self.original.gps_latitude {
-                    validate_latitude(&value)
-                } else {
+                self.edited.gps_latitude.clone_from(&value);
+                self.errors.gps_latitude = if value == self.original.gps_latitude {
                     None
+                } else {
+                    validate_latitude(&value)
                 };
             }
             MetadataField::GpsLongitude => {
-                self.edited.gps_longitude = value.clone();
-                self.errors.gps_longitude = if value != self.original.gps_longitude {
-                    validate_longitude(&value)
-                } else {
+                self.edited.gps_longitude.clone_from(&value);
+                self.errors.gps_longitude = if value == self.original.gps_longitude {
                     None
+                } else {
+                    validate_longitude(&value)
                 };
             }
             // Dublin Core / XMP fields (no validation needed - free-form text)
@@ -330,52 +336,53 @@ impl MetadataEditorState {
     /// Unchanged fields are assumed to be valid (they came from the file).
     pub fn validate_all(&mut self) -> bool {
         // Only validate if the field has been modified
-        self.errors.date_taken = if self.edited.date_taken != self.original.date_taken {
+        self.errors.date_taken = if self.edited.date_taken == self.original.date_taken {
+            None
+        } else {
             validate_date(&self.edited.date_taken)
-        } else {
-            None
         };
-        self.errors.exposure_time = if self.edited.exposure_time != self.original.exposure_time {
+        self.errors.exposure_time = if self.edited.exposure_time == self.original.exposure_time {
+            None
+        } else {
             validate_exposure_time(&self.edited.exposure_time)
-        } else {
-            None
         };
-        self.errors.aperture = if self.edited.aperture != self.original.aperture {
+        self.errors.aperture = if self.edited.aperture == self.original.aperture {
+            None
+        } else {
             validate_aperture(&self.edited.aperture)
-        } else {
-            None
         };
-        self.errors.iso = if self.edited.iso != self.original.iso {
+        self.errors.iso = if self.edited.iso == self.original.iso {
+            None
+        } else {
             validate_iso(&self.edited.iso)
-        } else {
-            None
         };
-        self.errors.focal_length = if self.edited.focal_length != self.original.focal_length {
-            validate_focal_length(&self.edited.focal_length)
-        } else {
+        self.errors.focal_length = if self.edited.focal_length == self.original.focal_length {
             None
+        } else {
+            validate_focal_length(&self.edited.focal_length)
         };
         self.errors.focal_length_35mm =
-            if self.edited.focal_length_35mm != self.original.focal_length_35mm {
-                validate_focal_length(&self.edited.focal_length_35mm)
-            } else {
+            if self.edited.focal_length_35mm == self.original.focal_length_35mm {
                 None
+            } else {
+                validate_focal_length(&self.edited.focal_length_35mm)
             };
-        self.errors.gps_latitude = if self.edited.gps_latitude != self.original.gps_latitude {
+        self.errors.gps_latitude = if self.edited.gps_latitude == self.original.gps_latitude {
+            None
+        } else {
             validate_latitude(&self.edited.gps_latitude)
-        } else {
-            None
         };
-        self.errors.gps_longitude = if self.edited.gps_longitude != self.original.gps_longitude {
-            validate_longitude(&self.edited.gps_longitude)
-        } else {
+        self.errors.gps_longitude = if self.edited.gps_longitude == self.original.gps_longitude {
             None
+        } else {
+            validate_longitude(&self.edited.gps_longitude)
         };
 
         !self.errors.has_errors()
     }
 
     /// Returns a reference to the edited metadata for writing.
+    #[must_use] 
     pub fn editable_metadata(&self) -> &EditableMetadata {
         &self.edited
     }
@@ -423,7 +430,7 @@ fn validate_exposure_time(value: &str) -> Option<String> {
     let cleaned = value
         .trim()
         .trim_end_matches(" sec")
-        .trim_end_matches("s")
+        .trim_end_matches('s')
         .trim();
 
     if cleaned.contains('/') {

@@ -220,11 +220,11 @@ impl FilterDropdownState {
 
     /// Update a specific segment of a date.
     /// Returns `true` if auto-advance should happen (segment is complete).
-    pub fn set_segment(&mut self, target: DateTarget, segment: DateSegment, value: String) -> bool {
+    pub fn set_segment(&mut self, target: DateTarget, segment: DateSegment, value: &str) -> bool {
         let date_state = self.date_state_mut(target);
 
         // Filter to only digits
-        let digits: String = value.chars().filter(|c| c.is_ascii_digit()).collect();
+        let digits: String = value.chars().filter(char::is_ascii_digit).collect();
 
         // Apply max length and store
         let (max_len, should_advance) = match segment {
@@ -660,7 +660,7 @@ fn build_segmented_date_input<'a>(
         target,
         DateSegment::Day,
         &date_state.day,
-        ctx.i18n.tr("filter-date-day-placeholder"),
+        &ctx.i18n.tr("filter-date-day-placeholder"),
         SEGMENT_WIDTH_SHORT,
         date_state.is_day_valid(),
     );
@@ -670,7 +670,7 @@ fn build_segmented_date_input<'a>(
         target,
         DateSegment::Month,
         &date_state.month,
-        ctx.i18n.tr("filter-date-month-placeholder"),
+        &ctx.i18n.tr("filter-date-month-placeholder"),
         SEGMENT_WIDTH_SHORT,
         date_state.is_month_valid(),
     );
@@ -680,7 +680,7 @@ fn build_segmented_date_input<'a>(
         target,
         DateSegment::Year,
         &date_state.year,
-        ctx.i18n.tr("filter-date-year-placeholder"),
+        &ctx.i18n.tr("filter-date-year-placeholder"),
         SEGMENT_WIDTH_LONG,
         date_state.is_year_valid(),
     );
@@ -728,11 +728,11 @@ fn build_segment_input<'a>(
     target: DateTarget,
     segment: DateSegment,
     value: &str,
-    placeholder: String,
+    placeholder: &str,
     width: f32,
     is_valid: bool,
 ) -> Element<'a, Message> {
-    let input = text_input(&placeholder, value)
+    let input = text_input(placeholder, value)
         .on_input(move |v| Message::DateSegmentChanged {
             target,
             segment,
@@ -1020,17 +1020,17 @@ mod tests {
         let mut state = FilterDropdownState::new();
 
         // Set day segment
-        let should_advance = state.set_segment(DateTarget::Start, DateSegment::Day, "15".to_string());
+        let should_advance = state.set_segment(DateTarget::Start, DateSegment::Day, "15");
         assert!(should_advance); // 2 digits entered
         assert_eq!(state.start_date.day, "15");
 
         // Set month segment
-        let should_advance = state.set_segment(DateTarget::Start, DateSegment::Month, "6".to_string());
+        let should_advance = state.set_segment(DateTarget::Start, DateSegment::Month, "6");
         assert!(!should_advance); // Only 1 digit
         assert_eq!(state.start_date.month, "6");
 
         // Set year segment
-        let should_advance = state.set_segment(DateTarget::Start, DateSegment::Year, "2024".to_string());
+        let should_advance = state.set_segment(DateTarget::Start, DateSegment::Year, "2024");
         assert!(should_advance); // 4 digits entered
         assert_eq!(state.start_date.year, "2024");
     }
@@ -1039,10 +1039,10 @@ mod tests {
     fn filter_dropdown_set_segment_filters_non_digits() {
         let mut state = FilterDropdownState::new();
 
-        state.set_segment(DateTarget::Start, DateSegment::Day, "1a5".to_string());
+        state.set_segment(DateTarget::Start, DateSegment::Day, "1a5");
         assert_eq!(state.start_date.day, "15");
 
-        state.set_segment(DateTarget::Start, DateSegment::Month, "0x6".to_string());
+        state.set_segment(DateTarget::Start, DateSegment::Month, "0x6");
         assert_eq!(state.start_date.month, "06");
     }
 
@@ -1051,11 +1051,11 @@ mod tests {
         let mut state = FilterDropdownState::new();
 
         // Day should be max 2 digits
-        state.set_segment(DateTarget::Start, DateSegment::Day, "123".to_string());
+        state.set_segment(DateTarget::Start, DateSegment::Day, "123");
         assert_eq!(state.start_date.day, "12");
 
         // Year should be max 4 digits
-        state.set_segment(DateTarget::Start, DateSegment::Year, "20241".to_string());
+        state.set_segment(DateTarget::Start, DateSegment::Year, "20241");
         assert_eq!(state.start_date.year, "2024");
     }
 

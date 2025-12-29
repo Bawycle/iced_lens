@@ -11,6 +11,7 @@ use iced::{Background, Border, Color, Element, Shadow, Theme, Vector};
 /// Style for tooltip container with good contrast and shadow.
 ///
 /// Automatically adapts to light/dark theme for optimal visibility.
+#[must_use] 
 pub fn tooltip_container(theme: &Theme) -> container::Style {
     let palette = theme.extended_palette();
 

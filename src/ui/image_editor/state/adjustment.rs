@@ -56,6 +56,7 @@ pub struct AdjustmentState {
 
 impl AdjustmentState {
     /// Returns true if any adjustment has been made (non-neutral values).
+    #[must_use] 
     pub fn has_changes(&self) -> bool {
         !self.brightness.is_neutral() || !self.contrast.is_neutral()
     }

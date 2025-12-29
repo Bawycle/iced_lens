@@ -26,6 +26,7 @@ use iced::Theme;
 
 /// Style for SVG icons that tints them with the theme's primary text color.
 /// Useful for section header icons that should match the surrounding text.
+#[must_use] 
 pub fn tinted_svg(theme: &Theme, _status: svg::Status) -> svg::Style {
     svg::Style {
         color: Some(theme.extended_palette().primary.strong.color),

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Small helper methods that keep the editor facade lean.
+#![allow(clippy::cast_precision_loss)]
 
 use crate::media::image_transform;
 use crate::ui::image_editor::{EditorTool, State, Transformation};

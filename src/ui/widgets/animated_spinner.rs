@@ -16,6 +16,7 @@ pub struct AnimatedSpinner {
 
 impl AnimatedSpinner {
     /// Creates a new animated spinner with the given color and rotation angle.
+    #[must_use] 
     pub fn new(color: Color, rotation: f32) -> Self {
         Self {
             cache: Cache::default(),
@@ -26,6 +27,7 @@ impl AnimatedSpinner {
     }
 
     /// Updates the rotation angle and invalidates the cache.
+    #[must_use]
     pub fn with_rotation(mut self, rotation: f32) -> Self {
         self.rotation = rotation;
         self.cache.clear();

@@ -92,7 +92,7 @@ pub enum DateFilterField {
 ///
 /// Filters files based on their creation or modification date.
 /// Both `start` and `end` bounds are inclusive.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct DateRangeFilter {
     /// Which date field to use for filtering.
     pub field: DateFilterField,
@@ -110,16 +110,6 @@ pub struct DateRangeFilter {
     pub end: Option<SystemTime>,
 }
 
-impl Default for DateRangeFilter {
-    fn default() -> Self {
-        Self {
-            field: DateFilterField::default(),
-            start: None,
-            end: None,
-        }
-    }
-}
-
 impl DateRangeFilter {
     /// Returns `true` if the file matches this date range filter.
     ///
@@ -127,9 +117,8 @@ impl DateRangeFilter {
     /// Returns `false` if metadata cannot be read or the date is not available.
     #[must_use]
     pub fn matches(&self, path: &Path) -> bool {
-        let metadata = match std::fs::metadata(path) {
-            Ok(m) => m,
-            Err(_) => return false,
+        let Ok(metadata) = std::fs::metadata(path) else {
+            return false;
         };
 
         let file_time = match self.field {
@@ -137,9 +126,8 @@ impl DateRangeFilter {
             DateFilterField::Created => metadata.created().ok(),
         };
 
-        let file_time = match file_time {
-            Some(t) => t,
-            None => return false,
+        let Some(file_time) = file_time else {
+            return false;
         };
 
         // Check lower bound
@@ -220,7 +208,7 @@ impl MediaFilter {
             || self
                 .date_range
                 .as_ref()
-                .map_or(false, DateRangeFilter::is_active)
+                .is_some_and(DateRangeFilter::is_active)
     }
 
     /// Returns the number of active filter criteria.
@@ -233,7 +221,7 @@ impl MediaFilter {
         if self
             .date_range
             .as_ref()
-            .map_or(false, DateRangeFilter::is_active)
+            .is_some_and(DateRangeFilter::is_active)
         {
             count += 1;
         }
@@ -252,6 +240,7 @@ impl MediaFilter {
 // =============================================================================
 
 /// Serialize `Option<SystemTime>` as Unix timestamp in seconds.
+#[allow(clippy::ref_option_ref, clippy::ref_option)] // Serde requires this signature
 fn serialize_system_time_option<S>(
     time: &Option<SystemTime>,
     serializer: S,

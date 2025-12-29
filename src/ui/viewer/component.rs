@@ -1315,7 +1315,7 @@ impl State {
                         value,
                     } => {
                         // Handle locally - update segment value
-                        let _ = self.filter_dropdown.set_segment(target, segment, value);
+                        let _ = self.filter_dropdown.set_segment(target, segment, &value);
 
                         // Check if the complete date is now valid and submit automatically
                         let date_state = self.filter_dropdown.date_state(target);

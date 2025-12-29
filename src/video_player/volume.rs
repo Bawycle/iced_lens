@@ -29,36 +29,43 @@ pub struct Volume(f32);
 
 impl Volume {
     /// Creates a new volume level, clamping to valid range.
+    #[must_use] 
     pub fn new(volume: f32) -> Self {
         Self(volume.clamp(MIN_VOLUME, MAX_VOLUME))
     }
 
     /// Returns the volume value as f32.
+    #[must_use] 
     pub fn value(self) -> f32 {
         self.0
     }
 
     /// Returns true if volume is effectively muted (below audible threshold).
+    #[must_use] 
     pub fn is_muted(self) -> bool {
         self.0 < 0.001
     }
 
     /// Increases volume by one step, clamping to maximum.
+    #[must_use] 
     pub fn increase(self) -> Self {
         Self::new(self.0 + VOLUME_STEP)
     }
 
     /// Decreases volume by one step, clamping to minimum.
+    #[must_use] 
     pub fn decrease(self) -> Self {
         Self::new(self.0 - VOLUME_STEP)
     }
 
     /// Returns true if this is the minimum volume.
+    #[must_use] 
     pub fn is_min(self) -> bool {
         self.0 <= MIN_VOLUME
     }
 
     /// Returns true if this is the maximum volume.
+    #[must_use] 
     pub fn is_max(self) -> bool {
         self.0 >= MAX_VOLUME
     }

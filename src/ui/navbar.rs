@@ -109,7 +109,9 @@ pub fn update(message: Message, menu_open: &mut bool) -> Event {
 /// Render the navigation bar.
 /// Note: The filter dropdown panel is rendered as an overlay in app/view.rs,
 /// not here, to avoid layout shifts when the dropdown opens.
-pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
+#[must_use]
+#[allow(clippy::needless_pass_by_value)] // ViewContext is small and consumed
+pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
     let mut content = Column::new().width(Length::Fill);
 
     // Top bar with hamburger menu, edit button, and filter button

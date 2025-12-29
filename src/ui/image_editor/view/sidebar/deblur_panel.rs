@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! AI deblur tool panel.
+#![allow(clippy::cast_precision_loss)]
 
 use crate::media::deblur::ModelStatus;
 use crate::ui::design_tokens::{spacing, typography};
@@ -8,10 +9,25 @@ use crate::ui::image_editor::{Message, SidebarMessage};
 use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
 use crate::ui::theme;
-use iced::widget::{button, container, progress_bar, text, Column};
-use iced::{Element, Length, Theme};
+use iced::widget::{button, container, progress_bar, text, Button, Column, Text};
+use iced::{Color, Element, Length, Theme};
 
 use super::super::ViewContext;
+
+/// Creates the disabled apply button used when deblur action is unavailable.
+fn disabled_apply_button<'a>(label: String) -> Button<'a, Message> {
+    button(text(label).size(typography::BODY_LG))
+        .padding(spacing::SM)
+        .width(Length::Fill)
+        .style(button_styles::disabled())
+}
+
+/// Creates a styled status text with the given color.
+fn status_text<'a>(message: String, color: Color) -> Text<'a> {
+    text(message)
+        .size(typography::BODY_SM)
+        .style(move |_: &Theme| iced::widget::text::Style { color: Some(color) })
+}
 
 /// Render the deblur tool panel.
 ///
@@ -25,138 +41,29 @@ pub fn panel<'a>(
     has_deblur_applied: bool,
     ctx: &ViewContext<'a>,
 ) -> Element<'a, Message> {
+    let apply_label = ctx.i18n.tr("image-editor-deblur-apply");
     let mut content = Column::new().spacing(spacing::SM);
 
     // Lossless export warning
-    let warning_text = text(ctx.i18n.tr("image-editor-deblur-lossless-warning"))
-        .size(typography::BODY_SM)
-        .style(move |_: &Theme| iced::widget::text::Style {
-            color: Some(theme::muted_text_color()),
-        });
-    content = content.push(warning_text);
+    content = content.push(status_text(
+        ctx.i18n.tr("image-editor-deblur-lossless-warning"),
+        theme::muted_text_color(),
+    ));
 
     if deblur.is_processing {
-        // Processing state: show processing message (no progress bar since ONNX inference is atomic)
-        let processing_text = text(ctx.i18n.tr("image-editor-deblur-processing"))
-            .size(typography::BODY_SM)
-            .style(move |_: &Theme| iced::widget::text::Style {
-                color: Some(theme::muted_text_color()),
-            });
-        content = content.push(processing_text);
-
-        // Show disabled apply button to indicate operation in progress
-        let apply_btn =
-            button(text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG))
-                .padding(spacing::SM)
-                .width(Length::Fill)
-                .style(button_styles::disabled());
-        content = content.push(apply_btn);
+        content = content.push(status_text(
+            ctx.i18n.tr("image-editor-deblur-processing"),
+            theme::muted_text_color(),
+        ));
+        content = content.push(disabled_apply_button(apply_label));
     } else if has_deblur_applied {
-        // Deblur already applied: show message and disabled button
-        let already_applied_text = text(ctx.i18n.tr("image-editor-deblur-already-applied"))
-            .size(typography::BODY_SM)
-            .style(move |_: &Theme| iced::widget::text::Style {
-                color: Some(theme::success_text_color()),
-            });
-        content = content.push(already_applied_text);
-
-        let apply_btn =
-            button(text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG))
-                .padding(spacing::SM)
-                .width(Length::Fill)
-                .style(button_styles::disabled());
-        content = content.push(apply_btn);
+        content = content.push(status_text(
+            ctx.i18n.tr("image-editor-deblur-already-applied"),
+            theme::success_text_color(),
+        ));
+        content = content.push(disabled_apply_button(apply_label));
     } else {
-        // Show status-specific UI based on model status
-        match model_status {
-            ModelStatus::Ready => {
-                // Model ready: show apply button
-                let apply_btn = button(
-                    text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG),
-                )
-                .padding(spacing::SM)
-                .width(Length::Fill)
-                .on_press(SidebarMessage::ApplyDeblur.into());
-                content = content.push(apply_btn);
-            }
-            ModelStatus::Validating => {
-                // Model is being validated at startup
-                let validating_text = text(ctx.i18n.tr("image-editor-deblur-validating"))
-                    .size(typography::BODY_SM)
-                    .style(move |_: &Theme| iced::widget::text::Style {
-                        color: Some(theme::muted_text_color()),
-                    });
-                content = content.push(validating_text);
-
-                let apply_btn = button(
-                    text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG),
-                )
-                .padding(spacing::SM)
-                .width(Length::Fill)
-                .style(button_styles::disabled());
-                content = content.push(apply_btn);
-            }
-            ModelStatus::Downloading { progress } => {
-                // Model is downloading
-                let download_progress = progress_bar(0.0..=1.0, *progress);
-                content = content.push(download_progress);
-
-                let progress_text = text(ctx.i18n.tr_with_args(
-                    "image-editor-deblur-downloading",
-                    &[(
-                        "progress",
-                        format!("{}", (*progress * 100.0) as u32).as_str(),
-                    )],
-                ))
-                .size(typography::BODY_SM);
-                content = content.push(progress_text);
-
-                let apply_btn = button(
-                    text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG),
-                )
-                .padding(spacing::SM)
-                .width(Length::Fill)
-                .style(button_styles::disabled());
-                content = content.push(apply_btn);
-            }
-            ModelStatus::NotDownloaded => {
-                // Model not downloaded: prompt user to enable in settings
-                let not_ready_text = text(ctx.i18n.tr("image-editor-deblur-model-not-ready"))
-                    .size(typography::BODY_SM)
-                    .style(move |_: &Theme| iced::widget::text::Style {
-                        color: Some(theme::error_text_color()),
-                    });
-                content = content.push(not_ready_text);
-
-                let apply_btn = button(
-                    text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG),
-                )
-                .padding(spacing::SM)
-                .width(Length::Fill)
-                .style(button_styles::disabled());
-                content = content.push(apply_btn);
-            }
-            ModelStatus::Error(error_msg) => {
-                // Error state: show error message
-                let error_text = text(ctx.i18n.tr_with_args(
-                    "image-editor-deblur-error",
-                    &[("error", error_msg.as_str())],
-                ))
-                .size(typography::BODY_SM)
-                .style(move |_: &Theme| iced::widget::text::Style {
-                    color: Some(theme::error_text_color()),
-                });
-                content = content.push(error_text);
-
-                let apply_btn = button(
-                    text(ctx.i18n.tr("image-editor-deblur-apply")).size(typography::BODY_LG),
-                )
-                .padding(spacing::SM)
-                .width(Length::Fill)
-                .style(button_styles::disabled());
-                content = content.push(apply_btn);
-            }
-        }
+        content = build_model_status_ui(content, model_status, &apply_label, ctx);
     }
 
     container(content)
@@ -164,4 +71,57 @@ pub fn panel<'a>(
         .width(Length::Fill)
         .style(styles::editor::settings_panel)
         .into()
+}
+
+/// Builds the UI elements based on model status when deblur is available.
+fn build_model_status_ui<'a>(
+    mut content: Column<'a, Message>,
+    model_status: &ModelStatus,
+    apply_label: &str,
+    ctx: &ViewContext<'_>,
+) -> Column<'a, Message> {
+    match model_status {
+        ModelStatus::Ready => {
+            let apply_btn = button(text(apply_label.to_string()).size(typography::BODY_LG))
+                .padding(spacing::SM)
+                .width(Length::Fill)
+                .on_press(SidebarMessage::ApplyDeblur.into());
+            content.push(apply_btn)
+        }
+        ModelStatus::Validating => {
+            content = content.push(status_text(
+                ctx.i18n.tr("image-editor-deblur-validating"),
+                theme::muted_text_color(),
+            ));
+            content.push(disabled_apply_button(apply_label.to_string()))
+        }
+        ModelStatus::Downloading { progress } => {
+            content = content.push(progress_bar(0.0..=1.0, *progress));
+
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let percent = (*progress * 100.0) as u32;
+            content = content.push(
+                text(ctx.i18n.tr_with_args(
+                    "image-editor-deblur-downloading",
+                    &[("progress", format!("{percent}").as_str())],
+                ))
+                .size(typography::BODY_SM),
+            );
+            content.push(disabled_apply_button(apply_label.to_string()))
+        }
+        ModelStatus::NotDownloaded => {
+            content = content.push(status_text(
+                ctx.i18n.tr("image-editor-deblur-model-not-ready"),
+                theme::error_text_color(),
+            ));
+            content.push(disabled_apply_button(apply_label.to_string()))
+        }
+        ModelStatus::Error(error_msg) => {
+            content = content.push(status_text(
+                ctx.i18n.tr_with_args("image-editor-deblur-error", &[("error", error_msg.as_str())]),
+                theme::error_text_color(),
+            ));
+            content.push(disabled_apply_button(apply_label.to_string()))
+        }
+    }
 }

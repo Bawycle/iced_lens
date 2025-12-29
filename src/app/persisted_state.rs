@@ -57,7 +57,7 @@ pub struct AppState {
 impl AppState {
     /// Loads application state from the default location.
     ///
-    /// Returns a tuple of (state, optional_warning). If loading fails, returns
+    /// Returns a tuple of (state, `optional_warning`). If loading fails, returns
     /// default state with a warning message explaining what went wrong.
     /// The warning can be displayed to the user via notifications.
     ///
@@ -66,6 +66,7 @@ impl AppState {
     /// Uses the standard path resolution (see [`paths::get_app_data_dir`]):
     /// 1. `ICED_LENS_DATA_DIR` environment variable (if set)
     /// 2. Platform-specific data directory
+    #[must_use] 
     pub fn load() -> (Self, Option<String>) {
         Self::load_from(None)
     }
@@ -81,6 +82,7 @@ impl AppState {
     /// 1. `base_dir` parameter (if `Some`)
     /// 2. `ICED_LENS_DATA_DIR` environment variable (if set)
     /// 3. Platform-specific data directory
+    #[must_use] 
     pub fn load_from(base_dir: Option<PathBuf>) -> (Self, Option<String>) {
         let Some(path) = Self::state_file_path_with_override(base_dir) else {
             return (Self::default(), None);
@@ -118,6 +120,7 @@ impl AppState {
     /// Uses the standard path resolution (see [`paths::get_app_data_dir`]):
     /// 1. `ICED_LENS_DATA_DIR` environment variable (if set)
     /// 2. Platform-specific data directory
+    #[must_use] 
     pub fn save(&self) -> Option<String> {
         self.save_to(None)
     }
@@ -133,6 +136,7 @@ impl AppState {
     /// 1. `base_dir` parameter (if `Some`)
     /// 2. `ICED_LENS_DATA_DIR` environment variable (if set)
     /// 3. Platform-specific data directory
+    #[must_use] 
     pub fn save_to(&self, base_dir: Option<PathBuf>) -> Option<String> {
         let Some(path) = Self::state_file_path_with_override(base_dir) else {
             return Some("notification-state-path-error".to_string());

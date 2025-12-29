@@ -248,7 +248,7 @@ impl Default for FullscreenConfig {
 /// (download/validation) rather than being user preferences.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AiConfig {
-    /// URL for downloading the NAFNet ONNX model.
+    /// URL for downloading the `NAFNet` ONNX model.
     #[serde(
         default = "default_deblur_model_url",
         skip_serializing_if = "Option::is_none"
@@ -384,43 +384,55 @@ fn default_theme_mode() -> ThemeMode {
     ThemeMode::System
 }
 
+// Serde default functions for optional config fields.
+// These return Option<T> because the field type is Option<T>.
+#[allow(clippy::unnecessary_wraps)]
 fn default_fit_to_window() -> Option<bool> {
     Some(true)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_zoom_step() -> Option<f32> {
     Some(DEFAULT_ZOOM_STEP_PERCENT)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_volume() -> Option<f32> {
     Some(DEFAULT_VOLUME)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_audio_normalization() -> Option<bool> {
     Some(true)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_frame_cache_mb() -> Option<u32> {
     Some(DEFAULT_FRAME_CACHE_MB)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_frame_history_mb() -> Option<u32> {
     Some(DEFAULT_FRAME_HISTORY_MB)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_keyboard_seek_step_secs() -> Option<f64> {
     Some(DEFAULT_KEYBOARD_SEEK_STEP_SECS)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_overlay_timeout_secs() -> Option<u32> {
     Some(DEFAULT_OVERLAY_TIMEOUT_SECS)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_max_skip_attempts() -> Option<u32> {
     Some(DEFAULT_MAX_SKIP_ATTEMPTS)
 }
 
 /// Skip serializing filter if None or if no filter is active.
+#[allow(clippy::ref_option_ref, clippy::ref_option)] // Serde requires this signature
 fn skip_serializing_filter(filter: &Option<MediaFilter>) -> bool {
     match filter {
         None => true,
@@ -428,10 +440,12 @@ fn skip_serializing_filter(filter: &Option<MediaFilter>) -> bool {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_deblur_model_url() -> Option<String> {
     Some(DEFAULT_DEBLUR_MODEL_URL.to_string())
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn default_upscale_model_url() -> Option<String> {
     Some(DEFAULT_UPSCALE_MODEL_URL.to_string())
 }
@@ -469,13 +483,15 @@ fn get_config_path_with_override(base_dir: Option<PathBuf>) -> Option<PathBuf> {
 
 /// Loads the configuration from the default path.
 ///
-/// Returns a tuple of (config, optional_warning). If loading fails, returns
+/// Returns a tuple of (config, `optional_warning`). If loading fails, returns
 /// default config with a warning message explaining what went wrong.
+#[must_use] 
 pub fn load() -> (Config, Option<String>) {
     load_with_override(None)
 }
 
 /// Loads the configuration from a custom directory.
+#[must_use] 
 pub fn load_with_override(base_dir: Option<PathBuf>) -> (Config, Option<String>) {
     if let Some(path) = get_config_path_with_override(base_dir) {
         if path.exists() {
@@ -496,6 +512,10 @@ pub fn load_with_override(base_dir: Option<PathBuf>) -> (Config, Option<String>)
 /// Loads configuration from a specific path.
 ///
 /// Automatically migrates legacy flat format to new sectioned format.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or contains invalid TOML.
 pub fn load_from_path(path: &Path) -> Result<Config> {
     let content = fs::read_to_string(path)?;
 
@@ -527,11 +547,19 @@ pub fn load_from_path(path: &Path) -> Result<Config> {
 // =============================================================================
 
 /// Saves the configuration to the default path.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be serialized or written to disk.
 pub fn save(config: &Config) -> Result<()> {
     save_with_override(config, None)
 }
 
 /// Saves the configuration to a custom directory.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be serialized or written to disk.
 pub fn save_with_override(config: &Config, base_dir: Option<PathBuf>) -> Result<()> {
     if let Some(path) = get_config_path_with_override(base_dir) {
         return save_to_path(config, &path);
@@ -540,6 +568,11 @@ pub fn save_with_override(config: &Config, base_dir: Option<PathBuf>) -> Result<
 }
 
 /// Saves configuration to a specific path.
+///
+/// # Errors
+///
+/// Returns an error if parent directories cannot be created, the configuration
+/// cannot be serialized, or the file cannot be written.
 pub fn save_to_path(config: &Config, path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;

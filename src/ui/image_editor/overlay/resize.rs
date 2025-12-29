@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize overlay renderer showing original and target dimensions.
+//!
+//! Uses f32 for canvas coordinates and u32 for pixel dimensions.
+//! Precision loss in conversions is acceptable for typical image sizes.
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
 
 use crate::ui::design_tokens::palette::WHITE;
 use crate::ui::image_editor::Message;

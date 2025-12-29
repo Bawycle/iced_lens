@@ -34,7 +34,7 @@ pub struct PreferencesContext<'a> {
 ///
 /// Guarded during tests to keep isolation: unit tests exercise the logic by
 /// calling the function directly rather than through `Effect`s.
-pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
+pub fn persist_preferences(ctx: &mut PreferencesContext<'_>) -> Task<Message> {
     if cfg!(test) {
         return Task::none();
     }
@@ -94,7 +94,7 @@ pub fn persist_preferences(ctx: PreferencesContext<'_>) -> Task<Message> {
 pub fn apply_language_change(
     i18n: &mut I18n,
     viewer: &mut component::State,
-    locale: LanguageIdentifier,
+    locale: &LanguageIdentifier,
     notifications: &mut notifications::Manager,
 ) -> Task<Message> {
     i18n.set_locale(locale.clone());

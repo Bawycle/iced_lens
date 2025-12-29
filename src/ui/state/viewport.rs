@@ -68,6 +68,7 @@ impl ViewportState {
     }
 
     /// Checks if content of given size fits within current viewport bounds.
+    #[must_use] 
     pub fn content_fits(&self, content_width: f32, content_height: f32) -> bool {
         match self.bounds {
             Some(bounds) => content_width <= bounds.width && content_height <= bounds.height,
@@ -76,6 +77,7 @@ impl ViewportState {
     }
 
     /// Calculates the scroll position as percentage (0-100%)
+    #[must_use] 
     pub fn scroll_position_percentage(
         &self,
         image_width: f32,

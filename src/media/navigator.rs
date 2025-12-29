@@ -60,7 +60,8 @@ pub struct MediaNavigator {
 }
 
 impl MediaNavigator {
-    /// Creates a new empty MediaNavigator.
+    /// Creates a new empty `MediaNavigator`.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             media_list: MediaList::new(),
@@ -70,6 +71,8 @@ impl MediaNavigator {
     }
 
     /// Scans the directory containing the given media file and updates the media list.
+    ///
+    /// # Errors
     ///
     /// Returns an error if the directory cannot be read or the path has no parent directory.
     pub fn scan_directory(&mut self, current_file: &Path, sort_order: SortOrder) -> Result<()> {
@@ -82,9 +85,12 @@ impl MediaNavigator {
     ///
     /// Returns `Ok(Some(path))` with the first media file path if any media is found,
     /// or `Ok(None)` if the directory contains no supported media files.
-    /// Returns an error if the directory cannot be read.
     ///
     /// If a filter is active, returns the first media that matches the filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be read.
     pub fn scan_from_directory(
         &mut self,
         directory: &Path,
@@ -114,6 +120,7 @@ impl MediaNavigator {
     }
 
     /// Returns the path to the current media, if set.
+    #[must_use]
     pub fn current_media_path(&self) -> Option<&Path> {
         self.current_media_path.as_deref()
     }
@@ -129,6 +136,7 @@ impl MediaNavigator {
     /// Use this for pessimistic navigation where position is confirmed after load.
     /// Returns `None` if there are no media in the list.
     /// Wraps around to the first media when at the last media.
+    #[must_use]
     pub fn peek_next(&self) -> Option<PathBuf> {
         self.media_list.next().map(std::path::Path::to_path_buf)
     }
@@ -138,6 +146,7 @@ impl MediaNavigator {
     /// Use this for pessimistic navigation where position is confirmed after load.
     /// Returns `None` if there are no media in the list.
     /// Wraps around to the last media when at the first media.
+    #[must_use]
     pub fn peek_previous(&self) -> Option<PathBuf> {
         self.media_list.previous().map(std::path::Path::to_path_buf)
     }
@@ -147,6 +156,7 @@ impl MediaNavigator {
     /// `skip_count = 0` returns immediate next, `skip_count = 1` skips one file, etc.
     /// Returns `None` if there are no media in the list.
     /// Wraps around when reaching the end.
+    #[must_use]
     pub fn peek_nth_next(&self, skip_count: usize) -> Option<PathBuf> {
         self.media_list
             .peek_nth_next(skip_count)
@@ -158,6 +168,7 @@ impl MediaNavigator {
     /// `skip_count = 0` returns immediate previous, `skip_count = 1` skips one file, etc.
     /// Returns `None` if there are no media in the list.
     /// Wraps around when reaching the start.
+    #[must_use]
     pub fn peek_nth_previous(&self, skip_count: usize) -> Option<PathBuf> {
         self.media_list
             .peek_nth_previous(skip_count)
@@ -168,6 +179,7 @@ impl MediaNavigator {
     ///
     /// Returns `None` if there are no images in the list (only videos).
     /// Wraps around to the first image when at the last.
+    #[must_use]
     pub fn peek_next_image(&self) -> Option<PathBuf> {
         self.peek_nth_next_image(0)
     }
@@ -176,6 +188,7 @@ impl MediaNavigator {
     ///
     /// Returns `None` if there are no images in the list (only videos).
     /// Wraps around to the last image when at the first.
+    #[must_use]
     pub fn peek_previous_image(&self) -> Option<PathBuf> {
         self.peek_nth_previous_image(0)
     }
@@ -183,9 +196,10 @@ impl MediaNavigator {
     /// Returns the n-th next image path (skipping videos) WITHOUT updating position.
     ///
     /// `skip_count = 0` returns immediate next image, `skip_count = 1` skips one image, etc.
-    /// Videos are always skipped and don't count toward skip_count.
+    /// Videos are always skipped and don't count toward `skip_count`.
     /// Returns `None` if there are no images in the list.
     /// Wraps around when reaching the end.
+    #[must_use]
     pub fn peek_nth_next_image(&self, skip_count: usize) -> Option<PathBuf> {
         let current_index = self.media_list.current_index()?;
         let total = self.len();
@@ -213,9 +227,10 @@ impl MediaNavigator {
     /// Returns the n-th previous image path (skipping videos) WITHOUT updating position.
     ///
     /// `skip_count = 0` returns immediate previous image, `skip_count = 1` skips one image, etc.
-    /// Videos are always skipped and don't count toward skip_count.
+    /// Videos are always skipped and don't count toward `skip_count`.
     /// Returns `None` if there are no images in the list.
     /// Wraps around when reaching the start.
+    #[must_use]
     pub fn peek_nth_previous_image(&self, skip_count: usize) -> Option<PathBuf> {
         let current_index = self.media_list.current_index()?;
         let total = self.len();
@@ -255,36 +270,43 @@ impl MediaNavigator {
     }
 
     /// Checks if there is a next media available.
+    #[must_use]
     pub fn has_next(&self) -> bool {
         self.media_list.next().is_some()
     }
 
     /// Checks if there is a previous media available.
+    #[must_use]
     pub fn has_previous(&self) -> bool {
         self.media_list.previous().is_some()
     }
 
     /// Checks if the current media is the first in the list.
+    #[must_use]
     pub fn is_at_first(&self) -> bool {
         self.media_list.is_at_first()
     }
 
     /// Checks if the current media is the last in the list.
+    #[must_use]
     pub fn is_at_last(&self) -> bool {
         self.media_list.is_at_last()
     }
 
     /// Returns the total number of media in the list.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.media_list.len()
     }
 
     /// Checks if the media list is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.media_list.is_empty()
     }
 
     /// Returns the current index in the media list, if set.
+    #[must_use]
     pub fn current_index(&self) -> Option<usize> {
         self.media_list.current_index()
     }
@@ -293,6 +315,7 @@ impl MediaNavigator {
     ///
     /// This method provides all the information needed by the viewer to render
     /// navigation controls without needing direct access to the media list.
+    #[must_use]
     pub fn navigation_info(&self) -> NavigationInfo {
         NavigationInfo {
             has_next: self.has_next(),
@@ -311,6 +334,7 @@ impl MediaNavigator {
     // =========================================================================
 
     /// Returns a reference to the current filter.
+    #[must_use]
     pub fn filter(&self) -> &MediaFilter {
         &self.filter
     }
@@ -331,6 +355,7 @@ impl MediaNavigator {
     /// Returns the number of media files matching the current filter.
     ///
     /// Returns total count when no filter is active.
+    #[must_use]
     pub fn filtered_count(&self) -> usize {
         if !self.filter.is_active() {
             return self.len();
@@ -348,6 +373,7 @@ impl MediaNavigator {
     /// Use this for filtered navigation in the viewer.
     /// Returns `None` if no media matches the filter.
     /// Wraps around when reaching the end.
+    #[must_use]
     pub fn peek_next_filtered(&self) -> Option<PathBuf> {
         self.peek_nth_next_filtered(0)
     }
@@ -357,6 +383,7 @@ impl MediaNavigator {
     /// Use this for filtered navigation in the viewer.
     /// Returns `None` if no media matches the filter.
     /// Wraps around when reaching the start.
+    #[must_use]
     pub fn peek_previous_filtered(&self) -> Option<PathBuf> {
         self.peek_nth_previous_filtered(0)
     }
@@ -364,9 +391,10 @@ impl MediaNavigator {
     /// Returns the n-th next media path matching the filter WITHOUT updating position.
     ///
     /// `skip_count = 0` returns immediate next match, `skip_count = 1` skips one match, etc.
-    /// Non-matching media are skipped and don't count toward skip_count.
+    /// Non-matching media are skipped and don't count toward `skip_count`.
     /// Returns `None` if no media matches the filter.
     /// Wraps around when reaching the end.
+    #[must_use]
     pub fn peek_nth_next_filtered(&self, skip_count: usize) -> Option<PathBuf> {
         // If no filter is active, use the unfiltered navigation
         if !self.filter.is_active() {
@@ -399,9 +427,10 @@ impl MediaNavigator {
     /// Returns the n-th previous media path matching the filter WITHOUT updating position.
     ///
     /// `skip_count = 0` returns immediate previous match, `skip_count = 1` skips one match, etc.
-    /// Non-matching media are skipped and don't count toward skip_count.
+    /// Non-matching media are skipped and don't count toward `skip_count`.
     /// Returns `None` if no media matches the filter.
     /// Wraps around when reaching the start.
+    #[must_use]
     pub fn peek_nth_previous_filtered(&self, skip_count: usize) -> Option<PathBuf> {
         // If no filter is active, use the unfiltered navigation
         if !self.filter.is_active() {
@@ -439,6 +468,7 @@ impl MediaNavigator {
     ///
     /// Returns `true` if no filter is active or if the current media matches.
     /// Returns `false` if filtered out or if there's no current media.
+    #[must_use]
     pub fn current_matches_filter(&self) -> bool {
         match &self.current_media_path {
             Some(path) => self.filter.matches(path),

@@ -23,6 +23,7 @@ pub enum ExportFormat {
 
 impl ExportFormat {
     /// Returns the file extension for this format.
+    #[must_use] 
     pub fn extension(&self) -> &'static str {
         match self {
             ExportFormat::Png => "png",
@@ -32,7 +33,7 @@ impl ExportFormat {
     }
 
     /// Returns the image format for the `image` crate.
-    fn image_format(&self) -> ImageFormat {
+    fn image_format(self) -> ImageFormat {
         match self {
             ExportFormat::Png => ImageFormat::Png,
             ExportFormat::Jpeg => ImageFormat::Jpeg,
@@ -41,6 +42,7 @@ impl ExportFormat {
     }
 
     /// Returns a human-readable description.
+    #[must_use] 
     pub fn description(&self) -> &'static str {
         match self {
             ExportFormat::Png => "PNG (Lossless)",
@@ -50,11 +52,13 @@ impl ExportFormat {
     }
 
     /// Returns all supported formats.
+    #[must_use] 
     pub fn all() -> &'static [ExportFormat] {
         &[ExportFormat::Png, ExportFormat::Jpeg, ExportFormat::WebP]
     }
 
     /// Detects format from file extension.
+    #[must_use] 
     pub fn from_extension(ext: &str) -> Option<ExportFormat> {
         match ext.to_lowercase().as_str() {
             "png" => Some(ExportFormat::Png),
@@ -88,6 +92,7 @@ pub struct ExportableFrame {
 
 impl ExportableFrame {
     /// Creates a new exportable frame from RGBA data.
+    #[must_use] 
     pub fn new(rgba_data: Arc<Vec<u8>>, width: u32, height: u32) -> Self {
         Self {
             rgba_data,
@@ -96,7 +101,7 @@ impl ExportableFrame {
         }
     }
 
-    /// Converts to a DynamicImage for use with image editing.
+    /// Converts to a `DynamicImage` for use with image editing.
     ///
     /// Note: This clones the underlying pixel data since `ImageBuffer::from_raw`
     /// requires ownership of the data.
@@ -105,10 +110,11 @@ impl ExportableFrame {
             .map(image_rs::DynamicImage::ImageRgba8)
     }
 
-    /// Converts to ImageData for display in the UI.
+    /// Converts to `ImageData` for display in the UI.
     ///
     /// Note: This clones the underlying pixel data since `from_rgba`
     /// requires ownership of the data.
+    #[must_use] 
     pub fn to_image_data(&self) -> crate::media::ImageData {
         crate::media::ImageData::from_rgba(self.width, self.height, (*self.rgba_data).clone())
     }
@@ -119,6 +125,10 @@ impl ExportableFrame {
     ///
     /// Note: This clones the underlying pixel data since `ImageBuffer::from_raw`
     /// requires ownership of the data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the image cannot be encoded or written to disk.
     pub fn save_to_file<P: AsRef<Path>>(
         &self,
         path: P,
@@ -158,6 +168,7 @@ impl ExportableFrame {
 /// Generates a default filename for frame export.
 ///
 /// Format: `{video_name}_frame_{position}.{ext}`
+#[must_use] 
 pub fn generate_default_filename(
     video_path: &Path,
     position_secs: f64,
@@ -169,7 +180,9 @@ pub fn generate_default_filename(
         .unwrap_or("video");
 
     // Format position as MM-SS-mmm (minutes-seconds-milliseconds)
-    let total_ms = (position_secs * 1000.0) as u64;
+    // Video positions are practically bounded (years of video fit in u64 ms), so cast is safe
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let total_ms = (position_secs.max(0.0) * 1000.0).round() as u64;
     let minutes = total_ms / 60000;
     let seconds = (total_ms % 60000) / 1000;
     let millis = total_ms % 1000;

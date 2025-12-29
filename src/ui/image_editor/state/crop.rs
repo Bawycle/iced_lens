@@ -1,5 +1,14 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Crop tool state and helpers.
+//!
+//! This module uses f32 for UI coordinates and u32 for image pixel coordinates.
+//! Precision loss in u32<->f32 conversions is acceptable because:
+//! - f32 can exactly represent all integers up to 2^24 (16 million)
+//! - Image dimensions rarely exceed this (8K video = 7680 pixels)
+//! - Sub-pixel precision is not needed for crop operations
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
 
 use crate::media::{image_transform, ImageData};
 use crate::ui::design_tokens::sizing;
@@ -102,14 +111,14 @@ impl CropState {
 }
 
 impl State {
-    pub(crate) fn handle_crop_canvas_message(&mut self, message: CanvasMessage) -> Event {
+    pub(crate) fn handle_crop_canvas_message(&mut self, message: &CanvasMessage) -> Event {
         match message {
             CanvasMessage::CropOverlayMouseDown { x, y } => {
-                self.handle_crop_overlay_mouse_down(x, y);
+                self.handle_crop_overlay_mouse_down(*x, *y);
                 Event::None
             }
             CanvasMessage::CropOverlayMouseMove { x, y } => {
-                self.handle_crop_overlay_mouse_move(x, y);
+                self.handle_crop_overlay_mouse_move(*x, *y);
                 Event::None
             }
             CanvasMessage::CropOverlayMouseUp => {

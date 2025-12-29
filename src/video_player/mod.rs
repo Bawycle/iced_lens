@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Video playback engine for IcedLens.
+//! Video playback engine for `IcedLens`.
 //!
-//! This module provides video playback functionality using FFmpeg for decoding
+//! This module provides video playback functionality using `FFmpeg` for decoding
 //! and async Tokio tasks for non-blocking frame delivery.
 
 pub mod audio;
@@ -40,6 +40,10 @@ use crate::error::Result;
 use crate::media::VideoData;
 
 /// Creates a new video player instance for the given video data.
+///
+/// # Errors
+///
+/// Returns an error if the video file cannot be opened or decoded.
 pub fn create_player(video_data: &VideoData) -> Result<VideoPlayer> {
     VideoPlayer::new(video_data)
 }

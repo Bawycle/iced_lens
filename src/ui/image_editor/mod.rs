@@ -48,7 +48,7 @@ pub struct State {
     original_image: DynamicImage,
     /// Current edited image (after applying transformations, for display)
     current_image: ImageData,
-    /// Working image for transformations (DynamicImage from image_rs crate)
+    /// Working image for transformations (`DynamicImage` from `image_rs` crate)
     working_image: DynamicImage,
     /// Currently active editing tool
     active_tool: Option<EditorTool>,
@@ -82,7 +82,7 @@ pub struct State {
     pub zoom: ZoomState,
     /// Current cursor position (for zoom-on-scroll detection)
     cursor_position: Option<iced::Point>,
-    /// Whether cursor is currently over the canvas area (set by mouse_area events)
+    /// Whether cursor is currently over the canvas area (set by `mouse_area` events)
     cursor_over_canvas: bool,
     /// Drag state for pan navigation
     drag: DragState,
@@ -105,9 +105,9 @@ impl State {
     /// Update the state and emit an [`Event`] for the parent when needed.
     pub fn update(&mut self, message: Message) -> Event {
         match message {
-            Message::Toolbar(msg) => self.handle_toolbar_message(msg),
+            Message::Toolbar(msg) => self.handle_toolbar_message(&msg),
             Message::Sidebar(msg) => self.handle_sidebar_message(msg),
-            Message::Canvas(msg) => self.handle_canvas_message(msg),
+            Message::Canvas(msg) => self.handle_canvas_message(&msg),
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
             Message::ViewportChanged { bounds, offset } => {
                 self.viewport.update(bounds, offset);

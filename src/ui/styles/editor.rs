@@ -16,6 +16,7 @@ const LUMINANCE_THRESHOLD: f32 = 1.5;
 ///
 /// Uses the current Iced `Theme` extended palette so the toolbar follows
 /// the global theme mode (light/dark) while staying visually subtle.
+#[must_use] 
 pub fn toolbar(theme: &Theme) -> container::Style {
     let palette = theme.extended_palette();
     let base = palette.background.base.color;
@@ -37,6 +38,7 @@ pub fn toolbar(theme: &Theme) -> container::Style {
 
 /// Style for settings-like panels in the editor sidebar.
 /// Matches the settings panel surface so other panels can stay visually in sync.
+#[must_use] 
 pub fn settings_panel(theme: &Theme) -> container::Style {
     let palette = theme.extended_palette();
     let base = palette.background.base.color;

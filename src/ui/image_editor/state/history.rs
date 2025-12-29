@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Transformation history bookkeeping (undo/redo).
+//!
+//! Image dimension conversions use f32 for calculations.
+//! Precision loss is acceptable for typical image sizes.
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
 
 use crate::media::image_transform;
 use crate::ui::image_editor::{State, Transformation};

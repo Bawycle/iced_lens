@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Message routing helpers that keep the editor facade slim.
+#![allow(clippy::cast_precision_loss)]
 
 use crate::ui::image_editor::{
     CanvasMessage, EditorTool, Event, ImageSource, SidebarMessage, State, ToolbarMessage,
@@ -8,7 +9,7 @@ use iced::widget::scrollable::AbsoluteOffset;
 use iced::{self, keyboard, mouse, Point};
 
 impl State {
-    pub(crate) fn handle_toolbar_message(&mut self, message: ToolbarMessage) -> Event {
+    pub(crate) fn handle_toolbar_message(&mut self, message: &ToolbarMessage) -> Event {
         match message {
             ToolbarMessage::BackToViewer => self.toolbar_back_to_viewer(),
         }
@@ -57,12 +58,10 @@ impl State {
 
                     match tool {
                         EditorTool::Crop => self.prepare_crop_tool(),
-                        EditorTool::Resize => {
-                            // Option A2: No overlay - preview shows directly on canvas
-                        }
                         EditorTool::Adjust => self.prepare_adjustment_tool(),
                         EditorTool::Deblur => self.prepare_deblur_tool(),
-                        EditorTool::Rotate => {}
+                        // Resize and Rotate have no overlay - preview shows directly on canvas
+                        EditorTool::Resize | EditorTool::Rotate => {}
                     }
                 }
                 Event::None
@@ -201,10 +200,10 @@ impl State {
         }
     }
 
-    pub(crate) fn handle_canvas_message(&mut self, message: CanvasMessage) -> Event {
+    pub(crate) fn handle_canvas_message(&mut self, message: &CanvasMessage) -> Event {
         match message {
             CanvasMessage::CursorMoved { position } => {
-                self.cursor_position = Some(position);
+                self.cursor_position = Some(*position);
                 self.cursor_over_canvas = true;
                 Event::None
             }
@@ -308,9 +307,9 @@ impl State {
     /// Checks if the cursor is currently positioned over the canvas area.
     ///
     /// Uses viewport bounds when available, otherwise falls back to the
-    /// `cursor_over_canvas` flag set by mouse_area events. This fallback
+    /// `cursor_over_canvas` flag set by `mouse_area` events. This fallback
     /// is needed when scrollbars are not visible (image fits in viewport),
-    /// since the scrollable's on_scroll callback is never triggered.
+    /// since the scrollable's `on_scroll` callback is never triggered.
     fn is_cursor_over_canvas(&self) -> bool {
         let Some(cursor) = self.cursor_position else {
             return false;
@@ -357,12 +356,9 @@ impl State {
         };
 
         // Get viewport and scaled image size to clamp offset
-        let viewport_bounds = match self.viewport.bounds {
-            Some(bounds) => bounds,
-            None => {
-                self.viewport.offset = proposed_offset;
-                return Event::None;
-            }
+        let Some(viewport_bounds) = self.viewport.bounds else {
+            self.viewport.offset = proposed_offset;
+            return Event::None;
         };
 
         let zoom_scale = self.zoom.zoom_percent / 100.0;

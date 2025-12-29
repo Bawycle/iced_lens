@@ -55,7 +55,7 @@ static CLI_CONFIG_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
 ///
 /// # Panics
 ///
-/// Panics if called more than once (OnceLock can only be set once).
+/// Panics if called more than once (`OnceLock` can only be set once).
 pub fn init_cli_overrides(data_dir: Option<String>, config_dir: Option<String>) {
     CLI_DATA_DIR
         .set(data_dir.map(PathBuf::from))
@@ -90,6 +90,7 @@ fn get_cli_config_dir() -> Option<PathBuf> {
 ///    - Windows: `C:\Users\<User>\AppData\Roaming\IcedLens\`
 ///
 /// Returns `None` if the data directory cannot be determined (rare edge case).
+#[must_use] 
 pub fn get_app_data_dir() -> Option<PathBuf> {
     get_app_data_dir_with_override(None)
 }
@@ -106,6 +107,7 @@ pub fn get_app_data_dir() -> Option<PathBuf> {
 /// # Arguments
 ///
 /// * `override_path` - Optional path to use instead of default. Takes highest priority.
+#[must_use] 
 pub fn get_app_data_dir_with_override(override_path: Option<PathBuf>) -> Option<PathBuf> {
     // Priority 1: Explicit override (for tests)
     if let Some(path) = override_path {
@@ -145,6 +147,7 @@ pub fn get_app_data_dir_with_override(override_path: Option<PathBuf>) -> Option<
 ///    - Windows: `C:\Users\<User>\AppData\Roaming\IcedLens\`
 ///
 /// Returns `None` if the config directory cannot be determined (rare edge case).
+#[must_use] 
 pub fn get_app_config_dir() -> Option<PathBuf> {
     get_app_config_dir_with_override(None)
 }
@@ -161,6 +164,7 @@ pub fn get_app_config_dir() -> Option<PathBuf> {
 /// # Arguments
 ///
 /// * `override_path` - Optional path to use instead of default. Takes highest priority.
+#[must_use] 
 pub fn get_app_config_dir_with_override(override_path: Option<PathBuf>) -> Option<PathBuf> {
     // Priority 1: Explicit override (for tests)
     if let Some(path) = override_path {

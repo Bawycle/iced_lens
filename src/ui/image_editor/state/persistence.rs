@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Save/discard helpers for the editor session.
+//!
+//! Image dimension conversions between u32 and f32 for display/calculations.
+//! Precision loss is acceptable for typical image sizes.
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
 
 use super::{CropDragState, CropRatio};
 use crate::error::{Error, Result};
@@ -8,10 +14,17 @@ use crate::ui::image_editor::{ImageSource, State};
 
 impl State {
     /// Save the edited image to a file, preserving the original format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the image format is unsupported or the file
+    /// cannot be written.
     pub fn save_image(&mut self, path: &std::path::Path) -> Result<()> {
         use image_rs::ImageFormat;
 
         // Detect format from file extension
+        // Note: png is listed explicitly for clarity even though it matches the default
+        #[allow(clippy::match_same_arms)]
         let format = match path.extension().and_then(|s| s.to_str()) {
             Some("jpg" | "jpeg") => ImageFormat::Jpeg,
             Some("png") => ImageFormat::Png,

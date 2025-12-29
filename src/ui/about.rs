@@ -50,14 +50,17 @@ pub enum Event {
 }
 
 /// Process an about screen message and return the corresponding event.
-pub fn update(message: Message) -> Event {
+#[must_use] 
+pub fn update(message: &Message) -> Event {
     match message {
         Message::BackToViewer => Event::BackToViewer,
     }
 }
 
 /// Render the about screen.
-pub fn view<'a>(ctx: ViewContext<'a>) -> Element<'a, Message> {
+#[must_use]
+#[allow(clippy::needless_pass_by_value)] // ViewContext is small and consumed
+pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
     let back_button = button(
         text(format!("← {}", ctx.i18n.tr("about-back-to-viewer-button"))).size(typography::BODY),
     )
@@ -153,10 +156,10 @@ fn build_icon_license_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message>
 fn build_credits_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let content = Column::new()
         .spacing(spacing::XS)
-        .push(build_credit_item(ctx.i18n.tr("about-credits-iced")))
-        .push(build_credit_item(ctx.i18n.tr("about-credits-ffmpeg")))
-        .push(build_credit_item(ctx.i18n.tr("about-credits-onnx")))
-        .push(build_credit_item(ctx.i18n.tr("about-credits-fluent")))
+        .push(build_credit_item(&ctx.i18n.tr("about-credits-iced")))
+        .push(build_credit_item(&ctx.i18n.tr("about-credits-ffmpeg")))
+        .push(build_credit_item(&ctx.i18n.tr("about-credits-onnx")))
+        .push(build_credit_item(&ctx.i18n.tr("about-credits-fluent")))
         .push(build_link_item(
             &ctx.i18n.tr("about-credits-full-list"),
             DEPENDENCIES_URL,
@@ -173,8 +176,8 @@ fn build_credits_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 fn build_third_party_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let content = Column::new()
         .spacing(spacing::XS)
-        .push(build_credit_item(ctx.i18n.tr("about-third-party-ffmpeg")))
-        .push(build_credit_item(ctx.i18n.tr("about-third-party-onnx")))
+        .push(build_credit_item(&ctx.i18n.tr("about-third-party-ffmpeg")))
+        .push(build_credit_item(&ctx.i18n.tr("about-third-party-onnx")))
         .push(build_link_item(
             &ctx.i18n.tr("about-third-party-details"),
             THIRD_PARTY_LICENSES_URL,
@@ -188,7 +191,7 @@ fn build_third_party_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> 
 }
 
 /// Build a single credit item.
-fn build_credit_item<'a>(description: String) -> Element<'a, Message> {
+fn build_credit_item<'a>(description: &str) -> Element<'a, Message> {
     Text::new(format!("• {description}"))
         .size(typography::BODY)
         .into()
@@ -221,11 +224,11 @@ fn build_link_item<'a>(label: &str, url: &'a str) -> Element<'a, Message> {
 }
 
 /// Build a section with icon, title, and content (same pattern as settings/help).
-fn build_section<'a>(
+fn build_section(
     icon: iced::widget::Image<iced::widget::image::Handle>,
     title: String,
-    content: Element<'a, Message>,
-) -> Element<'a, Message> {
+    content: Element<'_, Message>,
+) -> Element<'_, Message> {
     let icon_sized = icons::sized(icon, sizing::ICON_MD);
 
     let header = Row::new()
@@ -268,7 +271,7 @@ mod tests {
 
     #[test]
     fn back_to_viewer_emits_event() {
-        let event = update(Message::BackToViewer);
+        let event = update(&Message::BackToViewer);
         assert!(matches!(event, Event::BackToViewer));
     }
 

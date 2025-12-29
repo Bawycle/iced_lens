@@ -50,7 +50,7 @@ impl RotationAngle {
     /// Returns the angle in radians.
     #[must_use]
     pub fn radians(self) -> f32 {
-        (self.0 as f32) * std::f32::consts::PI / 180.0
+        f32::from(self.0) * std::f32::consts::PI / 180.0
     }
 
     /// Rotates 90° clockwise.

@@ -17,7 +17,8 @@ pub struct MediaList {
 }
 
 impl MediaList {
-    /// Creates a new empty MediaList.
+    /// Creates a new empty `MediaList`.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             media_files: Vec::new(),
@@ -27,7 +28,12 @@ impl MediaList {
 
     /// Scans a directory for supported media files and sorts them.
     /// If the current file doesn't exist anymore, the scan still succeeds but
-    /// current_index will be None.
+    /// `current_index` will be None.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the parent directory cannot be read or file metadata
+    /// cannot be accessed during sorting.
     pub fn scan_directory(current_file: &Path, sort_order: SortOrder) -> Result<Self> {
         let parent = current_file
             .parent()
@@ -56,9 +62,12 @@ impl MediaList {
     }
 
     /// Scans a directory directly for supported media files and sorts them.
-    /// Sets current_index to 0 (first file) if any media files are found.
+    /// Sets `current_index` to 0 (first file) if any media files are found.
     ///
-    /// Returns an error if the directory cannot be read.
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be read or file metadata
+    /// cannot be accessed during sorting.
     pub fn scan_directory_direct(directory: &Path, sort_order: SortOrder) -> Result<Self> {
         let mut media_files = Vec::new();
 
@@ -99,11 +108,13 @@ impl MediaList {
     }
 
     /// Returns the next media path, wrapping around to the start.
+    #[must_use] 
     pub fn next(&self) -> Option<&Path> {
         self.peek_nth_next(0)
     }
 
     /// Returns the previous media path, wrapping around to the end.
+    #[must_use] 
     pub fn previous(&self) -> Option<&Path> {
         self.peek_nth_previous(0)
     }
@@ -149,11 +160,13 @@ impl MediaList {
     }
 
     /// Checks if we're at the first media (used for boundary indication).
+    #[must_use] 
     pub fn is_at_first(&self) -> bool {
         matches!(self.current_index, Some(0))
     }
 
     /// Checks if we're at the last media (used for boundary indication).
+    #[must_use] 
     pub fn is_at_last(&self) -> bool {
         if self.media_files.is_empty() {
             return false;
@@ -162,11 +175,13 @@ impl MediaList {
     }
 
     /// Returns the total number of media files in the list.
+    #[must_use] 
     pub fn len(&self) -> usize {
         self.media_files.len()
     }
 
     /// Checks if the media list is empty.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.media_files.is_empty()
     }
@@ -177,6 +192,7 @@ impl MediaList {
     }
 
     /// Returns the current index if set.
+    #[must_use] 
     pub fn current_index(&self) -> Option<usize> {
         self.current_index
     }
@@ -206,6 +222,7 @@ fn is_supported_media(path: &Path) -> bool {
 }
 
 /// Sorts a list of media file paths according to the specified sort order.
+#[allow(clippy::unnecessary_wraps)] // Result for API consistency
 fn sort_media_files(media_files: &mut [PathBuf], sort_order: SortOrder) -> Result<()> {
     match sort_order {
         SortOrder::Alphabetical => {

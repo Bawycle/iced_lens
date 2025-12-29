@@ -30,26 +30,31 @@ pub struct OverlayTimeout(u32);
 
 impl OverlayTimeout {
     /// Creates a new overlay timeout value, clamping to valid range.
+    #[must_use] 
     pub fn new(value: u32) -> Self {
         Self(value.clamp(MIN_OVERLAY_TIMEOUT_SECS, MAX_OVERLAY_TIMEOUT_SECS))
     }
 
     /// Returns the value as u32.
+    #[must_use] 
     pub fn value(self) -> u32 {
         self.0
     }
 
     /// Returns the timeout as a Duration.
+    #[must_use] 
     pub fn as_duration(self) -> std::time::Duration {
-        std::time::Duration::from_secs(self.0 as u64)
+        std::time::Duration::from_secs(u64::from(self.0))
     }
 
     /// Returns true if this is the minimum value.
+    #[must_use] 
     pub fn is_min(self) -> bool {
         self.0 <= MIN_OVERLAY_TIMEOUT_SECS
     }
 
     /// Returns true if this is the maximum value.
+    #[must_use] 
     pub fn is_max(self) -> bool {
         self.0 >= MAX_OVERLAY_TIMEOUT_SECS
     }

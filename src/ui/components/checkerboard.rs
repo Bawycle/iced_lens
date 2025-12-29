@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Checkerboard component used as a background for transparent content.
+//!
+//! Cast precision notes:
+//! - UI viewport dimensions are small relative to i32/f32 range
+//! - Loop counters converted back to f32 for coordinates are always exact
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
 
 use crate::ui::design_tokens::palette;
 use iced::widget::{canvas, Container, Stack};
@@ -51,6 +57,7 @@ impl<Message> canvas::Program<Message> for Checkerboard {
 }
 
 /// Helper to wrap arbitrary content with a checkerboard background.
+#[must_use] 
 pub fn wrap<'a, Message: 'a>(content: Container<'a, Message>) -> Element<'a, Message> {
     Stack::new()
         .push(

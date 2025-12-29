@@ -8,7 +8,7 @@
 //!
 //! LUFS is the standard for loudness measurement (ITU-R BS.1770).
 //! Common targets:
-//! - Streaming platforms: -14 LUFS (Spotify, YouTube)
+//! - Streaming platforms: -14 LUFS (Spotify, `YouTube`)
 //! - Broadcast: -23 LUFS (EBU R128)
 //! - This application: -16 LUFS (balanced default)
 //!
@@ -46,6 +46,7 @@ pub struct LufsCache {
 
 impl LufsCache {
     /// Creates a new empty LUFS cache.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -84,13 +85,14 @@ impl LufsCache {
 pub type SharedLufsCache = Arc<LufsCache>;
 
 /// Creates a new shared LUFS cache.
+#[must_use] 
 pub fn create_lufs_cache() -> SharedLufsCache {
     Arc::new(LufsCache::new())
 }
 
 /// LUFS (Loudness Units Full Scale) analyzer for audio normalization.
 ///
-/// Uses FFmpeg's loudnorm filter to measure integrated loudness.
+/// Uses `FFmpeg`'s loudnorm filter to measure integrated loudness.
 #[derive(Debug, Clone)]
 pub struct LufsAnalyzer {
     /// Target LUFS level for normalization.
@@ -105,11 +107,13 @@ impl Default for LufsAnalyzer {
 
 impl LufsAnalyzer {
     /// Creates a new LUFS analyzer with the specified target level.
+    #[must_use] 
     pub fn new(target_lufs: f64) -> Self {
         Self { target_lufs }
     }
 
     /// Returns the target LUFS level.
+    #[must_use] 
     pub fn target_lufs(&self) -> f64 {
         self.target_lufs
     }
@@ -121,9 +125,13 @@ impl LufsAnalyzer {
 
     /// Analyzes a media file and returns its integrated LUFS value.
     ///
-    /// Uses FFmpeg with the loudnorm filter in measurement mode.
+    /// Uses `FFmpeg` with the loudnorm filter in measurement mode.
     /// Only analyzes the first 180 seconds (3 minutes) of audio to balance
     /// accuracy with processing time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `FFmpeg` execution fails or the output cannot be parsed.
     pub fn analyze_file<P: AsRef<Path>>(&self, path: P) -> Result<f64> {
         let path_str = path.as_ref().to_string_lossy();
 
@@ -157,14 +165,14 @@ impl LufsAnalyzer {
         // Find the JSON block in the output
         // loudnorm outputs: {"input_i" : "-23.5", "input_tp" : "-1.0", ...}
         let json_start = output
-            .find("{")
+            .find('{')
             .ok_or_else(|| Error::Io("No JSON output from loudnorm filter".to_string()))?;
 
         let json_end = output[json_start..]
-            .find("}")
+            .find('}')
             .ok_or_else(|| Error::Io("Malformed JSON from loudnorm filter".to_string()))?;
 
-        let json_str = &output[json_start..json_start + json_end + 1];
+        let json_str = &output[json_start..=(json_start + json_end)];
 
         // Parse input_i (integrated loudness)
         // Format: "input_i" : "-23.5"
@@ -183,6 +191,7 @@ impl LufsAnalyzer {
     }
 
     /// Extracts a numeric value from a simple JSON object.
+    #[allow(clippy::unused_self)] // Method for API consistency
     fn extract_json_value(&self, json: &str, key: &str) -> Option<f64> {
         // Look for "key" : "value" or "key" : value
         let pattern = format!("\"{key}\"");
@@ -217,6 +226,7 @@ impl LufsAnalyzer {
     ///
     /// # Returns
     /// The gain in dB to apply, clamped to a safe range.
+    #[must_use] 
     pub fn calculate_gain(&self, measured_lufs: f64) -> f64 {
         let gain_db = self.target_lufs - measured_lufs;
 
@@ -228,6 +238,7 @@ impl LufsAnalyzer {
     /// Converts gain in dB to a linear multiplier.
     ///
     /// The formula is: linear = 10^(dB/20)
+    #[must_use] 
     pub fn db_to_linear(gain_db: f64) -> f64 {
         10.0_f64.powf(gain_db / 20.0)
     }
@@ -235,6 +246,7 @@ impl LufsAnalyzer {
     /// Converts a linear multiplier to gain in dB.
     ///
     /// The formula is: dB = 20 * log10(linear)
+    #[must_use] 
     pub fn linear_to_db(linear: f64) -> f64 {
         if linear <= 0.0 {
             f64::NEG_INFINITY

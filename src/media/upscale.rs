@@ -116,7 +116,8 @@ impl Default for UpscaleManager {
 }
 
 impl UpscaleManager {
-    /// Creates a new UpscaleManager instance.
+    /// Creates a new `UpscaleManager` instance.
+    #[must_use] 
     pub fn new() -> Self {
         let model_path = get_model_path();
         Self {
@@ -126,11 +127,13 @@ impl UpscaleManager {
     }
 
     /// Returns the path where the model is/will be stored.
+    #[must_use] 
     pub fn model_path(&self) -> &PathBuf {
         &self.model_path
     }
 
     /// Checks if the model file exists on disk.
+    #[must_use] 
     pub fn is_model_downloaded(&self) -> bool {
         self.model_path.exists()
     }
@@ -139,6 +142,11 @@ impl UpscaleManager {
     ///
     /// Must be called after the model is downloaded and verified.
     /// If a cancellation token is provided and triggered, returns `UpscaleError::Cancelled`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the model file is not found, the operation is cancelled,
+    /// or the ONNX session fails to initialize.
     pub fn load_session(&mut self, cancel_token: Option<&CancellationToken>) -> UpscaleResult<()> {
         // Check for cancellation before loading
         if let Some(token) = cancel_token {
@@ -163,6 +171,7 @@ impl UpscaleManager {
     }
 
     /// Checks if the ONNX session is loaded and ready.
+    #[must_use] 
     pub fn is_session_ready(&self) -> bool {
         self.session.is_some()
     }
@@ -170,6 +179,11 @@ impl UpscaleManager {
     /// Runs 4x upscaling inference on an image.
     ///
     /// Returns the upscaled image (4x the original dimensions).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session is not initialized, preprocessing fails,
+    /// or the ONNX inference fails.
     pub fn upscale(&mut self, image: &DynamicImage) -> UpscaleResult<DynamicImage> {
         let session = self
             .session
@@ -204,6 +218,10 @@ impl UpscaleManager {
     ///
     /// Uses Real-ESRGAN 4x upscaling, then downscales with Lanczos3 if needed.
     /// This produces better quality than direct interpolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the upscaling inference fails.
     pub fn upscale_to_size(
         &mut self,
         image: &DynamicImage,
@@ -230,6 +248,10 @@ impl UpscaleManager {
     }
 
     /// Deletes the model file from disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be deleted.
     pub fn delete_model(&mut self) -> UpscaleResult<()> {
         self.session = None;
         if self.model_path.exists() {
@@ -240,6 +262,7 @@ impl UpscaleManager {
 }
 
 /// Returns the path where the upscale model should be stored.
+#[must_use] 
 pub fn get_model_path() -> PathBuf {
     paths::get_app_data_dir().map_or_else(
         || PathBuf::from(MODEL_FILENAME),
@@ -254,6 +277,7 @@ pub fn get_model_path() -> PathBuf {
 const MIN_MODEL_SIZE_BYTES: u64 = 60_000_000;
 
 /// Checks if the model file exists at the expected location with valid size.
+#[must_use] 
 pub fn is_model_downloaded() -> bool {
     let path = get_model_path();
     if !path.exists() {
@@ -269,6 +293,10 @@ pub fn is_model_downloaded() -> bool {
 /// Downloads the model from the specified URL.
 ///
 /// Returns the number of bytes downloaded.
+///
+/// # Errors
+///
+/// Returns an error if the download fails or the file cannot be written.
 pub async fn download_model(
     url: &str,
     mut progress_callback: impl FnMut(f32) + Send,
@@ -325,7 +353,10 @@ pub async fn download_model(
         downloaded += chunk.len() as u64;
 
         if total_size > 0 {
-            let progress = downloaded as f32 / total_size as f32;
+            // Progress percentage - precision loss acceptable for display purposes
+            // f64 to f32 truncation is fine for progress display (0.0-1.0 range)
+            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+            let progress = (downloaded as f64 / total_size as f64) as f32;
             progress_callback(progress);
         }
     }
@@ -343,6 +374,11 @@ pub async fn download_model(
 }
 
 /// Verifies the model file integrity using BLAKE3 hash.
+///
+/// # Errors
+///
+/// Returns an error if the model file is not found, cannot be read,
+/// or the checksum does not match.
 pub fn verify_checksum(expected_hash: &str) -> UpscaleResult<()> {
     let model_path = get_model_path();
     if !model_path.exists() {
@@ -363,6 +399,10 @@ pub fn verify_checksum(expected_hash: &str) -> UpscaleResult<()> {
 }
 
 /// Computes the BLAKE3 hash of the model file.
+///
+/// # Errors
+///
+/// Returns an error if the model file is not found or cannot be read.
 pub fn compute_model_hash() -> UpscaleResult<String> {
     let model_path = get_model_path();
     if !model_path.exists() {
@@ -378,6 +418,10 @@ pub fn compute_model_hash() -> UpscaleResult<String> {
 /// Uses a small 64x64 test image as Real-ESRGAN can handle any input size.
 ///
 /// If a cancellation token is provided and triggered, returns `UpscaleError::Cancelled`.
+///
+/// # Errors
+///
+/// Returns an error if validation is cancelled or the model fails inference.
 pub fn validate_model(
     manager: &mut UpscaleManager,
     cancel_token: Option<&CancellationToken>,
@@ -424,6 +468,7 @@ pub fn validate_model(
 ///
 /// Converts to NCHW format (batch=1, channels=3, height, width),
 /// RGB color order, normalized to 0-1 range.
+#[allow(clippy::unnecessary_wraps)] // Result for API consistency with other processing functions
 fn preprocess_image(img: &DynamicImage) -> UpscaleResult<Array4<f32>> {
     let rgb = img.to_rgb8();
     let (width, height) = rgb.dimensions();
@@ -433,10 +478,10 @@ fn preprocess_image(img: &DynamicImage) -> UpscaleResult<Array4<f32>> {
 
     for (x, y, pixel) in rgb.enumerate_pixels() {
         let [r, g, b] = pixel.0;
-        // Normalize to 0-1 range, RGB order
-        tensor[[0, 0, y as usize, x as usize]] = r as f32 / 255.0;
-        tensor[[0, 1, y as usize, x as usize]] = g as f32 / 255.0;
-        tensor[[0, 2, y as usize, x as usize]] = b as f32 / 255.0;
+        // Normalize to 0-1 range, RGB order (u8 to f32 is lossless via From)
+        tensor[[0, 0, y as usize, x as usize]] = f32::from(r) / 255.0;
+        tensor[[0, 1, y as usize, x as usize]] = f32::from(g) / 255.0;
+        tensor[[0, 2, y as usize, x as usize]] = f32::from(b) / 255.0;
     }
 
     Ok(tensor)
@@ -465,8 +510,11 @@ fn postprocess_output(outputs: &ort::session::SessionOutputs<'_>) -> UpscaleResu
         )));
     }
 
-    let height = shape[2] as usize;
-    let width = shape[3] as usize;
+    // Convert i64 dimensions to usize (validated to be positive by ONNX)
+    let height = usize::try_from(shape[2])
+        .map_err(|_| UpscaleError::PostprocessingFailed("Invalid tensor height".to_string()))?;
+    let width = usize::try_from(shape[3])
+        .map_err(|_| UpscaleError::PostprocessingFailed("Invalid tensor width".to_string()))?;
     let channel_size = height * width;
 
     // Create RGB image (model outputs RGB order)
@@ -475,26 +523,37 @@ fn postprocess_output(outputs: &ort::session::SessionOutputs<'_>) -> UpscaleResu
     for y in 0..height {
         for x in 0..width {
             let idx = y * width + x;
-            // Output is in RGB order
-            let r = (data[idx] * 255.0).clamp(0.0, 255.0) as u8;
-            let g = (data[channel_size + idx] * 255.0).clamp(0.0, 255.0) as u8;
-            let b = (data[2 * channel_size + idx] * 255.0).clamp(0.0, 255.0) as u8;
+            // Output is in RGB order, clamp ensures value is in 0-255 range
+            // Safe to convert clamped f32 to u8 (clamp guarantees 0.0..=255.0)
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let r = (data[idx] * 255.0).clamp(0.0, 255.0).round() as u8;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let g = (data[channel_size + idx] * 255.0).clamp(0.0, 255.0).round() as u8;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let b = (data[2 * channel_size + idx] * 255.0).clamp(0.0, 255.0).round() as u8;
             pixels.push(r);
             pixels.push(g);
             pixels.push(b);
         }
     }
 
-    let rgb_image = image_rs::RgbImage::from_raw(width as u32, height as u32, pixels)
+    // Convert usize dimensions to u32 for image creation
+    let width_u32 = u32::try_from(width)
+        .map_err(|_| UpscaleError::PostprocessingFailed("Image width too large".to_string()))?;
+    let height_u32 = u32::try_from(height)
+        .map_err(|_| UpscaleError::PostprocessingFailed("Image height too large".to_string()))?;
+
+    let rgb_image = image_rs::RgbImage::from_raw(width_u32, height_u32, pixels)
         .ok_or_else(|| UpscaleError::PostprocessingFailed("Failed to create image".to_string()))?;
 
     Ok(DynamicImage::ImageRgb8(rgb_image))
 }
 
-/// Thread-safe wrapper for UpscaleManager.
+/// Thread-safe wrapper for `UpscaleManager`.
 pub type SharedUpscaleManager = Arc<Mutex<UpscaleManager>>;
 
-/// Creates a new shared UpscaleManager instance.
+/// Creates a new shared `UpscaleManager` instance.
+#[must_use] 
 pub fn create_shared_manager() -> SharedUpscaleManager {
     Arc::new(Mutex::new(UpscaleManager::new()))
 }

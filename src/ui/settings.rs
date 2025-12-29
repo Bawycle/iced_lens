@@ -192,9 +192,9 @@ pub enum Event {
     PersistFiltersChanged(bool),
 }
 
-/// Language option for the pick_list widget.
+/// Language option for the `pick_list` widget.
 ///
-/// Wraps a LanguageIdentifier with a display name for use in the dropdown.
+/// Wraps a `LanguageIdentifier` with a display name for use in the dropdown.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LanguageOption {
     pub locale: LanguageIdentifier,
@@ -240,6 +240,7 @@ impl Default for State {
 
 impl State {
     /// Creates a new settings state from the given configuration.
+    #[must_use] 
     pub fn new(config: StateConfig) -> Self {
         let clamped = config
             .zoom_step_percent
@@ -284,59 +285,73 @@ impl State {
         }
     }
 
+    #[must_use] 
     pub fn background_theme(&self) -> BackgroundTheme {
         self.background_theme
     }
 
+    #[must_use] 
     pub fn sort_order(&self) -> SortOrder {
         self.sort_order
     }
 
+    #[must_use] 
     pub fn theme_mode(&self) -> ThemeMode {
         self.theme_mode
     }
 
+    #[must_use] 
     pub fn zoom_step_percent(&self) -> f32 {
         self.zoom_step_percent
     }
 
+    #[must_use] 
     pub fn overlay_timeout_secs(&self) -> u32 {
         self.overlay_timeout_secs
     }
 
+    #[must_use] 
     pub fn max_skip_attempts(&self) -> u32 {
         self.max_skip_attempts
     }
 
+    #[must_use] 
     pub fn video_autoplay(&self) -> bool {
         self.video_autoplay
     }
 
+    #[must_use] 
     pub fn audio_normalization(&self) -> bool {
         self.audio_normalization
     }
 
+    #[must_use] 
     pub fn frame_cache_mb(&self) -> u32 {
         self.frame_cache_mb
     }
 
+    #[must_use] 
     pub fn frame_history_mb(&self) -> u32 {
         self.frame_history_mb
     }
 
+    #[must_use] 
     pub fn keyboard_seek_step_secs(&self) -> f64 {
         self.keyboard_seek_step_secs
     }
 
+    #[must_use] 
     pub fn enable_deblur(&self) -> bool {
         self.enable_deblur
     }
 
+    #[must_use] 
     pub fn deblur_model_url(&self) -> &str {
         &self.deblur_model_url
     }
 
     /// Returns the current status of the deblur model.
+    #[must_use] 
     pub fn deblur_model_status(&self) -> &ModelStatus {
         &self.deblur_model_status
     }
@@ -346,7 +361,7 @@ impl State {
         self.deblur_model_status = status;
     }
 
-    /// Sets the enable_deblur flag (called from app after successful validation).
+    /// Sets the `enable_deblur` flag (called from app after successful validation).
     ///
     /// This should only be called by the application after the model has been
     /// successfully downloaded and validated, not in response to user UI action.
@@ -354,15 +369,18 @@ impl State {
         self.enable_deblur = enabled;
     }
 
+    #[must_use] 
     pub fn enable_upscale(&self) -> bool {
         self.enable_upscale
     }
 
+    #[must_use] 
     pub fn upscale_model_url(&self) -> &str {
         &self.upscale_model_url
     }
 
     /// Returns the current status of the upscale model.
+    #[must_use] 
     pub fn upscale_model_status(&self) -> &UpscaleModelStatus {
         &self.upscale_model_status
     }
@@ -372,7 +390,7 @@ impl State {
         self.upscale_model_status = status;
     }
 
-    /// Sets the enable_upscale flag (called from app after successful validation).
+    /// Sets the `enable_upscale` flag (called from app after successful validation).
     ///
     /// This should only be called by the application after the model has been
     /// successfully downloaded and validated, not in response to user UI action.
@@ -381,6 +399,7 @@ impl State {
     }
 
     /// Returns whether filter persistence is enabled.
+    #[must_use] 
     pub fn persist_filters(&self) -> bool {
         self.persist_filters
     }
@@ -399,6 +418,8 @@ impl State {
     }
 
     /// Render the settings view.
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)] // ViewContext is small and consumed
     pub fn view<'a>(&'a self, ctx: ViewContext<'a>) -> Element<'a, Message> {
         let back_button = button(
             text(format!(
@@ -493,21 +514,16 @@ impl State {
         );
 
         // Theme mode selection
-        let mut theme_row = Row::new().spacing(spacing::XS);
-        for (mode, key) in [
-            (ThemeMode::System, "settings-theme-system"),
-            (ThemeMode::Light, "settings-theme-light"),
-            (ThemeMode::Dark, "settings-theme-dark"),
-        ] {
-            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::ThemeModeSelected(mode))
-                .style(if self.theme_mode == mode {
-                    button_styles::selected
-                } else {
-                    button_styles::unselected
-                });
-            theme_row = theme_row.push(btn);
-        }
+        let theme_row = build_toggle_button_row(
+            &[
+                (ThemeMode::System, "settings-theme-system"),
+                (ThemeMode::Light, "settings-theme-light"),
+                (ThemeMode::Dark, "settings-theme-dark"),
+            ],
+            self.theme_mode,
+            Message::ThemeModeSelected,
+            ctx.i18n,
+        );
 
         let theme_setting = self.build_setting_row(
             ctx.i18n.tr("settings-theme-mode-label"),
@@ -530,24 +546,16 @@ impl State {
     /// Build the Display section (Background, Zoom step, Sort order).
     fn build_display_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         // Background selection
-        let mut background_row = Row::new().spacing(spacing::XS);
-        for (theme, key) in [
-            (BackgroundTheme::Light, "settings-background-light"),
-            (BackgroundTheme::Dark, "settings-background-dark"),
-            (
-                BackgroundTheme::Checkerboard,
-                "settings-background-checkerboard",
-            ),
-        ] {
-            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::BackgroundThemeSelected(theme))
-                .style(if self.background_theme == theme {
-                    button_styles::selected
-                } else {
-                    button_styles::unselected
-                });
-            background_row = background_row.push(btn);
-        }
+        let background_row = build_toggle_button_row(
+            &[
+                (BackgroundTheme::Light, "settings-background-light"),
+                (BackgroundTheme::Dark, "settings-background-dark"),
+                (BackgroundTheme::Checkerboard, "settings-background-checkerboard"),
+            ],
+            self.background_theme,
+            Message::BackgroundThemeSelected,
+            ctx.i18n,
+        );
 
         let background_setting = self.build_setting_row(
             ctx.i18n.tr("settings-background-label"),
@@ -591,21 +599,16 @@ impl State {
         );
 
         // Sort order selection
-        let mut sort_row = Row::new().spacing(spacing::XS);
-        for (order, key) in [
-            (SortOrder::Alphabetical, "settings-sort-alphabetical"),
-            (SortOrder::ModifiedDate, "settings-sort-modified"),
-            (SortOrder::CreatedDate, "settings-sort-created"),
-        ] {
-            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::SortOrderSelected(order))
-                .style(if self.sort_order == order {
-                    button_styles::selected
-                } else {
-                    button_styles::unselected
-                });
-            sort_row = sort_row.push(btn);
-        }
+        let sort_row = build_toggle_button_row(
+            &[
+                (SortOrder::Alphabetical, "settings-sort-alphabetical"),
+                (SortOrder::ModifiedDate, "settings-sort-modified"),
+                (SortOrder::CreatedDate, "settings-sort-created"),
+            ],
+            self.sort_order,
+            Message::SortOrderSelected,
+            ctx.i18n,
+        );
 
         let sort_setting = self.build_setting_row(
             ctx.i18n.tr("settings-sort-order-label"),
@@ -641,20 +644,15 @@ impl State {
         );
 
         // Persist filters toggle
-        let mut persist_filters_row = Row::new().spacing(spacing::XS);
-        for (enabled, key) in [
-            (false, "settings-persist-filters-disabled"),
-            (true, "settings-persist-filters-enabled"),
-        ] {
-            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::PersistFiltersChanged(enabled))
-                .style(if self.persist_filters == enabled {
-                    button_styles::selected
-                } else {
-                    button_styles::unselected
-                });
-            persist_filters_row = persist_filters_row.push(btn);
-        }
+        let persist_filters_row = build_toggle_button_row(
+            &[
+                (false, "settings-persist-filters-disabled"),
+                (true, "settings-persist-filters-enabled"),
+            ],
+            self.persist_filters,
+            Message::PersistFiltersChanged,
+            ctx.i18n,
+        );
 
         let persist_filters_setting = self.build_setting_row(
             ctx.i18n.tr("settings-persist-filters-label"),
@@ -684,20 +682,15 @@ impl State {
     /// Build the Video section (Autoplay, Audio normalization, Frame cache).
     fn build_video_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         // Video autoplay toggle
-        let mut autoplay_row = Row::new().spacing(spacing::XS);
-        for (enabled, key) in [
-            (false, "settings-video-autoplay-disabled"),
-            (true, "settings-video-autoplay-enabled"),
-        ] {
-            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::VideoAutoplayChanged(enabled))
-                .style(if self.video_autoplay == enabled {
-                    button_styles::selected
-                } else {
-                    button_styles::unselected
-                });
-            autoplay_row = autoplay_row.push(btn);
-        }
+        let autoplay_row = build_toggle_button_row(
+            &[
+                (false, "settings-video-autoplay-disabled"),
+                (true, "settings-video-autoplay-enabled"),
+            ],
+            self.video_autoplay,
+            Message::VideoAutoplayChanged,
+            ctx.i18n,
+        );
 
         let autoplay_setting = self.build_setting_row(
             ctx.i18n.tr("settings-video-autoplay-label"),
@@ -710,20 +703,15 @@ impl State {
         );
 
         // Audio normalization toggle
-        let mut normalization_row = Row::new().spacing(spacing::XS);
-        for (enabled, key) in [
-            (false, "settings-audio-normalization-disabled"),
-            (true, "settings-audio-normalization-enabled"),
-        ] {
-            let btn = Button::new(Text::new(ctx.i18n.tr(key)))
-                .on_press(Message::AudioNormalizationChanged(enabled))
-                .style(if self.audio_normalization == enabled {
-                    button_styles::selected
-                } else {
-                    button_styles::unselected
-                });
-            normalization_row = normalization_row.push(btn);
-        }
+        let normalization_row = build_toggle_button_row(
+            &[
+                (false, "settings-audio-normalization-disabled"),
+                (true, "settings-audio-normalization-enabled"),
+            ],
+            self.audio_normalization,
+            Message::AudioNormalizationChanged,
+            ctx.i18n,
+        );
 
         let normalization_setting = self.build_setting_row(
             ctx.i18n.tr("settings-audio-normalization-label"),
@@ -940,6 +928,8 @@ impl State {
         if show_status {
             if let ModelStatus::Downloading { progress } = &self.deblur_model_status {
                 let progress_bar_widget = progress_bar(0.0..=1.0, *progress);
+                // Progress is 0.0-1.0, so *100 is 0-100 which fits in u32
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let progress_percent = format!("{}", (progress * 100.0) as u32);
                 let progress_text = Text::new(ctx.i18n.tr_with_args(
                     "settings-deblur-status-downloading",
@@ -1072,6 +1062,8 @@ impl State {
         if show_status {
             if let UpscaleModelStatus::Downloading { progress } = &self.upscale_model_status {
                 let progress_bar_widget = progress_bar(0.0..=1.0, *progress);
+                // Progress is 0.0-1.0, so *100 is 0-100 which fits in u32
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let progress_percent = format!("{}", (progress * 100.0) as u32);
                 let progress_text = Text::new(ctx.i18n.tr_with_args(
                     "settings-upscale-status-downloading",
@@ -1176,6 +1168,7 @@ impl State {
     }
 
     /// Build a single setting row with label, optional hint, and control.
+    #[allow(clippy::unused_self)] // Method for API consistency
     fn build_setting_row<'a>(
         &self,
         label: String,
@@ -1275,7 +1268,7 @@ impl State {
                 Event::DisableDeblur
             }
             Message::DeblurModelUrlChanged(url) => {
-                self.deblur_model_url = url.clone();
+                self.deblur_model_url.clone_from(&url);
                 Event::DeblurModelUrlChanged(url)
             }
             Message::RequestEnableUpscale => {
@@ -1288,7 +1281,7 @@ impl State {
                 Event::DisableUpscale
             }
             Message::UpscaleModelUrlChanged(url) => {
-                self.upscale_model_url = url.clone();
+                self.upscale_model_url.clone_from(&url);
                 Event::UpscaleModelUrlChanged(url)
             }
             Message::PersistFiltersChanged(enabled) => update_if_changed(
@@ -1330,11 +1323,11 @@ impl State {
 }
 
 /// Build a settings section with icon, title, and content.
-fn build_section<'a>(
+fn build_section(
     icon: Image<Handle>,
     title: String,
-    content: Element<'a, Message>,
-) -> Element<'a, Message> {
+    content: Element<'_, Message>,
+) -> Element<'_, Message> {
     let icon_sized = icons::sized(icon, sizing::ICON_MD);
 
     let header = Row::new()
@@ -1361,6 +1354,33 @@ fn build_section<'a>(
             ..Default::default()
         })
         .into()
+}
+
+/// Builds a row of toggle buttons for boolean or enum selection.
+///
+/// Each button represents an option and toggles between selected/unselected style.
+fn build_toggle_button_row<'a, T, M>(
+    options: &[(T, &str)],
+    selected: T,
+    on_select: impl Fn(T) -> M + 'a,
+    i18n: &I18n,
+) -> Row<'a, M>
+where
+    T: PartialEq + Copy,
+    M: Clone + 'a,
+{
+    let mut row = Row::new().spacing(spacing::XS);
+    for (value, key) in options {
+        let btn = Button::new(Text::new(i18n.tr(key)))
+            .on_press(on_select(*value))
+            .style(if selected == *value {
+                button_styles::selected
+            } else {
+                button_styles::unselected
+            });
+        row = row.push(btn);
+    }
+    row
 }
 
 fn parse_number(input: &str) -> Option<f32> {

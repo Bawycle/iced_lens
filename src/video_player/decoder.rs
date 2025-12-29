@@ -45,6 +45,7 @@ enum PacingResult {
 /// * `sync_clock` - Optional audio sync clock for A/V synchronization
 /// * `playback_start_time` - Wall-clock reference for timing
 /// * `consecutive_skips` - Counter for consecutive skipped frames (mutated)
+#[allow(clippy::ref_option_ref, clippy::ref_option)] // Keeps consistent API with other decoder functions
 fn apply_frame_pacing(
     pts_secs: f64,
     first_pts: &mut Option<f64>,
@@ -66,9 +67,6 @@ fn apply_frame_pacing(
         if clock.is_playing() && clock.is_sync_enabled() {
             let audio_time = clock.current_time_secs();
             match calculate_sync_action(adjusted_pts, audio_time) {
-                SyncAction::Display => {
-                    *consecutive_skips = 0;
-                }
                 SyncAction::Wait(duration) => {
                     *consecutive_skips = 0;
                     std::thread::sleep(duration);
@@ -92,7 +90,8 @@ fn apply_frame_pacing(
                     );
                     *consecutive_skips = 0;
                 }
-                SyncAction::Repeat => {
+                // Display and Repeat both just reset the skip counter
+                SyncAction::Display | SyncAction::Repeat => {
                     *consecutive_skips = 0;
                 }
             }
@@ -239,7 +238,7 @@ fn handle_end_of_stream(
 ///
 /// This function handles the packet decoding path which includes seek timeout
 /// detection that isn't needed for buffered frames.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::ref_option_ref, clippy::ref_option)]
 fn process_packet_frame(
     decoded_frame: &ffmpeg_next::frame::Video,
     time_base_f64: f64,
@@ -340,7 +339,7 @@ enum FrameProcessingResult {
 ///
 /// This function consolidates the frame processing logic that appears in both
 /// the buffered frame path and the packet decoding path.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::ref_option_ref, clippy::ref_option)]
 fn process_decoded_frame(
     frame: &ffmpeg_next::frame::Video,
     time_base_f64: f64,
@@ -449,7 +448,7 @@ fn emit_frame(
 /// Processes a single decoder command.
 ///
 /// Returns `CommandResult` indicating what the main loop should do next.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn handle_decoder_command(
     command: DecoderCommand,
     state: &mut DecoderLoopState,
@@ -910,7 +909,7 @@ impl AsyncDecoder {
                         PacketDecodeResult::ContinueDecoding
                         | PacketDecodeResult::SeekTimeout
                         | PacketDecodeResult::FrameSkipped
-                        | PacketDecodeResult::Error => continue,
+                        | PacketDecodeResult::Error => {}
                         PacketDecodeResult::ChannelClosed => break,
                     }
                 }

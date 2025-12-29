@@ -36,6 +36,7 @@ pub struct ColorScheme {
 
 impl ColorScheme {
     /// Light theme (Light mode).
+    #[must_use] 
     pub fn light() -> Self {
         Self {
             surface_primary: palette::WHITE,
@@ -63,6 +64,7 @@ impl ColorScheme {
     }
 
     /// Dark theme (Dark mode).
+    #[must_use] 
     pub fn dark() -> Self {
         Self {
             surface_primary: palette::GRAY_900,
@@ -89,7 +91,8 @@ impl ColorScheme {
         }
     }
 
-    /// Detects the system theme and returns the appropriate ColorScheme.
+    /// Detects the system theme and returns the appropriate `ColorScheme`.
+    #[must_use] 
     pub fn from_system() -> Self {
         if let Ok(dark_light::Mode::Light) = dark_light::detect() {
             Self::light()
@@ -118,6 +121,7 @@ pub enum ThemeMode {
 impl ThemeMode {
     /// Returns true if the effective theme is dark.
     /// For System mode, detects the actual system theme.
+    #[must_use] 
     pub fn is_dark(self) -> bool {
         match self {
             ThemeMode::Light => false,
@@ -131,6 +135,7 @@ impl ThemeMode {
 }
 
 impl AppTheme {
+    #[must_use] 
     pub fn new(mode: ThemeMode) -> Self {
         let colors = match mode {
             ThemeMode::Light => ColorScheme::light(),

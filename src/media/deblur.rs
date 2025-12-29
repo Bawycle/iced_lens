@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
-//! AI-powered image deblurring using NAFNet ONNX model.
+//! AI-powered image deblurring using `NAFNet` ONNX model.
 //!
 //! This module provides functionality for:
-//! - Downloading the NAFNet ONNX model from a configurable URL
+//! - Downloading the `NAFNet` ONNX model from a configurable URL
 //! - Verifying model integrity with BLAKE3 checksum
 //! - Running inference to deblur images
 
@@ -89,7 +89,7 @@ pub enum ModelStatus {
     Error(String),
 }
 
-/// Manager for the NAFNet deblurring model.
+/// Manager for the `NAFNet` deblurring model.
 ///
 /// Handles model lifecycle: download, validation, and inference.
 pub struct DeblurManager {
@@ -104,7 +104,8 @@ impl Default for DeblurManager {
 }
 
 impl DeblurManager {
-    /// Creates a new DeblurManager instance.
+    /// Creates a new `DeblurManager` instance.
+    #[must_use] 
     pub fn new() -> Self {
         let model_path = get_model_path();
         Self {
@@ -114,11 +115,13 @@ impl DeblurManager {
     }
 
     /// Returns the path where the model is/will be stored.
+    #[must_use] 
     pub fn model_path(&self) -> &PathBuf {
         &self.model_path
     }
 
     /// Checks if the model file exists on disk.
+    #[must_use] 
     pub fn is_model_downloaded(&self) -> bool {
         self.model_path.exists()
     }
@@ -127,6 +130,11 @@ impl DeblurManager {
     ///
     /// Must be called after the model is downloaded and verified.
     /// If a cancellation token is provided and triggered, returns `DeblurError::Cancelled`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the model file is not found, the operation is cancelled,
+    /// or the ONNX session fails to initialize.
     pub fn load_session(&mut self, cancel_token: Option<&CancellationToken>) -> DeblurResult<()> {
         // Check for cancellation before loading
         if let Some(token) = cancel_token {
@@ -151,6 +159,7 @@ impl DeblurManager {
     }
 
     /// Checks if the ONNX session is loaded and ready.
+    #[must_use] 
     pub fn is_session_ready(&self) -> bool {
         self.session.is_some()
     }
@@ -159,6 +168,11 @@ impl DeblurManager {
     ///
     /// Returns the deblurred image. Small images are automatically padded
     /// to meet the minimum dimension requirement, then cropped back.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session is not initialized, preprocessing fails,
+    /// or the ONNX inference fails.
     pub fn deblur(&mut self, image: &DynamicImage) -> DeblurResult<DynamicImage> {
         let session = self
             .session
@@ -194,6 +208,10 @@ impl DeblurManager {
     }
 
     /// Deletes the model file from disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be deleted.
     pub fn delete_model(&mut self) -> DeblurResult<()> {
         self.session = None;
         if self.model_path.exists() {
@@ -204,6 +222,7 @@ impl DeblurManager {
 }
 
 /// Returns the path where the deblur model should be stored.
+#[must_use] 
 pub fn get_model_path() -> PathBuf {
     paths::get_app_data_dir().map_or_else(
         || PathBuf::from(MODEL_FILENAME),
@@ -218,6 +237,7 @@ pub fn get_model_path() -> PathBuf {
 const MIN_MODEL_SIZE_BYTES: u64 = 80_000_000;
 
 /// Checks if the model file exists at the expected location with valid size.
+#[must_use] 
 pub fn is_model_downloaded() -> bool {
     let path = get_model_path();
     if !path.exists() {
@@ -233,6 +253,10 @@ pub fn is_model_downloaded() -> bool {
 /// Downloads the model from the specified URL.
 ///
 /// Returns the number of bytes downloaded.
+///
+/// # Errors
+///
+/// Returns an error if the download fails or the file cannot be written.
 pub async fn download_model(
     url: &str,
     mut progress_callback: impl FnMut(f32) + Send,
@@ -288,7 +312,10 @@ pub async fn download_model(
         downloaded += chunk.len() as u64;
 
         if total_size > 0 {
-            let progress = downloaded as f32 / total_size as f32;
+            // Progress percentage - precision loss acceptable for display purposes
+            // f64 to f32 truncation is fine for progress display (0.0-1.0 range)
+            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+            let progress = (downloaded as f64 / total_size as f64) as f32;
             progress_callback(progress);
         }
     }
@@ -306,6 +333,11 @@ pub async fn download_model(
 }
 
 /// Verifies the model file integrity using BLAKE3 hash.
+///
+/// # Errors
+///
+/// Returns an error if the model file is not found, cannot be read,
+/// or the checksum does not match.
 pub fn verify_checksum(expected_hash: &str) -> DeblurResult<()> {
     let model_path = get_model_path();
     if !model_path.exists() {
@@ -326,6 +358,10 @@ pub fn verify_checksum(expected_hash: &str) -> DeblurResult<()> {
 }
 
 /// Computes the BLAKE3 hash of the model file.
+///
+/// # Errors
+///
+/// Returns an error if the model file is not found or cannot be read.
 pub fn compute_model_hash() -> DeblurResult<String> {
     let model_path = get_model_path();
     if !model_path.exists() {
@@ -338,12 +374,16 @@ pub fn compute_model_hash() -> DeblurResult<String> {
 
 /// Validates the model by running a test inference.
 ///
-/// Uses a 1024x1024 test image as NAFNet's architecture requires large
+/// Uses a 1024x1024 test image as `NAFNet`'s architecture requires large
 /// spatial dimensions for its many encoder stages (each stage halves dimensions).
-/// The OpenCV NAFNet model requires minimum ~1024x1024 input to avoid
+/// The `OpenCV` `NAFNet` model requires minimum ~1024x1024 input to avoid
 /// zero-sized internal tensors during inference.
 ///
 /// If a cancellation token is provided and triggered, returns `DeblurError::Cancelled`.
+///
+/// # Errors
+///
+/// Returns an error if validation is cancelled or the model fails inference.
 pub fn validate_model(
     manager: &mut DeblurManager,
     cancel_token: Option<&CancellationToken>,
@@ -377,18 +417,19 @@ pub fn validate_model(
     Ok(())
 }
 
-/// Minimum dimension for NAFNet inference.
-/// NAFNet's encoder stages halve dimensions multiple times, requiring sufficient
+/// Minimum dimension for `NAFNet` inference.
+/// `NAFNet`'s encoder stages halve dimensions multiple times, requiring sufficient
 /// spatial resolution to avoid zero-sized internal tensors.
 const MIN_DIMENSION: u32 = 1024;
 
-/// Preprocesses an image for NAFNet inference.
+/// Preprocesses an image for `NAFNet` inference.
 ///
 /// Converts to NCHW format (batch=1, channels=3, height, width),
 /// RGB color order, normalized to 0-1 range.
 ///
-/// If the image is smaller than MIN_DIMENSION, it will be padded with
+/// If the image is smaller than `MIN_DIMENSION`, it will be padded with
 /// edge reflection to meet the minimum size requirement.
+#[allow(clippy::unnecessary_wraps)] // Result for API consistency with other processing functions
 fn preprocess_image(img: &DynamicImage) -> DeblurResult<Array4<f32>> {
     let rgb = img.to_rgb8();
     let (width, height) = rgb.dimensions();
@@ -409,10 +450,10 @@ fn preprocess_image(img: &DynamicImage) -> DeblurResult<Array4<f32>> {
 
     for (x, y, pixel) in padded_rgb.enumerate_pixels() {
         let [r, g, b] = pixel.0;
-        // Normalize to 0-1 range, RGB order
-        tensor[[0, 0, y as usize, x as usize]] = r as f32 / 255.0;
-        tensor[[0, 1, y as usize, x as usize]] = g as f32 / 255.0;
-        tensor[[0, 2, y as usize, x as usize]] = b as f32 / 255.0;
+        // Normalize to 0-1 range, RGB order (u8 to f32 is lossless via From)
+        tensor[[0, 0, y as usize, x as usize]] = f32::from(r) / 255.0;
+        tensor[[0, 1, y as usize, x as usize]] = f32::from(g) / 255.0;
+        tensor[[0, 2, y as usize, x as usize]] = f32::from(b) / 255.0;
     }
 
     Ok(tensor)
@@ -458,7 +499,7 @@ fn pad_image_reflect(
     padded
 }
 
-/// Postprocesses NAFNet output back to an image.
+/// Postprocesses `NAFNet` output back to an image.
 ///
 /// Converts from NCHW format (RGB order), denormalizes from 0-1 to 0-255,
 /// clips values, and optionally crops to original dimensions if padding was applied.
@@ -485,8 +526,11 @@ fn postprocess_output(
         )));
     }
 
-    let height = shape[2] as usize;
-    let width = shape[3] as usize;
+    // Convert i64 dimensions to usize (validated to be positive by ONNX)
+    let height = usize::try_from(shape[2])
+        .map_err(|_| DeblurError::PostprocessingFailed("Invalid tensor height".to_string()))?;
+    let width = usize::try_from(shape[3])
+        .map_err(|_| DeblurError::PostprocessingFailed("Invalid tensor width".to_string()))?;
     let channel_size = height * width;
 
     // Create RGB image (model outputs RGB order)
@@ -495,33 +539,44 @@ fn postprocess_output(
     for y in 0..height {
         for x in 0..width {
             let idx = y * width + x;
-            // Output is in RGB order
-            let r = (data[idx] * 255.0).clamp(0.0, 255.0) as u8;
-            let g = (data[channel_size + idx] * 255.0).clamp(0.0, 255.0) as u8;
-            let b = (data[2 * channel_size + idx] * 255.0).clamp(0.0, 255.0) as u8;
+            // Output is in RGB order, clamp ensures value is in 0-255 range
+            // Safe to convert clamped f32 to u8 (clamp guarantees 0.0..=255.0)
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let r = (data[idx] * 255.0).clamp(0.0, 255.0).round() as u8;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let g = (data[channel_size + idx] * 255.0).clamp(0.0, 255.0).round() as u8;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let b = (data[2 * channel_size + idx] * 255.0).clamp(0.0, 255.0).round() as u8;
             pixels.push(r);
             pixels.push(g);
             pixels.push(b);
         }
     }
 
-    let rgb_image = image_rs::RgbImage::from_raw(width as u32, height as u32, pixels)
+    // Convert usize dimensions to u32 for image creation
+    let width_u32 = u32::try_from(width)
+        .map_err(|_| DeblurError::PostprocessingFailed("Image width too large".to_string()))?;
+    let height_u32 = u32::try_from(height)
+        .map_err(|_| DeblurError::PostprocessingFailed("Image height too large".to_string()))?;
+
+    let rgb_image = image_rs::RgbImage::from_raw(width_u32, height_u32, pixels)
         .ok_or_else(|| DeblurError::PostprocessingFailed("Failed to create image".to_string()))?;
 
     let result = DynamicImage::ImageRgb8(rgb_image);
 
     // Crop back to original dimensions if padding was applied
-    if width as u32 != original_width || height as u32 != original_height {
+    if width_u32 != original_width || height_u32 != original_height {
         Ok(result.crop_imm(0, 0, original_width, original_height))
     } else {
         Ok(result)
     }
 }
 
-/// Thread-safe wrapper for DeblurManager.
+/// Thread-safe wrapper for `DeblurManager`.
 pub type SharedDeblurManager = Arc<Mutex<DeblurManager>>;
 
-/// Creates a new shared DeblurManager instance.
+/// Creates a new shared `DeblurManager` instance.
+#[must_use] 
 pub fn create_shared_manager() -> SharedDeblurManager {
     Arc::new(Mutex::new(DeblurManager::new()))
 }

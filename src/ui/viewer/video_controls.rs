@@ -20,6 +20,103 @@ fn tip<'a, Message: 'a>(
     styles::tooltip::styled(content, text, tooltip::Position::Top)
 }
 
+/// Creates a toolbar button with optional enabled state.
+///
+/// When enabled, the button will trigger the message on press.
+/// When disabled, the button is styled as inactive and does not respond to clicks.
+fn toolbar_button<'a>(
+    icon: iced::widget::image::Image,
+    on_press: Option<Message>,
+    button_height: f32,
+) -> Element<'a, Message> {
+    let btn = button(icon)
+        .padding(spacing::XS)
+        .width(Length::Shrink)
+        .height(Length::Fixed(button_height));
+
+    match on_press {
+        Some(msg) => btn.on_press(msg).into(),
+        None => btn.style(styles::button::disabled()).into(),
+    }
+}
+
+/// Builds the volume controls section (button, slider, percentage).
+fn build_volume_controls<'a>(
+    ctx: &ViewContext<'a>,
+    state: &PlaybackState,
+    icon_size: f32,
+    button_height: f32,
+) -> (Element<'a, Message>, Element<'a, Message>, Element<'a, Message>) {
+    // Volume button with tooltip - shows mute icon when muted, disabled when no audio
+    let volume_icon = if state.muted || state.volume == 0.0 {
+        icons::sized(action_icons::video::toolbar::volume_muted(), icon_size)
+    } else {
+        icons::sized(action_icons::video::toolbar::volume(), icon_size)
+    };
+
+    let volume_button_content: Element<'_, Message> = if state.has_audio {
+        let volume_tooltip = if state.muted {
+            ctx.i18n.tr("video-unmute-tooltip")
+        } else {
+            ctx.i18n.tr("video-mute-tooltip")
+        };
+        let volume_button = button(volume_icon)
+            .on_press(Message::ToggleMute)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height));
+
+        let styled_button: Element<'_, Message> = if state.muted {
+            volume_button.style(styles::button::selected).into()
+        } else {
+            volume_button.into()
+        };
+        tip(styled_button, volume_tooltip).into()
+    } else {
+        let volume_button = button(volume_icon)
+            .padding(spacing::XS)
+            .width(Length::Shrink)
+            .height(Length::Fixed(button_height))
+            .style(styles::button::disabled());
+        tip(volume_button, ctx.i18n.tr("video-no-audio-tooltip")).into()
+    };
+
+    // Volume slider - disabled when no audio track
+    let current_volume = state.volume;
+    let volume_slider: Element<'_, Message> = if state.has_audio {
+        slider(0.0..=config::MAX_VOLUME, current_volume, |v| {
+            Message::SetVolume(Volume::new(v))
+        })
+        .width(Length::Fixed(80.0))
+        .step(0.01)
+        .into()
+    } else {
+        slider(0.0..=config::MAX_VOLUME, current_volume, move |_v| {
+            Message::SetVolume(Volume::new(current_volume))
+        })
+        .width(Length::Fixed(80.0))
+        .step(0.01)
+        .style(styles::slider::disabled())
+        .into()
+    };
+
+    // Volume percentage text - grayed when no audio
+    let volume_percent: Element<'_, Message> = if state.has_audio {
+        text(format_volume_percent(state.volume))
+            .size(sizing::ICON_SM)
+            .width(Length::Fixed(40.0))
+            .into()
+    } else {
+        text(format_volume_percent(state.volume))
+            .size(sizing::ICON_SM)
+            .width(Length::Fixed(40.0))
+            .style(styles::slider::disabled_text_style)
+            .into()
+    };
+
+    (volume_button_content, volume_slider, volume_percent)
+}
+
 /// Slider step in seconds (1ms precision).
 /// f64 has ~15 significant digits, so even for 24h videos (86400s),
 /// we have plenty of precision for millisecond accuracy.
@@ -198,77 +295,9 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
     ))
     .size(sizing::ICON_SM);
 
-    // Volume button with tooltip - shows mute icon when muted, disabled when no audio
-    let volume_icon = if state.muted || state.volume == 0.0 {
-        icons::sized(action_icons::video::toolbar::volume_muted(), icon_size)
-    } else {
-        icons::sized(action_icons::video::toolbar::volume(), icon_size)
-    };
-
-    let volume_button_content: Element<'_, Message> = if state.has_audio {
-        // Has audio: normal volume button with mute/unmute functionality
-        let volume_tooltip = if state.muted {
-            ctx.i18n.tr("video-unmute-tooltip")
-        } else {
-            ctx.i18n.tr("video-mute-tooltip")
-        };
-        let volume_button = button(volume_icon)
-            .on_press(Message::ToggleMute)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height));
-
-        // Apply active style when muted (highlighted like fit-to-window button)
-        let styled_button: Element<'_, Message> = if state.muted {
-            volume_button.style(styles::button::selected).into()
-        } else {
-            volume_button.into()
-        };
-        tip(styled_button, volume_tooltip).into()
-    } else {
-        // No audio: disabled button with explanatory tooltip
-        let volume_button = button(volume_icon)
-            .padding(spacing::XS)
-            .width(Length::Shrink)
-            .height(Length::Fixed(button_height))
-            .style(styles::button::disabled());
-        tip(volume_button, ctx.i18n.tr("video-no-audio-tooltip")).into()
-    };
-
-    // Volume slider with percentage display
-    // Disabled when no audio track
-    let current_volume = state.volume; // Copy for closure capture
-    let volume_slider: Element<'_, Message> = if state.has_audio {
-        slider(0.0..=config::MAX_VOLUME, current_volume, |v| {
-            Message::SetVolume(Volume::new(v))
-        })
-        .width(Length::Fixed(80.0))
-        .step(0.01)
-        .into()
-    } else {
-        slider(0.0..=config::MAX_VOLUME, current_volume, move |_v| {
-            // No-op: slider is disabled, but we need a message for type inference
-            Message::SetVolume(Volume::new(current_volume))
-        })
-        .width(Length::Fixed(80.0))
-        .step(0.01)
-        .style(styles::slider::disabled())
-        .into()
-    };
-
-    // Volume percentage text - grayed when no audio
-    let volume_percent: Element<'_, Message> = if state.has_audio {
-        text(format_volume_percent(state.volume))
-            .size(sizing::ICON_SM)
-            .width(Length::Fixed(40.0))
-            .into()
-    } else {
-        text(format_volume_percent(state.volume))
-            .size(sizing::ICON_SM)
-            .width(Length::Fixed(40.0))
-            .style(styles::slider::disabled_text_style)
-            .into()
-    };
+    // Volume controls (button, slider, percentage)
+    let (volume_button_content, volume_slider, volume_percent) =
+        build_volume_controls(&ctx, state, icon_size, button_height);
 
     // More button (overflow menu toggle)
     let more_button_base = button(icons::sized(
@@ -344,6 +373,7 @@ pub fn view<'a>(ctx: ViewContext<'a>, state: &PlaybackState) -> Element<'a, Mess
 }
 
 /// Builds the overflow menu with advanced controls.
+#[allow(clippy::needless_pass_by_value)] // ViewContext is small and consumed
 fn build_overflow_menu<'a>(
     ctx: ViewContext<'a>,
     state: &PlaybackState,
@@ -352,28 +382,15 @@ fn build_overflow_menu<'a>(
 ) -> Element<'a, Message> {
     // Speed down button (disabled at minimum speed)
     let at_min_speed = state.playback_speed <= config::MIN_PLAYBACK_SPEED;
-    let speed_down_content: Element<'_, Message> = if at_min_speed {
-        button(icons::sized(
-            action_icons::video::toolbar::speed_down(),
-            icon_size,
-        ))
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .style(styles::button::disabled())
-        .into()
-    } else {
-        button(icons::sized(
-            action_icons::video::toolbar::speed_down(),
-            icon_size,
-        ))
-        .on_press(Message::DecreasePlaybackSpeed)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .into()
-    };
-    let speed_down_button = tip(speed_down_content, ctx.i18n.tr("video-speed-down-tooltip"));
+    let speed_down_msg = (!at_min_speed).then_some(Message::DecreasePlaybackSpeed);
+    let speed_down_button = tip(
+        toolbar_button(
+            icons::sized(action_icons::video::toolbar::speed_down(), icon_size),
+            speed_down_msg,
+            button_height,
+        ),
+        ctx.i18n.tr("video-speed-down-tooltip"),
+    );
 
     // Speed label (text showing current speed)
     let speed_label = text(format_playback_speed(state.playback_speed))
@@ -382,97 +399,50 @@ fn build_overflow_menu<'a>(
 
     // Speed up button (disabled at maximum speed)
     let at_max_speed = state.playback_speed >= config::MAX_PLAYBACK_SPEED;
-    let speed_up_content: Element<'_, Message> = if at_max_speed {
-        button(icons::sized(
-            action_icons::video::toolbar::speed_up(),
-            icon_size,
-        ))
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .style(styles::button::disabled())
-        .into()
-    } else {
-        button(icons::sized(
-            action_icons::video::toolbar::speed_up(),
-            icon_size,
-        ))
-        .on_press(Message::IncreasePlaybackSpeed)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .into()
-    };
-    let speed_up_button = tip(speed_up_content, ctx.i18n.tr("video-speed-up-tooltip"));
+    let speed_up_msg = (!at_max_speed).then_some(Message::IncreasePlaybackSpeed);
+    let speed_up_button = tip(
+        toolbar_button(
+            icons::sized(action_icons::video::toolbar::speed_up(), icon_size),
+            speed_up_msg,
+            button_height,
+        ),
+        ctx.i18n.tr("video-speed-up-tooltip"),
+    );
 
     // Step backward button (only enabled when paused AND in stepping mode)
-    let step_back_content: Element<'_, Message> = if !state.is_playing && state.can_step_backward {
-        button(icons::sized(
-            action_icons::video::toolbar::step_backward(),
-            icon_size,
-        ))
-        .on_press(Message::StepBackward)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .into()
-    } else {
-        button(icons::sized(
-            action_icons::video::toolbar::step_backward(),
-            icon_size,
-        ))
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .style(styles::button::disabled())
-        .into()
-    };
+    let can_step_back = !state.is_playing && state.can_step_backward;
+    let step_back_msg = can_step_back.then_some(Message::StepBackward);
     let step_back_button = tip(
-        step_back_content,
+        toolbar_button(
+            icons::sized(action_icons::video::toolbar::step_backward(), icon_size),
+            step_back_msg,
+            button_height,
+        ),
         ctx.i18n.tr("video-step-backward-tooltip"),
     );
 
     // Step forward button (only enabled when paused AND not at end of video)
-    let step_forward_content: Element<'_, Message> = if state.can_step_forward {
-        button(icons::sized(
-            action_icons::video::toolbar::step_forward(),
-            icon_size,
-        ))
-        .on_press(Message::StepForward)
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .into()
-    } else {
-        button(icons::sized(
-            action_icons::video::toolbar::step_forward(),
-            icon_size,
-        ))
-        .padding(spacing::XS)
-        .width(Length::Shrink)
-        .height(Length::Fixed(button_height))
-        .style(styles::button::disabled())
-        .into()
-    };
+    let step_forward_msg = state.can_step_forward.then_some(Message::StepForward);
     let step_forward_button = tip(
-        step_forward_content,
+        toolbar_button(
+            icons::sized(action_icons::video::toolbar::step_forward(), icon_size),
+            step_forward_msg,
+            button_height,
+        ),
         ctx.i18n.tr("video-step-forward-tooltip"),
     );
 
-    // Capture frame button
-    let capture_content: Element<'_, Message> = button(icons::sized(
-        action_icons::video::toolbar::capture_frame(),
-        icon_size,
-    ))
-    .on_press(Message::CaptureFrame)
-    .padding(spacing::XS)
-    .width(Length::Shrink)
-    .height(Length::Fixed(button_height))
-    .into();
-    let capture_button = tip(capture_content, ctx.i18n.tr("video-capture-tooltip"));
+    // Capture frame button (always enabled)
+    let capture_button = tip(
+        toolbar_button(
+            icons::sized(action_icons::video::toolbar::capture_frame(), icon_size),
+            Some(Message::CaptureFrame),
+            button_height,
+        ),
+        ctx.i18n.tr("video-capture-tooltip"),
+    );
 
-    // Overflow menu container - align to the right
-    // Layout: [Speed Down] [1x] [Speed Up] | [Step Back] [Step Fwd] [Capture]
+    // Layout: [Space] [Speed Down] [1x] [Speed Up] | [Step Back] [Step Fwd] [Capture]
     let menu_content: Row<'a, Message> = row![
         Space::new().width(Length::Fill),
         speed_down_button,
@@ -491,6 +461,8 @@ fn build_overflow_menu<'a>(
 
 /// Formats duration in MM:SS or HH:MM:SS format.
 fn format_time(seconds: f64) -> String {
+    // Video durations are bounded (practical videos are < u64::MAX seconds)
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let total_secs = seconds.max(0.0) as u64;
     let hours = total_secs / 3600;
     let minutes = (total_secs % 3600) / 60;
@@ -512,7 +484,10 @@ fn format_playback_speed(speed: f64) -> String {
 /// Formats volume as percentage for display.
 /// Rounds to integer for cleaner UI (e.g., "75%" not "75.00%").
 fn format_volume_percent(volume: f32) -> String {
-    format!("{}%", (volume * 100.0).round() as u32)
+    // Volume is 0.0-1.0, so *100 is 0-100 which fits in u32
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let percent = (volume * 100.0).round() as u32;
+    format!("{percent}%")
 }
 
 #[cfg(test)]

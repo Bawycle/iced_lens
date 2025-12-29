@@ -28,21 +28,25 @@ pub struct FrameHistoryMb(u32);
 
 impl FrameHistoryMb {
     /// Creates a new frame history size, clamping to valid range.
+    #[must_use] 
     pub fn new(value: u32) -> Self {
         Self(value.clamp(MIN_FRAME_HISTORY_MB, MAX_FRAME_HISTORY_MB))
     }
 
     /// Returns the value as u32.
+    #[must_use] 
     pub fn value(self) -> u32 {
         self.0
     }
 
     /// Returns true if this is the minimum value.
+    #[must_use] 
     pub fn is_min(self) -> bool {
         self.0 <= MIN_FRAME_HISTORY_MB
     }
 
     /// Returns true if this is the maximum value.
+    #[must_use] 
     pub fn is_max(self) -> bool {
         self.0 >= MAX_FRAME_HISTORY_MB
     }

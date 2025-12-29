@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize tool panel for the editor sidebar.
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
 
 use crate::app::config::{MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT};
 use crate::media::upscale::UpscaleModelStatus;
@@ -127,14 +129,14 @@ pub fn panel<'a>(
         };
 
         // Determine tooltip text when disabled
-        let tooltip_text: Option<String> = if !is_enlargement {
-            Some(ctx.i18n.tr("image-editor-resize-ai-enlargement-only"))
-        } else {
+        let tooltip_text: Option<String> = if is_enlargement {
             match upscale_model_status {
                 UpscaleModelStatus::NotDownloaded => {
                     Some(ctx.i18n.tr("image-editor-resize-ai-model-not-downloaded"))
                 }
                 UpscaleModelStatus::Downloading { progress } => {
+                    // Progress is 0.0-1.0, so *100 is 0-100 which fits in u32
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                     let percent = (*progress * 100.0) as u32;
                     Some(format!(
                         "{} ({}%)",
@@ -152,6 +154,8 @@ pub fn panel<'a>(
                 )),
                 UpscaleModelStatus::Ready => None,
             }
+        } else {
+            Some(ctx.i18n.tr("image-editor-resize-ai-enlargement-only"))
         };
 
         // Wrap in tooltip when disabled, otherwise just show the checkbox
@@ -232,7 +236,10 @@ fn preset_button(percent: f32) -> iced::widget::Button<'static, Message> {
 
 /// Calculate thumbnail display size while preserving aspect ratio.
 fn calculate_thumbnail_size(width: u32, height: u32) -> (f32, f32) {
+    // Image dimensions < 2^24 are exactly representable in f32
+    #[allow(clippy::cast_precision_loss)]
     let w = width as f32;
+    #[allow(clippy::cast_precision_loss)]
     let h = height as f32;
 
     if w <= THUMBNAIL_MAX_SIZE && h <= THUMBNAIL_MAX_SIZE {

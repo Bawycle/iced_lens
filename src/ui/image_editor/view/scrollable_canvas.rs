@@ -6,17 +6,17 @@ use iced::Element;
 
 use super::centered_scrollable;
 
-/// Scrollable ID for the editor canvas (used for snap_to operations).
+/// Scrollable ID for the editor canvas (used for `snap_to` operations).
 pub const EDITOR_CANVAS_SCROLLABLE_ID: &str = "image-editor-canvas-scrollable";
 
 /// Creates a scrollable canvas for the editor.
 ///
 /// Wheel events are blocked to allow zoom via mouse wheel.
-pub fn scrollable_canvas<'a>(
-    image_content: Element<'a, Message>,
+pub fn scrollable_canvas(
+    image_content: Element<'_, Message>,
     image_width: f32,
     image_height: f32,
-) -> Element<'a, Message> {
+) -> Element<'_, Message> {
     centered_scrollable::centered_scrollable(
         image_content,
         image_width,

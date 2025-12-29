@@ -30,7 +30,7 @@ pub fn render<'a>(state: &'a State, ctx: &ViewContext<'a>) -> Element<'a, Messag
     }
 
     let canvas_model = CanvasModel::from_state(state);
-    let canvas = canvas::view(canvas_model, ctx);
+    let canvas = canvas::view(&canvas_model, ctx);
     main_row = main_row.push(canvas);
 
     let content = Column::new().push(toolbar).push(main_row);

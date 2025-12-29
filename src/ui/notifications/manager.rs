@@ -30,6 +30,7 @@ pub struct Manager {
 
 impl Manager {
     /// Creates a new empty notification manager.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -76,7 +77,7 @@ impl Manager {
             .visible
             .iter()
             .filter(|n| n.should_auto_dismiss())
-            .map(|n| n.id())
+            .map(super::notification::Notification::id)
             .collect();
 
         // Dismiss them
@@ -86,10 +87,10 @@ impl Manager {
     }
 
     /// Handles a notification message.
-    pub fn handle_message(&mut self, message: Message) {
+    pub fn handle_message(&mut self, message: &Message) {
         match message {
             Message::Dismiss(id) => {
-                self.dismiss(id);
+                self.dismiss(*id);
             }
             Message::Tick => {
                 self.tick();
@@ -103,16 +104,19 @@ impl Manager {
     }
 
     /// Returns the number of visible notifications.
+    #[must_use] 
     pub fn visible_count(&self) -> usize {
         self.visible.len()
     }
 
     /// Returns the number of queued notifications.
+    #[must_use] 
     pub fn queued_count(&self) -> usize {
         self.queue.len()
     }
 
     /// Returns whether there are any notifications (visible or queued).
+    #[must_use] 
     pub fn has_notifications(&self) -> bool {
         !self.visible.is_empty() || !self.queue.is_empty()
     }
@@ -261,7 +265,7 @@ mod tests {
         let id = notification.id();
         manager.push(notification);
 
-        manager.handle_message(Message::Dismiss(id));
+        manager.handle_message(&Message::Dismiss(id));
         assert_eq!(manager.visible_count(), 0);
     }
 

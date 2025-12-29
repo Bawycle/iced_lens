@@ -16,7 +16,7 @@ pub enum VideoError {
     /// File format is not supported (e.g., unknown extension)
     UnsupportedFormat,
 
-    /// Video codec is not supported by the system's FFmpeg
+    /// Video codec is not supported by the system's `FFmpeg`
     UnsupportedCodec(String),
 
     /// File appears corrupted or has invalid data
@@ -62,6 +62,7 @@ impl VideoError {
     ///
     /// Some error messages contain placeholders like `{ $codec }` or `{ $message }`
     /// that need to be filled with runtime values.
+    #[must_use] 
     pub fn i18n_args(&self) -> Vec<(&'static str, String)> {
         match self {
             VideoError::UnsupportedCodec(codec) => vec![("codec", codec.clone())],
@@ -70,8 +71,9 @@ impl VideoError {
         }
     }
 
-    /// Attempts to parse a raw error message into a specific VideoError type.
+    /// Attempts to parse a raw error message into a specific `VideoError` type.
     /// This is used to categorize errors from FFmpeg/decoder.
+    #[must_use] 
     pub fn from_message(msg: &str) -> Self {
         let msg_lower = msg.to_lowercase();
 

@@ -31,21 +31,25 @@ pub struct PlaybackSpeed(f64);
 
 impl PlaybackSpeed {
     /// Creates a new playback speed, clamping to valid range.
+    #[must_use] 
     pub fn new(speed: f64) -> Self {
         Self(speed.clamp(MIN_PLAYBACK_SPEED, MAX_PLAYBACK_SPEED))
     }
 
     /// Returns the speed value as f64.
+    #[must_use] 
     pub fn value(self) -> f64 {
         self.0
     }
 
     /// Returns true if audio should be auto-muted at this speed.
+    #[must_use] 
     pub fn should_auto_mute(self) -> bool {
         self.0 > PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD
     }
 
     /// Returns the next higher preset speed, or self if at maximum.
+    #[must_use] 
     pub fn increase(self) -> Self {
         let next = PLAYBACK_SPEED_PRESETS
             .iter()
@@ -56,6 +60,7 @@ impl PlaybackSpeed {
     }
 
     /// Returns the next lower preset speed, or self if at minimum.
+    #[must_use] 
     pub fn decrease(self) -> Self {
         let prev = PLAYBACK_SPEED_PRESETS
             .iter()
@@ -67,11 +72,13 @@ impl PlaybackSpeed {
     }
 
     /// Returns true if this is the minimum speed.
+    #[must_use] 
     pub fn is_min(self) -> bool {
         (self.0 - MIN_PLAYBACK_SPEED).abs() < 0.001
     }
 
     /// Returns true if this is the maximum speed.
+    #[must_use] 
     pub fn is_max(self) -> bool {
         (self.0 - MAX_PLAYBACK_SPEED).abs() < 0.001
     }

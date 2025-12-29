@@ -30,26 +30,31 @@ pub struct KeyboardSeekStep(f64);
 
 impl KeyboardSeekStep {
     /// Creates a new keyboard seek step value, clamping to valid range.
+    #[must_use] 
     pub fn new(value: f64) -> Self {
         Self(value.clamp(MIN_KEYBOARD_SEEK_STEP_SECS, MAX_KEYBOARD_SEEK_STEP_SECS))
     }
 
     /// Returns the value as f64.
+    #[must_use] 
     pub fn value(self) -> f64 {
         self.0
     }
 
     /// Returns the step as a Duration.
+    #[must_use] 
     pub fn as_duration(self) -> std::time::Duration {
         std::time::Duration::from_secs_f64(self.0)
     }
 
     /// Returns true if this is the minimum value.
+    #[must_use] 
     pub fn is_min(self) -> bool {
         self.0 <= MIN_KEYBOARD_SEEK_STEP_SECS
     }
 
     /// Returns true if this is the maximum value.
+    #[must_use] 
     pub fn is_max(self) -> bool {
         self.0 >= MAX_KEYBOARD_SEEK_STEP_SECS
     }

@@ -5,8 +5,8 @@
 //! to the UI event loop, delivering frames and playback events.
 //!
 //! Audio is integrated into the playback loop:
-//! - AudioDecoder extracts audio samples from the video file
-//! - AudioOutput plays the samples through the system audio device
+//! - `AudioDecoder` extracts audio samples from the video file
+//! - `AudioOutput` plays the samples through the system audio device
 //! - Synchronization uses audio as the master clock
 
 use super::audio::{AudioDecoder, AudioDecoderCommand, AudioDecoderEvent};
@@ -37,7 +37,7 @@ fn is_animated_webp(path: &PathBuf) -> bool {
 pub struct VideoPlaybackId(u64);
 
 /// Handle for sending commands to the decoder from UI.
-/// This is cloneable and can be stored in the VideoPlayer.
+/// This is cloneable and can be stored in the `VideoPlayer`.
 #[derive(Clone)]
 pub struct DecoderCommandSender {
     video_tx: mpsc::UnboundedSender<DecoderCommand>,
@@ -49,6 +49,10 @@ impl DecoderCommandSender {
     ///
     /// Note: Play/Pause/Seek/Stop commands are forwarded to the audio decoder
     /// internally by the subscription, not through this sender.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the video decoder channel is closed.
     pub fn send(&self, command: DecoderCommand) -> Result<(), String> {
         // Send to video decoder - subscription will forward to audio decoder
         self.video_tx
@@ -57,6 +61,10 @@ impl DecoderCommandSender {
     }
 
     /// Sets the audio volume.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio decoder channel is closed.
     pub fn set_volume(&self, volume: super::Volume) -> Result<(), String> {
         if let Some(ref audio_tx) = self.audio_tx {
             audio_tx
@@ -67,6 +75,10 @@ impl DecoderCommandSender {
     }
 
     /// Sets the mute state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the audio decoder channel is closed.
     pub fn set_muted(&self, muted: bool) -> Result<(), String> {
         if let Some(ref audio_tx) = self.audio_tx {
             audio_tx
@@ -77,6 +89,7 @@ impl DecoderCommandSender {
     }
 
     /// Returns true if audio is available.
+    #[must_use] 
     pub fn has_audio(&self) -> bool {
         self.audio_tx.is_some()
     }
@@ -142,7 +155,7 @@ impl NormalizationGain {
     }
 }
 
-/// Abstraction over different video decoder types (FFmpeg vs WebP).
+/// Abstraction over different video decoder types (`FFmpeg` vs WebP).
 enum VideoDecoderKind {
     /// FFmpeg-based decoder for regular videos (MP4, AVI, etc.) and animated GIFs.
     Ffmpeg(AsyncDecoder),
@@ -337,6 +350,8 @@ async fn run_playback_loop(
                                 let analyzer = LufsAnalyzer::default();
                                 let gain_db = analyzer.calculate_gain(cached_lufs);
                                 let gain_linear = LufsAnalyzer::db_to_linear(gain_db);
+                                // Audio gain is typically ~1.0, well within f32 range
+                                #[allow(clippy::cast_possible_truncation)]
                                 gain_clone.set(gain_linear as f32);
                                 return;
                             }
@@ -344,21 +359,20 @@ async fn run_playback_loop(
 
                         // Analyze LUFS (this is slow, ~1-5 seconds)
                         let analyzer = LufsAnalyzer::default();
-                        match analyzer.analyze_file(&path_clone) {
-                            Ok(measured_lufs) => {
-                                // Cache the result
-                                if let Some(ref cache) = cache_clone {
-                                    cache.insert(path_str, measured_lufs);
-                                }
+                        if let Ok(measured_lufs) = analyzer.analyze_file(&path_clone) {
+                            // Cache the result
+                            if let Some(ref cache) = cache_clone {
+                                cache.insert(path_str, measured_lufs);
+                            }
 
-                                // Calculate and apply gain
-                                let gain_db = analyzer.calculate_gain(measured_lufs);
-                                let gain_linear = LufsAnalyzer::db_to_linear(gain_db);
-                                gain_clone.set(gain_linear as f32);
-                            }
-                            Err(_) => {
-                                // Keep default gain of 1.0
-                            }
+                            // Calculate and apply gain
+                            let gain_db = analyzer.calculate_gain(measured_lufs);
+                            let gain_linear = LufsAnalyzer::db_to_linear(gain_db);
+                            // Audio gain is typically ~1.0, well within f32 range
+                            #[allow(clippy::cast_possible_truncation)]
+                            gain_clone.set(gain_linear as f32);
+                        } else {
+                            // Keep default gain of 1.0
                         }
                     });
                 }
@@ -415,12 +429,8 @@ async fn run_playback_loop(
                                         // This allows audio to continue if video was playing
                                         let _ = audio_out.clear_buffer();
                                     }
-                                    DecoderCommand::StepFrame => {
-                                        // No audio action needed for frame stepping
-                                    }
-                                    DecoderCommand::StepBackward => {
-                                        // No audio action needed for backward stepping
-                                    }
+                                    // No audio action needed for frame stepping
+                                    DecoderCommand::StepFrame | DecoderCommand::StepBackward => {}
                                     DecoderCommand::SetPlaybackSpeed { .. } => {
                                         // Clear audio buffer to prevent desync from old-speed samples
                                         let _ = audio_out.clear_buffer();
@@ -582,7 +592,7 @@ async fn run_playback_loop(
 /// This subscription manages the async decoder lifecycle and translates
 /// decoder events into Iced messages.
 ///
-/// The session_id ensures each playback session gets a unique subscription ID,
+/// The `session_id` ensures each playback session gets a unique subscription ID,
 /// allowing the subscription to be recreated when playback restarts.
 ///
 /// The subscription sends a `Started` message with a `DecoderCommandSender` that

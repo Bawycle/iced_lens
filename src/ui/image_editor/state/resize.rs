@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Resize tool state and helpers.
+//!
+//! Uses f32 for scale factors and u32 for pixel dimensions.
+//! Precision loss in conversions is acceptable for typical image sizes.
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
 
 use crate::media::{image_transform, ImageData, ResizeScale};
 use crate::ui::image_editor::{State, Transformation};
@@ -74,6 +80,7 @@ impl ResizeState {
     /// Returns true if the target dimensions differ from the current working image.
     /// The overlay stores the current image dimensions (updated after each resize).
     /// Used to determine whether the "Apply" button should be enabled.
+    #[must_use] 
     pub fn has_pending_changes(&self) -> bool {
         self.width != self.overlay.original_width || self.height != self.overlay.original_height
     }

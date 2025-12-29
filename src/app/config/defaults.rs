@@ -106,7 +106,7 @@ pub const MAX_FRAME_HISTORY_MB: u32 = 512;
 // AI/Deblur Defaults
 // ==========================================================================
 
-/// Default URL for downloading the NAFNet ONNX deblurring model.
+/// Default URL for downloading the `NAFNet` ONNX deblurring model.
 pub const DEFAULT_DEBLUR_MODEL_URL: &str =
     "https://huggingface.co/opencv/deblurring_nafnet/resolve/main/deblurring_nafnet_2025may.onnx";
 
@@ -237,9 +237,8 @@ const _: () = {
     let mut found_default = false;
     let mut j = 0;
     while j < PLAYBACK_SPEED_PRESETS.len() {
-        // Use integer comparison to avoid floating point issues
-        // 1.0 * 100 = 100, comparing integers
-        if (PLAYBACK_SPEED_PRESETS[j] * 100.0) as i32 == (DEFAULT_PLAYBACK_SPEED * 100.0) as i32 {
+        // Use epsilon comparison for floating point equality
+        if (PLAYBACK_SPEED_PRESETS[j] - DEFAULT_PLAYBACK_SPEED).abs() < f64::EPSILON {
             found_default = true;
         }
         j += 1;

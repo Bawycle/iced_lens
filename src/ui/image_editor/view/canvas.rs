@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Image canvas composition with overlays.
+#![allow(clippy::cast_precision_loss)]
 
 use crate::config::BackgroundTheme;
 use crate::media::ImageData;
@@ -64,7 +65,82 @@ fn calculate_centering_padding(content_size: Size, available: Size) -> Padding {
     }
 }
 
-pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Message> {
+/// Builds the processing overlay with spinner (used during deblur/upscale).
+fn build_processing_overlay<'a>(
+    scaled_width: f32,
+    scaled_height: f32,
+    spinner_rotation: f32,
+    processing_text: String,
+) -> Container<'a, Message> {
+    let spinner =
+        AnimatedSpinner::new(theme::overlay_arrow_light_color(), spinner_rotation).into_element();
+
+    let loading_text = text(processing_text).size(typography::BODY_LG);
+
+    let loading_content = Column::new()
+        .spacing(spacing::SM)
+        .align_x(Horizontal::Center)
+        .push(spinner)
+        .push(loading_text);
+
+    let loading_overlay = container(loading_content)
+        .padding(spacing::MD)
+        .style(move |_theme: &Theme| container::Style {
+            background: Some(Background::Color(Color {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: opacity::OVERLAY_MEDIUM,
+            })),
+            border: iced::Border {
+                radius: radius::MD.into(),
+                ..Default::default()
+            },
+            text_color: Some(theme::overlay_arrow_light_color()),
+            ..Default::default()
+        });
+
+    container(loading_overlay)
+        .width(Length::Fixed(scaled_width))
+        .height(Length::Fixed(scaled_height))
+        .align_x(Horizontal::Center)
+        .align_y(iced::alignment::Vertical::Center)
+}
+
+/// Determines cursor interaction based on current state.
+fn determine_cursor_interaction(crop_active: bool, is_dragging: bool) -> mouse::Interaction {
+    if crop_active {
+        mouse::Interaction::default()
+    } else if is_dragging {
+        mouse::Interaction::Grabbing
+    } else {
+        mouse::Interaction::Grab
+    }
+}
+
+/// Applies the background theme to the canvas surface.
+fn apply_background<'a>(
+    canvas_content: impl Into<Element<'a, Message>>,
+    background_theme: BackgroundTheme,
+) -> Element<'a, Message> {
+    let surface = container(canvas_content)
+        .width(Length::Fill)
+        .height(Length::Fill);
+
+    if theme::is_checkerboard(background_theme) {
+        checkerboard::wrap(surface)
+    } else {
+        let bg_color = match background_theme {
+            BackgroundTheme::Light => theme::viewer_light_surface_color(),
+            BackgroundTheme::Dark => theme::viewer_dark_surface_color(),
+            BackgroundTheme::Checkerboard => unreachable!(),
+        };
+
+        surface.style(theme::editor_canvas_style(bg_color)).into()
+    }
+}
+
+pub fn view<'a>(model: &CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let background_theme = ctx.background_theme;
 
     // Clone/copy values needed inside responsive closure
@@ -78,9 +154,9 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
     let upscale_processing = model.upscale_processing;
     let spinner_rotation = model.deblur_state.spinner_rotation;
     let processing_text = if deblur_processing {
-        ctx.i18n.tr("image-editor-deblur-processing").to_string()
+        ctx.i18n.tr("image-editor-deblur-processing").clone()
     } else if upscale_processing {
-        ctx.i18n.tr("image-editor-upscale-processing").to_string()
+        ctx.i18n.tr("image-editor-upscale-processing").clone()
     } else {
         String::new()
     };
@@ -118,43 +194,8 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
             .height(Length::Fixed(scaled_height));
 
         let image_with_overlay: Element<'_, Message> = if is_processing {
-            // Processing overlay (deblur or upscale)
-            let spinner =
-                AnimatedSpinner::new(theme::overlay_arrow_light_color(), spinner_rotation)
-                    .into_element();
-
-            let loading_text = text(processing_text.clone()).size(typography::BODY_LG);
-
-            let loading_content = Column::new()
-                .spacing(spacing::SM)
-                .align_x(Horizontal::Center)
-                .push(spinner)
-                .push(loading_text);
-
-            let loading_overlay =
-                container(loading_content)
-                    .padding(spacing::MD)
-                    .style(move |_theme: &Theme| container::Style {
-                        background: Some(Background::Color(Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: opacity::OVERLAY_MEDIUM,
-                        })),
-                        border: iced::Border {
-                            radius: radius::MD.into(),
-                            ..Default::default()
-                        },
-                        text_color: Some(theme::overlay_arrow_light_color()),
-                        ..Default::default()
-                    });
-
-            let overlay = container(loading_overlay)
-                .width(Length::Fixed(scaled_width))
-                .height(Length::Fixed(scaled_height))
-                .align_x(Horizontal::Center)
-                .align_y(iced::alignment::Vertical::Center);
-
+            let overlay =
+                build_processing_overlay(scaled_width, scaled_height, spinner_rotation, processing_text.clone());
             Stack::new().push(image_widget).push(overlay).into()
         } else if crop_visible {
             Stack::new()
@@ -196,15 +237,7 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
         scrollable_canvas::scrollable_canvas(centered_content.into(), scaled_width, scaled_height)
     });
 
-    // Determine cursor interaction for pan
-    // Show grab cursor when not in crop mode (crop has its own cursor handling)
-    let cursor_interaction = if crop_active {
-        mouse::Interaction::default()
-    } else if is_dragging {
-        mouse::Interaction::Grabbing
-    } else {
-        mouse::Interaction::Grab
-    };
+    let cursor_interaction = determine_cursor_interaction(crop_active, is_dragging);
 
     // Wrap canvas in mouse_area for cursor feedback and tracking
     let canvas_with_cursor = mouse_area(canvas_content)
@@ -212,24 +245,5 @@ pub fn view<'a>(model: CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, Me
         .on_move(|position| Message::Canvas(CanvasMessage::CursorMoved { position }))
         .on_exit(Message::Canvas(CanvasMessage::CursorLeft));
 
-    // Apply background
-    let build_surface = || {
-        container(canvas_with_cursor)
-            .width(Length::Fill)
-            .height(Length::Fill)
-    };
-
-    if theme::is_checkerboard(background_theme) {
-        checkerboard::wrap(build_surface())
-    } else {
-        let bg_color = match background_theme {
-            BackgroundTheme::Light => theme::viewer_light_surface_color(),
-            BackgroundTheme::Dark => theme::viewer_dark_surface_color(),
-            BackgroundTheme::Checkerboard => unreachable!(),
-        };
-
-        build_surface()
-            .style(theme::editor_canvas_style(bg_color))
-            .into()
-    }
+    apply_background(canvas_with_cursor, background_theme)
 }
