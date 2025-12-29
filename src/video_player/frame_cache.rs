@@ -119,7 +119,10 @@ pub struct CacheStats {
 
 impl CacheStats {
     /// Returns the cache hit rate as a percentage (0.0 - 100.0).
-    #[must_use] 
+    // Allow cast_precision_loss: cache statistics - exact precision not required
+    // for percentages. Hit/miss counts are unlikely to exceed f64 mantissa (2^52).
+    #[allow(clippy::cast_precision_loss)]
+    #[must_use]
     pub fn hit_rate(&self) -> f64 {
         let total = self.hits + self.misses;
         if total == 0 {

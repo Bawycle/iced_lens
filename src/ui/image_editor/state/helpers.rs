@@ -36,15 +36,15 @@ impl State {
     }
 
     pub(crate) fn sync_resize_state_dimensions(&mut self) {
-        self.resize_state.sync_from_image(&self.current_image);
+        self.resize.sync_from_image(&self.current_image);
     }
 
     pub(crate) fn sync_crop_state_dimensions(&mut self) {
         // Reset crop rectangle to cover entire image after rotation
-        self.crop_state.x = 0;
-        self.crop_state.y = 0;
-        self.crop_state.width = self.current_image.width;
-        self.crop_state.height = self.current_image.height;
+        self.crop.x = 0;
+        self.crop.y = 0;
+        self.crop.width = self.current_image.width;
+        self.crop.height = self.current_image.height;
 
         // Update crop base dimensions if crop tool is active
         if matches!(self.active_tool, Some(EditorTool::Crop)) {
@@ -72,7 +72,7 @@ impl State {
     pub(crate) fn commit_active_tool_changes(&mut self) {
         if matches!(self.active_tool, Some(EditorTool::Crop))
             && self.crop_modified
-            && self.crop_state.overlay.visible
+            && self.crop.overlay.visible
         {
             self.finalize_crop_overlay();
         }

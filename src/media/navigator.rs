@@ -17,6 +17,9 @@ use std::path::{Path, PathBuf};
 /// This struct contains all the information needed by the viewer to render
 /// navigation controls without needing direct access to the media list.
 /// It acts as a snapshot of the current navigation state.
+// Allow excessive bools: read-only UI snapshot with orthogonal capability flags.
+// has_next/has_previous differ from at_first/at_last due to wrap-around logic.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NavigationInfo {
     /// Whether there is a next media to navigate to.

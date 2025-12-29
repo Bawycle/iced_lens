@@ -82,6 +82,12 @@ impl WebpAnimDecoder {
     }
 
     /// Main decoder loop running in a blocking thread.
+    // Allow too_many_lines: decoder loop with command handling and frame pacing.
+    // Marginal benefit from extraction (131 lines vs 100 limit).
+    // Allow similar_names: `decoder` vs `decoded` is intentional -
+    // they represent the decoder object and its decoded output respectively.
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::similar_names)]
     #[allow(clippy::needless_pass_by_value)] // Vec and Sender are consumed
     fn decoder_loop_blocking(
         webp_data: Vec<u8>,
@@ -245,7 +251,6 @@ impl WebpAnimDecoder {
             }
 
             // Send frame event
-            #[allow(clippy::similar_names)] // decoder vs decoded is intentional
             let decoded = DecodedFrame {
                 rgba_data: Arc::new(rgba_data.clone()),
                 width,
@@ -280,6 +285,8 @@ impl WebpAnimDecoder {
     /// # Errors
     ///
     /// Returns an error if the file cannot be read or is not a valid WebP.
+    // Allow cast_precision_loss: WebP animations are short - frame count easily fits in f64.
+    #[allow(clippy::cast_precision_loss)]
     pub fn get_metadata<P: AsRef<Path>>(webp_path: P) -> Result<WebpMetadata> {
         let webp_data = std::fs::read(webp_path.as_ref())
             .map_err(|e| Error::Io(format!("Failed to read WebP file: {e}")))?;

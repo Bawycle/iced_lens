@@ -119,7 +119,7 @@ impl ResizeOverlay {
 
 impl State {
     pub(crate) fn hide_resize_overlay(&mut self) {
-        self.resize_state.overlay.visible = false;
+        self.resize.overlay.visible = false;
     }
 
     pub(crate) fn sidebar_scale_changed(&mut self, percent: f32) {
@@ -145,8 +145,8 @@ impl State {
     /// Returns the target dimensions for the pending resize operation.
     pub fn pending_resize_dimensions(&self) -> (u32, u32) {
         (
-            self.resize_state.width.max(1),
-            self.resize_state.height.max(1),
+            self.resize.width.max(1),
+            self.resize.height.max(1),
         )
     }
 
@@ -166,7 +166,7 @@ impl State {
     /// This is called when the async AI upscaling task completes.
     pub fn apply_upscale_resize_result(&mut self, result: image_rs::DynamicImage) {
         // Clear processing state
-        self.resize_state.is_upscale_processing = false;
+        self.resize.is_upscale_processing = false;
 
         // Record the transformation for undo/redo
         self.record_transformation(Transformation::Resize {
@@ -187,29 +187,29 @@ impl State {
         self.preview_image = None;
 
         // Update overlay with new dimensions
-        self.resize_state
+        self.resize
             .overlay
             .set_original_dimensions(self.current_image.width, self.current_image.height);
     }
 
     /// Clears the upscale processing state (called on error or fallback).
     pub fn clear_upscale_processing(&mut self) {
-        self.resize_state.is_upscale_processing = false;
+        self.resize.is_upscale_processing = false;
     }
 
     fn set_resize_percent(&mut self, percent: f32) {
         let scale = ResizeScale::new(percent);
-        self.resize_state.scale = scale;
+        self.resize.scale = scale;
         let width = (self.base_width() * scale.as_factor()).round().max(1.0) as u32;
         let height = (self.base_height() * scale.as_factor()).round().max(1.0) as u32;
 
-        if self.resize_state.lock_aspect {
+        if self.resize.lock_aspect {
             self.set_width_preserving_aspect(width);
         } else {
-            self.resize_state.width = width;
-            self.resize_state.height = height;
-            self.resize_state.width_input = width.to_string();
-            self.resize_state.height_input = height.to_string();
+            self.resize.width = width;
+            self.resize.height = height;
+            self.resize.width_input = width.to_string();
+            self.resize.height_input = height.to_string();
         }
 
         self.update_resize_preview();
@@ -218,21 +218,21 @@ impl State {
     fn handle_width_input_change(&mut self, value: String) {
         // Store the raw input value and mark as dirty
         // Calculation happens on submit, blur (via commit_dirty), or other actions
-        self.resize_state.width_input = value;
-        self.resize_state.dirty_field = DirtyField::Width;
+        self.resize.width_input = value;
+        self.resize.dirty_field = DirtyField::Width;
     }
 
     fn handle_height_input_change(&mut self, value: String) {
         // Store the raw input value and mark as dirty
         // Calculation happens on submit, blur (via commit_dirty), or other actions
-        self.resize_state.height_input = value;
-        self.resize_state.dirty_field = DirtyField::Height;
+        self.resize.height_input = value;
+        self.resize.dirty_field = DirtyField::Height;
     }
 
     /// Commits any pending (dirty) input field changes.
     /// Call this before any action that depends on dimension values.
     pub(crate) fn commit_dirty_resize_input(&mut self) {
-        match self.resize_state.dirty_field {
+        match self.resize.dirty_field {
             DirtyField::Width => self.commit_width_input(),
             DirtyField::Height => self.commit_height_input(),
             DirtyField::None => {}
@@ -240,46 +240,46 @@ impl State {
     }
 
     fn commit_width_input(&mut self) {
-        self.resize_state.dirty_field = DirtyField::None;
+        self.resize.dirty_field = DirtyField::None;
 
-        if let Some(width) = parse_dimension_input(&self.resize_state.width_input) {
+        if let Some(width) = parse_dimension_input(&self.resize.width_input) {
             let width = width.max(1);
-            self.resize_state.width = width;
-            self.resize_state.width_input = width.to_string();
+            self.resize.width = width;
+            self.resize.width_input = width.to_string();
 
-            if self.resize_state.lock_aspect {
-                let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
+            if self.resize.lock_aspect {
+                let aspect = self.resize.original_aspect.max(f32::EPSILON);
                 let height = (width as f32 / aspect).round().max(1.0) as u32;
-                self.resize_state.height = height;
-                self.resize_state.height_input = height.to_string();
+                self.resize.height = height;
+                self.resize.height_input = height.to_string();
             }
             self.update_scale_percent_from_width();
             self.update_resize_preview();
         } else {
             // Invalid input: restore from current width value
-            self.resize_state.width_input = self.resize_state.width.to_string();
+            self.resize.width_input = self.resize.width.to_string();
         }
     }
 
     fn commit_height_input(&mut self) {
-        self.resize_state.dirty_field = DirtyField::None;
+        self.resize.dirty_field = DirtyField::None;
 
-        if let Some(height) = parse_dimension_input(&self.resize_state.height_input) {
+        if let Some(height) = parse_dimension_input(&self.resize.height_input) {
             let height = height.max(1);
-            self.resize_state.height = height;
-            self.resize_state.height_input = height.to_string();
+            self.resize.height = height;
+            self.resize.height_input = height.to_string();
 
-            if self.resize_state.lock_aspect {
-                let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
+            if self.resize.lock_aspect {
+                let aspect = self.resize.original_aspect.max(f32::EPSILON);
                 let width = (height as f32 * aspect).round().max(1.0) as u32;
-                self.resize_state.width = width;
-                self.resize_state.width_input = width.to_string();
+                self.resize.width = width;
+                self.resize.width_input = width.to_string();
             }
             self.update_scale_percent_from_width();
             self.update_resize_preview();
         } else {
             // Invalid input: restore from current height value
-            self.resize_state.height_input = self.resize_state.height.to_string();
+            self.resize.height_input = self.resize.height.to_string();
         }
     }
 
@@ -292,9 +292,9 @@ impl State {
     }
 
     fn toggle_resize_lock(&mut self) {
-        self.resize_state.lock_aspect = !self.resize_state.lock_aspect;
-        if self.resize_state.lock_aspect {
-            let width = self.resize_state.width;
+        self.resize.lock_aspect = !self.resize.lock_aspect;
+        if self.resize.lock_aspect {
+            let width = self.resize.width;
             self.set_width_preserving_aspect(width);
         }
         self.update_resize_preview();
@@ -302,12 +302,12 @@ impl State {
 
     fn set_width_preserving_aspect(&mut self, width: u32) {
         let width = width.max(1);
-        let aspect = self.resize_state.original_aspect.max(f32::EPSILON);
+        let aspect = self.resize.original_aspect.max(f32::EPSILON);
         let height = (width as f32 / aspect).round().max(1.0) as u32;
-        self.resize_state.width = width;
-        self.resize_state.height = height;
-        self.resize_state.width_input = width.to_string();
-        self.resize_state.height_input = height.to_string();
+        self.resize.width = width;
+        self.resize.height = height;
+        self.resize.width_input = width.to_string();
+        self.resize.height_input = height.to_string();
     }
 
     fn update_scale_percent_from_width(&mut self) {
@@ -315,21 +315,21 @@ impl State {
         if base_width <= 0.0 {
             return;
         }
-        let percent = (self.resize_state.width as f32 / base_width) * 100.0;
+        let percent = (self.resize.width as f32 / base_width) * 100.0;
         let scale = ResizeScale::new(percent);
         // If clamping changed the value, recalculate dimensions
         if (scale.value() - percent).abs() > f32::EPSILON {
             self.set_resize_percent(scale.value());
         } else {
-            self.resize_state.scale = scale;
+            self.resize.scale = scale;
             self.update_resize_preview();
         }
     }
 
     fn apply_resize_dimensions(&mut self) {
         // Note: commit_dirty_resize_input is called before this method in routing
-        let target_width = self.resize_state.width.max(1);
-        let target_height = self.resize_state.height.max(1);
+        let target_width = self.resize.width.max(1);
+        let target_height = self.resize.height.max(1);
         if target_width == self.current_image.width && target_height == self.current_image.height {
             return;
         }
@@ -342,14 +342,14 @@ impl State {
             move |image| image_transform::resize(image, target_width, target_height),
         );
 
-        self.resize_state
+        self.resize
             .overlay
             .set_original_dimensions(self.current_image.width, self.current_image.height);
     }
 
     fn update_resize_preview(&mut self) {
-        let target_width = self.resize_state.width.max(1);
-        let target_height = self.resize_state.height.max(1);
+        let target_width = self.resize.width.max(1);
+        let target_height = self.resize.height.max(1);
         if target_width == self.current_image.width && target_height == self.current_image.height {
             self.preview_image = None;
             return;

@@ -46,6 +46,9 @@ pub struct ViewContext<'a> {
 ///
 /// This struct groups all configuration options to avoid functions with too many arguments.
 /// Use `StateConfig::default()` for sensible defaults, then customize as needed.
+// Allow excessive bools: independent feature toggles in configuration struct.
+// Each bool enables/disables a distinct, independent feature.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct StateConfig {
     pub zoom_step_percent: f32,
@@ -98,6 +101,8 @@ impl Default for StateConfig {
 }
 
 /// Local UI state for the settings screen.
+// Allow excessive bools: mirrors StateConfig's feature toggles for UI editing.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct State {
     background_theme: BackgroundTheme,
@@ -544,6 +549,9 @@ impl State {
     }
 
     /// Build the Display section (Background, Zoom step, Sort order).
+    // Allow too_many_lines: declarative UI section with multiple settings.
+    // Linear composition of themed widgets without complex logic.
+    #[allow(clippy::too_many_lines)]
     fn build_display_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         // Background selection
         let background_row = build_toggle_button_row(
@@ -680,6 +688,9 @@ impl State {
     }
 
     /// Build the Video section (Autoplay, Audio normalization, Frame cache).
+    // Allow too_many_lines: declarative UI section for video settings.
+    // All settings logically grouped together, extraction adds indirection.
+    #[allow(clippy::too_many_lines)]
     fn build_video_section<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         // Video autoplay toggle
         let autoplay_row = build_toggle_button_row(
@@ -856,6 +867,9 @@ impl State {
     }
 
     /// Build the deblur subsection within the AI section.
+    // Allow too_many_lines: declarative UI subsection for AI deblur feature.
+    // Model status handling and toggle widgets logically grouped.
+    #[allow(clippy::too_many_lines)]
     fn build_deblur_subsection<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         // Determine if an operation is in progress (downloading or validating)
         let is_busy = matches!(
@@ -990,6 +1004,9 @@ impl State {
     }
 
     /// Build the upscale subsection within the AI section.
+    // Allow too_many_lines: declarative UI subsection for AI upscale feature.
+    // Model status handling and toggle widgets logically grouped.
+    #[allow(clippy::too_many_lines)]
     fn build_upscale_subsection<'a>(&'a self, ctx: &ViewContext<'a>) -> Element<'a, Message> {
         // Determine if an operation is in progress (downloading or validating)
         let is_busy = matches!(

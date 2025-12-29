@@ -86,6 +86,7 @@ impl<Message> canvas::Program<Message> for AnimatedSpinner {
 
                 // Draw arc using multiple small line segments for smooth appearance
                 let segments = 30;
+                #[allow(clippy::cast_precision_loss)] // segments=30, i∈[1,30] - well within f32 precision
                 for i in 1..=segments {
                     let t = i as f32 / segments as f32;
                     let angle = start_angle + (end_angle - start_angle) * t;

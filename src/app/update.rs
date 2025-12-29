@@ -118,7 +118,7 @@ pub struct UpdateContext<'a> {
     pub current_metadata: &'a mut Option<MediaMetadata>,
     pub metadata_editor_state: &'a mut Option<MetadataEditorState>,
     pub help_state: &'a mut help::State,
-    pub app_state: &'a mut super::persisted_state::AppState,
+    pub persisted: &'a mut super::persisted_state::AppState,
     pub notifications: &'a mut notifications::Manager,
 }
 
@@ -166,8 +166,8 @@ pub fn handle_viewer_message(
             *ctx.current_metadata = media::metadata::extract_metadata(path);
 
             // Remember the directory for next time and persist
-            ctx.app_state.set_last_open_directory_from_file(path);
-            if let Some(key) = ctx.app_state.save() {
+            ctx.persisted.set_last_open_directory_from_file(path);
+            if let Some(key) = ctx.persisted.save() {
                 ctx.notifications
                     .push(notifications::Notification::warning(&key));
             }
@@ -217,7 +217,7 @@ pub fn handle_viewer_message(
             Task::none()
         }
         component::Effect::OpenFileDialog => {
-            handle_open_file_dialog(ctx.app_state.last_open_directory.clone())
+            handle_open_file_dialog(ctx.persisted.last_open_directory.clone())
         }
         component::Effect::ShowErrorNotification { key, args } => {
             let mut notification = notifications::Notification::error(key);
@@ -519,8 +519,8 @@ pub fn handle_settings_message(
         }
         SettingsEvent::DisableDeblur => {
             // User disabled the feature - persist the state and delete the model
-            ctx.app_state.enable_deblur = false;
-            if let Some(key) = ctx.app_state.save() {
+            ctx.persisted.enable_deblur = false;
+            if let Some(key) = ctx.persisted.save() {
                 ctx.notifications
                     .push(notifications::Notification::warning(&key));
             }
@@ -620,8 +620,8 @@ pub fn handle_settings_message(
             Task::stream(download_stream)
         }
         SettingsEvent::DisableUpscale => {
-            ctx.app_state.enable_upscale = false;
-            if let Some(key) = ctx.app_state.save() {
+            ctx.persisted.enable_upscale = false;
+            if let Some(key) = ctx.persisted.save() {
                 ctx.notifications
                     .push(notifications::Notification::warning(&key));
             }
@@ -694,7 +694,7 @@ pub fn handle_editor_message(
         }
         ImageEditorEvent::SaveAsRequested => {
             let editor_state = ctx.image_editor.as_ref().expect("editor state exists");
-            let last_dir = ctx.app_state.last_save_directory.clone();
+            let last_dir = ctx.persisted.last_save_directory.clone();
             handle_save_as_dialog(editor_state, last_dir)
         }
         ImageEditorEvent::DeblurRequested => handle_deblur_request(ctx),
@@ -757,7 +757,7 @@ fn handle_upscale_resize_request(
     };
 
     // Check if AI upscaling should be used
-    let use_ai_upscale = ctx.app_state.enable_upscale
+    let use_ai_upscale = ctx.persisted.enable_upscale
         && matches!(
             ctx.settings.upscale_model_status(),
             media::upscale::UpscaleModelStatus::Ready
@@ -1031,7 +1031,7 @@ pub fn handle_metadata_panel_message(
             }
 
             // Set initial directory from app state
-            let dialog = if let Some(dir) = ctx.app_state.last_save_directory.as_ref() {
+            let dialog = if let Some(dir) = ctx.persisted.last_save_directory.as_ref() {
                 dialog.set_directory(dir)
             } else {
                 dialog

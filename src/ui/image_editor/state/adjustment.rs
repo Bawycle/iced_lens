@@ -71,20 +71,20 @@ impl AdjustmentState {
 impl State {
     /// Handle brightness slider change with live preview.
     pub(crate) fn sidebar_brightness_changed(&mut self, value: i32) {
-        self.adjustment_state.brightness = AdjustmentPercent::new(value);
+        self.adjustment.brightness = AdjustmentPercent::new(value);
         self.update_adjustment_preview();
     }
 
     /// Handle contrast slider change with live preview.
     pub(crate) fn sidebar_contrast_changed(&mut self, value: i32) {
-        self.adjustment_state.contrast = AdjustmentPercent::new(value);
+        self.adjustment.contrast = AdjustmentPercent::new(value);
         self.update_adjustment_preview();
     }
 
     /// Apply current adjustments to the image history.
     pub(crate) fn sidebar_apply_adjustments(&mut self) {
-        let brightness = self.adjustment_state.brightness;
-        let contrast = self.adjustment_state.contrast;
+        let brightness = self.adjustment.brightness;
+        let contrast = self.adjustment.contrast;
 
         // Only apply if there are actual changes
         if brightness.is_neutral() && contrast.is_neutral() {
@@ -110,20 +110,20 @@ impl State {
         }
 
         // Reset sliders after applying
-        self.adjustment_state.reset();
+        self.adjustment.reset();
         self.preview_image = None;
     }
 
     /// Reset adjustments and clear preview.
     pub(crate) fn sidebar_reset_adjustments(&mut self) {
-        self.adjustment_state.reset();
+        self.adjustment.reset();
         self.preview_image = None;
     }
 
     /// Update the preview image with current adjustment values.
     fn update_adjustment_preview(&mut self) {
-        let brightness = self.adjustment_state.brightness;
-        let contrast = self.adjustment_state.contrast;
+        let brightness = self.adjustment.brightness;
+        let contrast = self.adjustment.contrast;
 
         // No adjustments = no preview needed
         if brightness.is_neutral() && contrast.is_neutral() {
@@ -152,20 +152,20 @@ impl State {
     /// Prepare adjustment tool when selected.
     pub(crate) fn prepare_adjustment_tool(&mut self) {
         // Reset to defaults when opening the tool
-        self.adjustment_state.reset();
+        self.adjustment.reset();
         self.preview_image = None;
     }
 
     /// Teardown adjustment tool when deselected.
     pub(crate) fn teardown_adjustment_tool(&mut self) {
         // Clear any pending preview
-        self.adjustment_state.reset();
+        self.adjustment.reset();
         self.preview_image = None;
     }
 
     /// Commit pending adjustment changes (called when switching tools).
     pub(crate) fn commit_adjustment_changes(&mut self) {
-        if self.adjustment_state.has_changes() {
+        if self.adjustment.has_changes() {
             self.sidebar_apply_adjustments();
         }
     }

@@ -77,8 +77,11 @@ pub fn pts_to_micros(pts_secs: f64) -> i64 {
 /// assert_eq!(micros_to_pts(1_000_000), 1.0);
 /// assert_eq!(micros_to_pts(500_000), 0.5);
 /// ```
+// Allow cast_precision_loss: video timestamps - millisecond precision is sufficient.
+// f64 mantissa (52 bits) covers practical video durations with ms precision.
+#[allow(clippy::cast_precision_loss)]
 #[inline]
-#[must_use] 
+#[must_use]
 pub fn micros_to_pts(micros: i64) -> f64 {
     micros as f64 / MICROS_PER_SECOND
 }

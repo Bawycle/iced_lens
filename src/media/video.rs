@@ -71,6 +71,9 @@ pub struct VideoMetadata {
 ///
 /// Returns an error if `FFmpeg` initialization fails, the video file cannot be
 /// opened, no video stream is found, or frame decoding fails.
+// Allow similar_names: `decoder` vs `decoded` is intentional -
+// they represent the decoder object and its decoded output respectively.
+#[allow(clippy::similar_names)]
 pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
     // Initialize FFmpeg (with log level set to suppress warnings)
     init_ffmpeg()?;
@@ -124,7 +127,6 @@ pub fn extract_thumbnail<P: AsRef<Path>>(path: P) -> Result<ImageData> {
                 .send_packet(&packet)
                 .map_err(|e| Error::Io(format!("Failed to send packet: {e}")))?;
 
-            #[allow(clippy::similar_names)] // decoder vs decoded is intentional
             let mut decoded = ffmpeg_next::frame::Video::empty();
             if decoder.receive_frame(&mut decoded).is_ok() {
                 // Convert to RGBA

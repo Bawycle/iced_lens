@@ -71,16 +71,16 @@ impl State {
     /// Prepare deblur tool when selected.
     pub(crate) fn prepare_deblur_tool(&mut self) {
         // Reset to defaults when opening the tool
-        self.deblur_state.reset();
+        self.deblur.reset();
     }
 
     /// Teardown deblur tool when deselected.
     pub(crate) fn teardown_deblur_tool(&mut self) {
         // Cancel any in-progress operation
-        if self.deblur_state.is_processing {
-            self.deblur_state.request_cancel();
+        if self.deblur.is_processing {
+            self.deblur.request_cancel();
         }
-        self.deblur_state.reset();
+        self.deblur.reset();
     }
 
     /// Apply deblur to the current image.
@@ -90,12 +90,12 @@ impl State {
     pub(crate) fn sidebar_apply_deblur(&mut self) {
         // Mark as processing - the actual inference will be handled
         // by the parent application which has access to the DeblurManager
-        self.deblur_state.start_processing();
+        self.deblur.start_processing();
     }
 
     /// Cancel the ongoing deblur operation.
     pub(crate) fn sidebar_cancel_deblur(&mut self) {
-        self.deblur_state.request_cancel();
+        self.deblur.request_cancel();
     }
 
     /// Apply the deblur result to the editor state.
@@ -119,12 +119,12 @@ impl State {
 
         // Clear any preview and finish processing
         self.preview_image = None;
-        self.deblur_state.finish_processing();
+        self.deblur.finish_processing();
     }
 
     /// Mark the deblur operation as failed and reset state.
     pub fn deblur_failed(&mut self) {
-        self.deblur_state.finish_processing();
+        self.deblur.finish_processing();
     }
 
     /// Returns true if a deblur transformation has already been applied.
