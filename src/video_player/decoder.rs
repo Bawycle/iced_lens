@@ -172,6 +172,19 @@ impl DecoderLoopState {
     }
 }
 
+/// Context for emitting decoded frames to the UI.
+///
+/// Groups together the mutable state and channels needed when emitting frames,
+/// reducing the number of arguments passed to frame emission functions.
+struct EmitContext<'a> {
+    state: &'a mut DecoderLoopState,
+    frame_cache: &'a mut FrameCache,
+    frame_history: &'a mut FrameHistory,
+    event_tx: &'a mpsc::Sender<DecoderEvent>,
+    width: u32,
+    height: u32,
+}
+
 /// Result of processing a decoder command.
 enum CommandResult {
     /// Continue the main loop normally.
@@ -201,32 +214,16 @@ enum PacketDecodeResult {
 /// Handles end-of-stream: emits last decoded frame if seeking beyond EOF.
 ///
 /// Returns true if a frame was emitted, false otherwise.
-#[allow(clippy::too_many_arguments)]
 fn handle_end_of_stream(
     last_decoded_for_seek: Option<(ffmpeg_next::frame::Video, f64, bool)>,
-    state: &mut DecoderLoopState,
     scaler: &mut ffmpeg_next::software::scaling::Context,
-    frame_cache: &mut FrameCache,
-    frame_history: &mut FrameHistory,
-    event_tx: &mpsc::Sender<DecoderEvent>,
-    width: u32,
-    height: u32,
+    ctx: &mut EmitContext,
 ) -> bool {
     if let Some((last_frame, pts_secs, is_keyframe)) = last_decoded_for_seek {
-        state.seek_target_secs = None;
+        ctx.state.seek_target_secs = None;
         let mut rgb_frame = ffmpeg_next::frame::Video::empty();
         if scaler.run(&last_frame, &mut rgb_frame).is_ok()
-            && emit_frame(
-                &rgb_frame,
-                pts_secs,
-                is_keyframe,
-                state,
-                frame_cache,
-                frame_history,
-                event_tx,
-                width,
-                height,
-            )
+            && emit_frame(&rgb_frame, pts_secs, is_keyframe, ctx)
         {
             return true;
         }
@@ -304,17 +301,15 @@ fn process_packet_frame(
     }
 
     // Emit the frame
-    if emit_frame(
-        &rgb_frame,
-        pts_secs,
-        is_keyframe,
+    let mut ctx = EmitContext {
         state,
         frame_cache,
         frame_history,
         event_tx,
         width,
         height,
-    ) {
+    };
+    if emit_frame(&rgb_frame, pts_secs, is_keyframe, &mut ctx) {
         PacketDecodeResult::FrameEmitted
     } else {
         PacketDecodeResult::ChannelClosed
@@ -391,17 +386,15 @@ fn process_decoded_frame(
     }
 
     // Emit the frame
-    if emit_frame(
-        &rgb_frame,
-        pts_secs,
-        is_keyframe,
+    let mut ctx = EmitContext {
         state,
         frame_cache,
         frame_history,
         event_tx,
         width,
         height,
-    ) {
+    };
+    if emit_frame(&rgb_frame, pts_secs, is_keyframe, &mut ctx) {
         FrameProcessingResult::Emitted
     } else {
         FrameProcessingResult::ChannelClosed
@@ -415,32 +408,27 @@ fn emit_frame(
     rgb_frame: &ffmpeg_next::frame::Video,
     pts_secs: f64,
     is_keyframe: bool,
-    state: &mut DecoderLoopState,
-    frame_cache: &mut FrameCache,
-    frame_history: &mut FrameHistory,
-    event_tx: &mpsc::Sender<DecoderEvent>,
-    width: u32,
-    height: u32,
+    ctx: &mut EmitContext,
 ) -> bool {
     let rgba_data = AsyncDecoder::extract_rgba_data(rgb_frame);
     let output_frame = DecodedFrame {
         rgba_data: Arc::new(rgba_data),
-        width,
-        height,
+        width: ctx.width,
+        height: ctx.height,
         pts_secs,
     };
 
     if is_keyframe {
-        frame_cache.insert(output_frame.clone(), true);
+        ctx.frame_cache.insert(output_frame.clone(), true);
     }
-    if !state.is_playing && !state.in_stepping_mode {
-        state.last_paused_frame = Some(output_frame.clone());
+    if !ctx.state.is_playing && !ctx.state.in_stepping_mode {
+        ctx.state.last_paused_frame = Some(output_frame.clone());
     }
-    if state.in_stepping_mode {
-        frame_history.push(output_frame.clone());
+    if ctx.state.in_stepping_mode {
+        ctx.frame_history.push(output_frame.clone());
     }
 
-    event_tx
+    ctx.event_tx
         .blocking_send(DecoderEvent::FrameReady(output_frame))
         .is_ok()
 }
@@ -917,16 +905,15 @@ impl AsyncDecoder {
 
             // End of stream handling
             if !frame_decoded {
-                let emitted = handle_end_of_stream(
-                    last_decoded_for_seek,
-                    &mut state,
-                    &mut scaler,
-                    &mut frame_cache,
-                    &mut frame_history,
-                    &event_tx,
+                let mut ctx = EmitContext {
+                    state: &mut state,
+                    frame_cache: &mut frame_cache,
+                    frame_history: &mut frame_history,
+                    event_tx: &event_tx,
                     width,
                     height,
-                );
+                };
+                let emitted = handle_end_of_stream(last_decoded_for_seek, &mut scaler, &mut ctx);
                 if !emitted {
                     let _ = event_tx.blocking_send(DecoderEvent::EndOfStream);
                 }

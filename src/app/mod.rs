@@ -44,6 +44,10 @@ static SUBSCRIPTION_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
 
 /// Root Iced application state that bridges UI components, localization, and
 /// persisted preferences.
+// Allow excessive bools: these represent orthogonal application states
+// (fullscreen, autoplay, normalization, menu state, info panel, shutdown flag).
+// They are independent concerns, not mutually exclusive states for an enum.
+#[allow(clippy::struct_excessive_bools)]
 pub struct App {
     pub i18n: I18n,
     screen: Screen,
@@ -77,7 +81,7 @@ pub struct App {
     /// Help screen state (tracks expanded sections).
     help_state: help::State,
     /// Persisted application state (last save directory, etc.).
-    app_state: persisted_state::AppState,
+    persisted: persisted_state::AppState,
     /// Toast notification manager for user feedback.
     notifications: notifications::Manager,
     /// Whether the application is shutting down (used to cancel background tasks).
@@ -91,7 +95,7 @@ impl fmt::Debug for App {
         f.debug_struct("App")
             .field("screen", &self.screen)
             .field("viewer_has_image", &self.viewer.has_media())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -174,7 +178,7 @@ impl Default for App {
             current_metadata: None,
             metadata_editor_state: None,
             help_state: help::State::new(),
-            app_state: persisted_state::AppState::default(),
+            persisted: persisted_state::AppState::default(),
             notifications: notifications::Manager::new(),
             shutting_down: false,
             cancellation_token: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -185,6 +189,9 @@ impl Default for App {
 impl App {
     /// Initializes application state and optionally kicks off asynchronous image
     /// loading based on `Flags` received from the launcher.
+    // Allow too_many_lines: initialization function with ordered setup steps.
+    // Refactoring would risk breaking initialization order and add indirection.
+    #[allow(clippy::too_many_lines)]
     fn new(flags: Flags) -> (Self, Task<Message>) {
         let startup_time = std::time::Instant::now();
         eprintln!("[STARTUP] App::new() started");
@@ -248,7 +255,7 @@ impl App {
         let enable_upscale = app_state.enable_upscale;
 
         // Move app_state (no clone needed since we've already extracted the values we need)
-        app.app_state = app_state;
+        app.persisted = app_state;
         let deblur_model_url = config
             .ai
             .deblur_model_url
@@ -613,6 +620,9 @@ impl App {
         Subscription::batch([event_sub, tick_sub, video_sub, editor_sub])
     }
 
+    // Allow too_many_lines: match dispatcher inherent to Elm architecture.
+    // Length comes from number of message variants, not from complexity.
+    #[allow(clippy::too_many_lines)]
     fn update(&mut self, message: Message) -> Task<Message> {
         let count = UPDATE_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
         if count < 10 {
@@ -647,7 +657,7 @@ impl App {
             current_metadata: &mut self.current_metadata,
             metadata_editor_state: &mut self.metadata_editor_state,
             help_state: &mut self.help_state,
-            app_state: &mut self.app_state,
+            persisted: &mut self.persisted,
             notifications: &mut self.notifications,
         };
 
@@ -703,8 +713,8 @@ impl App {
                                     ));
 
                                 // Remember the save directory for next time
-                                self.app_state.set_last_save_directory_from_file(&path);
-                                if let Some(key) = self.app_state.save() {
+                                self.persisted.set_last_save_directory_from_file(&path);
+                                if let Some(key) = self.persisted.save() {
                                     self.notifications
                                         .push(notifications::Notification::warning(&key));
                                 }
@@ -739,8 +749,8 @@ impl App {
                                 ));
 
                             // Remember the save directory for next time
-                            self.app_state.set_last_save_directory_from_file(&path);
-                            if let Some(key) = self.app_state.save() {
+                            self.persisted.set_last_save_directory_from_file(&path);
+                            if let Some(key) = self.persisted.save() {
                                 self.notifications
                                     .push(notifications::Notification::warning(&key));
                             }
@@ -773,7 +783,7 @@ impl App {
                 Task::none()
             }
             Message::OpenFileDialog => {
-                update::handle_open_file_dialog(self.app_state.last_open_directory.clone())
+                update::handle_open_file_dialog(self.persisted.last_open_directory.clone())
             }
             Message::OpenFileDialogResult(path) => {
                 update::handle_open_file_dialog_result(&mut ctx, path)
@@ -912,8 +922,8 @@ impl App {
             match metadata_writer::write_exif(path, editor_state.editable_metadata()) {
                 Ok(()) => {
                     // Remember the save directory
-                    self.app_state.set_last_save_directory_from_file(path);
-                    if let Some(key) = self.app_state.save() {
+                    self.persisted.set_last_save_directory_from_file(path);
+                    if let Some(key) = self.persisted.save() {
                         self.notifications
                             .push(notifications::Notification::warning(&key));
                     }
@@ -1015,8 +1025,8 @@ impl App {
                 self.settings
                     .set_deblur_model_status(media::deblur::ModelStatus::Ready);
                 self.settings.set_enable_deblur(true);
-                self.app_state.enable_deblur = true;
-                if let Some(key) = self.app_state.save() {
+                self.persisted.enable_deblur = true;
+                if let Some(key) = self.persisted.save() {
                     self.notifications
                         .push(notifications::Notification::warning(&key));
                 }
@@ -1033,8 +1043,8 @@ impl App {
                 self.settings
                     .set_deblur_model_status(media::deblur::ModelStatus::Error(e.clone()));
                 self.settings.set_enable_deblur(false);
-                self.app_state.enable_deblur = false;
-                if let Some(key) = self.app_state.save() {
+                self.persisted.enable_deblur = false;
+                if let Some(key) = self.persisted.save() {
                     self.notifications
                         .push(notifications::Notification::warning(&key));
                 }
@@ -1117,8 +1127,8 @@ impl App {
                 self.settings
                     .set_upscale_model_status(media::upscale::UpscaleModelStatus::Ready);
                 self.settings.set_enable_upscale(true);
-                self.app_state.enable_upscale = true;
-                if let Some(key) = self.app_state.save() {
+                self.persisted.enable_upscale = true;
+                if let Some(key) = self.persisted.save() {
                     self.notifications
                         .push(notifications::Notification::warning(&key));
                 }
@@ -1135,8 +1145,8 @@ impl App {
                 self.settings
                     .set_upscale_model_status(media::upscale::UpscaleModelStatus::Error(e.clone()));
                 self.settings.set_enable_upscale(false);
-                self.app_state.enable_upscale = false;
-                if let Some(key) = self.app_state.save() {
+                self.persisted.enable_upscale = false;
+                if let Some(key) = self.persisted.save() {
                     self.notifications
                         .push(notifications::Notification::warning(&key));
                 }
@@ -1152,6 +1162,9 @@ impl App {
     }
 
     /// Handles async image loading result for the editor.
+    // Allow too_many_lines: sequential async result handling with navigation logic.
+    // Marginal benefit from extraction (111 lines vs 100 limit).
+    #[allow(clippy::too_many_lines)]
     fn handle_image_editor_loaded(
         &mut self,
         result: Result<MediaData, crate::error::Error>,
@@ -1328,7 +1341,7 @@ impl App {
             is_dark_theme,
             deblur_model_status: self.settings.deblur_model_status(),
             upscale_model_status: self.settings.upscale_model_status(),
-            enable_upscale: self.app_state.enable_upscale,
+            enable_upscale: self.persisted.enable_upscale,
             filter: self.media_navigator.filter(),
             total_count: self.media_navigator.navigation_info().total_count,
             filtered_count: self.media_navigator.navigation_info().filtered_count,

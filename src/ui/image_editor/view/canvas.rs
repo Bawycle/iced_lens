@@ -23,9 +23,9 @@ use super::scrollable_canvas;
 
 pub struct CanvasModel<'a> {
     pub display_image: &'a ImageData,
-    pub crop_state: &'a CropState,
-    pub resize_state: &'a ResizeState,
-    pub deblur_state: &'a DeblurState,
+    pub crop: &'a CropState,
+    pub resize: &'a ResizeState,
+    pub deblur: &'a DeblurState,
     /// Zoom scale factor (1.0 = 100%)
     pub zoom_scale: f32,
     /// Whether the user is currently dragging to pan
@@ -41,13 +41,13 @@ impl<'a> CanvasModel<'a> {
         let display_image = state.display_image();
         Self {
             display_image,
-            crop_state: &state.crop_state,
-            resize_state: &state.resize_state,
-            deblur_state: &state.deblur_state,
+            crop: &state.crop,
+            resize: &state.resize,
+            deblur: &state.deblur,
             zoom_scale: state.zoom.zoom_percent / 100.0,
             is_dragging: state.is_dragging(),
-            crop_active: state.crop_state.overlay.visible,
-            upscale_processing: state.resize_state.is_upscale_processing,
+            crop_active: state.crop.overlay.visible,
+            upscale_processing: state.resize.is_upscale_processing,
         }
     }
 }
@@ -150,9 +150,9 @@ pub fn view<'a>(model: &CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, M
     let zoom_scale = model.zoom_scale;
 
     // Capture overlay state
-    let deblur_processing = model.deblur_state.is_processing;
+    let deblur_processing = model.deblur.is_processing;
     let upscale_processing = model.upscale_processing;
-    let spinner_rotation = model.deblur_state.spinner_rotation;
+    let spinner_rotation = model.deblur.spinner_rotation;
     let processing_text = if deblur_processing {
         ctx.i18n.tr("image-editor-deblur-processing").clone()
     } else if upscale_processing {
@@ -162,17 +162,17 @@ pub fn view<'a>(model: &CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, M
     };
     let is_processing = deblur_processing || upscale_processing;
 
-    let crop_visible = model.crop_state.overlay.visible;
-    let crop_x = model.crop_state.x;
-    let crop_y = model.crop_state.y;
-    let crop_width = model.crop_state.width;
-    let crop_height = model.crop_state.height;
+    let crop_visible = model.crop.overlay.visible;
+    let crop_x = model.crop.x;
+    let crop_y = model.crop.y;
+    let crop_width = model.crop.width;
+    let crop_height = model.crop.height;
 
-    let resize_visible = model.resize_state.overlay.visible;
-    let resize_original_width = model.resize_state.overlay.original_width;
-    let resize_original_height = model.resize_state.overlay.original_height;
-    let resize_width = model.resize_state.width;
-    let resize_height = model.resize_state.height;
+    let resize_visible = model.resize.overlay.visible;
+    let resize_original_width = model.resize.overlay.original_width;
+    let resize_original_height = model.resize.overlay.original_height;
+    let resize_width = model.resize.width;
+    let resize_height = model.resize.height;
 
     // Capture drag state for cursor interaction
     let is_dragging = model.is_dragging;

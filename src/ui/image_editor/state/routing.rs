@@ -15,6 +15,9 @@ impl State {
         }
     }
 
+    // Allow too_many_lines: match dispatcher for sidebar messages.
+    // Length is inherent to the number of SidebarMessage variants.
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn handle_sidebar_message(&mut self, message: SidebarMessage) -> Event {
         match message {
             SidebarMessage::ToggleSidebar => {
@@ -138,11 +141,11 @@ impl State {
                 // If so, emit event to let app decide whether to use AI upscaling
                 if self.is_resize_enlargement()
                     && self.has_pending_resize()
-                    && self.resize_state.use_ai_upscale
+                    && self.resize.use_ai_upscale
                 {
                     let (width, height) = self.pending_resize_dimensions();
                     // Mark as processing (app will clear this when upscaling completes or falls back)
-                    self.resize_state.is_upscale_processing = true;
+                    self.resize.is_upscale_processing = true;
                     Event::UpscaleResizeRequested { width, height }
                 } else {
                     // For reductions, same size, or when AI upscale is disabled
@@ -151,7 +154,7 @@ impl State {
                 }
             }
             SidebarMessage::ToggleAiUpscale => {
-                self.resize_state.use_ai_upscale = !self.resize_state.use_ai_upscale;
+                self.resize.use_ai_upscale = !self.resize.use_ai_upscale;
                 Event::None
             }
             SidebarMessage::BrightnessChanged(value) => {
@@ -335,7 +338,7 @@ impl State {
         }
 
         // Don't start pan if crop tool is active and interacting with overlay
-        if self.active_tool == Some(EditorTool::Crop) && self.crop_state.overlay.visible {
+        if self.active_tool == Some(EditorTool::Crop) && self.crop.overlay.visible {
             // Crop overlay handles its own mouse events
             return;
         }

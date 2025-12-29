@@ -99,7 +99,7 @@ impl std::fmt::Debug for DecoderCommandSender {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DecoderCommandSender")
             .field("has_audio", &self.audio_tx.is_some())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -245,6 +245,10 @@ fn create_playback_stream(
 }
 
 /// Internal playback loop extracted for cleaner code structure.
+// Allow too_many_lines: async state machine for A/V playback with sync.
+// Inherent complexity from audio/video synchronization and event handling.
+// Refactoring risks breaking timing-sensitive playback logic.
+#[allow(clippy::too_many_lines)]
 async fn run_playback_loop(
     output: &mut iced::futures::channel::mpsc::Sender<PlaybackMessage>,
     video_path: PathBuf,

@@ -79,18 +79,18 @@ impl State {
         // Reset crop state
         let crop_width = (self.current_image.width as f32 * 0.75).round() as u32;
         let crop_height = (self.current_image.height as f32 * 0.75).round() as u32;
-        self.crop_state.x = (self.current_image.width - crop_width) / 2;
-        self.crop_state.y = (self.current_image.height - crop_height) / 2;
-        self.crop_state.width = crop_width;
-        self.crop_state.height = crop_height;
-        self.crop_state.ratio = CropRatio::None;
-        self.crop_state.overlay.visible = false;
-        self.crop_state.overlay.drag_state = CropDragState::None;
+        self.crop.x = (self.current_image.width - crop_width) / 2;
+        self.crop.y = (self.current_image.height - crop_height) / 2;
+        self.crop.width = crop_width;
+        self.crop.height = crop_height;
+        self.crop.ratio = CropRatio::None;
+        self.crop.overlay.visible = false;
+        self.crop.overlay.drag_state = CropDragState::None;
         self.crop_modified = false;
 
         // Hide resize overlay to avoid stale rectangles after cancel
-        self.resize_state.overlay.visible = false;
-        self.resize_state
+        self.resize.overlay.visible = false;
+        self.resize
             .overlay
             .set_original_dimensions(self.current_image.width, self.current_image.height);
 

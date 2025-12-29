@@ -18,6 +18,10 @@ use crate::ui::image_editor::{Message, SidebarMessage};
 /// Maximum size for the thumbnail preview in the sidebar.
 const THUMBNAIL_MAX_SIZE: f32 = 150.0;
 
+// Allow too_many_lines: declarative UI composition for resize panel.
+// Linear widget construction without complex logic; extraction would
+// add indirection without reducing complexity.
+#[allow(clippy::too_many_lines)]
 pub fn panel<'a>(
     resize: &'a ResizeState,
     thumbnail: Option<&'a ImageData>,

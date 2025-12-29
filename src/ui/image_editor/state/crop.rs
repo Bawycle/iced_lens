@@ -122,7 +122,7 @@ impl State {
                 Event::None
             }
             CanvasMessage::CropOverlayMouseUp => {
-                self.crop_state.overlay.drag_state = CropDragState::None;
+                self.crop.overlay.drag_state = CropDragState::None;
                 Event::None
             }
             // Cursor events are handled in routing.rs before reaching here
@@ -136,17 +136,17 @@ impl State {
         self.crop_base_image = Some(self.working_image.clone());
         self.crop_base_width = self.current_image.width;
         self.crop_base_height = self.current_image.height;
-        self.crop_state.x = 0;
-        self.crop_state.y = 0;
-        self.crop_state.width = self.current_image.width;
-        self.crop_state.height = self.current_image.height;
-        self.crop_state.ratio = CropRatio::None;
+        self.crop.x = 0;
+        self.crop.y = 0;
+        self.crop.width = self.current_image.width;
+        self.crop.height = self.current_image.height;
+        self.crop.ratio = CropRatio::None;
         self.hide_crop_overlay();
     }
 
     pub(crate) fn hide_crop_overlay(&mut self) {
-        self.crop_state.overlay.visible = false;
-        self.crop_state.overlay.drag_state = CropDragState::None;
+        self.crop.overlay.visible = false;
+        self.crop.overlay.drag_state = CropDragState::None;
     }
 
     pub(crate) fn teardown_crop_tool(&mut self) {
@@ -156,14 +156,14 @@ impl State {
     }
 
     pub(crate) fn set_crop_ratio_from_sidebar(&mut self, ratio: CropRatio) {
-        self.crop_state.ratio = ratio;
+        self.crop.ratio = ratio;
         self.adjust_crop_to_ratio(ratio);
-        self.crop_state.overlay.visible = true;
+        self.crop.overlay.visible = true;
         self.crop_modified = true;
     }
 
     pub(crate) fn apply_crop_from_sidebar(&mut self) {
-        if self.crop_state.overlay.visible {
+        if self.crop.overlay.visible {
             self.finalize_crop_overlay();
         }
     }
@@ -229,10 +229,10 @@ impl State {
         let new_height = new_height.round() as u32;
 
         // Center the crop area (using base image dimensions)
-        self.crop_state.width = new_width;
-        self.crop_state.height = new_height;
-        self.crop_state.x = (self.crop_base_width - new_width) / 2;
-        self.crop_state.y = (self.crop_base_height - new_height) / 2;
+        self.crop.width = new_width;
+        self.crop.height = new_height;
+        self.crop.x = (self.crop_base_width - new_width) / 2;
+        self.crop.y = (self.crop_base_height - new_height) / 2;
     }
 
     pub(crate) fn apply_crop_from_base(&mut self) {
@@ -241,10 +241,10 @@ impl State {
             return;
         };
 
-        let x = self.crop_state.x;
-        let y = self.crop_state.y;
-        let width = self.crop_state.width;
-        let height = self.crop_state.height;
+        let x = self.crop.x;
+        let y = self.crop.y;
+        let width = self.crop.width;
+        let height = self.crop.height;
 
         // Validate crop bounds
         if width == 0 || height == 0 || x >= self.crop_base_width || y >= self.crop_base_height {
@@ -281,19 +281,19 @@ impl State {
     }
 
     pub(crate) fn finalize_crop_overlay(&mut self) {
-        if !self.crop_state.overlay.visible {
+        if !self.crop.overlay.visible {
             return;
         }
 
         self.apply_crop_from_base();
-        self.crop_state.overlay.visible = false;
-        self.crop_state.overlay.drag_state = CropDragState::None;
+        self.crop.overlay.visible = false;
+        self.crop.overlay.drag_state = CropDragState::None;
         self.crop_modified = false;
-        self.crop_state.ratio = CropRatio::None;
-        self.crop_state.x = 0;
-        self.crop_state.y = 0;
-        self.crop_state.width = self.current_image.width;
-        self.crop_state.height = self.current_image.height;
+        self.crop.ratio = CropRatio::None;
+        self.crop.x = 0;
+        self.crop.y = 0;
+        self.crop.width = self.current_image.width;
+        self.crop.height = self.current_image.height;
         self.crop_base_image = Some(self.working_image.clone());
         self.crop_base_width = self.current_image.width;
         self.crop_base_height = self.current_image.height;
@@ -303,22 +303,22 @@ impl State {
     pub(crate) fn handle_crop_overlay_mouse_down(&mut self, x: f32, y: f32) {
         // Check if clicking on a handle
         if let Some(handle) = self.get_handle_at_position(x, y) {
-            self.crop_state.overlay.drag_state = CropDragState::DraggingHandle {
+            self.crop.overlay.drag_state = CropDragState::DraggingHandle {
                 handle,
                 start_rect: (
-                    self.crop_state.x,
-                    self.crop_state.y,
-                    self.crop_state.width,
-                    self.crop_state.height,
+                    self.crop.x,
+                    self.crop.y,
+                    self.crop.width,
+                    self.crop.height,
                 ),
                 start_cursor_x: x,
                 start_cursor_y: y,
             };
         } else if self.is_point_in_crop_rect(x, y) {
             // Start dragging the entire rectangle
-            self.crop_state.overlay.drag_state = CropDragState::DraggingRectangle {
-                start_rect_x: self.crop_state.x,
-                start_rect_y: self.crop_state.y,
+            self.crop.overlay.drag_state = CropDragState::DraggingRectangle {
+                start_rect_x: self.crop.x,
+                start_rect_y: self.crop.y,
                 start_cursor_x: x,
                 start_cursor_y: y,
             };
@@ -327,7 +327,7 @@ impl State {
 
     /// Handle mouse move on crop overlay to update drag
     pub(crate) fn handle_crop_overlay_mouse_move(&mut self, x: f32, y: f32) {
-        match self.crop_state.overlay.drag_state.clone() {
+        match self.crop.overlay.drag_state.clone() {
             CropDragState::DraggingRectangle {
                 start_rect_x,
                 start_rect_y,
@@ -341,13 +341,13 @@ impl State {
                 // Update position with bounds checking
                 let new_x = (start_rect_x as f32 + delta_x)
                     .max(0.0)
-                    .min((self.crop_base_width - self.crop_state.width) as f32);
+                    .min((self.crop_base_width - self.crop.width) as f32);
                 let new_y = (start_rect_y as f32 + delta_y)
                     .max(0.0)
-                    .min((self.crop_base_height - self.crop_state.height) as f32);
+                    .min((self.crop_base_height - self.crop.height) as f32);
 
-                self.crop_state.x = new_x as u32;
-                self.crop_state.y = new_y as u32;
+                self.crop.x = new_x as u32;
+                self.crop.y = new_y as u32;
                 self.crop_modified = true;
             }
             CropDragState::DraggingHandle {
@@ -364,17 +364,17 @@ impl State {
                 self.update_crop_from_handle_drag(handle, start_rect, delta_x, delta_y);
                 self.crop_modified = true;
                 // Switch to Free ratio when manually resizing
-                self.crop_state.ratio = CropRatio::Free;
+                self.crop.ratio = CropRatio::Free;
             }
             CropDragState::None => {}
         }
     }
 
     fn is_point_in_crop_rect(&self, x: f32, y: f32) -> bool {
-        let rect_x = self.crop_state.x as f32;
-        let rect_y = self.crop_state.y as f32;
-        let rect_w = self.crop_state.width as f32;
-        let rect_h = self.crop_state.height as f32;
+        let rect_x = self.crop.x as f32;
+        let rect_y = self.crop.y as f32;
+        let rect_w = self.crop.width as f32;
+        let rect_h = self.crop.height as f32;
 
         x >= rect_x && x <= rect_x + rect_w && y >= rect_y && y <= rect_y + rect_h
     }
@@ -383,10 +383,10 @@ impl State {
         // Half the hit area size (distance from center to edge)
         let handle_hit_radius = sizing::CROP_HANDLE_HIT_SIZE / 2.0;
 
-        let rect_x = self.crop_state.x as f32;
-        let rect_y = self.crop_state.y as f32;
-        let rect_w = self.crop_state.width as f32;
-        let rect_h = self.crop_state.height as f32;
+        let rect_x = self.crop.x as f32;
+        let rect_y = self.crop.y as f32;
+        let rect_w = self.crop.width as f32;
+        let rect_h = self.crop.height as f32;
 
         // Define handle positions
         let handles = [
@@ -439,17 +439,17 @@ impl State {
                 let new_y = (start_y as f32 + delta_y)
                     .max(0.0)
                     .min(start_y as f32 + start_h as f32 - 10.0);
-                self.crop_state.width = (start_x + start_w) - new_x as u32;
-                self.crop_state.height = (start_y + start_h) - new_y as u32;
-                self.crop_state.x = new_x as u32;
-                self.crop_state.y = new_y as u32;
+                self.crop.width = (start_x + start_w) - new_x as u32;
+                self.crop.height = (start_y + start_h) - new_y as u32;
+                self.crop.x = new_x as u32;
+                self.crop.y = new_y as u32;
             }
             HandlePosition::Top => {
                 let new_y = (start_y as f32 + delta_y)
                     .max(0.0)
                     .min(start_y as f32 + start_h as f32 - 10.0);
-                self.crop_state.height = (start_y + start_h) - new_y as u32;
-                self.crop_state.y = new_y as u32;
+                self.crop.height = (start_y + start_h) - new_y as u32;
+                self.crop.y = new_y as u32;
             }
             HandlePosition::TopRight => {
                 let new_y = (start_y as f32 + delta_y)
@@ -458,15 +458,15 @@ impl State {
                 let new_w = (start_w as f32 + delta_x)
                     .max(10.0)
                     .min((self.crop_base_width - start_x) as f32);
-                self.crop_state.width = new_w as u32;
-                self.crop_state.height = (start_y + start_h) - new_y as u32;
-                self.crop_state.y = new_y as u32;
+                self.crop.width = new_w as u32;
+                self.crop.height = (start_y + start_h) - new_y as u32;
+                self.crop.y = new_y as u32;
             }
             HandlePosition::Right => {
                 let new_w = (start_w as f32 + delta_x)
                     .max(10.0)
                     .min((self.crop_base_width - start_x) as f32);
-                self.crop_state.width = new_w as u32;
+                self.crop.width = new_w as u32;
             }
             HandlePosition::BottomRight => {
                 let new_w = (start_w as f32 + delta_x)
@@ -475,14 +475,14 @@ impl State {
                 let new_h = (start_h as f32 + delta_y)
                     .max(10.0)
                     .min((self.crop_base_height - start_y) as f32);
-                self.crop_state.width = new_w as u32;
-                self.crop_state.height = new_h as u32;
+                self.crop.width = new_w as u32;
+                self.crop.height = new_h as u32;
             }
             HandlePosition::Bottom => {
                 let new_h = (start_h as f32 + delta_y)
                     .max(10.0)
                     .min((self.crop_base_height - start_y) as f32);
-                self.crop_state.height = new_h as u32;
+                self.crop.height = new_h as u32;
             }
             HandlePosition::BottomLeft => {
                 let new_x = (start_x as f32 + delta_x)
@@ -491,27 +491,27 @@ impl State {
                 let new_h = (start_h as f32 + delta_y)
                     .max(10.0)
                     .min((self.crop_base_height - start_y) as f32);
-                self.crop_state.width = (start_x + start_w) - new_x as u32;
-                self.crop_state.height = new_h as u32;
-                self.crop_state.x = new_x as u32;
+                self.crop.width = (start_x + start_w) - new_x as u32;
+                self.crop.height = new_h as u32;
+                self.crop.x = new_x as u32;
             }
             HandlePosition::Left => {
                 let new_x = (start_x as f32 + delta_x)
                     .max(0.0)
                     .min(start_x as f32 + start_w as f32 - 10.0);
-                self.crop_state.width = (start_x + start_w) - new_x as u32;
-                self.crop_state.x = new_x as u32;
+                self.crop.width = (start_x + start_w) - new_x as u32;
+                self.crop.x = new_x as u32;
             }
         }
 
         // Apply aspect ratio constraint if needed
-        if self.crop_state.ratio != CropRatio::Free {
+        if self.crop.ratio != CropRatio::Free {
             self.apply_aspect_ratio_constraint_to_current_crop();
         }
     }
 
     fn apply_aspect_ratio_constraint_to_current_crop(&mut self) {
-        let target_ratio = match self.crop_state.ratio {
+        let target_ratio = match self.crop.ratio {
             CropRatio::None | CropRatio::Free => return, // No constraint
             CropRatio::Square => 1.0,
             CropRatio::Landscape => 16.0 / 9.0,
@@ -521,16 +521,16 @@ impl State {
         };
 
         // Adjust height to match ratio, keeping width fixed
-        let new_height = (self.crop_state.width as f32 / target_ratio).round() as u32;
+        let new_height = (self.crop.width as f32 / target_ratio).round() as u32;
 
         // Check if new height fits
-        if self.crop_state.y + new_height <= self.crop_base_height {
-            self.crop_state.height = new_height;
+        if self.crop.y + new_height <= self.crop_base_height {
+            self.crop.height = new_height;
         } else {
             // Height doesn't fit, adjust width instead
-            let available_height = self.crop_base_height - self.crop_state.y;
-            self.crop_state.height = available_height;
-            self.crop_state.width = (available_height as f32 * target_ratio).round() as u32;
+            let available_height = self.crop_base_height - self.crop.y;
+            self.crop.height = available_height;
+            self.crop.width = (available_height as f32 * target_ratio).round() as u32;
         }
     }
 }

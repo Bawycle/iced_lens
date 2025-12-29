@@ -26,15 +26,15 @@ fn new_editor_state_has_no_changes() {
 }
 
 #[test]
-fn new_editor_state_initializes_resize_state() {
+fn new_editor_state_initializes_resize() {
     let (_dir, path, img) = create_test_image(4, 3);
     let state = State::new(path, &img).expect("editor state");
 
-    assert_eq!(state.resize_state.width, 4);
-    assert_eq!(state.resize_state.height, 3);
-    assert_eq!(state.resize_state.scale.value(), 100.0);
-    assert!(state.resize_state.lock_aspect);
-    assert_eq!(state.resize_state.original_aspect, 4.0 / 3.0);
+    assert_eq!(state.resize.width, 4);
+    assert_eq!(state.resize.height, 3);
+    assert_eq!(state.resize.scale.value(), 100.0);
+    assert!(state.resize.lock_aspect);
+    assert_eq!(state.resize.original_aspect, 4.0 / 3.0);
 }
 
 #[test]
@@ -60,10 +60,10 @@ fn apply_resize_updates_image_dimensions() {
     state.update(Message::Sidebar(SidebarMessage::SelectTool(
         EditorTool::Resize,
     )));
-    state.resize_state.width = 4;
-    state.resize_state.height = 3;
-    state.resize_state.width_input = "4".into();
-    state.resize_state.height_input = "3".into();
+    state.resize.width = 4;
+    state.resize.height = 3;
+    state.resize.width_input = "4".into();
+    state.resize.height_input = "3".into();
     state.update(Message::Sidebar(SidebarMessage::ApplyResize));
 
     assert_eq!(state.current_image.width, 4);
@@ -79,7 +79,7 @@ fn cancel_clears_resize_preview() {
         EditorTool::Resize,
     )));
     // In Option A2, no overlay is used
-    assert!(!state.resize_state.overlay.visible);
+    assert!(!state.resize.overlay.visible);
 
     // Make a change to create a preview
     state.update(Message::Sidebar(SidebarMessage::ScaleChanged(50.0)));
@@ -216,7 +216,7 @@ fn resize_preview_works_with_tool_selected() {
 
     // In Option A2, no overlay is shown - preview is direct
     assert!(
-        !state.resize_state.overlay.visible,
+        !state.resize.overlay.visible,
         "Overlay should not be visible in Option A2"
     );
 
@@ -238,10 +238,10 @@ fn crop_handle_detection_with_extended_hit_area() {
 
     // Setup crop state with known dimensions
     // Crop at (50, 50) with size 100x100
-    state.crop_state.x = 50;
-    state.crop_state.y = 50;
-    state.crop_state.width = 100;
-    state.crop_state.height = 100;
+    state.crop.x = 50;
+    state.crop.y = 50;
+    state.crop.width = 100;
+    state.crop.height = 100;
     state.crop_base_width = 200;
     state.crop_base_height = 200;
 
@@ -250,7 +250,7 @@ fn crop_handle_detection_with_extended_hit_area() {
     state.handle_crop_overlay_mouse_down(50.0, 50.0);
     assert!(
         matches!(
-            state.crop_state.overlay.drag_state,
+            state.crop.overlay.drag_state,
             CropDragState::DraggingHandle {
                 handle: HandlePosition::TopLeft,
                 ..
@@ -260,14 +260,14 @@ fn crop_handle_detection_with_extended_hit_area() {
     );
 
     // Reset drag state
-    state.crop_state.overlay.drag_state = CropDragState::None;
+    state.crop.overlay.drag_state = CropDragState::None;
 
     // Click 15 pixels away from TopLeft handle (within extended hit area)
     // With CROP_HANDLE_HIT_SIZE = 44 (radius 22), this should still be detected
     state.handle_crop_overlay_mouse_down(65.0, 65.0);
     assert!(
         matches!(
-            state.crop_state.overlay.drag_state,
+            state.crop.overlay.drag_state,
             CropDragState::DraggingHandle {
                 handle: HandlePosition::TopLeft,
                 ..
@@ -277,13 +277,13 @@ fn crop_handle_detection_with_extended_hit_area() {
     );
 
     // Reset drag state
-    state.crop_state.overlay.drag_state = CropDragState::None;
+    state.crop.overlay.drag_state = CropDragState::None;
 
     // Test BottomRight handle at (150, 150)
     state.handle_crop_overlay_mouse_down(150.0, 150.0);
     assert!(
         matches!(
-            state.crop_state.overlay.drag_state,
+            state.crop.overlay.drag_state,
             CropDragState::DraggingHandle {
                 handle: HandlePosition::BottomRight,
                 ..
@@ -293,13 +293,13 @@ fn crop_handle_detection_with_extended_hit_area() {
     );
 
     // Reset drag state
-    state.crop_state.overlay.drag_state = CropDragState::None;
+    state.crop.overlay.drag_state = CropDragState::None;
 
     // Click 15 pixels away from BottomRight handle
     state.handle_crop_overlay_mouse_down(135.0, 135.0);
     assert!(
         matches!(
-            state.crop_state.overlay.drag_state,
+            state.crop.overlay.drag_state,
             CropDragState::DraggingHandle {
                 handle: HandlePosition::BottomRight,
                 ..
@@ -309,13 +309,13 @@ fn crop_handle_detection_with_extended_hit_area() {
     );
 
     // Reset drag state
-    state.crop_state.overlay.drag_state = CropDragState::None;
+    state.crop.overlay.drag_state = CropDragState::None;
 
     // Test Top center handle at (100, 50)
     state.handle_crop_overlay_mouse_down(100.0, 50.0);
     assert!(
         matches!(
-            state.crop_state.overlay.drag_state,
+            state.crop.overlay.drag_state,
             CropDragState::DraggingHandle {
                 handle: HandlePosition::Top,
                 ..
@@ -325,25 +325,25 @@ fn crop_handle_detection_with_extended_hit_area() {
     );
 
     // Reset drag state
-    state.crop_state.overlay.drag_state = CropDragState::None;
+    state.crop.overlay.drag_state = CropDragState::None;
 
     // Click far from any handle (should trigger rectangle drag, not handle)
     state.handle_crop_overlay_mouse_down(100.0, 100.0);
     assert!(
         matches!(
-            state.crop_state.overlay.drag_state,
+            state.crop.overlay.drag_state,
             CropDragState::DraggingRectangle { .. }
         ),
         "Clicking in center of crop rect should start rectangle drag, not handle drag"
     );
 
     // Reset drag state
-    state.crop_state.overlay.drag_state = CropDragState::None;
+    state.crop.overlay.drag_state = CropDragState::None;
 
     // Click outside crop rectangle entirely
     state.handle_crop_overlay_mouse_down(10.0, 10.0);
     assert!(
-        matches!(state.crop_state.overlay.drag_state, CropDragState::None),
+        matches!(state.crop.overlay.drag_state, CropDragState::None),
         "Clicking outside crop rect should not trigger any drag"
     );
 }
@@ -354,10 +354,10 @@ fn crop_handle_detection_at_image_edges() {
     let mut state = State::new(path, &img).expect("editor state");
 
     // Crop that extends to image edges
-    state.crop_state.x = 0;
-    state.crop_state.y = 0;
-    state.crop_state.width = 100;
-    state.crop_state.height = 100;
+    state.crop.x = 0;
+    state.crop.y = 0;
+    state.crop.width = 100;
+    state.crop.height = 100;
     state.crop_base_width = 100;
     state.crop_base_height = 100;
 
@@ -366,7 +366,7 @@ fn crop_handle_detection_at_image_edges() {
     state.handle_crop_overlay_mouse_down(0.0, 0.0);
     assert!(
         matches!(
-            state.crop_state.overlay.drag_state,
+            state.crop.overlay.drag_state,
             CropDragState::DraggingHandle {
                 handle: HandlePosition::TopLeft,
                 ..
@@ -376,13 +376,13 @@ fn crop_handle_detection_at_image_edges() {
     );
 
     // Reset drag state
-    state.crop_state.overlay.drag_state = CropDragState::None;
+    state.crop.overlay.drag_state = CropDragState::None;
 
     // Click slightly offset from edge (within extended hit area)
     state.handle_crop_overlay_mouse_down(15.0, 15.0);
     assert!(
         matches!(
-            state.crop_state.overlay.drag_state,
+            state.crop.overlay.drag_state,
             CropDragState::DraggingHandle {
                 handle: HandlePosition::TopLeft,
                 ..
@@ -392,13 +392,13 @@ fn crop_handle_detection_at_image_edges() {
     );
 
     // Reset drag state
-    state.crop_state.overlay.drag_state = CropDragState::None;
+    state.crop.overlay.drag_state = CropDragState::None;
 
     // Test BottomRight corner at (100, 100) - at opposite image edge
     state.handle_crop_overlay_mouse_down(100.0, 100.0);
     assert!(
         matches!(
-            state.crop_state.overlay.drag_state,
+            state.crop.overlay.drag_state,
             CropDragState::DraggingHandle {
                 handle: HandlePosition::BottomRight,
                 ..

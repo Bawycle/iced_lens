@@ -173,6 +173,10 @@ pub struct ViewContext<'a> {
 }
 
 /// Video playback state for rendering controls.
+// Allow excessive bools: orthogonal playback states for video control rendering.
+// is_playing, muted, loop_enabled are independent audio/video states.
+// can_step_*, has_audio, speed_auto_muted are capability/state flags.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct PlaybackState {
     /// Is the video currently playing?

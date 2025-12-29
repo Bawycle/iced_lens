@@ -22,12 +22,12 @@ pub struct CropOverlayRenderer {
 }
 
 impl CropOverlayRenderer {
-    /// Convert screen coordinates to image coordinates (clamped to image bounds)
+    /// Convert screen coordinates to image coordinates (clamped to image bounds).
     fn screen_to_image_coords(
         &self,
         screen_pos: iced::Point,
         bounds: iced::Rectangle,
-    ) -> Option<(f32, f32)> {
+    ) -> (f32, f32) {
         // Calculate image position and scale (ContentFit::Contain logic)
         let img_aspect = self.img_width as f32 / self.img_height as f32;
         let bounds_aspect = bounds.width / bounds.height;
@@ -63,7 +63,7 @@ impl CropOverlayRenderer {
             .max(0.0)
             .min(self.img_height as f32);
 
-        Some((img_x, img_y))
+        (img_x, img_y)
     }
 }
 
@@ -82,17 +82,14 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
         match event {
             iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)) => {
                 if let Some(cursor_position) = cursor.position_in(bounds) {
-                    if let Some((img_x, img_y)) =
-                        self.screen_to_image_coords(cursor_position, bounds)
-                    {
-                        return Some(
-                            Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseDown {
-                                x: img_x,
-                                y: img_y,
-                            }))
-                            .and_capture(),
-                        );
-                    }
+                    let (img_x, img_y) = self.screen_to_image_coords(cursor_position, bounds);
+                    return Some(
+                        Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseDown {
+                            x: img_x,
+                            y: img_y,
+                        }))
+                        .and_capture(),
+                    );
                 }
             }
             iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) => {
@@ -105,17 +102,14 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
                 }
 
                 if let Some(cursor_position) = cursor.position_in(bounds) {
-                    if let Some((img_x, img_y)) =
-                        self.screen_to_image_coords(cursor_position, bounds)
-                    {
-                        return Some(
-                            Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseMove {
-                                x: img_x,
-                                y: img_y,
-                            }))
-                            .and_capture(),
-                        );
-                    }
+                    let (img_x, img_y) = self.screen_to_image_coords(cursor_position, bounds);
+                    return Some(
+                        Action::publish(Message::Canvas(CanvasMessage::CropOverlayMouseMove {
+                            x: img_x,
+                            y: img_y,
+                        }))
+                        .and_capture(),
+                    );
                 }
             }
             // End drag operation on mouse up or cursor leaving canvas
@@ -134,6 +128,10 @@ impl iced::widget::canvas::Program<Message> for CropOverlayRenderer {
         None
     }
 
+    // Allow too_many_lines: geometry drawing with cohesive calculations.
+    // Overlays, grid lines, and handles are logically related and benefit
+    // from proximity. Extraction would fragment cohesive rendering logic.
+    #[allow(clippy::too_many_lines)]
     fn draw(
         &self,
         _state: &Self::State,

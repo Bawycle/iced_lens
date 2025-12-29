@@ -37,6 +37,9 @@ impl<'a> ViewerState<'a> {
 
     /// Computes the zoom percentage required to fit the current media inside the viewport.
     #[must_use] 
+    // Allow cast_precision_loss: image dimensions are typically < 16M pixels;
+    // f32 is exact up to 2^24 (~16.7M), sufficient for any reasonable image.
+    #[allow(clippy::cast_precision_loss)]
     pub fn compute_fit_zoom_percent(&self) -> Option<f32> {
         let media = self.media?;
         let viewport = self.viewport.bounds?;

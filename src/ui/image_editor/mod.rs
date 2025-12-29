@@ -59,7 +59,7 @@ pub struct State {
     /// Whether the sidebar is expanded
     sidebar_expanded: bool,
     /// Crop tool state
-    crop_state: CropState,
+    crop: CropState,
     /// Track if crop state has been modified (to avoid auto-commit on tool close)
     crop_modified: bool,
     /// Image state when crop tool was opened (to calculate ratios from original, not from previous crops)
@@ -67,11 +67,11 @@ pub struct State {
     crop_base_width: u32,
     crop_base_height: u32,
     /// Resize state
-    resize_state: ResizeState,
+    resize: ResizeState,
     /// Adjustment state (brightness/contrast)
-    adjustment_state: AdjustmentState,
+    adjustment: AdjustmentState,
     /// Deblur state (AI-powered deblurring)
-    deblur_state: DeblurState,
+    deblur: DeblurState,
     /// Optional preview image (used for live adjustments)
     preview_image: Option<ImageData>,
     /// Viewport state for tracking canvas bounds and scroll position
@@ -97,7 +97,7 @@ impl std::fmt::Debug for State {
             .field("history_index", &self.history_index)
             .field("sidebar_expanded", &self.sidebar_expanded)
             .field("export_format", &self.export_format)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -114,7 +114,7 @@ impl State {
                 Event::None
             }
             Message::SpinnerTick => {
-                self.deblur_state.tick_spinner();
+                self.deblur.tick_spinner();
                 Event::None
             }
         }
@@ -122,7 +122,7 @@ impl State {
 
     /// Returns the subscriptions needed for the editor (spinner animation during AI processing).
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        if self.deblur_state.is_processing || self.resize_state.is_upscale_processing {
+        if self.deblur.is_processing || self.resize.is_upscale_processing {
             // Animate spinner at 60 FPS while processing
             iced::time::every(std::time::Duration::from_millis(16)).map(|_| Message::SpinnerTick)
         } else {

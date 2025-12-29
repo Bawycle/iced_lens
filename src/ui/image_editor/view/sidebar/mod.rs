@@ -37,10 +37,10 @@ const SIDEBAR_WIDTH: f32 = 310.0;
 #[allow(clippy::struct_excessive_bools)]
 pub struct SidebarModel<'a> {
     pub active_tool: Option<EditorTool>,
-    pub crop_state: &'a CropState,
-    pub resize_state: &'a ResizeState,
-    pub adjustment_state: &'a AdjustmentState,
-    pub deblur_state: &'a DeblurState,
+    pub crop: &'a CropState,
+    pub resize: &'a ResizeState,
+    pub adjustment: &'a AdjustmentState,
+    pub deblur: &'a DeblurState,
     pub can_undo: bool,
     pub can_redo: bool,
     pub has_unsaved_changes: bool,
@@ -64,10 +64,10 @@ impl<'a> SidebarModel<'a> {
     pub fn from_state(state: &'a State, ctx: &ViewContext<'a>) -> Self {
         Self {
             active_tool: state.active_tool,
-            crop_state: &state.crop_state,
-            resize_state: &state.resize_state,
-            adjustment_state: &state.adjustment_state,
-            deblur_state: &state.deblur_state,
+            crop: &state.crop,
+            resize: &state.resize,
+            adjustment: &state.adjustment,
+            deblur: &state.deblur,
             can_undo: state.can_undo(),
             can_redo: state.can_redo(),
             has_unsaved_changes: state.has_unsaved_changes(),
@@ -103,7 +103,7 @@ pub fn expanded<'a>(model: &SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<
     );
     scrollable_section = scrollable_section.push(crop_button);
     if model.active_tool == Some(EditorTool::Crop) {
-        scrollable_section = scrollable_section.push(crop_panel::panel(model.crop_state, ctx));
+        scrollable_section = scrollable_section.push(crop_panel::panel(model.crop, ctx));
     }
 
     let resize_button = tool_button(
@@ -114,7 +114,7 @@ pub fn expanded<'a>(model: &SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<
     scrollable_section = scrollable_section.push(resize_button);
     if model.active_tool == Some(EditorTool::Resize) {
         scrollable_section = scrollable_section.push(resize_panel::panel(
-            model.resize_state,
+            model.resize,
             model.resize_thumbnail,
             model.upscale_model_status,
             model.enable_upscale,
@@ -130,7 +130,7 @@ pub fn expanded<'a>(model: &SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<
     scrollable_section = scrollable_section.push(light_button);
     if model.active_tool == Some(EditorTool::Adjust) {
         scrollable_section =
-            scrollable_section.push(adjustments_panel::panel(model.adjustment_state, ctx));
+            scrollable_section.push(adjustments_panel::panel(model.adjustment, ctx));
     }
 
     let deblur_button = tool_button(
@@ -141,7 +141,7 @@ pub fn expanded<'a>(model: &SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<
     scrollable_section = scrollable_section.push(deblur_button);
     if model.active_tool == Some(EditorTool::Deblur) {
         scrollable_section = scrollable_section.push(deblur_panel::panel(
-            model.deblur_state,
+            model.deblur,
             model.deblur_model_status,
             model.has_deblur_applied,
             ctx,
