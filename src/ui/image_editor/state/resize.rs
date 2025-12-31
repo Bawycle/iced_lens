@@ -97,6 +97,10 @@ impl ResizeState {
         } else {
             image.width as f32 / image.height.max(1) as f32
         };
+        // Sync overlay to match current image dimensions so has_pending_changes()
+        // correctly detects when user changes the target dimensions.
+        self.overlay
+            .set_original_dimensions(image.width, image.height);
     }
 }
 
