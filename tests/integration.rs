@@ -185,7 +185,7 @@ fn test_parallel_test_isolation() {
         enable_deblur: false,
         enable_upscale: false,
     };
-    state_a.save_to(Some(base_a.clone()));
+    let _ = state_a.save_to(Some(base_a.clone()));
 
     // Scenario B: Spanish user with different state
     let dir_b = tempdir().expect("create temp dir B");
@@ -202,7 +202,7 @@ fn test_parallel_test_isolation() {
         enable_deblur: true,
         enable_upscale: false,
     };
-    state_b.save_to(Some(base_b.clone()));
+    let _ = state_b.save_to(Some(base_b.clone()));
 
     // Verify complete isolation
     let (loaded_config_a, _) = config::load_with_override(Some(base_a.clone()));
@@ -243,7 +243,7 @@ fn test_explicit_override_takes_precedence_over_env_var() {
         enable_deblur: false,
         enable_upscale: false,
     };
-    state.save_to(Some(explicit_dir.path().to_path_buf()));
+    let _ = state.save_to(Some(explicit_dir.path().to_path_buf()));
 
     // Verify file is in explicit directory, not env directory
     assert!(explicit_dir.path().join("state.cbor").exists());
@@ -281,7 +281,7 @@ fn test_ci_friendly_isolated_tests() {
                 enable_deblur: false,
                 enable_upscale: false,
             };
-            state.save_to(Some(base.clone()));
+            let _ = state.save_to(Some(base.clone()));
 
             (dir, base, i)
         })

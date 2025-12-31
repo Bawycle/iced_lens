@@ -136,8 +136,9 @@ pub enum EditorTool {
 
 /// Image transformations that can be applied and undone.
 ///
-/// Note: Deblur stores the result image because the AI model inference
-/// is non-deterministic and expensive to re-run during undo/redo.
+/// Note: AI transformations (`Deblur`, `UpscaleResize`) store the result image
+/// because model inference is non-deterministic and expensive to re-run
+/// during undo/redo.
 #[derive(Debug, Clone)]
 pub enum Transformation {
     RotateLeft,
@@ -150,6 +151,11 @@ pub enum Transformation {
     Resize {
         width: u32,
         height: u32,
+    },
+    /// AI upscale resize transformation with cached result for undo/redo.
+    UpscaleResize {
+        /// The upscaled image result (boxed to keep enum size small).
+        result: Box<image_rs::DynamicImage>,
     },
     AdjustBrightness {
         value: i32,

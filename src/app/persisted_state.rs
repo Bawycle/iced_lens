@@ -347,7 +347,7 @@ mod tests {
             enable_deblur: false,
             enable_upscale: false,
         };
-        state_a.save_to(Some(temp_dir_a.path().to_path_buf()));
+        let _ = state_a.save_to(Some(temp_dir_a.path().to_path_buf()));
 
         // Test 2: Save state B (different directory)
         let temp_dir_b = tempdir().expect("create temp dir B");
@@ -357,7 +357,7 @@ mod tests {
             enable_deblur: true,
             enable_upscale: true,
         };
-        state_b.save_to(Some(temp_dir_b.path().to_path_buf()));
+        let _ = state_b.save_to(Some(temp_dir_b.path().to_path_buf()));
 
         // Verify they are independent
         let (loaded_a, _) = AppState::load_from(Some(temp_dir_a.path().to_path_buf()));

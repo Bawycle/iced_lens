@@ -74,6 +74,10 @@ impl State {
                 Transformation::Resize { width, height } => {
                     image_transform::resize(&working_image, *width, *height)
                 }
+                Transformation::UpscaleResize { result } => {
+                    // Use the cached upscaled image (AI inference is expensive)
+                    result.as_ref().clone()
+                }
                 Transformation::AdjustBrightness { value } => {
                     image_transform::adjust_brightness(&working_image, *value)
                 }

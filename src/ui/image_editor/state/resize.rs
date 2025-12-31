@@ -168,10 +168,9 @@ impl State {
         // Clear processing state
         self.resize.is_upscale_processing = false;
 
-        // Record the transformation for undo/redo
-        self.record_transformation(Transformation::Resize {
-            width: result.width(),
-            height: result.height(),
+        // Record the transformation for undo/redo with cached AI result
+        self.record_transformation(Transformation::UpscaleResize {
+            result: Box::new(result.clone()),
         });
 
         // Update the working image
