@@ -126,7 +126,8 @@ fi
 
 # Install scalable SVG (source of truth)
 ICON_SVG_SRC="$ROOT_DIR/assets/branding/iced_lens.svg"
-install -m 644 "$ICON_SVG_SRC" "$APPDIR/usr/share/icons/hicolor/scalable/apps/iced_lens.svg"
+ICON_DEST="$APPDIR/usr/share/icons/hicolor/scalable/apps/iced_lens.svg"
+install -m 644 "$ICON_SVG_SRC" "$ICON_DEST"
 
 # Install generated PNG icons for better desktop integration
 for size in 64 128 256; do
