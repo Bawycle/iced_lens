@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=IcedLens
+GenericName=Media Viewer
+Comment=Privacy-first media viewer and editor with AI enhancement
+Icon=page.codeberg.Bawycle.IcedLens
+Exec=iced_lens %F
+Terminal=false
+Categories=Graphics;Photography;Viewer;Video;AudioVideo;
+MimeType=image/jpeg;image/png;image/gif;image/webp;image/tiff;image/bmp;image/x-icon;image/svg+xml;video/mp4;video/x-msvideo;video/quicktime;video/x-matroska;video/webm;
+Keywords=image;photo;picture;viewer;editor;video;media;EXIF;metadata;AI;upscale;deblur;
+StartupNotify=true
+StartupWMClass=iced_lens

@@ -1,20 +1,28 @@
 # Application Branding
 
-This directory contains the IcedLens application icon and branding assets.
+This directory contains the IcedLens application icon source.
 
 ## Files
 
-- `iced_lens.svg` - Master scalable source (512x512). All raster exports originate here.
-- `iced_lens-{size}.png` - Pre-rendered PNG icons at various sizes (16, 32, 48, 64, 128, 256, 512)
-- `iced_lens.ico` - Windows executable icon (multi-size ICO format)
-- `iced_lens.icns` - macOS application icon (multi-size ICNS format)
+- `iced_lens.svg` - Master scalable source (512x512). This is the **single source of truth** for all branding icons.
+
+## Generated Files
+
+All raster formats are generated automatically during `cargo build` by `build.rs`:
+
+| File | Location | Usage |
+|------|----------|-------|
+| `iced_lens-{16,32,48,64,128,256,512}.png` | `target/branding/` | Linux desktop integration |
+| `iced_lens.ico` | `target/branding/` | Windows executable icon |
+| `iced_lens.icns` | `target/branding/` | macOS application icon |
 
 ## Usage
 
 - **Window icon**: The SVG is embedded in the binary and rasterized at runtime (see `src/icon.rs`)
 - **Windows executable**: The ICO is embedded via `build.rs` using winresource
 - **macOS bundle**: The ICNS is referenced in Info.plist when creating a .app bundle
-- **Linux desktop integration**: Use PNG files with `.desktop` file
+- **Linux desktop integration**: Use generated PNG files with `.desktop` file
+- **AppImage/Flatpak**: Build scripts reference generated icons from `target/branding/`
 
 ## Design Goals
 
@@ -34,22 +42,19 @@ This directory contains the IcedLens application icon and branding assets.
 
 ## Regenerating Icons
 
+Icons are regenerated automatically on every build. To manually trigger regeneration:
+
 ```bash
-# Generate all PNG sizes from SVG
-for size in 16 32 48 64 128 256 512; do
-  rsvg-convert -w $size -h $size iced_lens.svg -o iced_lens-${size}.png
-done
-
-# Generate ICO for Windows (requires ImageMagick)
-convert iced_lens-16.png iced_lens-32.png iced_lens-48.png \
-        iced_lens-64.png iced_lens-128.png iced_lens-256.png \
-        iced_lens.ico
-
-# Generate ICNS for macOS (requires icnsutils: apt install icnsutils)
-png2icns iced_lens.icns iced_lens-16.png iced_lens-32.png \
-         iced_lens-48.png iced_lens-128.png iced_lens-256.png \
-         iced_lens-512.png
+cargo build
+# Generated icons are in target/branding/
+ls target/branding/
 ```
+
+The build system uses:
+- `resvg` for SVG parsing and rendering
+- `ico` crate for Windows ICO generation
+- `icns` crate for macOS ICNS generation
+- `image` crate for PNG encoding
 
 ## License
 

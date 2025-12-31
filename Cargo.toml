@@ -59,7 +59,9 @@ default = []
 winresource = "0.1"
 resvg = "0.45.1"
 tiny-skia = "0.11.4"
-image_rs = { package = "image", version = "0.25", default-features = false, features = ["png"] }
+image_rs = { package = "image", version = "0.25", default-features = false, features = ["png", "ico"] }
+ico = "0.4"
+icns = "0.3"
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
