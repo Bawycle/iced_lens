@@ -11,8 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Media filters:** filter navigation by media type (images/videos), orientation (landscape/portrait/square), and date range. Access via the filter dropdown in the toolbar. Filters can optionally persist across sessions (Settings → Display).
 - **XMP metadata for PNG, WebP, and TIFF:** title, author, description, keywords, and copyright fields now work on PNG, WebP, and TIFF files, not just JPEG.
 - **Temporary rotation in viewer:** rotate images 90° clockwise (`R`) or counter-clockwise (`Shift+R`). Rotation is session-only and resets when navigating to another image.
+- **Flatpak packaging:** IcedLens can now be packaged as a Flatpak for easier installation on Linux.
 
 ### Changed
+- Alphabetical sorting now matches your file manager: case-insensitive, numbers sorted naturally (`file2` before `file10`).
 - Video playback errors are now displayed as notifications instead of failing silently.
 - Audio controls (mute button, volume slider) are now disabled with a grayed appearance when media has no audio track (videos without audio, animated GIFs/WebPs). A tooltip explains "No audio track".
 - Metadata fields are now filtered based on file format support—only relevant fields appear in the editor.

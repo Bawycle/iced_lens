@@ -7,6 +7,7 @@
 use crate::config::SortOrder;
 use crate::error::Result;
 use crate::media;
+use lexical_sort::natural_lexical_cmp;
 use std::path::{Path, PathBuf};
 
 /// Represents a list of media files (images and videos) in a directory with navigation capabilities.
@@ -50,7 +51,7 @@ impl MediaList {
             }
         }
 
-        sort_media_files(&mut media_files, sort_order)?;
+        sort_media_files(&mut media_files, sort_order);
 
         // Find current file in the list (may be None if file was deleted)
         let current_index = media_files.iter().position(|p| p == current_file);
@@ -80,7 +81,7 @@ impl MediaList {
             }
         }
 
-        sort_media_files(&mut media_files, sort_order)?;
+        sort_media_files(&mut media_files, sort_order);
 
         // Set current_index to first file if any exist
         let current_index = if media_files.is_empty() {
@@ -222,11 +223,19 @@ fn is_supported_media(path: &Path) -> bool {
 }
 
 /// Sorts a list of media file paths according to the specified sort order.
-#[allow(clippy::unnecessary_wraps)] // Result for API consistency
-fn sort_media_files(media_files: &mut [PathBuf], sort_order: SortOrder) -> Result<()> {
+///
+/// For alphabetical sorting, uses natural lexical sorting which:
+/// - Is case-insensitive ('a' == 'A')
+/// - Handles numbers naturally ('file2' < 'file10')
+/// - Treats accented characters as their base ASCII equivalent ('é' ≈ 'e')
+fn sort_media_files(media_files: &mut [PathBuf], sort_order: SortOrder) {
     match sort_order {
         SortOrder::Alphabetical => {
-            media_files.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+            media_files.sort_by(|a, b| {
+                let a_name = a.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                let b_name = b.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                natural_lexical_cmp(a_name, b_name)
+            });
         }
         SortOrder::ModifiedDate => {
             media_files.sort_by(|a, b| {
@@ -255,7 +264,6 @@ fn sort_media_files(media_files: &mut [PathBuf], sort_order: SortOrder) -> Resul
             });
         }
     }
-    Ok(())
 }
 
 #[cfg(test)]

@@ -37,6 +37,7 @@ bytemuck = { version = "1.16", features = ["derive"] }
 ciborium = "0.2"
 wgpu = "27.0"
 cpal = "0.17.0"
+lexical-sort = "0.3.1"
 little_exif = "0.6"
 lru = "0.16"
 png = "0.18"
