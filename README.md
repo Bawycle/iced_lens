@@ -63,6 +63,13 @@ View and edit EXIF (camera, exposure, GPS) and Dublin Core/XMP (title, creator, 
 
 Local-first: images are processed locally. AI features download models from Hugging Face on first use (~92 MB for deblur, ~64 MB for upscaling), each verified with BLAKE3 checksum. No other network activity. Report vulnerabilities via [SECURITY.md](SECURITY.md).
 
+## Repository
+
+This project is developed on [Codeberg](https://codeberg.org/Bawycle/iced_lens).
+A mirror is available on [GitHub](https://github.com/Bawycle/iced_lens) for releases.
+
+Please submit issues and pull requests on Codeberg.
+
 ## License
 
 [MPL-2.0](LICENSE) — File-level copyleft. Icons use a [separate license](ICON_LICENSE.md).
