@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<component type="desktop-application">
+  <id>page.codeberg.Bawycle.IcedLens</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MPL-2.0</project_license>
+
+  <name>IcedLens</name>
+  <summary>Privacy-first media viewer and editor with AI enhancement</summary>
+
+  <description>
+    <p>
+      IcedLens is a fast, privacy-focused media viewer and editor built with Rust.
+      View and edit images and videos with powerful AI-powered features, all running
+      locally on your machine without any cloud uploads or telemetry.
+    </p>
+    <p>Key features:</p>
+    <ul>
+      <li>View images (JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, SVG) and videos (MP4, AVI, MOV, MKV, WebM)</li>
+      <li>Non-destructive editing: rotate, crop, resize, adjust brightness and contrast</li>
+      <li>Full undo/redo history - experiment freely without losing your original</li>
+      <li>AI-powered deblurring using NAFNet neural network</li>
+      <li>AI upscaling up to 4x resolution with Real-ESRGAN</li>
+      <li>Edit EXIF metadata (camera info, GPS, timestamps) and XMP/Dublin Core fields</li>
+      <li>Video playback with frame-by-frame navigation, speed control (0.1x-8x), and volume boost</li>
+      <li>Filter media by type, orientation, or date range</li>
+      <li>Multilingual interface (English, French, Spanish, German, Italian)</li>
+    </ul>
+    <p>
+      AI features are optional and download models from Hugging Face on first use.
+      All processing happens locally - your files never leave your computer.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">page.codeberg.Bawycle.IcedLens.desktop</launchable>
+
+  <url type="homepage">https://codeberg.org/Bawycle/iced_lens</url>
+  <url type="bugtracker">https://codeberg.org/Bawycle/iced_lens/issues</url>
+  <url type="vcs-browser">https://codeberg.org/Bawycle/iced_lens</url>
+  <url type="contribute">https://codeberg.org/Bawycle/iced_lens/src/branch/master/CONTRIBUTING.md</url>
+
+  <developer id="page.codeberg.Bawycle">
+    <name>Bawycle</name>
+  </developer>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#F2C94C</color>
+    <color type="primary" scheme_preference="dark">#2E3440</color>
+  </branding>
+
+  <screenshots>
+    <!-- TODO: Add screenshots before Flathub submission -->
+    <!-- Screenshots must be hosted at a stable URL (e.g., Codeberg raw file) -->
+    <!--
+    <screenshot type="default">
+      <image>https://codeberg.org/Bawycle/iced_lens/raw/branch/master/docs/screenshots/viewer-light.png</image>
+      <caption>Image viewer with zoom and navigation controls</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://codeberg.org/Bawycle/iced_lens/raw/branch/master/docs/screenshots/video-playback.png</image>
+      <caption>Video playback with timeline and speed controls</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://codeberg.org/Bawycle/iced_lens/raw/branch/master/docs/screenshots/image-editor.png</image>
+      <caption>Non-destructive image editing with live preview</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://codeberg.org/Bawycle/iced_lens/raw/branch/master/docs/screenshots/metadata-panel.png</image>
+      <caption>EXIF and XMP metadata viewing and editing</caption>
+    </screenshot>
+    -->
+  </screenshots>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.5.0" date="2025-12-22">
+      <description>
+        <p>New features:</p>
+        <ul>
+          <li>Volume amplification up to 150% for quiet videos</li>
+          <li>Video playback speed control (0.1x to 8x)</li>
+          <li>Mouse wheel zoom and grab-to-pan in image editor</li>
+          <li>AI upscaling with Real-ESRGAN (4x resolution)</li>
+          <li>Auto-skip corrupted files during navigation</li>
+          <li>Resize preview thumbnail before applying</li>
+        </ul>
+        <p>Improvements:</p>
+        <ul>
+          <li>Larger crop handles for easier selection</li>
+          <li>Better tooltip visibility on all themes</li>
+          <li>Resize scale maximum increased to 400%</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.4.1" date="2025-12-19">
+      <description>
+        <p>Fixed navigation arrow clickable zones spanning entire viewport height.</p>
+      </description>
+    </release>
+    <release version="0.4.0" date="2025-12-18">
+      <description>
+        <p>Major release with AI deblurring and metadata editing:</p>
+        <ul>
+          <li>AI-powered image deblurring with NAFNet</li>
+          <li>EXIF and Dublin Core/XMP metadata editing</li>
+          <li>Empty state view with drag-and-drop support</li>
+          <li>Dynamic window title with filename and unsaved indicator</li>
+          <li>Application icons for all platforms</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.3.0" date="2025-12-14">
+      <description>
+        <p>Added media info panel, brightness/contrast editing, toast notifications,
+           and new translations (Spanish, German, Italian).</p>
+      </description>
+    </release>
+    <release version="0.2.0" date="2025-12-12">
+      <description>
+        <p>Added video playback support for MP4, AVI, MOV, MKV, WebM with full
+           playback controls, frame-by-frame navigation, and theme selection.</p>
+      </description>
+    </release>
+    <release version="0.1.0" date="2025-12-02">
+      <description>
+        <p>Initial release with image viewing (JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, SVG),
+           zoom/pan, navigation, fullscreen, and non-destructive editing.</p>
+      </description>
+    </release>
+  </releases>
+
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+
+  <supports>
+    <control>touch</control>
+  </supports>
+
+  <categories>
+    <category>Graphics</category>
+    <category>Photography</category>
+    <category>Viewer</category>
+    <category>Video</category>
+  </categories>
+
+  <keywords>
+    <keyword>image</keyword>
+    <keyword>photo</keyword>
+    <keyword>picture</keyword>
+    <keyword>viewer</keyword>
+    <keyword>editor</keyword>
+    <keyword>video</keyword>
+    <keyword>media</keyword>
+    <keyword>EXIF</keyword>
+    <keyword>metadata</keyword>
+    <keyword>AI</keyword>
+    <keyword>upscale</keyword>
+    <keyword>deblur</keyword>
+    <keyword>privacy</keyword>
+  </keywords>
+</component>
