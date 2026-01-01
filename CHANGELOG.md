@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Help screen expand/collapse icons no longer display with blue rectangles on Windows.
 - Undo/redo now correctly preserves AI upscaling results in the image editor.
 - Resize tool now works correctly after undoing an AI upscaling operation.
+- Audio now plays at correct speed on all videos (fixed sample rate mismatch with audio device).
 
 ## [0.5.0] - 2025-12-22
 

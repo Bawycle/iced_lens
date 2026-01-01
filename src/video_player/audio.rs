@@ -5,6 +5,7 @@
 //! and audio playback using cpal.
 
 use crate::error::{Error, Result};
+use crate::video_player::audio_output::AudioOutputConfig;
 use crate::video_player::sync::SharedSyncClock;
 use std::path::Path;
 use std::sync::Arc;
@@ -270,6 +271,8 @@ impl AudioDecoder {
     /// * `sync_clock` - Optional shared sync clock for A/V synchronization.
     ///   When provided, the audio decoder will update the clock with its PTS,
     ///   allowing the video decoder to sync to audio timing.
+    /// * `output_config` - Audio output device configuration (sample rate, channels).
+    ///   The decoder will resample audio to match these specs for correct playback.
     ///
     /// # Errors
     ///
@@ -279,6 +282,7 @@ impl AudioDecoder {
     pub fn new<P: AsRef<Path>>(
         video_path: P,
         sync_clock: Option<SharedSyncClock>,
+        output_config: AudioOutputConfig,
     ) -> Result<Option<Self>> {
         let path = video_path.as_ref().to_path_buf();
 
@@ -303,7 +307,9 @@ impl AudioDecoder {
 
         // Spawn the decoder task in a blocking thread
         tokio::task::spawn_blocking(move || {
-            if let Err(e) = Self::decoder_loop(path, command_rx, event_tx, sync_clock) {
+            if let Err(e) =
+                Self::decoder_loop(path, command_rx, event_tx, sync_clock, output_config)
+            {
                 eprintln!("Audio decoder task failed: {e}");
             }
         });
@@ -349,7 +355,7 @@ impl AudioDecoder {
     }
 
     /// Main audio decoder loop running in a blocking thread.
-    #[allow(clippy::needless_pass_by_value)] // PathBuf/Sender/SyncClock need ownership for thread
+    #[allow(clippy::needless_pass_by_value)] // PathBuf/Sender/SyncClock/Config need ownership for thread
     #[allow(clippy::cast_precision_loss)] // FFmpeg i64 timestamps have enough f64 precision
     #[allow(clippy::cast_possible_truncation)] // Timestamp conversions are within valid range
     #[allow(clippy::too_many_lines)] // Core decoder state machine - refactored from 202 to 160 lines
@@ -358,6 +364,7 @@ impl AudioDecoder {
         mut command_rx: mpsc::UnboundedReceiver<AudioDecoderCommand>,
         event_tx: mpsc::Sender<AudioDecoderEvent>,
         sync_clock: Option<SharedSyncClock>,
+        output_config: AudioOutputConfig,
     ) -> Result<()> {
         // Initialize FFmpeg
         crate::media::video::init_ffmpeg()?;
@@ -409,16 +416,27 @@ impl AudioDecoder {
             bit_rate: None, // Could extract from stream if needed
         }));
 
-        // Setup resampler to convert to f32 planar -> interleaved f32
+        // Setup resampler to convert to f32 interleaved at the target sample rate and channels.
+        // This is critical: the audio device expects samples at its native rate and channel count.
+        // Without proper resampling, audio plays at wrong speed (robotic sound) or wrong channels.
+        let output_channel_layout = match output_config.channels {
+            1 => ffmpeg_next::ChannelLayout::MONO,
+            _ => ffmpeg_next::ChannelLayout::STEREO, // Downmix anything else to stereo
+        };
+
         let mut resampler = ffmpeg_next::software::resampling::Context::get(
             decoder.format(),
             decoder.channel_layout(),
             decoder.rate(),
             ffmpeg_next::format::Sample::F32(ffmpeg_next::format::sample::Type::Packed),
-            decoder.channel_layout(),
-            decoder.rate(),
+            output_channel_layout,
+            output_config.sample_rate,
         )
         .map_err(|e| Error::Io(format!("Failed to create resampler: {e}")))?;
+
+        // Use output config for duration calculations since that's what we output
+        let output_sample_rate = output_config.sample_rate;
+        let output_channels = output_config.channels;
 
         // Playback state
         let mut state = AudioDecoderState::new();
@@ -479,7 +497,7 @@ impl AudioDecoder {
                         continue;
                     }
 
-                    let samples = Self::extract_samples(&output_audio, channels);
+                    let samples = Self::extract_samples(&output_audio, output_channels);
 
                     #[allow(clippy::cast_precision_loss)]
                     let pts_secs = if let Some(pts) = decoded_frame.timestamp() {
@@ -488,8 +506,8 @@ impl AudioDecoder {
                         0.0
                     };
 
-                    let frame_duration =
-                        samples.len() as f64 / (f64::from(sample_rate) * f64::from(channels));
+                    let frame_duration = samples.len() as f64
+                        / (f64::from(output_sample_rate) * f64::from(output_channels));
 
                     // Precise seeking: skip audio frames before target PTS
                     if let Some(target) = state.seek_target_secs {
@@ -536,8 +554,8 @@ impl AudioDecoder {
 
                     let audio = DecodedAudio {
                         samples: Arc::new(samples),
-                        sample_rate,
-                        channels,
+                        sample_rate: output_sample_rate,
+                        channels: output_channels,
                         pts_secs,
                         duration_secs: frame_duration,
                     };
@@ -702,14 +720,23 @@ mod tests {
         std::fs::write(&video_path, b"fake video data without audio").unwrap();
 
         // This should return Ok(None) or an error, not panic
-        let result = AudioDecoder::new(&video_path, None);
+        // Use typical device config: 48000 Hz stereo
+        let config = AudioOutputConfig {
+            sample_rate: 48000,
+            channels: 2,
+        };
+        let result = AudioDecoder::new(&video_path, None, config);
         // We expect either Ok(None) for no audio or Err for invalid file
         assert!(result.is_ok() || result.is_err());
     }
 
     #[tokio::test]
     async fn audio_decoder_fails_for_nonexistent_file() {
-        let result = AudioDecoder::new("/nonexistent/video.mp4", None);
+        let config = AudioOutputConfig {
+            sample_rate: 48000,
+            channels: 2,
+        };
+        let result = AudioDecoder::new("/nonexistent/video.mp4", None, config);
         assert!(result.is_err());
     }
 }

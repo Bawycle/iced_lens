@@ -305,36 +305,35 @@ async fn run_playback_loop(
                     }
                 };
 
-                // Try to create audio decoder (optional - video might not have audio)
-                // Note: WebP animations don't have audio, so skip for them
-                let audio_decoder = if use_webp_decoder {
-                    None
+                // Create audio output first to get the device configuration.
+                // The audio decoder needs this to resample correctly (sample rate + channels).
+                // Note: WebP animations don't have audio, so skip for them.
+                let (audio_decoder, audio_output) = if use_webp_decoder {
+                    (None, None)
                 } else {
-                    match AudioDecoder::new(&video_path, sync_clock) {
-                        Ok(Some(decoder)) => Some(decoder),
-                        Ok(None) => {
-                            // No audio stream in video - this is fine
-                            None
-                        }
-                        Err(e) => {
-                            // Log error but continue without audio
-                            eprintln!("Audio decoder failed: {e}");
-                            None
-                        }
-                    }
-                };
-
-                // Create audio output if we have audio
-                let audio_output = if audio_decoder.is_some() {
+                    // Try to create audio output to get device config
                     match AudioOutput::new(0.8) {
-                        Ok(output) => Some(output),
+                        Ok(output) => {
+                            let output_config = output.config();
+                            // Now create decoder with the correct output configuration
+                            match AudioDecoder::new(&video_path, sync_clock, output_config) {
+                                Ok(Some(decoder)) => (Some(decoder), Some(output)),
+                                Ok(None) => {
+                                    // No audio stream in video - this is fine
+                                    (None, None)
+                                }
+                                Err(e) => {
+                                    // Log error but continue without audio
+                                    eprintln!("Audio decoder failed: {e}");
+                                    (None, None)
+                                }
+                            }
+                        }
                         Err(e) => {
                             eprintln!("Audio output failed: {e}");
-                            None
+                            (None, None)
                         }
                     }
-                } else {
-                    None
                 };
 
                 // Create normalization gain

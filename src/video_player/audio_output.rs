@@ -11,6 +11,19 @@ use tokio::sync::mpsc;
 
 use crate::error::{Error, Result};
 
+/// Configuration for audio output device.
+///
+/// Used to configure the audio decoder's resampler to match the output device.
+/// This ensures audio plays at the correct speed and with proper channel mapping.
+#[derive(Debug, Clone, Copy)]
+pub struct AudioOutputConfig {
+    /// Sample rate in Hz (e.g., 44100, 48000).
+    pub sample_rate: u32,
+
+    /// Number of audio channels (1 = mono, 2 = stereo).
+    pub channels: u16,
+}
+
 /// Audio samples to be played.
 /// Interleaved f32 samples normalized to [-1.0, 1.0].
 pub type AudioSamples = Arc<Vec<f32>>;
@@ -402,6 +415,15 @@ impl AudioOutput {
     #[must_use]
     pub fn channels(&self) -> u16 {
         self.channels
+    }
+
+    /// Returns the output configuration for use by the audio decoder.
+    #[must_use]
+    pub fn config(&self) -> AudioOutputConfig {
+        AudioOutputConfig {
+            sample_rate: self.sample_rate,
+            channels: self.channels,
+        }
     }
 }
 

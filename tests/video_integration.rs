@@ -6,6 +6,7 @@
 
 use iced_lens::media::video::{extract_thumbnail, extract_video_metadata};
 use iced_lens::video_player::audio::{AudioDecoder, AudioDecoderCommand, AudioDecoderEvent};
+use iced_lens::video_player::audio_output::AudioOutputConfig;
 use iced_lens::video_player::{AsyncDecoder, CacheConfig, DecoderCommand, DecoderEvent};
 use std::time::Duration;
 
@@ -444,7 +445,12 @@ fn test_audio_decoding(path: &str, format_name: &str, expect_audio: bool) {
     let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
     rt.block_on(async {
-        match AudioDecoder::new(path, None) {
+        // Use typical device config: 48000 Hz stereo
+        let config = AudioOutputConfig {
+            sample_rate: 48000,
+            channels: 2,
+        };
+        match AudioDecoder::new(path, None, config) {
             Ok(Some(mut decoder)) => {
                 assert!(
                     expect_audio,
@@ -588,7 +594,12 @@ fn test_audio_stream_info_all_formats() {
         }
 
         rt.block_on(async {
-            match AudioDecoder::new(path, None) {
+            // Use typical device config: 48000 Hz stereo
+            let config = AudioOutputConfig {
+                sample_rate: 48000,
+                channels: 2,
+            };
+            match AudioDecoder::new(path, None, config) {
                 Ok(Some(mut decoder)) => {
                     decoder
                         .send_command(AudioDecoderCommand::Play)
