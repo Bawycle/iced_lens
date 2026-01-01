@@ -398,6 +398,9 @@ impl App {
             );
 
             if let Some(media_path) = resolved_path {
+                // Synchronize navigator state (single source of truth for current media)
+                app.media_navigator.set_current_media_path(media_path.clone());
+
                 // Synchronize viewer state
                 app.viewer.current_media_path = Some(media_path.clone());
 

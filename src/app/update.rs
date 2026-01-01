@@ -160,8 +160,11 @@ pub fn handle_viewer_message(
         // Exit metadata edit mode (new media loaded = new context)
         *ctx.metadata_editor_state = None;
 
-        // Use media_navigator as single source of truth for current path
-        if let Some(path) = ctx.media_navigator.current_media_path() {
+        // Use viewer.current_media_path as the source of truth for metadata extraction.
+        // This is the path of the media that was just loaded, which is guaranteed to be
+        // correct at this point. The navigator may not yet be synchronized (ConfirmNavigation
+        // effect is processed later).
+        if let Some(path) = ctx.viewer.current_media_path.as_ref() {
             // Extract metadata
             *ctx.current_metadata = media::metadata::extract_metadata(path);
 
