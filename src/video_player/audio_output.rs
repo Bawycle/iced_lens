@@ -214,25 +214,29 @@ impl AudioOutput {
             }
         });
 
-        // Build audio stream based on sample format
+        // Build audio stream based on sample format.
+        // Pass the device channel count so the callback can map stereo samples correctly.
         let stream = match supported_config.sample_format() {
             cpal::SampleFormat::F32 => Self::build_stream::<f32>(
                 &device,
                 &supported_config.into(),
                 buffer_clone,
                 shared_state_clone,
+                channels,
             )?,
             cpal::SampleFormat::I16 => Self::build_stream::<i16>(
                 &device,
                 &supported_config.into(),
                 buffer_clone,
                 shared_state_clone,
+                channels,
             )?,
             cpal::SampleFormat::U16 => Self::build_stream::<u16>(
                 &device,
                 &supported_config.into(),
                 buffer_clone,
                 shared_state_clone,
+                channels,
             )?,
             _ => return Err(Error::Io("Unsupported audio sample format".to_string())),
         };
@@ -252,11 +256,16 @@ impl AudioOutput {
     }
 
     /// Builds an audio output stream for a specific sample format.
+    ///
+    /// The `device_channels` parameter specifies the number of channels the device expects.
+    /// The input buffer contains stereo samples (L, R, L, R, ...) which are mapped to the
+    /// device channels. For surround sound devices (5.1, 7.1), only FL/FR are used.
     fn build_stream<T: cpal::SizedSample + cpal::FromSample<f32>>(
         device: &cpal::Device,
         config: &cpal::StreamConfig,
         buffer: Arc<std::sync::Mutex<Vec<f32>>>,
         shared_state: Arc<SharedState>,
+        device_channels: u16,
     ) -> Result<cpal::Stream> {
         let stream = device
             .build_output_stream(
@@ -291,22 +300,32 @@ impl AudioOutput {
                     // - 150% slider → 225% actual (+7 dB, clearly louder)
                     let perceptual_volume = volume * volume;
 
-                    for (i, sample) in data.iter_mut().enumerate() {
-                        if i < buf.len() {
-                            // Apply volume and clamp to safe range.
-                            // Clamping to slightly below 1.0 prevents i16 overflow
-                            // (dasp's from_sample overflows at exactly 1.0 for i16).
-                            // Values > 1.0 represent amplification and will be clipped.
-                            let amplified = (buf[i] * perceptual_volume).clamp(-1.0, 0.999_999_9);
-                            *sample = T::from_sample(amplified);
-                        } else {
-                            *sample = T::from_sample(0.0f32);
+                    // Map stereo samples to device channels.
+                    // Buffer contains interleaved stereo: [L0, R0, L1, R1, ...]
+                    // Device expects interleaved by frame: [ch0, ch1, ..., chN, ch0, ch1, ...]
+                    // For surround (5.1/7.1), we map L→FL(0), R→FR(1), other channels→silence.
+                    let dev_ch = device_channels as usize;
+                    let num_frames = data.len() / dev_ch;
+                    let mut buf_idx = 0;
+
+                    for frame in 0..num_frames {
+                        let frame_offset = frame * dev_ch;
+                        for ch in 0..dev_ch {
+                            let sample_value = if ch < 2 && buf_idx < buf.len() {
+                                // Left (ch=0) or Right (ch=1) from stereo buffer
+                                let s = buf[buf_idx];
+                                buf_idx += 1;
+                                (s * perceptual_volume).clamp(-1.0, 0.999_999_9)
+                            } else {
+                                // Center, LFE, rear channels, or buffer exhausted → silence
+                                0.0f32
+                            };
+                            data[frame_offset + ch] = T::from_sample(sample_value);
                         }
                     }
 
-                    // Remove consumed samples
-                    let consumed = data.len().min(buf.len());
-                    buf.drain(..consumed);
+                    // Remove consumed samples (we consumed buf_idx samples)
+                    buf.drain(..buf_idx);
                 },
                 |err| {
                     eprintln!("Audio output error: {err}");

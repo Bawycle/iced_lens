@@ -416,17 +416,37 @@ impl AudioDecoder {
             bit_rate: None, // Could extract from stream if needed
         }));
 
-        // Setup resampler to convert to f32 interleaved at the target sample rate and channels.
-        // This is critical: the audio device expects samples at its native rate and channel count.
-        // Without proper resampling, audio plays at wrong speed (robotic sound) or wrong channels.
-        let output_channel_layout = match output_config.channels {
-            1 => ffmpeg_next::ChannelLayout::MONO,
-            _ => ffmpeg_next::ChannelLayout::STEREO, // Downmix anything else to stereo
+        // Setup resampler to convert to f32 interleaved at the target sample rate.
+        // We always output stereo (or mono if device is mono) because:
+        // 1. Most audio content is stereo
+        // 2. cpal's audio callback receives a flat sample buffer - we write L,R,L,R...
+        // 3. The audio device driver handles mapping stereo to surround (if applicable)
+        //
+        // IMPORTANT: output_channels must match the actual resampler output, not the device
+        // config. Using device channels (e.g., 6 for 5.1) when resampler outputs stereo (2)
+        // causes extract_samples to read beyond data bounds and duration miscalculation,
+        // resulting in audio playing at wrong speed (robotic sound).
+        let (output_channel_layout, output_channels) = match output_config.channels {
+            1 => (ffmpeg_next::ChannelLayout::MONO, 1u16),
+            _ => (ffmpeg_next::ChannelLayout::STEREO, 2u16),
+        };
+
+        // Get the input channel layout. Some files have an empty/unspecified channel layout
+        // (is_empty() returns true when order == AV_CHANNEL_ORDER_UNSPEC). In this case,
+        // bits() returns 0, which causes the resampler to malfunction (robotic sound).
+        // Fall back to a default layout based on channel count.
+        let input_channel_layout = {
+            let layout = decoder.channel_layout();
+            if layout.is_empty() {
+                ffmpeg_next::ChannelLayout::default(decoder.channels() as i32)
+            } else {
+                layout
+            }
         };
 
         let mut resampler = ffmpeg_next::software::resampling::Context::get(
             decoder.format(),
-            decoder.channel_layout(),
+            input_channel_layout,
             decoder.rate(),
             ffmpeg_next::format::Sample::F32(ffmpeg_next::format::sample::Type::Packed),
             output_channel_layout,
@@ -434,9 +454,8 @@ impl AudioDecoder {
         )
         .map_err(|e| Error::Io(format!("Failed to create resampler: {e}")))?;
 
-        // Use output config for duration calculations since that's what we output
+        // Use output config sample rate and the actual channel count from resampler
         let output_sample_rate = output_config.sample_rate;
-        let output_channels = output_config.channels;
 
         // Playback state
         let mut state = AudioDecoderState::new();
@@ -489,7 +508,29 @@ impl AudioDecoder {
 
                 let mut decoded_frame = ffmpeg_next::frame::Audio::empty();
                 if decoder.receive_frame(&mut decoded_frame).is_ok() {
+                    // Pre-allocate output frame with correct sample count for resampling.
+                    // When sample rates differ, output needs proportionally more/fewer samples.
+                    // ffmpeg-next's run() allocates with input.samples() which is wrong for
+                    // sample rate conversion (causes audio speedup/slowdown = robotic sound).
+                    let input_samples = decoded_frame.samples();
+                    let input_rate = decoded_frame.rate();
+                    // Round up to avoid losing samples
+                    let output_samples = ((input_samples as u64 * u64::from(output_sample_rate)
+                        + u64::from(input_rate) - 1)
+                        / u64::from(input_rate)) as usize;
+
                     let mut output_audio = ffmpeg_next::frame::Audio::empty();
+                    // Pre-allocate with correct size so run() doesn't reallocate incorrectly
+                    unsafe {
+                        output_audio.alloc(
+                            ffmpeg_next::format::Sample::F32(
+                                ffmpeg_next::format::sample::Type::Packed,
+                            ),
+                            output_samples,
+                            output_channel_layout,
+                        );
+                    }
+
                     if let Err(e) = resampler.run(&decoded_frame, &mut output_audio) {
                         let _ = event_tx.blocking_send(AudioDecoderEvent::Error(format!(
                             "Resampling failed: {e}"
