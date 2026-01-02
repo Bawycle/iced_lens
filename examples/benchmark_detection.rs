@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Benchmark media type detection performance
 
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
+
 use iced_lens::media::detect_media_type;
 use std::env;
 use std::time::Instant;

@@ -105,7 +105,7 @@ fn clamp_zoom_step(value: f32) -> f32 {
 }
 
 /// Builds the window settings
-#[must_use] 
+#[must_use]
 pub fn window_settings_with_locale() -> window::Settings {
     let icon = crate::icon::load_window_icon();
 
@@ -378,7 +378,8 @@ impl App {
 
             if let Some(media_path) = resolved_path {
                 // Synchronize navigator state (single source of truth for current media)
-                app.media_navigator.set_current_media_path(media_path.clone());
+                app.media_navigator
+                    .set_current_media_path(media_path.clone());
 
                 // Synchronize viewer state
                 app.viewer.current_media_path = Some(media_path.clone());
@@ -1222,10 +1223,8 @@ impl App {
                             )
                         } else {
                             // No more images to navigate to
-                            let files_text = update::format_skipped_files_message(
-                                &self.i18n,
-                                &skipped_files,
-                            );
+                            let files_text =
+                                update::format_skipped_files_message(&self.i18n, &skipped_files);
                             self.notifications.push(
                                 notifications::Notification::warning(
                                     "notification-skipped-corrupted-files",
@@ -1788,8 +1787,7 @@ mod tests {
             .viewer
             .current_media_path
             .as_ref()
-            .map(|p| p.ends_with("b.jpg"))
-            .unwrap_or(false));
+            .is_some_and(|p| p.ends_with("b.jpg")));
     }
 
     #[test]
@@ -1827,8 +1825,7 @@ mod tests {
             .viewer
             .current_media_path
             .as_ref()
-            .map(|p| p.ends_with("a.jpg"))
-            .unwrap_or(false));
+            .is_some_and(|p| p.ends_with("a.jpg")));
     }
 
     #[test]
@@ -1866,8 +1863,7 @@ mod tests {
             .viewer
             .current_media_path
             .as_ref()
-            .map(|p| p.ends_with("a.jpg"))
-            .unwrap_or(false));
+            .is_some_and(|p| p.ends_with("a.jpg")));
     }
 
     #[test]
@@ -1917,8 +1913,7 @@ mod tests {
                 .viewer
                 .current_media_path
                 .as_ref()
-                .map(|p| p.ends_with("b.jpg"))
-                .unwrap_or(false));
+                .is_some_and(|p| p.ends_with("b.jpg")));
         });
     }
 
@@ -1969,8 +1964,7 @@ mod tests {
             .viewer
             .current_media_path
             .as_ref()
-            .map(|p| p.ends_with("b.png"))
-            .unwrap_or(false));
+            .is_some_and(|p| p.ends_with("b.png")));
 
         // Simulate the async image loading completing
         let img2_data = media::load_media(&img2_path).expect("failed to load img2");
@@ -2026,8 +2020,7 @@ mod tests {
             .viewer
             .current_media_path
             .as_ref()
-            .map(|p| p.ends_with("a.png"))
-            .unwrap_or(false));
+            .is_some_and(|p| p.ends_with("a.png")));
 
         // Simulate the async image loading completing
         let img1_data = media::load_media(&img1_path).expect("failed to load img1");

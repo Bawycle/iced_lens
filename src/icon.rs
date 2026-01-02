@@ -8,7 +8,7 @@ use resvg::usvg;
 
 /// Rasterize the embedded SVG icon to a 128x128 RGBA buffer.
 /// Returns `None` if parsing or rendering fails.
-#[must_use] 
+#[must_use]
 pub fn load_window_icon() -> Option<Icon> {
     // Embed the SVG so packaging does not need to locate assets on disk.
     const SVG_SOURCE: &str = include_str!("../assets/branding/iced_lens.svg");

@@ -30,7 +30,7 @@ pub struct Manager {
 
 impl Manager {
     /// Creates a new empty notification manager.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -104,19 +104,19 @@ impl Manager {
     }
 
     /// Returns the number of visible notifications.
-    #[must_use] 
+    #[must_use]
     pub fn visible_count(&self) -> usize {
         self.visible.len()
     }
 
     /// Returns the number of queued notifications.
-    #[must_use] 
+    #[must_use]
     pub fn queued_count(&self) -> usize {
         self.queue.len()
     }
 
     /// Returns whether there are any notifications (visible or queued).
-    #[must_use] 
+    #[must_use]
     pub fn has_notifications(&self) -> bool {
         !self.visible.is_empty() || !self.queue.is_empty()
     }

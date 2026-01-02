@@ -83,22 +83,23 @@ fn build_processing_overlay<'a>(
         .push(spinner)
         .push(loading_text);
 
-    let loading_overlay = container(loading_content)
-        .padding(spacing::MD)
-        .style(move |_theme: &Theme| container::Style {
-            background: Some(Background::Color(Color {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: opacity::OVERLAY_MEDIUM,
-            })),
-            border: iced::Border {
-                radius: radius::MD.into(),
+    let loading_overlay =
+        container(loading_content)
+            .padding(spacing::MD)
+            .style(move |_theme: &Theme| container::Style {
+                background: Some(Background::Color(Color {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: opacity::OVERLAY_MEDIUM,
+                })),
+                border: iced::Border {
+                    radius: radius::MD.into(),
+                    ..Default::default()
+                },
+                text_color: Some(theme::overlay_arrow_light_color()),
                 ..Default::default()
-            },
-            text_color: Some(theme::overlay_arrow_light_color()),
-            ..Default::default()
-        });
+            });
 
     container(loading_overlay)
         .width(Length::Fixed(scaled_width))
@@ -194,8 +195,12 @@ pub fn view<'a>(model: &CanvasModel<'a>, ctx: &ViewContext<'a>) -> Element<'a, M
             .height(Length::Fixed(scaled_height));
 
         let image_with_overlay: Element<'_, Message> = if is_processing {
-            let overlay =
-                build_processing_overlay(scaled_width, scaled_height, spinner_rotation, processing_text.clone());
+            let overlay = build_processing_overlay(
+                scaled_width,
+                scaled_height,
+                spinner_rotation,
+                processing_text.clone(),
+            );
             Stack::new().push(image_widget).push(overlay).into()
         } else if crop_visible {
             Stack::new()

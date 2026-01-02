@@ -311,7 +311,7 @@ fn test_decode_corrupted_file() {
                             DecoderEvent::Error(_)
                             | DecoderEvent::EndOfStream
                             | DecoderEvent::FrameReady(_) => return true,
-                            DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => continue,
+                            DecoderEvent::Buffering | DecoderEvent::HistoryExhausted => {}
                         }
                     }
                 }

@@ -1332,7 +1332,10 @@ impl State {
                         // Forward to app if valid, otherwise just update locally
                         let date_state = self.filter_dropdown.date_state(target);
                         if date_state.is_complete_and_valid() {
-                            (Effect::FilterChanged(FdMsg::DateSubmit(target)), Task::none())
+                            (
+                                Effect::FilterChanged(FdMsg::DateSubmit(target)),
+                                Task::none(),
+                            )
                         } else {
                             (Effect::None, Task::none())
                         }
@@ -1340,7 +1343,10 @@ impl State {
                     FdMsg::ClearDate(target) => {
                         // Clear local input and forward to app
                         self.filter_dropdown.clear_date(target);
-                        (Effect::FilterChanged(FdMsg::ClearDate(target)), Task::none())
+                        (
+                            Effect::FilterChanged(FdMsg::ClearDate(target)),
+                            Task::none(),
+                        )
                     }
                     // Forward other filter changes to app (it owns the navigator/filter)
                     other => (Effect::FilterChanged(other), Task::none()),

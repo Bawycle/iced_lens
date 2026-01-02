@@ -63,7 +63,6 @@ pub enum Message {
     ResetFilters,
 }
 
-
 // =============================================================================
 // State
 // =============================================================================
@@ -136,9 +135,7 @@ impl SegmentedDateState {
         if self.day.is_empty() {
             return true; // Empty is valid (not yet entered)
         }
-        self.day
-            .parse::<u32>()
-            .is_ok_and(|d| (1..=31).contains(&d))
+        self.day.parse::<u32>().is_ok_and(|d| (1..=31).contains(&d))
     }
 
     /// Validate the month segment (1-12).
@@ -370,16 +367,20 @@ fn build_tooltip_text(ctx: &ViewContext<'_>) -> String {
             (Some(start), Some(end)) => {
                 let start_str = format_system_time(start);
                 let end_str = format_system_time(end);
-                ctx.i18n
-                    .tr_with_args("filter-tooltip-date-range", &[("start", &start_str), ("end", &end_str)])
+                ctx.i18n.tr_with_args(
+                    "filter-tooltip-date-range",
+                    &[("start", &start_str), ("end", &end_str)],
+                )
             }
             (Some(start), None) => {
                 let date_str = format_system_time(start);
-                ctx.i18n.tr_with_args("filter-tooltip-date-from", &[("date", &date_str)])
+                ctx.i18n
+                    .tr_with_args("filter-tooltip-date-from", &[("date", &date_str)])
             }
             (None, Some(end)) => {
                 let date_str = format_system_time(end);
-                ctx.i18n.tr_with_args("filter-tooltip-date-to", &[("date", &date_str)])
+                ctx.i18n
+                    .tr_with_args("filter-tooltip-date-to", &[("date", &date_str)])
             }
             (None, None) => String::new(),
         };
@@ -392,7 +393,8 @@ fn build_tooltip_text(ctx: &ViewContext<'_>) -> String {
         ctx.i18n.tr("filter-dropdown-tooltip")
     } else {
         let filters = parts.join(", ");
-        ctx.i18n.tr_with_args("filter-dropdown-tooltip-active", &[("filters", &filters)])
+        ctx.i18n
+            .tr_with_args("filter-dropdown-tooltip-active", &[("filters", &filters)])
     }
 }
 
@@ -964,39 +966,56 @@ mod tests {
 
     #[test]
     fn segmented_date_state_validation() {
-        let mut state = SegmentedDateState::default();
-
         // Valid day
-        state.day = "15".to_string();
+        let state = SegmentedDateState {
+            day: "15".to_string(),
+            ..Default::default()
+        };
         assert!(state.is_day_valid());
 
         // Invalid day
-        state.day = "32".to_string();
+        let state = SegmentedDateState {
+            day: "32".to_string(),
+            ..Default::default()
+        };
         assert!(!state.is_day_valid());
 
         // Valid month
-        state.month = "06".to_string();
+        let state = SegmentedDateState {
+            month: "06".to_string(),
+            ..Default::default()
+        };
         assert!(state.is_month_valid());
 
         // Invalid month
-        state.month = "13".to_string();
+        let state = SegmentedDateState {
+            month: "13".to_string(),
+            ..Default::default()
+        };
         assert!(!state.is_month_valid());
 
         // Valid year
-        state.year = "2024".to_string();
+        let state = SegmentedDateState {
+            year: "2024".to_string(),
+            ..Default::default()
+        };
         assert!(state.is_year_valid());
 
         // Invalid year
-        state.year = "1969".to_string();
+        let state = SegmentedDateState {
+            year: "1969".to_string(),
+            ..Default::default()
+        };
         assert!(!state.is_year_valid());
     }
 
     #[test]
     fn segmented_date_state_to_system_time() {
-        let mut state = SegmentedDateState::default();
-        state.day = "15".to_string();
-        state.month = "06".to_string();
-        state.year = "2024".to_string();
+        let state = SegmentedDateState {
+            day: "15".to_string(),
+            month: "06".to_string(),
+            year: "2024".to_string(),
+        };
 
         let time = state.to_system_time();
         assert!(time.is_some());
@@ -1008,8 +1027,10 @@ mod tests {
 
     #[test]
     fn segmented_date_state_incomplete() {
-        let mut state = SegmentedDateState::default();
-        state.day = "15".to_string();
+        let state = SegmentedDateState {
+            day: "15".to_string(),
+            ..Default::default()
+        };
         // Missing month and year
         assert!(state.to_system_time().is_none());
         assert!(!state.is_complete_and_valid());

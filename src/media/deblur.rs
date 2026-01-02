@@ -105,7 +105,7 @@ impl Default for DeblurManager {
 
 impl DeblurManager {
     /// Creates a new `DeblurManager` instance.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         let model_path = get_model_path();
         Self {
@@ -115,13 +115,13 @@ impl DeblurManager {
     }
 
     /// Returns the path where the model is/will be stored.
-    #[must_use] 
+    #[must_use]
     pub fn model_path(&self) -> &PathBuf {
         &self.model_path
     }
 
     /// Checks if the model file exists on disk.
-    #[must_use] 
+    #[must_use]
     pub fn is_model_downloaded(&self) -> bool {
         self.model_path.exists()
     }
@@ -159,7 +159,7 @@ impl DeblurManager {
     }
 
     /// Checks if the ONNX session is loaded and ready.
-    #[must_use] 
+    #[must_use]
     pub fn is_session_ready(&self) -> bool {
         self.session.is_some()
     }
@@ -222,7 +222,7 @@ impl DeblurManager {
 }
 
 /// Returns the path where the deblur model should be stored.
-#[must_use] 
+#[must_use]
 pub fn get_model_path() -> PathBuf {
     paths::get_app_data_dir().map_or_else(
         || PathBuf::from(MODEL_FILENAME),
@@ -237,7 +237,7 @@ pub fn get_model_path() -> PathBuf {
 const MIN_MODEL_SIZE_BYTES: u64 = 80_000_000;
 
 /// Checks if the model file exists at the expected location with valid size.
-#[must_use] 
+#[must_use]
 pub fn is_model_downloaded() -> bool {
     let path = get_model_path();
     if !path.exists() {
@@ -546,7 +546,9 @@ fn postprocess_output(
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let g = (data[channel_size + idx] * 255.0).clamp(0.0, 255.0).round() as u8;
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let b = (data[2 * channel_size + idx] * 255.0).clamp(0.0, 255.0).round() as u8;
+            let b = (data[2 * channel_size + idx] * 255.0)
+                .clamp(0.0, 255.0)
+                .round() as u8;
             pixels.push(r);
             pixels.push(g);
             pixels.push(b);
@@ -576,7 +578,7 @@ fn postprocess_output(
 pub type SharedDeblurManager = Arc<Mutex<DeblurManager>>;
 
 /// Creates a new shared `DeblurManager` instance.
-#[must_use] 
+#[must_use]
 pub fn create_shared_manager() -> SharedDeblurManager {
     Arc::new(Mutex::new(DeblurManager::new()))
 }

@@ -50,7 +50,7 @@ pub enum Event {
 }
 
 /// Process an about screen message and return the corresponding event.
-#[must_use] 
+#[must_use]
 pub fn update(message: &Message) -> Event {
     match message {
         Message::BackToViewer => Event::BackToViewer,

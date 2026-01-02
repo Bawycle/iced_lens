@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Test video metadata extraction with a real video file.
 
+#![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+
 use iced_lens::media::video;
 use std::env;
 use std::error::Error;
 
+#[allow(clippy::unnecessary_wraps)]
 fn main() -> Result<(), Box<dyn Error>> {
     // Get video path from command line arguments
     let args: Vec<String> = env::args().collect();

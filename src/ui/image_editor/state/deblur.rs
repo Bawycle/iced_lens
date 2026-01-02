@@ -20,7 +20,7 @@ pub struct DeblurState {
 
 impl DeblurState {
     /// Returns true if the deblur is currently in progress.
-    #[must_use] 
+    #[must_use]
     pub fn is_busy(&self) -> bool {
         self.is_processing
     }

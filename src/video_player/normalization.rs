@@ -46,7 +46,7 @@ pub struct LufsCache {
 
 impl LufsCache {
     /// Creates a new empty LUFS cache.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -85,7 +85,7 @@ impl LufsCache {
 pub type SharedLufsCache = Arc<LufsCache>;
 
 /// Creates a new shared LUFS cache.
-#[must_use] 
+#[must_use]
 pub fn create_lufs_cache() -> SharedLufsCache {
     Arc::new(LufsCache::new())
 }
@@ -107,13 +107,13 @@ impl Default for LufsAnalyzer {
 
 impl LufsAnalyzer {
     /// Creates a new LUFS analyzer with the specified target level.
-    #[must_use] 
+    #[must_use]
     pub fn new(target_lufs: f64) -> Self {
         Self { target_lufs }
     }
 
     /// Returns the target LUFS level.
-    #[must_use] 
+    #[must_use]
     pub fn target_lufs(&self) -> f64 {
         self.target_lufs
     }
@@ -226,7 +226,7 @@ impl LufsAnalyzer {
     ///
     /// # Returns
     /// The gain in dB to apply, clamped to a safe range.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_gain(&self, measured_lufs: f64) -> f64 {
         let gain_db = self.target_lufs - measured_lufs;
 
@@ -238,7 +238,7 @@ impl LufsAnalyzer {
     /// Converts gain in dB to a linear multiplier.
     ///
     /// The formula is: linear = 10^(dB/20)
-    #[must_use] 
+    #[must_use]
     pub fn db_to_linear(gain_db: f64) -> f64 {
         10.0_f64.powf(gain_db / 20.0)
     }
@@ -246,7 +246,7 @@ impl LufsAnalyzer {
     /// Converts a linear multiplier to gain in dB.
     ///
     /// The formula is: dB = 20 * log10(linear)
-    #[must_use] 
+    #[must_use]
     pub fn linear_to_db(linear: f64) -> f64 {
         if linear <= 0.0 {
             f64::NEG_INFINITY

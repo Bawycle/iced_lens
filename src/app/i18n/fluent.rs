@@ -96,10 +96,14 @@ impl I18n {
                 };
 
                 let locale = match filename.strip_suffix(".ftl") {
-                    Some(locale_str) => if let Ok(locale) = locale_str.parse::<LanguageIdentifier>() { locale } else {
-                        eprintln!("Invalid locale in FTL filename '{filename}'; skipping");
-                        continue;
-                    },
+                    Some(locale_str) => {
+                        if let Ok(locale) = locale_str.parse::<LanguageIdentifier>() {
+                            locale
+                        } else {
+                            eprintln!("Invalid locale in FTL filename '{filename}'; skipping");
+                            continue;
+                        }
+                    }
                     None => continue,
                 };
 
@@ -155,7 +159,7 @@ impl I18n {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn tr(&self, key: &str) -> String {
         self.tr_with_args(key, &[])
     }
@@ -177,7 +181,7 @@ impl I18n {
     /// i18n.tr_with_args("error-codec", &[("codec", "H264")]);
     /// // Returns: "The codec 'H264' is not supported."
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn tr_with_args(&self, key: &str, args: &[(&str, &str)]) -> String {
         if let Some(bundle) = self.bundles.get(&self.current_locale) {
             if let Some(msg) = bundle.get_message(key) {
@@ -204,7 +208,7 @@ impl I18n {
         format!("MISSING: {key}")
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn current_locale(&self) -> &LanguageIdentifier {
         &self.current_locale
     }
@@ -394,7 +398,7 @@ mod tests {
         let locales: Vec<String> = i18n
             .available_locales
             .iter()
-            .map(|l| l.to_string())
+            .map(ToString::to_string)
             .collect();
         assert_eq!(locales, vec!["en-US".to_string()]);
         assert_eq!(i18n.tr("window-title"), "Test");

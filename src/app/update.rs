@@ -901,10 +901,9 @@ pub fn handle_navbar_message(
                 | filter_dropdown::Message::ConsumeClick
                 | filter_dropdown::Message::DateSegmentChanged { .. } => {
                     // These are local dropdown state messages - forward to viewer component
-                    let (effect, task) = ctx.viewer.handle_message(
-                        component::Message::FilterDropdown(filter_msg),
-                        ctx.i18n,
-                    );
+                    let (effect, task) = ctx
+                        .viewer
+                        .handle_message(component::Message::FilterDropdown(filter_msg), ctx.i18n);
                     // Handle any effects from the viewer
                     // Only FilterChanged and None are expected from FilterDropdown messages
                     let effect_task = match effect {
@@ -932,7 +931,10 @@ pub fn handle_help_message(ctx: &mut UpdateContext<'_>, message: help::Message) 
 }
 
 /// Handles about screen messages.
-pub fn handle_about_message(ctx: &mut UpdateContext<'_>, message: &about::Message) -> Task<Message> {
+pub fn handle_about_message(
+    ctx: &mut UpdateContext<'_>,
+    message: &about::Message,
+) -> Task<Message> {
     match about::update(message) {
         AboutEvent::None => Task::none(),
         AboutEvent::BackToViewer => {

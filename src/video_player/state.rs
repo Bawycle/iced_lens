@@ -1176,7 +1176,7 @@ mod tests {
         let frame_duration = 1.0 / 30.0;
         for i in 1..=5 {
             player.step_frame();
-            let new_pos = 20.0 + (i as f64) * frame_duration;
+            let new_pos = 20.0 + f64::from(i) * frame_duration;
             player.update_position(new_pos);
         }
 
@@ -1378,7 +1378,7 @@ mod tests {
         // Step forward significantly
         for i in 1..=30 {
             player.step_frame();
-            player.update_position(10.0 + (i as f64) * 0.033);
+            player.update_position(10.0 + f64::from(i) * 0.033);
         }
 
         let stepped_position = player.state().position().unwrap();

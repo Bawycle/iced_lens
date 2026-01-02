@@ -1108,11 +1108,8 @@ mod tests {
         // Should receive Buffering or FrameReady event for real video
         assert!(event.is_ok(), "Timeout waiting for decoder event");
         match event.unwrap() {
-            Some(DecoderEvent::Buffering) => {
-                // Expected when starting playback
-            }
-            Some(DecoderEvent::FrameReady(_)) => {
-                // Also valid if frame is decoded quickly
+            Some(DecoderEvent::Buffering | DecoderEvent::FrameReady(_)) => {
+                // Expected when starting playback or if frame is decoded quickly
             }
             Some(DecoderEvent::Error(msg)) => {
                 panic!("Unexpected error from decoder: {msg}");

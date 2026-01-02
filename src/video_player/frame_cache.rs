@@ -76,7 +76,7 @@ impl Default for CacheConfig {
 
 impl CacheConfig {
     /// Creates a new cache configuration with specified limits.
-    #[must_use] 
+    #[must_use]
     pub fn new(max_bytes: usize, max_frames: usize) -> Self {
         Self {
             max_bytes: max_bytes.clamp(MIN_CACHE_SIZE_BYTES, MAX_CACHE_SIZE_BYTES),
@@ -86,7 +86,7 @@ impl CacheConfig {
     }
 
     /// Creates a disabled cache configuration.
-    #[must_use] 
+    #[must_use]
     pub fn disabled() -> Self {
         Self {
             enabled: false,
@@ -193,13 +193,13 @@ impl FrameCache {
     }
 
     /// Creates a new frame cache with default configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_defaults() -> Self {
         Self::new(CacheConfig::default())
     }
 
     /// Returns whether caching is enabled.
-    #[must_use] 
+    #[must_use]
     pub fn is_enabled(&self) -> bool {
         self.config.enabled
     }
@@ -346,7 +346,7 @@ impl FrameCache {
     }
 
     /// Checks if a frame is cached for the given PTS.
-    #[must_use] 
+    #[must_use]
     pub fn contains(&self, pts_secs: f64) -> bool {
         if !self.config.enabled {
             return false;
@@ -364,31 +364,31 @@ impl FrameCache {
     }
 
     /// Returns the current cache statistics.
-    #[must_use] 
+    #[must_use]
     pub fn stats(&self) -> CacheStats {
         self.stats
     }
 
     /// Returns the current number of cached frames.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.cache.len()
     }
 
     /// Returns whether the cache is empty.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cache.is_empty()
     }
 
     /// Returns the current memory usage in bytes.
-    #[must_use] 
+    #[must_use]
     pub fn memory_usage(&self) -> usize {
         self.current_bytes
     }
 
     /// Returns the cache configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &CacheConfig {
         &self.config
     }
@@ -455,6 +455,7 @@ mod tests {
         DecodedFrame {
             rgba_data: Arc::new(vec![0u8; size]),
             width: 100,
+            #[allow(clippy::cast_possible_truncation)] // Test helper, values are small
             height: (size / 400) as u32, // Approximate for RGBA
             pts_secs,
         }
@@ -511,7 +512,7 @@ mod tests {
 
         // Insert frames that exceed the byte limit
         for i in 0..10 {
-            let frame = create_test_frame(i as f64, 1000);
+            let frame = create_test_frame(f64::from(i), 1000);
             cache.insert(frame, true);
         }
 
@@ -571,7 +572,7 @@ mod tests {
         let mut cache = FrameCache::with_defaults();
 
         for i in 0..5 {
-            cache.insert(create_test_frame(i as f64, 1000), true);
+            cache.insert(create_test_frame(f64::from(i), 1000), true);
         }
 
         assert_eq!(cache.len(), 5);
@@ -632,7 +633,7 @@ mod tests {
 
         // Fill cache
         for i in 0..10 {
-            cache.insert(create_test_frame(i as f64, 10_000), true);
+            cache.insert(create_test_frame(f64::from(i), 10_000), true);
         }
         assert_eq!(cache.len(), 10);
 

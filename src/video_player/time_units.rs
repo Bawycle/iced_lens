@@ -23,7 +23,7 @@ pub const MICROS_PER_SECOND: f64 = 1_000_000.0;
 /// assert_eq!(secs_to_micros(0.5), 500_000.0);
 /// ```
 #[inline]
-#[must_use] 
+#[must_use]
 pub fn secs_to_micros(secs: f64) -> f64 {
     secs * MICROS_PER_SECOND
 }
@@ -39,7 +39,7 @@ pub fn secs_to_micros(secs: f64) -> f64 {
 /// assert_eq!(micros_to_secs(500_000.0), 0.5);
 /// ```
 #[inline]
-#[must_use] 
+#[must_use]
 pub fn micros_to_secs(micros: f64) -> f64 {
     micros / MICROS_PER_SECOND
 }
@@ -57,7 +57,7 @@ pub fn micros_to_secs(micros: f64) -> f64 {
 /// assert_eq!(pts_to_micros(0.5), 500_000);
 /// ```
 #[inline]
-#[must_use] 
+#[must_use]
 pub fn pts_to_micros(pts_secs: f64) -> i64 {
     // Video PTS values are bounded (practical video lengths fit easily in i64 microseconds)
     #[allow(clippy::cast_possible_truncation)]

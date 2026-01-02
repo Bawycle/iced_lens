@@ -46,7 +46,11 @@ fn build_volume_controls<'a>(
     state: &PlaybackState,
     icon_size: f32,
     button_height: f32,
-) -> (Element<'a, Message>, Element<'a, Message>, Element<'a, Message>) {
+) -> (
+    Element<'a, Message>,
+    Element<'a, Message>,
+    Element<'a, Message>,
+) {
     // Volume button with tooltip - shows mute icon when muted, disabled when no audio
     let volume_icon = if state.muted || state.volume == 0.0 {
         icons::sized(action_icons::video::toolbar::volume_muted(), icon_size)

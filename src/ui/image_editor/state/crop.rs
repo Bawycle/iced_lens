@@ -305,12 +305,7 @@ impl State {
         if let Some(handle) = self.get_handle_at_position(x, y) {
             self.crop.overlay.drag_state = CropDragState::DraggingHandle {
                 handle,
-                start_rect: (
-                    self.crop.x,
-                    self.crop.y,
-                    self.crop.width,
-                    self.crop.height,
-                ),
+                start_rect: (self.crop.x, self.crop.y, self.crop.width, self.crop.height),
                 start_cursor_x: x,
                 start_cursor_y: y,
             };

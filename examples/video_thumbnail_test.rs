@@ -6,6 +6,7 @@ use std::env;
 use std::error::Error;
 use std::time::Instant;
 
+#[allow(clippy::unnecessary_wraps)]
 fn main() -> Result<(), Box<dyn Error>> {
     // Get video path from command line arguments
     let args: Vec<String> = env::args().collect();

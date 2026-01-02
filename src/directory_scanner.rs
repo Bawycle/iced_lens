@@ -19,7 +19,7 @@ pub struct MediaList {
 
 impl MediaList {
     /// Creates a new empty `MediaList`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             media_files: Vec::new(),
@@ -109,13 +109,13 @@ impl MediaList {
     }
 
     /// Returns the next media path, wrapping around to the start.
-    #[must_use] 
+    #[must_use]
     pub fn next(&self) -> Option<&Path> {
         self.peek_nth_next(0)
     }
 
     /// Returns the previous media path, wrapping around to the end.
-    #[must_use] 
+    #[must_use]
     pub fn previous(&self) -> Option<&Path> {
         self.peek_nth_previous(0)
     }
@@ -161,13 +161,13 @@ impl MediaList {
     }
 
     /// Checks if we're at the first media (used for boundary indication).
-    #[must_use] 
+    #[must_use]
     pub fn is_at_first(&self) -> bool {
         matches!(self.current_index, Some(0))
     }
 
     /// Checks if we're at the last media (used for boundary indication).
-    #[must_use] 
+    #[must_use]
     pub fn is_at_last(&self) -> bool {
         if self.media_files.is_empty() {
             return false;
@@ -176,13 +176,13 @@ impl MediaList {
     }
 
     /// Returns the total number of media files in the list.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.media_files.len()
     }
 
     /// Checks if the media list is empty.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.media_files.is_empty()
     }
@@ -193,7 +193,7 @@ impl MediaList {
     }
 
     /// Returns the current index if set.
-    #[must_use] 
+    #[must_use]
     pub fn current_index(&self) -> Option<usize> {
         self.current_index
     }

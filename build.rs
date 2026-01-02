@@ -185,7 +185,8 @@ fn generate_ico_file(output_path: &Path, png_images: &[(u32, Vec<u8>)]) {
             ico::IconImage::from_rgba_data(*size, *size, img.into_raw())
         };
 
-        icon_dir.add_entry(ico::IconDirEntry::encode(&ico_image).expect("Failed to encode ICO entry"));
+        icon_dir
+            .add_entry(ico::IconDirEntry::encode(&ico_image).expect("Failed to encode ICO entry"));
     }
 
     icon_dir
