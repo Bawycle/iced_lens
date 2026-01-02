@@ -273,7 +273,7 @@ Ensure `metainfo.xml` has the correct release version and date:
 
 ```xml
 <releases>
-  <release version="0.5.0" date="2025-12-22">
+  <release version="0.6.0" date="2025-01-02">
     <description>
       <p>Release description...</p>
     </description>
@@ -342,7 +342,7 @@ cp /path/to/iced_lens/flatpak/cargo-sources.json .
 sources:
   - type: git
     url: https://codeberg.org/Bawycle/iced_lens.git
-    tag: v0.5.0
+    tag: v0.6.0
     commit: <full-commit-hash>  # Required for reproducibility
 ```
 

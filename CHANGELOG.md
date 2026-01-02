@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-01-02
+
 ### Added
 - **Media filters:** filter navigation by media type (images/videos), orientation (landscape/portrait/square), and date range. Access via the filter dropdown in the toolbar. Filters can optionally persist across sessions (Settings → Display).
 - **XMP metadata for PNG, WebP, and TIFF:** title, author, description, keywords, and copyright fields now work on PNG, WebP, and TIFF files, not just JPEG.
@@ -152,7 +154,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tested on Linux Mint 22.2
 - Licensed under MPL-2.0
 
-[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.5.0...HEAD
+[unreleased]: https://codeberg.org/Bawycle/iced_lens/compare/v0.6.0...HEAD
+[0.6.0]: https://codeberg.org/Bawycle/iced_lens/compare/v0.5.0...v0.6.0
 [0.5.0]: https://codeberg.org/Bawycle/iced_lens/compare/v0.4.1...v0.5.0
 [0.4.1]: https://codeberg.org/Bawycle/iced_lens/compare/v0.4.0...v0.4.1
 [0.4.0]: https://codeberg.org/Bawycle/iced_lens/compare/v0.3.0...v0.4.0

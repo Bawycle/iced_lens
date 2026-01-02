@@ -17,7 +17,7 @@
 
 ; Fallback version if exe doesn't exist yet
 #ifndef MyAppVersion
-  #define MyAppVersion "0.4.1"
+  #define MyAppVersion "0.6.0"
 #endif
 
 [Setup]
