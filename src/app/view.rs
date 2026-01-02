@@ -12,13 +12,13 @@ use crate::media::metadata::MediaMetadata;
 use crate::media::navigator::NavigationInfo;
 use crate::media::upscale::UpscaleModelStatus;
 use crate::ui::about::{self, ViewContext as AboutViewContext};
+use crate::ui::design_tokens::spacing;
 use crate::ui::help::{self, ViewContext as HelpViewContext};
 use crate::ui::image_editor::{self, State as ImageEditorState};
 use crate::ui::metadata_panel::{self, MetadataEditorState, PanelContext as MetadataPanelContext};
 use crate::ui::navbar::{self, ViewContext as NavbarViewContext};
 use crate::ui::notifications::{Manager as NotificationManager, Toast};
 use crate::ui::settings::{State as SettingsState, ViewContext as SettingsViewContext};
-use crate::ui::design_tokens::spacing;
 use crate::ui::viewer::{component, filter_dropdown};
 use iced::{
     widget::{mouse_area, Container, Row, Stack, Text},
@@ -137,47 +137,46 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
     let toast_overlay = Toast::view_overlay(ctx.notifications, ctx.i18n).map(Message::Notification);
 
     // Build filter dropdown overlay (only on Viewer screen, not in fullscreen)
-    let filter_overlay: Option<Element<'_, Message>> =
-        if matches!(ctx.screen, Screen::Viewer) && !ctx.fullscreen {
-            let filter_dropdown_state = ctx.viewer.filter_dropdown_state();
-            if filter_dropdown_state.is_open {
-                filter_dropdown::view_panel(filter_dropdown::ViewContext {
-                    i18n: ctx.i18n,
-                    filter: ctx.filter,
-                    state: filter_dropdown_state,
-                    total_count: ctx.total_count,
-                    filtered_count: ctx.filtered_count,
-                })
-                .map(|panel| {
-                    let mapped_panel =
-                        panel.map(|msg| Message::Navbar(navbar::Message::FilterDropdown(msg)));
+    let filter_overlay: Option<Element<'_, Message>> = if matches!(ctx.screen, Screen::Viewer)
+        && !ctx.fullscreen
+    {
+        let filter_dropdown_state = ctx.viewer.filter_dropdown_state();
+        if filter_dropdown_state.is_open {
+            filter_dropdown::view_panel(filter_dropdown::ViewContext {
+                i18n: ctx.i18n,
+                filter: ctx.filter,
+                state: filter_dropdown_state,
+                total_count: ctx.total_count,
+                filtered_count: ctx.filtered_count,
+            })
+            .map(|panel| {
+                let mapped_panel =
+                    panel.map(|msg| Message::Navbar(navbar::Message::FilterDropdown(msg)));
 
-                    // Position panel below navbar, aligned to left
-                    let navbar_height = spacing::SM * 2.0 + 32.0;
+                // Position panel below navbar, aligned to left
+                let navbar_height = spacing::SM * 2.0 + 32.0;
 
-                    // Wrap panel in mouse_area to prevent clicks from closing dropdown
-                    let panel_with_click_guard = mouse_area(mapped_panel).on_press(
-                        Message::Navbar(navbar::Message::FilterDropdown(
-                            filter_dropdown::Message::ConsumeClick,
-                        )),
-                    );
+                // Wrap panel in mouse_area to prevent clicks from closing dropdown
+                let panel_with_click_guard = mouse_area(mapped_panel).on_press(Message::Navbar(
+                    navbar::Message::FilterDropdown(filter_dropdown::Message::ConsumeClick),
+                ));
 
-                    Container::new(panel_with_click_guard)
-                        .width(Length::Shrink)
-                        .padding(iced::Padding {
-                            top: navbar_height,
-                            right: 0.0,
-                            bottom: 0.0,
-                            left: spacing::SM,
-                        })
-                        .into()
-                })
-            } else {
-                None
-            }
+                Container::new(panel_with_click_guard)
+                    .width(Length::Shrink)
+                    .padding(iced::Padding {
+                        top: navbar_height,
+                        right: 0.0,
+                        bottom: 0.0,
+                        left: spacing::SM,
+                    })
+                    .into()
+            })
         } else {
             None
-        };
+        }
+    } else {
+        None
+    };
 
     // Stack the main content with overlays
     let mut stack = Stack::new()
@@ -188,10 +187,14 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
     // Add click-outside overlay and filter panel if open
     if let Some(panel) = filter_overlay {
         // Full-screen click catcher to close dropdown when clicking outside
-        let click_outside = mouse_area(Container::new(Text::new("")).width(Length::Fill).height(Length::Fill))
-            .on_press(Message::Navbar(navbar::Message::FilterDropdown(
-                filter_dropdown::Message::CloseDropdown,
-            )));
+        let click_outside = mouse_area(
+            Container::new(Text::new(""))
+                .width(Length::Fill)
+                .height(Length::Fill),
+        )
+        .on_press(Message::Navbar(navbar::Message::FilterDropdown(
+            filter_dropdown::Message::CloseDropdown,
+        )));
         stack = stack.push(click_outside);
         stack = stack.push(panel);
     }

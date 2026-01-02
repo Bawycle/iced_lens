@@ -118,7 +118,10 @@ fn build_model_status_ui<'a>(
         }
         ModelStatus::Error(error_msg) => {
             content = content.push(status_text(
-                ctx.i18n.tr_with_args("image-editor-deblur-error", &[("error", error_msg.as_str())]),
+                ctx.i18n.tr_with_args(
+                    "image-editor-deblur-error",
+                    &[("error", error_msg.as_str())],
+                ),
                 theme::error_text_color(),
             ));
             content.push(disabled_apply_button(apply_label.to_string()))

@@ -28,25 +28,25 @@ pub struct MaxSkipAttempts(u32);
 
 impl MaxSkipAttempts {
     /// Creates a new max skip attempts value, clamping to valid range.
-    #[must_use] 
+    #[must_use]
     pub fn new(value: u32) -> Self {
         Self(value.clamp(MIN_MAX_SKIP_ATTEMPTS, MAX_MAX_SKIP_ATTEMPTS))
     }
 
     /// Returns the value as u32.
-    #[must_use] 
+    #[must_use]
     pub fn value(self) -> u32 {
         self.0
     }
 
     /// Returns true if this is the minimum value.
-    #[must_use] 
+    #[must_use]
     pub fn is_min(self) -> bool {
         self.0 <= MIN_MAX_SKIP_ATTEMPTS
     }
 
     /// Returns true if this is the maximum value.
-    #[must_use] 
+    #[must_use]
     pub fn is_max(self) -> bool {
         self.0 >= MAX_MAX_SKIP_ATTEMPTS
     }

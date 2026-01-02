@@ -62,7 +62,7 @@ impl VideoError {
     ///
     /// Some error messages contain placeholders like `{ $codec }` or `{ $message }`
     /// that need to be filled with runtime values.
-    #[must_use] 
+    #[must_use]
     pub fn i18n_args(&self) -> Vec<(&'static str, String)> {
         match self {
             VideoError::UnsupportedCodec(codec) => vec![("codec", codec.clone())],
@@ -73,7 +73,7 @@ impl VideoError {
 
     /// Attempts to parse a raw error message into a specific `VideoError` type.
     /// This is used to categorize errors from FFmpeg/decoder.
-    #[must_use] 
+    #[must_use]
     pub fn from_message(msg: &str) -> Self {
         let msg_lower = msg.to_lowercase();
 

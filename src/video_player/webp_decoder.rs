@@ -40,7 +40,10 @@ impl WebpAnimDecoder {
 
         // Validate file exists
         if !path.exists() {
-            return Err(Error::Io(format!("WebP file not found: {}", path.display())));
+            return Err(Error::Io(format!(
+                "WebP file not found: {}",
+                path.display()
+            )));
         }
 
         // Read the entire file into memory (WebP decoder requires full buffer)

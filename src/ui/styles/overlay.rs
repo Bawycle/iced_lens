@@ -37,7 +37,7 @@ pub fn indicator(rad: f32) -> impl Fn(&Theme) -> container::Style {
 }
 
 /// Style for the overlay controls container in fullscreen mode.
-#[must_use] 
+#[must_use]
 pub fn controls_container(_theme: &Theme) -> container::Style {
     container::Style {
         background: Some(Background::Color(container_background())),

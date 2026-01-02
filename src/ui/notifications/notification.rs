@@ -43,7 +43,7 @@ pub enum Severity {
 
 impl Severity {
     /// Returns the primary color for this severity level.
-    #[must_use] 
+    #[must_use]
     pub fn color(&self) -> Color {
         match self {
             Severity::Success => palette::SUCCESS_500,
@@ -55,7 +55,7 @@ impl Severity {
 
     /// Returns the auto-dismiss duration for this severity.
     /// Returns `None` for errors (manual dismiss required).
-    #[must_use] 
+    #[must_use]
     pub fn auto_dismiss_duration(&self) -> Option<Duration> {
         match self {
             Severity::Success | Severity::Info => Some(Duration::from_secs(3)),
@@ -130,50 +130,50 @@ impl Notification {
     /// Sets a custom auto-dismiss duration, overriding the severity default.
     ///
     /// Useful for notifications that need more time to read (e.g., long file lists).
-    #[must_use] 
+    #[must_use]
     pub fn auto_dismiss(mut self, duration: Duration) -> Self {
         self.custom_dismiss_duration = Some(duration);
         self
     }
 
     /// Returns the notification's unique ID.
-    #[must_use] 
+    #[must_use]
     pub fn id(&self) -> NotificationId {
         self.id
     }
 
     /// Returns the severity level.
-    #[must_use] 
+    #[must_use]
     pub fn severity(&self) -> Severity {
         self.severity
     }
 
     /// Returns the i18n message key.
-    #[must_use] 
+    #[must_use]
     pub fn message_key(&self) -> &str {
         &self.message_key
     }
 
     /// Returns the message arguments for interpolation.
-    #[must_use] 
+    #[must_use]
     pub fn message_args(&self) -> &[(String, String)] {
         &self.message_args
     }
 
     /// Returns when this notification was created.
-    #[must_use] 
+    #[must_use]
     pub fn created_at(&self) -> Instant {
         self.created_at
     }
 
     /// Returns the age of this notification.
-    #[must_use] 
+    #[must_use]
     pub fn age(&self) -> Duration {
         self.created_at.elapsed()
     }
 
     /// Returns whether this notification should auto-dismiss.
-    #[must_use] 
+    #[must_use]
     pub fn should_auto_dismiss(&self) -> bool {
         // Custom duration takes precedence over severity default
         let duration = self

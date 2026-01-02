@@ -83,7 +83,7 @@ impl Toast {
     /// Renders the toast overlay with all visible notifications.
     ///
     /// Positions toasts in the bottom-right corner, stacked vertically.
-    #[must_use] 
+    #[must_use]
     pub fn view_overlay<'a>(manager: &'a Manager, i18n: &'a I18n) -> Element<'a, Message> {
         let toasts: Vec<Element<'a, Message>> = manager
             .visible()

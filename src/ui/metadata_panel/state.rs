@@ -21,7 +21,7 @@ pub struct ValidationErrors {
 
 impl ValidationErrors {
     /// Returns true if there are any validation errors.
-    #[must_use] 
+    #[must_use]
     pub fn has_errors(&self) -> bool {
         self.date_taken.is_some()
             || self.exposure_time.is_some()
@@ -49,7 +49,7 @@ pub struct MetadataEditorState {
 
 impl MetadataEditorState {
     /// Creates a new editor state from image metadata.
-    #[must_use] 
+    #[must_use]
     pub fn from_image_metadata(meta: &ImageMetadata) -> Self {
         let editable = EditableMetadata::from_image_metadata(meta);
         let visible = Self::visible_fields_from_data(&editable);
@@ -62,7 +62,7 @@ impl MetadataEditorState {
     }
 
     /// Creates an empty editor state (for images without EXIF data).
-    #[must_use] 
+    #[must_use]
     pub fn new_empty() -> Self {
         Self {
             edited: EditableMetadata::default(),
@@ -196,7 +196,7 @@ impl MetadataEditorState {
     }
 
     /// Returns fields that are not currently visible (available for adding).
-    #[must_use] 
+    #[must_use]
     pub fn available_fields(&self) -> Vec<MetadataField> {
         MetadataField::all()
             .iter()
@@ -211,13 +211,13 @@ impl MetadataEditorState {
     }
 
     /// Returns true if a field is currently visible.
-    #[must_use] 
+    #[must_use]
     pub fn is_field_visible(&self, field: &MetadataField) -> bool {
         self.visible_fields.contains(field)
     }
 
     /// Returns true if any field has been modified from the original.
-    #[must_use] 
+    #[must_use]
     pub fn has_changes(&self) -> bool {
         // EXIF fields
         self.edited.camera_make != self.original.camera_make
@@ -382,7 +382,7 @@ impl MetadataEditorState {
     }
 
     /// Returns a reference to the edited metadata for writing.
-    #[must_use] 
+    #[must_use]
     pub fn editable_metadata(&self) -> &EditableMetadata {
         &self.edited
     }

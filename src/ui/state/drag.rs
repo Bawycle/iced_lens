@@ -35,7 +35,7 @@ impl DragState {
     }
 
     /// Calculates the new offset based on cursor movement during drag
-    #[must_use] 
+    #[must_use]
     pub fn calculate_offset(&self, current_position: Point) -> Option<AbsoluteOffset> {
         if !self.is_dragging {
             return None;

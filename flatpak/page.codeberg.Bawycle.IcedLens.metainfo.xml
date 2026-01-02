@@ -49,9 +49,6 @@
   </branding>
 
   <screenshots>
-    <!-- TODO: Add screenshots before Flathub submission -->
-    <!-- Screenshots must be hosted at a stable URL (e.g., Codeberg raw file) -->
-    <!--
     <screenshot type="default">
       <image>https://codeberg.org/Bawycle/iced_lens/raw/branch/master/docs/screenshots/viewer-light.png</image>
       <caption>Image viewer with zoom and navigation controls</caption>
@@ -68,12 +65,34 @@
       <image>https://codeberg.org/Bawycle/iced_lens/raw/branch/master/docs/screenshots/metadata-panel.png</image>
       <caption>EXIF and XMP metadata viewing and editing</caption>
     </screenshot>
-    -->
   </screenshots>
 
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.6.0" date="2025-01-02">
+      <description>
+        <p>New features:</p>
+        <ul>
+          <li>Media filters: filter by type (images/videos), orientation, or date range</li>
+          <li>XMP metadata support for PNG, WebP, and TIFF files</li>
+          <li>Temporary rotation in viewer (R / Shift+R)</li>
+          <li>Flatpak packaging for easier Linux installation</li>
+        </ul>
+        <p>Improvements:</p>
+        <ul>
+          <li>Natural alphabetical sorting matching file managers</li>
+          <li>Audio controls disabled with tooltip when media has no audio</li>
+          <li>Reorganized toolbar for better UX</li>
+        </ul>
+        <p>Bug fixes:</p>
+        <ul>
+          <li>Fixed audio on surround sound systems and non-standard sample rates</li>
+          <li>Fixed frame-by-frame navigation and video seeking issues</li>
+          <li>Improved audio/video synchronization</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.5.0" date="2025-12-22">
       <description>
         <p>New features:</p>

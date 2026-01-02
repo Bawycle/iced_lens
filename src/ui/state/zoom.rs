@@ -22,43 +22,43 @@ pub struct ZoomPercent(f32);
 
 impl ZoomPercent {
     /// Creates a new zoom percentage, clamping the value to the valid range.
-    #[must_use] 
+    #[must_use]
     pub fn new(percent: f32) -> Self {
         Self(percent.clamp(MIN_ZOOM_PERCENT, MAX_ZOOM_PERCENT))
     }
 
     /// Returns the raw percentage value.
-    #[must_use] 
+    #[must_use]
     pub fn value(self) -> f32 {
         self.0
     }
 
     /// Returns the zoom as a multiplier (e.g., 100% → 1.0).
-    #[must_use] 
+    #[must_use]
     pub fn as_factor(self) -> f32 {
         self.0 / 100.0
     }
 
     /// Returns whether the zoom is at the minimum value.
-    #[must_use] 
+    #[must_use]
     pub fn is_min(self) -> bool {
         self.0 <= MIN_ZOOM_PERCENT
     }
 
     /// Returns whether the zoom is at the maximum value.
-    #[must_use] 
+    #[must_use]
     pub fn is_max(self) -> bool {
         self.0 >= MAX_ZOOM_PERCENT
     }
 
     /// Increases zoom by the given step.
-    #[must_use] 
+    #[must_use]
     pub fn zoom_in(self, step: f32) -> Self {
         Self::new(self.0 + step)
     }
 
     /// Decreases zoom by the given step.
-    #[must_use] 
+    #[must_use]
     pub fn zoom_out(self, step: f32) -> Self {
         Self::new(self.0 - step)
     }
@@ -79,25 +79,25 @@ pub struct ZoomStep(f32);
 
 impl ZoomStep {
     /// Creates a new zoom step, clamping the value to the valid range.
-    #[must_use] 
+    #[must_use]
     pub fn new(percent: f32) -> Self {
         Self(percent.clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT))
     }
 
     /// Returns the raw percentage value.
-    #[must_use] 
+    #[must_use]
     pub fn value(self) -> f32 {
         self.0
     }
 
     /// Returns whether the step is at the minimum value.
-    #[must_use] 
+    #[must_use]
     pub fn is_min(self) -> bool {
         self.0 <= MIN_ZOOM_STEP_PERCENT
     }
 
     /// Returns whether the step is at the maximum value.
-    #[must_use] 
+    #[must_use]
     pub fn is_max(self) -> bool {
         self.0 >= MAX_ZOOM_STEP_PERCENT
     }
@@ -229,7 +229,7 @@ impl ZoomState {
     }
 
     /// Gets the zoom input value
-    #[must_use] 
+    #[must_use]
     pub fn zoom_input_value(&self) -> &str {
         &self.zoom_input
     }
@@ -239,13 +239,13 @@ impl ZoomState {
 ///
 /// This is a convenience function that uses `ZoomPercent::new()` internally.
 /// Prefer using `ZoomPercent` directly for type-safe zoom handling.
-#[must_use] 
+#[must_use]
 pub fn clamp_zoom(percent: f32) -> f32 {
     ZoomPercent::new(percent).value()
 }
 
 /// Formats a number for display (removes unnecessary decimal places)
-#[must_use] 
+#[must_use]
 pub fn format_number(value: f32) -> String {
     if value.fract().abs() < f32::EPSILON {
         // Value has no fractional part, so it represents an integer exactly

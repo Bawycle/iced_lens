@@ -20,7 +20,7 @@ pub struct ViewerState<'a> {
 
 impl<'a> ViewerState<'a> {
     /// Creates a new derived state helper.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         media: Option<&'a MediaData>,
         viewport: &'a ViewportState,
@@ -36,7 +36,7 @@ impl<'a> ViewerState<'a> {
     }
 
     /// Computes the zoom percentage required to fit the current media inside the viewport.
-    #[must_use] 
+    #[must_use]
     // Allow cast_precision_loss: image dimensions are typically < 16M pixels;
     // f32 is exact up to 2^24 (~16.7M), sufficient for any reasonable image.
     #[allow(clippy::cast_precision_loss)]
@@ -69,7 +69,7 @@ impl<'a> ViewerState<'a> {
 
     /// Returns the scaled media dimensions for the current zoom level.
     #[allow(clippy::cast_precision_loss)] // u32 to f32 for dimensions: f32 is exact up to 16M
-    #[must_use] 
+    #[must_use]
     pub fn scaled_media_size(&self) -> Option<Size> {
         let media = self.media?;
         let scale = (self.zoom_percent / 100.0).max(0.01);
@@ -82,7 +82,7 @@ impl<'a> ViewerState<'a> {
     ///
     /// When rotated 90° or 270°, width and height are swapped.
     #[allow(clippy::cast_precision_loss)] // u32 to f32 for dimensions: f32 is exact up to 16M
-    #[must_use] 
+    #[must_use]
     pub fn scaled_media_size_rotated(&self, rotation: RotationAngle) -> Option<Size> {
         let media = self.media?;
         let scale = (self.zoom_percent / 100.0).max(0.01);
@@ -112,7 +112,7 @@ impl<'a> ViewerState<'a> {
     }
 
     /// Returns the padding needed to center the media inside the viewport.
-    #[must_use] 
+    #[must_use]
     pub fn media_padding(&self) -> Padding {
         match (self.viewport.bounds, self.scaled_media_size()) {
             (Some(viewport), Some(size)) => Self::compute_padding(viewport, size),
@@ -121,7 +121,7 @@ impl<'a> ViewerState<'a> {
     }
 
     /// Returns the scroll position as a percentage when scrolling is possible.
-    #[must_use] 
+    #[must_use]
     pub fn scroll_position_percentage(&self) -> Option<(f32, f32)> {
         let size = self.scaled_media_size()?;
         self.viewport
@@ -129,7 +129,7 @@ impl<'a> ViewerState<'a> {
     }
 
     /// Returns the media bounds relative to the window, factoring in scroll and padding.
-    #[must_use] 
+    #[must_use]
     pub fn media_bounds_in_window(&self) -> Option<Rectangle> {
         let viewport = self.viewport.bounds?;
         let size = self.scaled_media_size()?;
@@ -145,7 +145,7 @@ impl<'a> ViewerState<'a> {
     }
 
     /// Indicates whether the cursor is currently positioned over the media.
-    #[must_use] 
+    #[must_use]
     pub fn is_cursor_over_media(&self) -> bool {
         let Some(cursor) = self.cursor_position else {
             return false;

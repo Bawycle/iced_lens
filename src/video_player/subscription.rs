@@ -89,7 +89,7 @@ impl DecoderCommandSender {
     }
 
     /// Returns true if audio is available.
-    #[must_use] 
+    #[must_use]
     pub fn has_audio(&self) -> bool {
         self.audio_tx.is_some()
     }

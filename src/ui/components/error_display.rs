@@ -42,7 +42,7 @@ pub enum ErrorSeverity {
 
 impl ErrorSeverity {
     /// Returns the primary color for this severity level.
-    #[must_use] 
+    #[must_use]
     pub fn color(&self) -> Color {
         match self {
             ErrorSeverity::Error => palette::ERROR_500,
@@ -52,7 +52,7 @@ impl ErrorSeverity {
     }
 
     /// Returns the appropriate icon for this severity level.
-    #[must_use] 
+    #[must_use]
     pub fn icon(&self) -> Image<Handle> {
         // Warning icon is used for all severity levels as it's the most recognizable
         // The color differentiation handles the severity communication
@@ -96,7 +96,7 @@ impl<Message> Default for ErrorDisplay<Message> {
 
 impl<Message: Clone + 'static> ErrorDisplay<Message> {
     /// Creates a new error display with the given severity.
-    #[must_use] 
+    #[must_use]
     pub fn new(severity: ErrorSeverity) -> Self {
         Self {
             severity,
@@ -273,17 +273,19 @@ impl<Message: Clone + 'static> ErrorDisplay<Message> {
                 let heading_label = self.details_heading_label.clone();
                 let details_clone = details_text.clone();
 
-                let details_heading = Text::new(heading_label).size(14).style(
-                    |theme: &Theme| text::Style {
-                        color: Some(theme.extended_palette().secondary.base.text),
-                    },
-                );
+                let details_heading =
+                    Text::new(heading_label)
+                        .size(14)
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(theme.extended_palette().secondary.base.text),
+                        });
 
-                let details_body = Text::new(details_clone).size(12).style(
-                    |theme: &Theme| text::Style {
-                        color: Some(theme.extended_palette().secondary.base.text),
-                    },
-                );
+                let details_body =
+                    Text::new(details_clone)
+                        .size(12)
+                        .style(|theme: &Theme| text::Style {
+                            color: Some(theme.extended_palette().secondary.base.text),
+                        });
 
                 let details_column = Column::new()
                     .spacing(spacing::XS)

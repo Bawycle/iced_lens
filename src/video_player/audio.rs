@@ -516,7 +516,8 @@ impl AudioDecoder {
                     let input_rate = decoded_frame.rate();
                     // Round up to avoid losing samples
                     let output_samples = (input_samples as u64 * u64::from(output_sample_rate))
-                        .div_ceil(u64::from(input_rate)) as usize;
+                        .div_ceil(u64::from(input_rate))
+                        as usize;
 
                     let mut output_audio = ffmpeg_next::frame::Audio::empty();
                     // Pre-allocate with correct size so run() doesn't reallocate incorrectly

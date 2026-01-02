@@ -80,7 +80,7 @@ impl ResizeState {
     /// Returns true if the target dimensions differ from the current working image.
     /// The overlay stores the current image dimensions (updated after each resize).
     /// Used to determine whether the "Apply" button should be enabled.
-    #[must_use] 
+    #[must_use]
     pub fn has_pending_changes(&self) -> bool {
         self.width != self.overlay.original_width || self.height != self.overlay.original_height
     }
@@ -148,10 +148,7 @@ impl State {
 
     /// Returns the target dimensions for the pending resize operation.
     pub fn pending_resize_dimensions(&self) -> (u32, u32) {
-        (
-            self.resize.width.max(1),
-            self.resize.height.max(1),
-        )
+        (self.resize.width.max(1), self.resize.height.max(1))
     }
 
     /// Returns true if the pending resize operation is an enlargement (scale > 100%).

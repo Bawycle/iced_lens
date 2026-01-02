@@ -245,7 +245,7 @@ impl Default for State {
 
 impl State {
     /// Creates a new settings state from the given configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: StateConfig) -> Self {
         let clamped = config
             .zoom_step_percent
@@ -290,73 +290,73 @@ impl State {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn background_theme(&self) -> BackgroundTheme {
         self.background_theme
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn sort_order(&self) -> SortOrder {
         self.sort_order
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn theme_mode(&self) -> ThemeMode {
         self.theme_mode
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn zoom_step_percent(&self) -> f32 {
         self.zoom_step_percent
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn overlay_timeout_secs(&self) -> u32 {
         self.overlay_timeout_secs
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn max_skip_attempts(&self) -> u32 {
         self.max_skip_attempts
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn video_autoplay(&self) -> bool {
         self.video_autoplay
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn audio_normalization(&self) -> bool {
         self.audio_normalization
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn frame_cache_mb(&self) -> u32 {
         self.frame_cache_mb
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn frame_history_mb(&self) -> u32 {
         self.frame_history_mb
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn keyboard_seek_step_secs(&self) -> f64 {
         self.keyboard_seek_step_secs
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn enable_deblur(&self) -> bool {
         self.enable_deblur
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn deblur_model_url(&self) -> &str {
         &self.deblur_model_url
     }
 
     /// Returns the current status of the deblur model.
-    #[must_use] 
+    #[must_use]
     pub fn deblur_model_status(&self) -> &ModelStatus {
         &self.deblur_model_status
     }
@@ -374,18 +374,18 @@ impl State {
         self.enable_deblur = enabled;
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn enable_upscale(&self) -> bool {
         self.enable_upscale
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn upscale_model_url(&self) -> &str {
         &self.upscale_model_url
     }
 
     /// Returns the current status of the upscale model.
-    #[must_use] 
+    #[must_use]
     pub fn upscale_model_status(&self) -> &UpscaleModelStatus {
         &self.upscale_model_status
     }
@@ -404,7 +404,7 @@ impl State {
     }
 
     /// Returns whether filter persistence is enabled.
-    #[must_use] 
+    #[must_use]
     pub fn persist_filters(&self) -> bool {
         self.persist_filters
     }
@@ -558,7 +558,10 @@ impl State {
             &[
                 (BackgroundTheme::Light, "settings-background-light"),
                 (BackgroundTheme::Dark, "settings-background-dark"),
-                (BackgroundTheme::Checkerboard, "settings-background-checkerboard"),
+                (
+                    BackgroundTheme::Checkerboard,
+                    "settings-background-checkerboard",
+                ),
             ],
             self.background_theme,
             Message::BackgroundThemeSelected,
@@ -1448,7 +1451,7 @@ mod tests {
     #[test]
     fn commit_zoom_step_rejects_invalid_input() {
         let mut state = State {
-            zoom_step_input: "".into(),
+            zoom_step_input: String::new(),
             ..State::default()
         };
         assert_eq!(state.commit_zoom_step(), Err(ZoomStepError::InvalidInput));

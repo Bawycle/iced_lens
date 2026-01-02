@@ -57,7 +57,7 @@ impl<Message> canvas::Program<Message> for Checkerboard {
 }
 
 /// Helper to wrap arbitrary content with a checkerboard background.
-#[must_use] 
+#[must_use]
 pub fn wrap<'a, Message: 'a>(content: Container<'a, Message>) -> Element<'a, Message> {
     Stack::new()
         .push(

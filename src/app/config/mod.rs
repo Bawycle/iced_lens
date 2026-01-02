@@ -485,13 +485,13 @@ fn get_config_path_with_override(base_dir: Option<PathBuf>) -> Option<PathBuf> {
 ///
 /// Returns a tuple of (config, `optional_warning`). If loading fails, returns
 /// default config with a warning message explaining what went wrong.
-#[must_use] 
+#[must_use]
 pub fn load() -> (Config, Option<String>) {
     load_with_override(None)
 }
 
 /// Loads the configuration from a custom directory.
-#[must_use] 
+#[must_use]
 pub fn load_with_override(base_dir: Option<PathBuf>) -> (Config, Option<String>) {
     if let Some(path) = get_config_path_with_override(base_dir) {
         if path.exists() {

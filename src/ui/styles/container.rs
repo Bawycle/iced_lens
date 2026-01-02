@@ -10,7 +10,7 @@ use iced::{Background, Border, Color, Theme};
 /// The color is derived from the active Iced `Theme` background, with a slight
 /// opacity, so panels stay readable in both light and dark modes without
 /// hard-coding colors.
-#[must_use] 
+#[must_use]
 pub fn panel(theme: &Theme) -> container::Style {
     let palette = theme.extended_palette();
     let base = palette.background.base.color;
