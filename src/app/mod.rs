@@ -35,12 +35,6 @@ use crate::video_player::{create_lufs_cache, SharedLufsCache};
 use i18n::fluent::I18n;
 use iced::{window, Element, Subscription, Task, Theme};
 use std::fmt;
-use std::sync::atomic::{AtomicU32, Ordering};
-
-// Diagnostic counters for startup hang investigation
-static VIEW_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
-static UPDATE_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
-static SUBSCRIPTION_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
 
 /// Root Iced application state that bridges UI components, localization, and
 /// persisted preferences.
@@ -193,14 +187,9 @@ impl App {
     // Refactoring would risk breaking initialization order and add indirection.
     #[allow(clippy::too_many_lines)]
     fn new(flags: Flags) -> (Self, Task<Message>) {
-        let startup_time = std::time::Instant::now();
-        eprintln!("[STARTUP] App::new() started");
-
         let (config, config_warning) = config::load();
-        eprintln!("[STARTUP] Config loaded in {:?}", startup_time.elapsed());
 
         let i18n = I18n::new(flags.lang.clone(), flags.i18n_dir.clone(), &config);
-        eprintln!("[STARTUP] I18n loaded in {:?}", startup_time.elapsed());
 
         let mut app = App {
             i18n,
@@ -246,9 +235,7 @@ impl App {
         app.frame_cache_mb = frame_cache_mb;
         app.frame_history_mb = frame_history_mb;
         // Load application state (last save directory, deblur enabled, etc.)
-        eprintln!("[STARTUP] Loading app state...");
         let (app_state, state_warning) = persisted_state::AppState::load();
-        eprintln!("[STARTUP] App state loaded in {:?}", startup_time.elapsed());
 
         // Read AI settings before moving app_state (enable flags come from persisted state)
         let enable_deblur = app_state.enable_deblur;
@@ -356,11 +343,8 @@ impl App {
                 .push(notifications::Notification::warning(&key));
         }
 
-        eprintln!("[STARTUP] Settings applied in {:?}", startup_time.elapsed());
-
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
-            eprintln!("[STARTUP] Scanning directory for: {}", path.display());
 
             // Determine if path is a directory or a file and resolve the media path
             let resolved_path = if path.is_dir() {
@@ -392,11 +376,6 @@ impl App {
                 Some(path)
             };
 
-            eprintln!(
-                "[STARTUP] Directory scanned in {:?}",
-                startup_time.elapsed()
-            );
-
             if let Some(media_path) = resolved_path {
                 // Synchronize navigator state (single source of truth for current media)
                 app.media_navigator.set_current_media_path(media_path.clone());
@@ -419,13 +398,6 @@ impl App {
             Task::none()
         };
 
-        eprintln!(
-            "[STARTUP] Media task prepared in {:?}, deblur_validation={}, upscale_validation={}",
-            startup_time.elapsed(),
-            needs_deblur_startup_validation,
-            needs_upscale_startup_validation
-        );
-
         // If deblur was enabled and model exists, start validation in background
         // Use spawn_blocking to avoid blocking the tokio runtime during CPU-intensive ONNX inference
         let deblur_validation_task = if needs_deblur_startup_validation {
@@ -433,13 +405,9 @@ impl App {
             Task::perform(
                 async move {
                     tokio::task::spawn_blocking(move || {
-                        eprintln!("[STARTUP] Deblur validation: starting...");
                         let mut manager = media::deblur::DeblurManager::new();
-                        eprintln!("[STARTUP] Deblur validation: loading session...");
                         manager.load_session(Some(&cancel_token))?;
-                        eprintln!("[STARTUP] Deblur validation: validating model...");
                         media::deblur::validate_model(&mut manager, Some(&cancel_token))?;
-                        eprintln!("[STARTUP] Deblur validation: completed");
                         Ok::<(), media::deblur::DeblurError>(())
                     })
                     .await
@@ -466,13 +434,9 @@ impl App {
             Task::perform(
                 async move {
                     tokio::task::spawn_blocking(move || {
-                        eprintln!("[STARTUP] Upscale validation: starting...");
                         let mut manager = media::upscale::UpscaleManager::new();
-                        eprintln!("[STARTUP] Upscale validation: loading session...");
                         manager.load_session(Some(&cancel_token))?;
-                        eprintln!("[STARTUP] Upscale validation: validating model...");
                         media::upscale::validate_model(&mut manager, Some(&cancel_token))?;
-                        eprintln!("[STARTUP] Upscale validation: completed");
                         Ok::<(), media::upscale::UpscaleError>(())
                     })
                     .await
@@ -496,10 +460,6 @@ impl App {
         // Combine tasks
         let combined_task = Task::batch([task, deblur_validation_task, upscale_validation_task]);
 
-        eprintln!(
-            "[STARTUP] App::new() completed in {:?}",
-            startup_time.elapsed()
-        );
         (app, combined_task)
     }
 
@@ -593,11 +553,6 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        let count = SUBSCRIPTION_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
-        if count < 5 {
-            eprintln!("[STARTUP] subscription() call #{}", count + 1);
-        }
-
         let event_sub = subscription::create_event_subscription(self.screen);
         let tick_sub = subscription::create_tick_subscription(
             self.fullscreen,
@@ -627,11 +582,6 @@ impl App {
     // Length comes from number of message variants, not from complexity.
     #[allow(clippy::too_many_lines)]
     fn update(&mut self, message: Message) -> Task<Message> {
-        let count = UPDATE_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
-        if count < 10 {
-            eprintln!("[STARTUP] update() call #{}: {:?}", count + 1, std::mem::discriminant(&message));
-        }
-
         // Track window size from resize events before creating context
         // (must be done before borrowing self.window_size)
         if let Message::Viewer(component::Message::RawEvent {
@@ -1314,11 +1264,6 @@ impl App {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let count = VIEW_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
-        if count < 5 {
-            eprintln!("[STARTUP] view() call #{}, screen={:?}", count + 1, self.screen);
-        }
-
         let is_dark_theme = self.theme_mode.is_dark();
         let is_image = matches!(
             self.current_metadata,

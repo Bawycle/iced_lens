@@ -241,26 +241,15 @@ fn is_animated<P: AsRef<Path>>(path: P) -> crate::error::Result<bool> {
 /// - The file cannot be read or decoded
 pub fn load_media<P: AsRef<Path>>(path: P) -> crate::error::Result<MediaData> {
     let path_ref = path.as_ref();
-    eprintln!("[STARTUP] load_media: {}", path_ref.display());
-    let start = std::time::Instant::now();
 
     // Detect media type
     let media_type = detect_media_type(path_ref)
         .ok_or_else(|| crate::error::Error::Io("Unsupported file format".to_string()))?;
-    eprintln!(
-        "[STARTUP] load_media: detected {:?} in {:?}",
-        media_type,
-        start.elapsed()
-    );
 
     match media_type {
         MediaType::Image => {
             // Load as image
             let image_data = image::load_image(path_ref)?;
-            eprintln!(
-                "[STARTUP] load_media: image loaded in {:?}",
-                start.elapsed()
-            );
             Ok(MediaData::Image(image_data))
         }
         MediaType::Video => {
@@ -278,16 +267,11 @@ pub fn load_media<P: AsRef<Path>>(path: P) -> crate::error::Result<MediaData> {
             }
 
             // Try to load as video using FFmpeg
-            eprintln!("[STARTUP] load_media: extracting video thumbnail...");
             match (
                 video::extract_thumbnail(path_ref),
                 video::extract_video_metadata(path_ref),
             ) {
                 (Ok(thumbnail), Ok(metadata)) => {
-                    eprintln!(
-                        "[STARTUP] load_media: video loaded in {:?}",
-                        start.elapsed()
-                    );
                     let video_data = VideoData {
                         thumbnail,
                         width: metadata.width,

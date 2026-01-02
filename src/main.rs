@@ -43,13 +43,11 @@ fn main() -> iced::Result {
             Ok(())
         }
         RunMode::Normal(flags) => {
-            eprintln!("[STARTUP] Application starting...");
             // Initialize CLI path overrides before any config/state loading
             iced_lens::app::paths::init_cli_overrides(
                 flags.data_dir.clone(),
                 flags.config_dir.clone(),
             );
-            eprintln!("[STARTUP] CLI overrides initialized, launching app...");
             app::run(flags)
         }
     }

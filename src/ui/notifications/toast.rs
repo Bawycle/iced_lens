@@ -78,7 +78,6 @@ impl Toast {
                 .padding(spacing::SM)
                 .style(move |theme: &Theme| toast_container_style(theme, accent_color)),
         )
-        .into()
     }
 
     /// Renders the toast overlay with all visible notifications.

@@ -438,7 +438,7 @@ impl AudioDecoder {
         let input_channel_layout = {
             let layout = decoder.channel_layout();
             if layout.is_empty() {
-                ffmpeg_next::ChannelLayout::default(decoder.channels() as i32)
+                ffmpeg_next::ChannelLayout::default(i32::from(decoder.channels()))
             } else {
                 layout
             }
@@ -515,9 +515,8 @@ impl AudioDecoder {
                     let input_samples = decoded_frame.samples();
                     let input_rate = decoded_frame.rate();
                     // Round up to avoid losing samples
-                    let output_samples = ((input_samples as u64 * u64::from(output_sample_rate)
-                        + u64::from(input_rate) - 1)
-                        / u64::from(input_rate)) as usize;
+                    let output_samples = (input_samples as u64 * u64::from(output_sample_rate))
+                        .div_ceil(u64::from(input_rate)) as usize;
 
                     let mut output_audio = ffmpeg_next::frame::Audio::empty();
                     // Pre-allocate with correct size so run() doesn't reallocate incorrectly
