@@ -12,7 +12,7 @@ use crate::ui::design_tokens::{
 };
 use crate::ui::icons;
 use iced::widget::image::{Handle, Image};
-use iced::widget::{button, container, text, Column, Container, Row, Text};
+use iced::widget::{button, container, opaque, text, Column, Container, Row, Text};
 use iced::{alignment, Color, Element, Length, Theme};
 
 /// Toast widget configuration.
@@ -68,12 +68,17 @@ impl Toast {
             )
             .push(dismiss_button);
 
-        // Toast container with accent border
-        Container::new(content)
-            .width(Length::Fixed(sizing::TOAST_WIDTH))
-            .padding(spacing::SM)
-            .style(move |theme: &Theme| toast_container_style(theme, accent_color))
-            .into()
+        // Toast container with accent border.
+        // Wrap with opaque() to ensure mouse events are captured by the toast
+        // and propagated to children (dismiss button). Without this, the full-screen
+        // overlay container may intercept events before they reach the toast.
+        opaque(
+            Container::new(content)
+                .width(Length::Fixed(sizing::TOAST_WIDTH))
+                .padding(spacing::SM)
+                .style(move |theme: &Theme| toast_container_style(theme, accent_color)),
+        )
+        .into()
     }
 
     /// Renders the toast overlay with all visible notifications.

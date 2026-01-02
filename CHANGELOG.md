@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Audio now plays correctly on surround sound systems (5.1, 7.1). Previously, audio on multi-channel devices could sound robotic or distorted.
 - Audio now plays at correct speed for videos with non-standard sample rates (e.g., 32000 Hz). Previously, sample rate conversion produced distorted/robotic audio.
 - Metadata panel now shows correct file info when opening a specific file via command line.
+- Error notifications can now be dismissed by clicking the close button.
 
 ## [0.5.0] - 2025-12-22
 
