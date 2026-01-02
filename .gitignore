@@ -39,3 +39,4 @@ tests/data/*.webm
 tests/data/*.mov
 tests/data/*.mkv
 tests/samples/
+.github/workflows/
