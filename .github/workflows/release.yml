@@ -1,0 +1,291 @@
+# SPDX-License-Identifier: MPL-2.0
+#
+# GitHub Actions workflow for automated release builds.
+#
+# This workflow triggers when a version tag (v*) is pushed to the repository.
+# It builds platform-specific packages and uploads them to GitHub Releases.
+#
+# Packages built:
+#   - Linux: AppImage (x86_64)
+#   - Windows: Installer (x86_64)
+#
+# Usage:
+#   1. Update version in Cargo.toml and CHANGELOG.md
+#   2. Commit and push changes
+#   3. Create and push a tag: git tag v0.6.0 && git push origin v0.6.0
+#   4. GitHub Actions automatically builds and creates the release
+
+name: Release
+
+# Trigger: only when a tag starting with 'v' is pushed
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Prevent concurrent releases
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Environment variables shared across all jobs
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ==========================================================================
+  # Linux AppImage Build
+  # ==========================================================================
+  build-linux:
+    name: Build Linux AppImage
+    runs-on: ubuntu-22.04
+
+    steps:
+      # Step 1: Clone the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Install Rust toolchain
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # Step 3: Cache Rust dependencies (speeds up builds)
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: linux-cargo-
+
+      # Step 4: Install system dependencies for FFmpeg and audio
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libswresample-dev \
+            libasound2-dev \
+            libfuse2 \
+            file
+
+      # Step 5: Download linuxdeploy (AppImage packaging tool)
+      - name: Download linuxdeploy
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          # Move to a location in PATH
+          sudo mv linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
+
+      # Step 6: Build the AppImage using existing script
+      - name: Build AppImage
+        run: |
+          ./scripts/build-appimage.sh --output-dir ./artifacts
+        env:
+          LINUXDEPLOY_BIN: linuxdeploy
+
+      # Step 7: List built artifacts (for debugging)
+      - name: List artifacts
+        run: ls -la ./artifacts/
+
+      # Step 8: Upload artifacts for the release job
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: |
+            ./artifacts/*.AppImage
+            ./artifacts/*.sha256
+          if-no-files-found: error
+
+  # ==========================================================================
+  # Windows Installer Build
+  # ==========================================================================
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      # Step 1: Clone the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Install Rust toolchain
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # Step 3: Cache Rust dependencies
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: windows-cargo-
+
+      # Step 4: Install LLVM/Clang (required for bindgen/ffmpeg-next)
+      - name: Install LLVM
+        run: choco install llvm -y
+
+      # Step 5: Install Inno Setup (installer compiler)
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      # Step 6: Download and setup FFmpeg (headers for build + DLLs for runtime)
+      - name: Setup FFmpeg
+        run: |
+          # Download FFmpeg shared build from BtbN (includes headers and DLLs)
+          $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip"
+          $ffmpegZip = "$env:TEMP\ffmpeg.zip"
+          $ffmpegExtract = "$env:TEMP\ffmpeg-extract"
+          $ffmpegDir = "C:\ffmpeg"
+
+          Write-Host "Downloading FFmpeg..."
+          Invoke-WebRequest -Uri $ffmpegUrl -OutFile $ffmpegZip
+
+          Write-Host "Extracting FFmpeg..."
+          Expand-Archive -Path $ffmpegZip -DestinationPath $ffmpegExtract -Force
+
+          # Move to a stable location (BtbN archives have a nested folder)
+          $nestedDir = Get-ChildItem -Path $ffmpegExtract -Directory | Select-Object -First 1
+          Move-Item -Path $nestedDir.FullName -Destination $ffmpegDir -Force
+
+          Write-Host "FFmpeg installed to $ffmpegDir"
+          Write-Host "Contents:"
+          Get-ChildItem -Path $ffmpegDir | ForEach-Object { Write-Host "  - $($_.Name)" }
+
+          # Copy DLLs to target/release for the installer
+          New-Item -ItemType Directory -Force -Path "target/release" | Out-Null
+          Copy-Item -Path "$ffmpegDir\bin\*.dll" -Destination "target/release\" -Force
+
+          Write-Host "DLLs copied to target/release:"
+          Get-ChildItem -Path "target/release\*.dll" | ForEach-Object { Write-Host "  - $($_.Name)" }
+        shell: pwsh
+
+      # Step 7: Build release binary
+      - name: Build release binary
+        run: cargo build --release
+        env:
+          # LLVM/Clang path for bindgen
+          LIBCLANG_PATH: "C:\\Program Files\\LLVM\\bin"
+          # FFmpeg paths for ffmpeg-next crate
+          FFMPEG_DIR: "C:\\ffmpeg"
+
+      # Step 8: Build installer with Inno Setup
+      - name: Build Windows installer
+        run: |
+          # Add Inno Setup to PATH
+          $env:PATH += ";C:\Program Files (x86)\Inno Setup 6"
+
+          # Run Inno Setup compiler from scripts/ directory
+          # (the .iss file uses relative paths like ..\target\)
+          Push-Location scripts
+          iscc build-windows-installer.iss
+          Pop-Location
+        shell: pwsh
+
+      # Step 9: Generate checksum
+      - name: Generate checksum
+        run: |
+          $installers = Get-ChildItem -Path "target/release" -Filter "IcedLens-*-setup.exe"
+          foreach ($installer in $installers) {
+            $hash = Get-FileHash -Path $installer.FullName -Algorithm SHA256
+            "$($hash.Hash)  $($installer.Name)" | Out-File -FilePath "$($installer.FullName).sha256" -Encoding ASCII
+            Write-Host "Created checksum for $($installer.Name)"
+          }
+        shell: pwsh
+
+      # Step 10: List built artifacts
+      - name: List artifacts
+        run: Get-ChildItem -Path "target/release" -Filter "IcedLens-*"
+        shell: pwsh
+
+      # Step 11: Upload artifacts for the release job
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: |
+            target/release/IcedLens-*-setup.exe
+            target/release/IcedLens-*-setup.exe.sha256
+          if-no-files-found: error
+
+  # ==========================================================================
+  # Create GitHub Release
+  # ==========================================================================
+  create-release:
+    name: Create GitHub Release
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # Step 1: Download all artifacts from build jobs
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-artifacts
+          path: ./artifacts
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-artifacts
+          path: ./artifacts
+
+      # Step 2: List all artifacts
+      - name: List all artifacts
+        run: ls -la ./artifacts/
+
+      # Step 3: Extract version from tag
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      # Step 4: Create GitHub Release and upload assets
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: IcedLens v${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+          generate_release_notes: false
+          body: |
+            ## IcedLens v${{ steps.version.outputs.VERSION }}
+
+            See [CHANGELOG](https://codeberg.org/Bawycle/iced_lens/src/branch/master/CHANGELOG.md) for details.
+
+            ### Downloads
+
+            | Platform | Package | Checksum |
+            |----------|---------|----------|
+            | Linux (x86_64) | AppImage | SHA256 |
+            | Windows (x86_64) | Installer | SHA256 |
+
+            ### Installation
+
+            **Linux AppImage:**
+            ```bash
+            chmod +x iced_lens-*.AppImage
+            ./iced_lens-*.AppImage
+            ```
+
+            **Windows:**
+            Run the installer and follow the prompts.
+
+            ---
+
+            **Main repository:** [Codeberg](https://codeberg.org/Bawycle/iced_lens)
+          files: |
+            ./artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
