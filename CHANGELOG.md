@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add software tag and modification date (default: on)
   - Strip GPS location data (shown only if image has GPS coordinates)
 - **Processing metadata display:** software and modification date now shown in a new "Processing" section of the metadata panel.
+- **Editable processing metadata:** software and modification date fields can now be edited in the metadata panel, like other metadata fields.
 
 ### Fixed
 - Edited images now preserve original metadata (EXIF, XMP, ICC) when saved. Previously, all metadata was lost.

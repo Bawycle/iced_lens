@@ -206,6 +206,11 @@ fn build_edit_content<'a>(ctx: &PanelContext<'a>, _meta: &ImageMetadata) -> Elem
         sections = sections.push(gps_section);
     }
 
+    // Processing section
+    if let Some(processing_section) = build_processing_section_edit(ctx.i18n, editor) {
+        sections = sections.push(processing_section);
+    }
+
     // Show message if no fields are visible
     if editor.visible_fields.is_empty() {
         sections = sections.push(
@@ -522,6 +527,48 @@ fn build_dublin_core_section_edit<'a>(
     }
 }
 
+fn build_processing_section_edit<'a>(
+    i18n: &'a I18n,
+    editor: &MetadataEditorState,
+) -> Option<Element<'a, Message>> {
+    let mut rows = Column::new().spacing(spacing::XS);
+    let mut has_fields = false;
+
+    // Software
+    if editor.is_field_visible(&MetadataField::Software) {
+        rows = rows.push(build_edit_field_with_remove(
+            &i18n.tr("metadata-label-software"),
+            &editor.edited.software,
+            MetadataField::Software,
+            Some("IcedLens".to_string()),
+            None,
+        ));
+        has_fields = true;
+    }
+
+    // Date Modified (uses smart date picker like DateTaken)
+    if editor.is_field_visible(&MetadataField::DateModified) {
+        rows = rows.push(build_generic_date_field_with_remove(
+            i18n,
+            &i18n.tr("metadata-label-date-modified"),
+            &editor.edited.date_modified,
+            MetadataField::DateModified,
+            editor.errors.date_modified.as_ref(),
+        ));
+        has_fields = true;
+    }
+
+    if has_fields {
+        Some(build_section(
+            icons::cog(),
+            i18n.tr("metadata-section-processing"),
+            rows.into(),
+        ))
+    } else {
+        None
+    }
+}
+
 /// Build an editable field with label, input, and optional error.
 fn build_edit_field<'a>(
     label: &str,
@@ -670,6 +717,77 @@ fn build_date_field_with_remove<'a>(
     col.into()
 }
 
+/// Build a generic smart date/time field with single input and intelligent parsing.
+///
+/// Works for any date field (`DateTaken`, `DateModified`, etc.).
+/// Accepts multiple date formats and converts to EXIF format (YYYY:MM:DD HH:MM:SS).
+/// Includes a "Now" button for quick current date/time input.
+fn build_generic_date_field_with_remove<'a>(
+    i18n: &'a I18n,
+    label: &str,
+    value: &str,
+    field: MetadataField,
+    error: Option<&String>,
+) -> Element<'a, Message> {
+    let mut col = Column::new().spacing(spacing::XXS);
+
+    // Label row with remove button
+    let label_row = Row::new()
+        .spacing(spacing::XS)
+        .align_y(Vertical::Center)
+        .push(text(format!("{label}:")).size(typography::BODY_SM))
+        .push(iced::widget::Space::new().width(Length::Fill))
+        .push(
+            button(icons::sized(icons::cross(), sizing::ICON_SM))
+                .on_press(Message::RemoveField(field))
+                .padding(spacing::XXS),
+        );
+    col = col.push(label_row);
+
+    // Format the display value for better readability
+    let display_value = format_date_for_display(value);
+
+    // Input row with "Now" button
+    let input_row = Row::new()
+        .spacing(spacing::XS)
+        .align_y(Vertical::Center)
+        .push(
+            text_input(&i18n.tr("metadata-date-placeholder"), &display_value)
+                .on_input(move |v| {
+                    // Parse and convert to EXIF format
+                    let exif_date = parse_date_input(&v);
+                    Message::FieldChanged(field, exif_date)
+                })
+                .padding(spacing::XS)
+                .size(typography::BODY)
+                .width(Length::Fill),
+        )
+        .push(
+            button(text(i18n.tr("metadata-date-now")).size(typography::BODY_SM))
+                .on_press(Message::FieldChanged(field, get_current_datetime_exif()))
+                .padding(spacing::XS),
+        );
+    col = col.push(input_row);
+
+    // Help text
+    col = col.push(
+        text(i18n.tr("metadata-date-help"))
+            .size(typography::CAPTION)
+            .color(palette::GRAY_400),
+    );
+
+    // Error message if present
+    if let Some(err) = error {
+        col = col.push(
+            text(err.clone())
+                .size(typography::CAPTION)
+                .color(palette::ERROR_500),
+        );
+    }
+
+    col.into()
+}
+
 /// Format a date string for display (more readable format).
 fn format_date_for_display(value: &str) -> String {
     if value.is_empty() {
@@ -790,6 +908,9 @@ fn build_add_field_picker<'a>(i18n: &'a I18n, available: &[MetadataField]) -> El
                 MetadataField::FocalLength => "Focal length",
                 MetadataField::FocalLength35mm => "Focal length (35mm)",
                 MetadataField::GpsLatitude | MetadataField::GpsLongitude => "GPS coordinates",
+                // Processing fields
+                MetadataField::Software => "Software",
+                MetadataField::DateModified => "Date modified",
             },
         })
         .collect();

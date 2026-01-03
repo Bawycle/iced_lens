@@ -17,6 +17,7 @@ pub struct ValidationErrors {
     pub focal_length_35mm: Option<String>,
     pub gps_latitude: Option<String>,
     pub gps_longitude: Option<String>,
+    pub date_modified: Option<String>,
 }
 
 impl ValidationErrors {
@@ -31,6 +32,7 @@ impl ValidationErrors {
             || self.focal_length_35mm.is_some()
             || self.gps_latitude.is_some()
             || self.gps_longitude.is_some()
+            || self.date_modified.is_some()
     }
 }
 
@@ -102,6 +104,14 @@ impl MetadataEditorState {
         if !data.gps_latitude.is_empty() || !data.gps_longitude.is_empty() {
             visible.insert(MetadataField::GpsLatitude);
             visible.insert(MetadataField::GpsLongitude);
+        }
+
+        // Processing fields
+        if !data.software.is_empty() {
+            visible.insert(MetadataField::Software);
+        }
+        if !data.date_modified.is_empty() {
+            visible.insert(MetadataField::DateModified);
         }
 
         // Dublin Core / XMP fields
@@ -186,6 +196,12 @@ impl MetadataEditorState {
                 self.edited.gps_longitude.clear();
                 self.errors.gps_longitude = None;
             }
+            // Processing fields
+            MetadataField::Software => self.edited.software.clear(),
+            MetadataField::DateModified => {
+                self.edited.date_modified.clear();
+                self.errors.date_modified = None;
+            }
             // Dublin Core / XMP fields (no validation needed)
             MetadataField::DcTitle => self.edited.dc_title.clear(),
             MetadataField::DcCreator => self.edited.dc_creator.clear(),
@@ -231,6 +247,9 @@ impl MetadataEditorState {
             || self.edited.focal_length_35mm != self.original.focal_length_35mm
             || self.edited.gps_latitude != self.original.gps_latitude
             || self.edited.gps_longitude != self.original.gps_longitude
+            // Processing fields
+            || self.edited.software != self.original.software
+            || self.edited.date_modified != self.original.date_modified
             // Dublin Core / XMP fields
             || self.edited.dc_title != self.original.dc_title
             || self.edited.dc_creator != self.original.dc_creator
@@ -321,6 +340,17 @@ impl MetadataEditorState {
                     validate_longitude(&value)
                 };
             }
+            // Processing fields
+            MetadataField::Software => self.edited.software = value,
+            MetadataField::DateModified => {
+                self.edited.date_modified.clone_from(&value);
+                // Same validation as date_taken
+                self.errors.date_modified = if value == self.original.date_modified {
+                    None
+                } else {
+                    validate_date(&value)
+                };
+            }
             // Dublin Core / XMP fields (no validation needed - free-form text)
             MetadataField::DcTitle => self.edited.dc_title = value,
             MetadataField::DcCreator => self.edited.dc_creator = value,
@@ -376,6 +406,11 @@ impl MetadataEditorState {
             None
         } else {
             validate_longitude(&self.edited.gps_longitude)
+        };
+        self.errors.date_modified = if self.edited.date_modified == self.original.date_modified {
+            None
+        } else {
+            validate_date(&self.edited.date_modified)
         };
 
         !self.errors.has_errors()

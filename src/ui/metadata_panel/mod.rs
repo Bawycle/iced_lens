@@ -30,6 +30,9 @@ pub enum MetadataField {
     FocalLength35mm,
     GpsLatitude,
     GpsLongitude,
+    // Processing / Software fields
+    Software,
+    DateModified,
     // Dublin Core / XMP fields
     DcTitle,
     DcCreator,
@@ -61,6 +64,9 @@ impl MetadataField {
             MetadataField::FocalLength,
             MetadataField::GpsLatitude,
             MetadataField::GpsLongitude,
+            // Processing fields
+            MetadataField::Software,
+            MetadataField::DateModified,
         ]
     }
 

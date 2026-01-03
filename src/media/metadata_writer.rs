@@ -93,10 +93,10 @@ impl EditableMetadata {
                 .map(|v| v.join(", "))
                 .unwrap_or_default(),
             dc_rights: meta.dc_rights.clone().unwrap_or_default(),
-            // Preservation fields default to empty (set during save operations)
-            orientation: String::new(),
-            software: String::new(),
-            date_modified: String::new(),
+            // Processing fields
+            orientation: String::new(), // Set during save operations, not user-editable
+            software: meta.software.clone().unwrap_or_default(),
+            date_modified: meta.date_modified.clone().unwrap_or_default(),
         }
     }
 
