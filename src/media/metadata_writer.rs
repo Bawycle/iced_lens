@@ -51,6 +51,15 @@ pub struct EditableMetadata {
     pub dc_subject: String,
     /// dc:rights - Copyright/license
     pub dc_rights: String,
+
+    // Metadata preservation fields (for image editor save operations)
+    /// EXIF Orientation tag (1-8). "1" = normal.
+    /// Set to "1" when image is physically rotated during editing.
+    pub orientation: String,
+    /// Software that created/modified the image.
+    pub software: String,
+    /// Date/time of modification (EXIF format: "YYYY:MM:DD HH:MM:SS").
+    pub date_modified: String,
 }
 
 impl EditableMetadata {
@@ -84,6 +93,10 @@ impl EditableMetadata {
                 .map(|v| v.join(", "))
                 .unwrap_or_default(),
             dc_rights: meta.dc_rights.clone().unwrap_or_default(),
+            // Preservation fields default to empty (set during save operations)
+            orientation: String::new(),
+            software: String::new(),
+            date_modified: String::new(),
         }
     }
 
@@ -101,6 +114,10 @@ impl EditableMetadata {
             || !self.focal_length_35mm.is_empty()
             || !self.gps_latitude.is_empty()
             || !self.gps_longitude.is_empty()
+            // Preservation fields
+            || !self.orientation.is_empty()
+            || !self.software.is_empty()
+            || !self.date_modified.is_empty()
     }
 
     /// Returns true if any Dublin Core / XMP field has a non-empty value.
@@ -139,13 +156,14 @@ pub fn write_exif<P: AsRef<Path>>(path: P, metadata: &EditableMetadata) -> Resul
     let path = path.as_ref();
 
     // Load existing EXIF or create empty metadata
-    let (mut exif_metadata, has_existing_exif) = load_existing_exif(path, metadata);
+    let (mut exif_metadata, can_write_exif) = load_existing_exif(path, metadata);
 
     // Apply all EXIF tags from editable metadata
     apply_exif_tags(&mut exif_metadata, metadata);
 
-    // Write EXIF to file (with panic protection for buggy WebP files)
-    if has_existing_exif {
+    // Write EXIF to file if we have data to write and format supports it
+    // Note: can_write_exif is false for problematic WebP files (VP8L without VP8X)
+    if can_write_exif && metadata.has_any_exif_data() {
         write_exif_to_file(path, &exif_metadata)?;
     }
 
@@ -157,8 +175,12 @@ pub fn write_exif<P: AsRef<Path>>(path: P, metadata: &EditableMetadata) -> Resul
 
 /// Loads existing EXIF metadata from file, or creates empty metadata if none exists.
 ///
+/// Returns `(metadata, can_write)` where:
+/// - `metadata` is the existing EXIF data or empty metadata
+/// - `can_write` is true if the format supports EXIF writing (false only for problematic formats)
+///
 /// Skips EXIF handling for WebP files without VP8X chunk, as `little_exif` panics on these.
-fn load_existing_exif(path: &Path, metadata: &EditableMetadata) -> (Metadata, bool) {
+fn load_existing_exif(path: &Path, _metadata: &EditableMetadata) -> (Metadata, bool) {
     // Skip EXIF for problematic WebP files (VP8L without VP8X)
     if is_webp_without_vp8x(path) {
         return (Metadata::new(), false);
@@ -171,19 +193,13 @@ fn load_existing_exif(path: &Path, metadata: &EditableMetadata) -> (Metadata, bo
 
     match read_result {
         Ok(Ok(m)) => (m, true),
-        Ok(Err(e)) => {
-            // Only warn if user is trying to write EXIF fields
-            if metadata.has_any_exif_data() {
-                eprintln!(
-                    "[WARN] Could not read existing EXIF from '{}': {:?}. EXIF write skipped.",
-                    path.display(),
-                    e
-                );
-            }
-            (Metadata::new(), false)
+        Ok(Err(_e)) => {
+            // No existing EXIF (e.g., file just created by image_rs), but format supports it.
+            // We can still write new EXIF data.
+            (Metadata::new(), true)
         }
         Err(_panic) => {
-            // little_exif panicked unexpectedly
+            // little_exif panicked unexpectedly - format likely unsupported
             (Metadata::new(), false)
         }
     }
@@ -256,6 +272,31 @@ fn apply_exif_tags(exif_metadata: &mut Metadata, metadata: &EditableMetadata) {
         ) {
             set_gps_coordinates(exif_metadata, lat, lon);
         }
+    }
+
+    // Metadata preservation tags (for image editor save operations)
+    apply_preservation_tags(exif_metadata, metadata);
+}
+
+/// Applies metadata preservation tags (orientation, software, modification date).
+fn apply_preservation_tags(exif_metadata: &mut Metadata, metadata: &EditableMetadata) {
+    // Orientation tag (1-8, where 1 = normal)
+    if !metadata.orientation.is_empty() {
+        if let Ok(orientation) = metadata.orientation.trim().parse::<u16>() {
+            if (1..=8).contains(&orientation) {
+                exif_metadata.set_tag(ExifTag::Orientation(vec![orientation]));
+            }
+        }
+    }
+
+    // Software tag
+    if !metadata.software.is_empty() {
+        exif_metadata.set_tag(ExifTag::Software(metadata.software.clone()));
+    }
+
+    // Modification date (ModifyDate tag, distinct from DateTimeOriginal)
+    if !metadata.date_modified.is_empty() {
+        exif_metadata.set_tag(ExifTag::ModifyDate(metadata.date_modified.clone()));
     }
 }
 

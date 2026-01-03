@@ -4,6 +4,7 @@
 pub mod adjustments_panel;
 pub mod crop_panel;
 pub mod deblur_panel;
+pub mod metadata_options;
 pub mod resize_panel;
 
 use crate::media::deblur::ModelStatus;
@@ -13,7 +14,9 @@ use crate::media::ImageData;
 use crate::ui::action_icons;
 use crate::ui::design_tokens::{sizing, spacing, typography};
 use crate::ui::icons;
-use crate::ui::image_editor::state::{AdjustmentState, CropState, DeblurState, ResizeState};
+use crate::ui::image_editor::state::{
+    AdjustmentState, CropState, DeblurState, MetadataPreservationOptions, ResizeState,
+};
 use crate::ui::styles;
 use crate::ui::styles::button as button_styles;
 use iced::widget::scrollable::{Direction, Scrollbar};
@@ -58,6 +61,10 @@ pub struct SidebarModel<'a> {
     pub upscale_model_status: &'a UpscaleModelStatus,
     /// Whether AI upscaling is enabled globally in settings.
     pub enable_upscale: bool,
+    /// Metadata preservation options for save operations.
+    pub metadata_options: &'a MetadataPreservationOptions,
+    /// Whether the original image has GPS data.
+    pub has_gps_data: bool,
 }
 
 impl<'a> SidebarModel<'a> {
@@ -78,6 +85,8 @@ impl<'a> SidebarModel<'a> {
             resize_thumbnail: state.resize_thumbnail(),
             upscale_model_status: ctx.upscale_model_status,
             enable_upscale: ctx.enable_upscale,
+            metadata_options: state.metadata_options(),
+            has_gps_data: state.has_gps_data(),
         }
     }
 }
@@ -163,6 +172,8 @@ pub fn expanded<'a>(model: &SidebarModel<'a>, ctx: &ViewContext<'a>) -> Element<
             model.has_unsaved_changes,
             model.is_captured_frame,
             model.export_format,
+            model.metadata_options,
+            model.has_gps_data,
             ctx,
         ));
 
@@ -350,6 +361,8 @@ fn footer_section<'a>(
     has_changes: bool,
     is_captured_frame: bool,
     export_format: ExportFormat,
+    metadata_options: &MetadataPreservationOptions,
+    has_gps_data: bool,
     ctx: &ViewContext<'a>,
 ) -> Column<'a, Message> {
     let mut footer = Column::new().spacing(spacing::XS).push(rule::horizontal(1));
@@ -393,6 +406,15 @@ fn footer_section<'a>(
             .push(prev_btn)
             .push(next_btn);
         footer = footer.push(nav_row).push(rule::horizontal(1));
+    }
+
+    // Metadata options section - only for file mode (not captured frames)
+    if !is_captured_frame {
+        footer = footer.push(metadata_options::section(
+            metadata_options,
+            has_gps_data,
+            ctx,
+        ));
     }
 
     // Cancel button - available when there are changes

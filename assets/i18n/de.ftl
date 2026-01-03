@@ -420,6 +420,9 @@ metadata-label-aperture = Blende
 metadata-label-iso = ISO
 metadata-label-focal-length = Brennweite
 metadata-label-gps = Koordinaten
+metadata-section-processing = Verarbeitung
+metadata-label-software = Software
+metadata-label-date-modified = Geändert
 metadata-label-codec = Codec
 metadata-label-bitrate = Bitrate
 metadata-label-duration = Dauer
@@ -528,6 +531,9 @@ image-editor-deblur-validating = Modell wird validiert, bitte warten...
 image-editor-deblur-downloading = Modell wird heruntergeladen ({ $progress }%)...
 image-editor-deblur-error = Fehler: { $error }
 image-editor-deblur-already-applied = Entunschärfung bereits angewendet. Verwenden Sie Rückgängig, um bei Bedarf zurückzusetzen.
+image-editor-metadata-options-title = Metadaten
+image-editor-metadata-add-software = Software-Tag und Änderungsdatum hinzufügen
+image-editor-metadata-strip-gps = GPS-Standortdaten entfernen
 
 # KI-Hilfeabschnitt
 help-editor-deblur-title = KI-Entunschärfung

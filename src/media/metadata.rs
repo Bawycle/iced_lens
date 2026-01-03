@@ -56,6 +56,12 @@ pub struct ImageMetadata {
     /// Longitude in decimal degrees (e.g., 2.3522)
     pub gps_longitude: Option<f64>,
 
+    // Software/processing info (EXIF)
+    /// Software used to process the image
+    pub software: Option<String>,
+    /// Date and time the image was last modified
+    pub date_modified: Option<String>,
+
     // Dublin Core / XMP metadata
     /// dc:title - Title of the work
     pub dc_title: Option<String>,
@@ -155,109 +161,152 @@ pub fn extract_image_metadata<P: AsRef<Path>>(path: P) -> Result<ImageMetadata> 
 
     let exif_reader = exif::Reader::new();
     if let Ok(exif) = exif_reader.read_from_container(&mut reader) {
-        // Image dimensions
-        if let Some(field) = exif.get_field(exif::Tag::PixelXDimension, exif::In::PRIMARY) {
-            metadata.width = field.value.get_uint(0);
-        } else if let Some(field) = exif.get_field(exif::Tag::ImageWidth, exif::In::PRIMARY) {
-            metadata.width = field.value.get_uint(0);
-        }
-
-        if let Some(field) = exif.get_field(exif::Tag::PixelYDimension, exif::In::PRIMARY) {
-            metadata.height = field.value.get_uint(0);
-        } else if let Some(field) = exif.get_field(exif::Tag::ImageLength, exif::In::PRIMARY) {
-            metadata.height = field.value.get_uint(0);
-        }
-
-        // Camera info
-        if let Some(field) = exif.get_field(exif::Tag::Make, exif::In::PRIMARY) {
-            metadata.camera_make = Some(
-                field
-                    .display_value()
-                    .to_string()
-                    .trim_matches('"')
-                    .to_string(),
-            );
-        }
-
-        if let Some(field) = exif.get_field(exif::Tag::Model, exif::In::PRIMARY) {
-            metadata.camera_model = Some(
-                field
-                    .display_value()
-                    .to_string()
-                    .trim_matches('"')
-                    .to_string(),
-            );
-        }
-
-        // Date taken
-        if let Some(field) = exif.get_field(exif::Tag::DateTimeOriginal, exif::In::PRIMARY) {
-            metadata.date_taken = Some(
-                field
-                    .display_value()
-                    .to_string()
-                    .trim_matches('"')
-                    .to_string(),
-            );
-        } else if let Some(field) = exif.get_field(exif::Tag::DateTime, exif::In::PRIMARY) {
-            metadata.date_taken = Some(
-                field
-                    .display_value()
-                    .to_string()
-                    .trim_matches('"')
-                    .to_string(),
-            );
-        }
-
-        // Exposure settings
-        if let Some(field) = exif.get_field(exif::Tag::ExposureTime, exif::In::PRIMARY) {
-            metadata.exposure_time = Some(format!("{} sec", field.display_value()));
-        }
-
-        if let Some(field) = exif.get_field(exif::Tag::FNumber, exif::In::PRIMARY) {
-            metadata.aperture = Some(field.display_value().to_string());
-        }
-
-        if let Some(field) = exif.get_field(exif::Tag::PhotographicSensitivity, exif::In::PRIMARY) {
-            metadata.iso = Some(format!("ISO {}", field.display_value()));
-        }
-
-        if let Some(field) = exif.get_field(exif::Tag::Flash, exif::In::PRIMARY) {
-            metadata.flash = Some(field.display_value().to_string());
-        }
-
-        // Lens info
-        if let Some(field) = exif.get_field(exif::Tag::FocalLength, exif::In::PRIMARY) {
-            metadata.focal_length = Some(field.display_value().to_string());
-        }
-
-        if let Some(field) = exif.get_field(exif::Tag::FocalLengthIn35mmFilm, exif::In::PRIMARY) {
-            metadata.focal_length_35mm = Some(format!("{} mm", field.display_value()));
-        }
-
-        // GPS coordinates
+        extract_dimensions(&exif, &mut metadata);
+        extract_camera_info(&exif, &mut metadata);
+        extract_exposure_info(&exif, &mut metadata);
+        extract_lens_info(&exif, &mut metadata);
+        extract_software_info(&exif, &mut metadata);
         extract_gps_coordinates(&exif, &mut metadata);
     }
 
     // Try to extract XMP Dublin Core metadata
-    if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-        let dc = match ext.to_lowercase().as_str() {
-            "jpg" | "jpeg" => xmp::extract_xmp_from_jpeg(path),
-            "png" => xmp::extract_xmp_from_png(path),
-            "webp" => xmp::extract_xmp_from_webp(path),
-            "tiff" | "tif" => xmp::extract_xmp_from_tiff(path),
-            _ => None,
-        };
-
-        if let Some(dc) = dc {
-            metadata.dc_title = dc.title;
-            metadata.dc_creator = dc.creator;
-            metadata.dc_description = dc.description;
-            metadata.dc_subject = dc.subject;
-            metadata.dc_rights = dc.rights;
-        }
-    }
+    extract_xmp_metadata(path, &mut metadata);
 
     Ok(metadata)
+}
+
+/// Extract image dimensions from EXIF data.
+fn extract_dimensions(exif: &exif::Exif, metadata: &mut ImageMetadata) {
+    if let Some(field) = exif.get_field(exif::Tag::PixelXDimension, exif::In::PRIMARY) {
+        metadata.width = field.value.get_uint(0);
+    } else if let Some(field) = exif.get_field(exif::Tag::ImageWidth, exif::In::PRIMARY) {
+        metadata.width = field.value.get_uint(0);
+    }
+
+    if let Some(field) = exif.get_field(exif::Tag::PixelYDimension, exif::In::PRIMARY) {
+        metadata.height = field.value.get_uint(0);
+    } else if let Some(field) = exif.get_field(exif::Tag::ImageLength, exif::In::PRIMARY) {
+        metadata.height = field.value.get_uint(0);
+    }
+}
+
+/// Extract camera make, model, and date taken from EXIF data.
+fn extract_camera_info(exif: &exif::Exif, metadata: &mut ImageMetadata) {
+    if let Some(field) = exif.get_field(exif::Tag::Make, exif::In::PRIMARY) {
+        metadata.camera_make = Some(
+            field
+                .display_value()
+                .to_string()
+                .trim_matches('"')
+                .to_string(),
+        );
+    }
+
+    if let Some(field) = exif.get_field(exif::Tag::Model, exif::In::PRIMARY) {
+        metadata.camera_model = Some(
+            field
+                .display_value()
+                .to_string()
+                .trim_matches('"')
+                .to_string(),
+        );
+    }
+
+    // Date taken (prefer DateTimeOriginal, fallback to DateTime)
+    if let Some(field) = exif.get_field(exif::Tag::DateTimeOriginal, exif::In::PRIMARY) {
+        metadata.date_taken = Some(
+            field
+                .display_value()
+                .to_string()
+                .trim_matches('"')
+                .to_string(),
+        );
+    } else if let Some(field) = exif.get_field(exif::Tag::DateTime, exif::In::PRIMARY) {
+        metadata.date_taken = Some(
+            field
+                .display_value()
+                .to_string()
+                .trim_matches('"')
+                .to_string(),
+        );
+    }
+}
+
+/// Extract exposure settings from EXIF data.
+fn extract_exposure_info(exif: &exif::Exif, metadata: &mut ImageMetadata) {
+    if let Some(field) = exif.get_field(exif::Tag::ExposureTime, exif::In::PRIMARY) {
+        metadata.exposure_time = Some(format!("{} sec", field.display_value()));
+    }
+
+    if let Some(field) = exif.get_field(exif::Tag::FNumber, exif::In::PRIMARY) {
+        metadata.aperture = Some(field.display_value().to_string());
+    }
+
+    if let Some(field) = exif.get_field(exif::Tag::PhotographicSensitivity, exif::In::PRIMARY) {
+        metadata.iso = Some(format!("ISO {}", field.display_value()));
+    }
+
+    if let Some(field) = exif.get_field(exif::Tag::Flash, exif::In::PRIMARY) {
+        metadata.flash = Some(field.display_value().to_string());
+    }
+}
+
+/// Extract lens information from EXIF data.
+fn extract_lens_info(exif: &exif::Exif, metadata: &mut ImageMetadata) {
+    if let Some(field) = exif.get_field(exif::Tag::FocalLength, exif::In::PRIMARY) {
+        metadata.focal_length = Some(field.display_value().to_string());
+    }
+
+    if let Some(field) = exif.get_field(exif::Tag::FocalLengthIn35mmFilm, exif::In::PRIMARY) {
+        metadata.focal_length_35mm = Some(format!("{} mm", field.display_value()));
+    }
+}
+
+/// Extract software and modification date from EXIF data.
+fn extract_software_info(exif: &exif::Exif, metadata: &mut ImageMetadata) {
+    if let Some(field) = exif.get_field(exif::Tag::Software, exif::In::PRIMARY) {
+        metadata.software = Some(
+            field
+                .display_value()
+                .to_string()
+                .trim_matches('"')
+                .to_string(),
+        );
+    }
+
+    // Date modified (DateTime tag)
+    if let Some(field) = exif.get_field(exif::Tag::DateTime, exif::In::PRIMARY) {
+        metadata.date_modified = Some(
+            field
+                .display_value()
+                .to_string()
+                .trim_matches('"')
+                .to_string(),
+        );
+    }
+}
+
+/// Extract XMP Dublin Core metadata from file.
+fn extract_xmp_metadata(path: &Path, metadata: &mut ImageMetadata) {
+    let Some(ext) = path.extension().and_then(|s| s.to_str()) else {
+        return;
+    };
+
+    let dc = match ext.to_lowercase().as_str() {
+        "jpg" | "jpeg" => xmp::extract_xmp_from_jpeg(path),
+        "png" => xmp::extract_xmp_from_png(path),
+        "webp" => xmp::extract_xmp_from_webp(path),
+        "tiff" | "tif" => xmp::extract_xmp_from_tiff(path),
+        _ => None,
+    };
+
+    if let Some(dc) = dc {
+        metadata.dc_title = dc.title;
+        metadata.dc_creator = dc.creator;
+        metadata.dc_description = dc.description;
+        metadata.dc_subject = dc.subject;
+        metadata.dc_rights = dc.rights;
+    }
 }
 
 /// Extract GPS coordinates from EXIF data.

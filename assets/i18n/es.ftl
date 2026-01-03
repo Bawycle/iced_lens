@@ -420,6 +420,9 @@ metadata-label-aperture = Apertura
 metadata-label-iso = ISO
 metadata-label-focal-length = Distancia focal
 metadata-label-gps = Coordenadas
+metadata-section-processing = Procesamiento
+metadata-label-software = Software
+metadata-label-date-modified = Modificado
 metadata-label-codec = Códec
 metadata-label-bitrate = Tasa de bits
 metadata-label-duration = Duración
@@ -528,6 +531,9 @@ image-editor-deblur-validating = Validando modelo, por favor espera...
 image-editor-deblur-downloading = Descargando modelo ({ $progress }%)...
 image-editor-deblur-error = Error: { $error }
 image-editor-deblur-already-applied = Desenfoque ya aplicado. Usa Deshacer para revertir si es necesario.
+image-editor-metadata-options-title = Metadatos
+image-editor-metadata-add-software = Añadir etiqueta de software y fecha de modificación
+image-editor-metadata-strip-gps = Eliminar datos de ubicación GPS
 
 # Sección de ayuda de IA
 help-editor-deblur-title = Desenfoque IA

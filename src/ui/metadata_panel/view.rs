@@ -852,6 +852,12 @@ fn build_image_metadata_view<'a>(i18n: &'a I18n, meta: &ImageMetadata) -> Elemen
         sections = sections.push(gps_section);
     }
 
+    // Processing/Software section (if available)
+    if meta.software.is_some() || meta.date_modified.is_some() {
+        let processing_section = build_processing_section_view(i18n, meta);
+        sections = sections.push(processing_section);
+    }
+
     sections.into()
 }
 
@@ -1041,6 +1047,30 @@ fn build_gps_section_view<'a>(i18n: &'a I18n, meta: &ImageMetadata) -> Element<'
     }
 
     build_section(icons::globe(), i18n.tr("metadata-section-gps"), rows.into())
+}
+
+fn build_processing_section_view<'a>(i18n: &'a I18n, meta: &ImageMetadata) -> Element<'a, Message> {
+    let mut rows = Column::new().spacing(spacing::XS);
+
+    if let Some(ref software) = meta.software {
+        rows = rows.push(build_metadata_row(
+            i18n.tr("metadata-label-software"),
+            software.clone(),
+        ));
+    }
+
+    if let Some(ref date_modified) = meta.date_modified {
+        rows = rows.push(build_metadata_row(
+            i18n.tr("metadata-label-date-modified"),
+            date_modified.clone(),
+        ));
+    }
+
+    build_section(
+        icons::cog(),
+        i18n.tr("metadata-section-processing"),
+        rows.into(),
+    )
 }
 
 fn build_dublin_core_section_view<'a>(

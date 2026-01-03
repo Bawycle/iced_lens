@@ -10,22 +10,38 @@
 use super::{CropDragState, CropRatio};
 use crate::error::{Error, Result};
 use crate::media::image_transform;
+use crate::media::metadata_operations::{preserve_metadata_from_bytes, PreservationConfig};
 use crate::ui::image_editor::{ImageSource, State};
+use std::fs;
 
 impl State {
-    /// Save the edited image to a file, preserving the original format.
+    /// Save the edited image to a file, preserving the original format and metadata.
+    ///
+    /// This function:
+    /// 1. Saves the pixel data using the `image` crate
+    /// 2. Preserves EXIF/XMP metadata from the source image (if editing a file)
+    /// 3. Applies metadata transformations based on user options:
+    ///    - Strips GPS data if requested
+    ///    - Resets orientation tag if image was rotated
+    ///    - Adds software tag and modification date if requested
     ///
     /// # Errors
     ///
     /// Returns an error if the image format is unsupported or the file
-    /// cannot be written.
+    /// cannot be written. Metadata preservation errors are logged but don't
+    /// fail the save operation.
     pub fn save_image(&mut self, path: &std::path::Path) -> Result<()> {
         use image_rs::ImageFormat;
 
-        // Detect format from file extension
+        // Detect format from file extension (case-insensitive)
+        let ext_lower = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(str::to_lowercase);
+
         // Note: png is listed explicitly for clarity even though it matches the default
         #[allow(clippy::match_same_arms)]
-        let format = match path.extension().and_then(|s| s.to_str()) {
+        let format = match ext_lower.as_deref() {
             Some("jpg" | "jpeg") => ImageFormat::Jpeg,
             Some("png") => ImageFormat::Png,
             Some("gif") => ImageFormat::Gif,
@@ -36,10 +52,42 @@ impl State {
             _ => ImageFormat::Png, // Default fallback
         };
 
-        // Save the working image
+        // Read source bytes BEFORE saving (in case we're overwriting the same file)
+        // This must happen before save_with_format() which would overwrite the file
+        let source_data = if let ImageSource::File(source_path) = &self.image_source {
+            let source_ext = source_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_string();
+            fs::read(source_path).ok().map(|bytes| (bytes, source_ext))
+        } else {
+            None
+        };
+
+        // Save the working image (pixels only)
         self.working_image
             .save_with_format(path, format)
             .map_err(|err| Error::Io(format!("Failed to save image: {err}")))?;
+
+        // Preserve metadata if editing a file (not captured frame)
+        if let Some((source_bytes, source_ext)) = source_data {
+            // Update orientation_changed flag from transformation history
+            self.metadata_options
+                .update_from_transformations(&self.transformation_history);
+
+            let config = PreservationConfig {
+                strip_gps: self.metadata_options.strip_gps,
+                add_software_tag: self.metadata_options.add_software_tag,
+                reset_orientation: self.metadata_options.orientation_changed(),
+            };
+
+            // Preserve metadata from the bytes we read earlier (best-effort)
+            if let Err(e) = preserve_metadata_from_bytes(&source_bytes, &source_ext, path, &config)
+            {
+                eprintln!("[WARN] Failed to preserve metadata: {e}. Image saved without metadata.");
+            }
+        }
 
         // Clear transformation history after successful save
         self.transformation_history.clear();

@@ -5,13 +5,14 @@ use crate::config::BackgroundTheme;
 use crate::error::{Error, Result};
 use crate::media::deblur::ModelStatus;
 use crate::media::frame_export::{ExportFormat, ExportableFrame};
+use crate::media::metadata_operations;
 use crate::media::upscale::UpscaleModelStatus;
 use crate::media::ImageData;
 use iced::{Element, Rectangle};
 use image_rs;
 use std::path::PathBuf;
 
-use super::{state, view, ImageSource, Message, State};
+use super::{state, view, ImageSource, Message, MetadataPreservationOptions, State};
 
 /// Contextual data needed to render the editor view.
 pub struct ViewContext<'a> {
@@ -37,6 +38,9 @@ impl State {
         let working_image =
             image_rs::open(&image_path).map_err(|err| Error::Io(err.to_string()))?;
 
+        // Check if image has GPS data for conditional UI display
+        let has_gps_data = metadata_operations::has_gps_data(&image_path);
+
         Ok(Self {
             image_source: ImageSource::File(image_path),
             original_image: working_image.clone(),
@@ -61,6 +65,8 @@ impl State {
             cursor_position: None,
             cursor_over_canvas: false,
             drag: crate::ui::state::DragState::default(),
+            metadata_options: MetadataPreservationOptions::default(),
+            has_gps_data,
         })
     }
 
@@ -106,6 +112,9 @@ impl State {
             cursor_position: None,
             cursor_over_canvas: false,
             drag: crate::ui::state::DragState::default(),
+            // Captured frames have no source metadata
+            metadata_options: MetadataPreservationOptions::default(),
+            has_gps_data: false,
         })
     }
 

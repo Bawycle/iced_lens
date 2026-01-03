@@ -420,6 +420,9 @@ metadata-label-aperture = Aperture
 metadata-label-iso = ISO
 metadata-label-focal-length = Focal length
 metadata-label-gps = Coordinates
+metadata-section-processing = Processing
+metadata-label-software = Software
+metadata-label-date-modified = Modified
 metadata-label-codec = Codec
 metadata-label-bitrate = Bit rate
 metadata-label-duration = Duration
@@ -529,6 +532,9 @@ image-editor-deblur-validating = Validating model, please wait...
 image-editor-deblur-downloading = Downloading model ({ $progress }%)...
 image-editor-deblur-error = Error: { $error }
 image-editor-deblur-already-applied = Deblur already applied. Use Undo to revert if needed.
+image-editor-metadata-options-title = Metadata
+image-editor-metadata-add-software = Add software tag & modification date
+image-editor-metadata-strip-gps = Strip GPS location data
 
 # AI Help section
 help-editor-deblur-title = AI Deblur

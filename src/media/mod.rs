@@ -10,6 +10,7 @@ pub mod frame_export;
 pub mod image;
 pub mod image_transform;
 pub mod metadata;
+pub mod metadata_operations;
 pub mod metadata_writer;
 pub mod navigator;
 pub mod skip_attempts;

@@ -200,6 +200,14 @@ impl State {
                 self.set_export_format(format);
                 Event::None
             }
+            SidebarMessage::ToggleStripGps => {
+                self.metadata_options.strip_gps = !self.metadata_options.strip_gps;
+                Event::None
+            }
+            SidebarMessage::ToggleAddSoftwareTag => {
+                self.metadata_options.add_software_tag = !self.metadata_options.add_software_tag;
+                Event::None
+            }
         }
     }
 

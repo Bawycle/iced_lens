@@ -58,6 +58,10 @@ pub enum SidebarMessage {
     Cancel,
     /// Set the export format for Save As.
     SetExportFormat(ExportFormat),
+    /// Toggle "Strip GPS data" option for metadata preservation.
+    ToggleStripGps,
+    /// Toggle "Add software/modification date" option for metadata preservation.
+    ToggleAddSoftwareTag,
 }
 
 /// Canvas overlay interaction messages.

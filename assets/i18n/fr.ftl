@@ -420,6 +420,9 @@ metadata-label-aperture = Ouverture
 metadata-label-iso = ISO
 metadata-label-focal-length = Focale
 metadata-label-gps = Coordonnées
+metadata-section-processing = Traitement
+metadata-label-software = Logiciel
+metadata-label-date-modified = Modifié
 metadata-label-codec = Codec
 metadata-label-bitrate = Débit
 metadata-label-duration = Durée
@@ -529,6 +532,9 @@ image-editor-deblur-validating = Validation du modèle en cours...
 image-editor-deblur-downloading = Téléchargement du modèle ({ $progress }%)...
 image-editor-deblur-error = Erreur : { $error }
 image-editor-deblur-already-applied = Défloutage déjà appliqué. Utilisez Annuler pour revenir en arrière si nécessaire.
+image-editor-metadata-options-title = Métadonnées
+image-editor-metadata-add-software = Ajouter le tag logiciel et la date de modification
+image-editor-metadata-strip-gps = Supprimer les données GPS
 
 # Section d'aide IA
 help-editor-deblur-title = Défloutage IA

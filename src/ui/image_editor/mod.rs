@@ -17,7 +17,7 @@ mod view;
 
 pub use self::state::{
     AdjustmentState, CropDragState, CropOverlay, CropRatio, CropState, DeblurState, HandlePosition,
-    ResizeOverlay, ResizeState,
+    MetadataPreservationOptions, ResizeOverlay, ResizeState,
 };
 pub use component::{EditorTool, Transformation, ViewContext};
 use image_rs::DynamicImage;
@@ -39,6 +39,9 @@ pub enum ImageSource {
 }
 
 /// Local UI state for the editor screen.
+// Allow struct_excessive_bools: UI state naturally contains multiple boolean flags
+// for visibility, modes, and toggles. Refactoring would reduce clarity.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone)]
 pub struct State {
     /// Source of the image being edited (file or captured frame).
@@ -86,6 +89,10 @@ pub struct State {
     cursor_over_canvas: bool,
     /// Drag state for pan navigation
     drag: DragState,
+    /// Metadata preservation options for save operations.
+    metadata_options: MetadataPreservationOptions,
+    /// Whether the original image has GPS data (for conditional UI display).
+    has_gps_data: bool,
 }
 
 impl std::fmt::Debug for State {
@@ -188,6 +195,21 @@ impl State {
         } else {
             None
         }
+    }
+
+    /// Get the metadata preservation options.
+    pub fn metadata_options(&self) -> &MetadataPreservationOptions {
+        &self.metadata_options
+    }
+
+    /// Get mutable reference to metadata preservation options.
+    pub fn metadata_options_mut(&mut self) -> &mut MetadataPreservationOptions {
+        &mut self.metadata_options
+    }
+
+    /// Check if the original image has GPS data.
+    pub fn has_gps_data(&self) -> bool {
+        self.has_gps_data
     }
 }
 

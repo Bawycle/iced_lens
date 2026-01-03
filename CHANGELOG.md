@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Metadata preservation options:** checkboxes in the editor sidebar to control metadata when saving.
+  - Add software tag and modification date (default: on)
+  - Strip GPS location data (shown only if image has GPS coordinates)
+- **Processing metadata display:** software and modification date now shown in a new "Processing" section of the metadata panel.
+
+### Fixed
+- Edited images now preserve original metadata (EXIF, XMP, ICC) when saved. Previously, all metadata was lost.
+- EXIF orientation is now automatically reset after rotation/flip transformations.
+- Image editor now correctly saves files with uppercase extensions (`.JPG`, `.PNG`).
+
 ## [0.6.0] - 2025-01-02
 
 ### Added
