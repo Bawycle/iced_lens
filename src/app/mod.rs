@@ -255,26 +255,22 @@ impl App {
             .clone()
             .unwrap_or_else(|| config::DEFAULT_UPSCALE_MODEL_URL.to_string());
 
-        // Check if the deblur model needs validation at startup
-        // If enable_deblur is true and model exists, we need to validate it before making it available
-        let (deblur_model_status, needs_deblur_startup_validation) =
-            if enable_deblur && media::deblur::is_model_downloaded() {
-                // Model exists but needs validation - set to Validating, not Ready
-                (crate::media::deblur::ModelStatus::Validating, true)
-            } else {
-                (crate::media::deblur::ModelStatus::NotDownloaded, false)
-            };
+        // Check if the AI models need validation
+        // Validation is deferred until the user enters the image editor to avoid
+        // CPU-intensive operations at startup (especially when user frequently restarts the app)
+        let deblur_model_status = if enable_deblur && media::deblur::is_model_downloaded() {
+            // Model exists but validation is deferred until first editor access
+            crate::media::deblur::ModelStatus::NeedsValidation
+        } else {
+            crate::media::deblur::ModelStatus::NotDownloaded
+        };
 
-        // Check if the upscale model needs validation at startup
-        let (upscale_model_status, needs_upscale_startup_validation) =
-            if enable_upscale && media::upscale::is_model_downloaded() {
-                (crate::media::upscale::UpscaleModelStatus::Validating, true)
-            } else {
-                (
-                    crate::media::upscale::UpscaleModelStatus::NotDownloaded,
-                    false,
-                )
-            };
+        let upscale_model_status = if enable_upscale && media::upscale::is_model_downloaded() {
+            // Model exists but validation is deferred until first editor access
+            crate::media::upscale::UpscaleModelStatus::NeedsValidation
+        } else {
+            crate::media::upscale::UpscaleModelStatus::NotDownloaded
+        };
 
         let max_skip_attempts = config
             .display
@@ -399,69 +395,10 @@ impl App {
             Task::none()
         };
 
-        // If deblur was enabled and model exists, start validation in background
-        // Use spawn_blocking to avoid blocking the tokio runtime during CPU-intensive ONNX inference
-        let deblur_validation_task = if needs_deblur_startup_validation {
-            let cancel_token = app.cancellation_token.clone();
-            Task::perform(
-                async move {
-                    tokio::task::spawn_blocking(move || {
-                        let mut manager = media::deblur::DeblurManager::new();
-                        manager.load_session(Some(&cancel_token))?;
-                        media::deblur::validate_model(&mut manager, Some(&cancel_token))?;
-                        Ok::<(), media::deblur::DeblurError>(())
-                    })
-                    .await
-                    .map_err(|e| media::deblur::DeblurError::InferenceFailed(e.to_string()))?
-                },
-                |result: media::deblur::DeblurResult<()>| match result {
-                    Ok(()) => Message::DeblurValidationCompleted {
-                        result: Ok(()),
-                        is_startup: true,
-                    },
-                    Err(e) => Message::DeblurValidationCompleted {
-                        result: Err(e.to_string()),
-                        is_startup: true,
-                    },
-                },
-            )
-        } else {
-            Task::none()
-        };
+        // AI model validation is now deferred until the user enters the image editor
+        // (see handle_screen_switch in update.rs for the validation trigger)
 
-        // If upscale was enabled and model exists, start validation in background
-        let upscale_validation_task = if needs_upscale_startup_validation {
-            let cancel_token = app.cancellation_token.clone();
-            Task::perform(
-                async move {
-                    tokio::task::spawn_blocking(move || {
-                        let mut manager = media::upscale::UpscaleManager::new();
-                        manager.load_session(Some(&cancel_token))?;
-                        media::upscale::validate_model(&mut manager, Some(&cancel_token))?;
-                        Ok::<(), media::upscale::UpscaleError>(())
-                    })
-                    .await
-                    .map_err(|e| media::upscale::UpscaleError::InferenceFailed(e.to_string()))?
-                },
-                |result: media::upscale::UpscaleResult<()>| match result {
-                    Ok(()) => Message::UpscaleValidationCompleted {
-                        result: Ok(()),
-                        is_startup: true,
-                    },
-                    Err(e) => Message::UpscaleValidationCompleted {
-                        result: Err(e.to_string()),
-                        is_startup: true,
-                    },
-                },
-            )
-        } else {
-            Task::none()
-        };
-
-        // Combine tasks
-        let combined_task = Task::batch([task, deblur_validation_task, upscale_validation_task]);
-
-        (app, combined_task)
+        (app, task)
     }
 
     fn title(&self) -> String {
@@ -613,6 +550,7 @@ impl App {
             help_state: &mut self.help_state,
             persisted: &mut self.persisted,
             notifications: &mut self.notifications,
+            cancellation_token: &self.cancellation_token,
         };
 
         match message {

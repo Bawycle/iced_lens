@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Processing metadata display:** software and modification date now shown in a new "Processing" section of the metadata panel.
 - **Editable processing metadata:** software and modification date fields can now be edited in the metadata panel, like other metadata fields.
 
+### Changed
+- AI model validation (for deblur and upscale) is now deferred until the user first enters the image editor. This avoids CPU-intensive operations at startup, especially when the user frequently opens and closes the application without using the editor.
+
 ### Fixed
 - Edited images now preserve original metadata (EXIF, XMP, ICC) when saved. Previously, all metadata was lost.
 - EXIF orientation is now automatically reset after rotation/flip transformations.

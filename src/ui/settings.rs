@@ -974,6 +974,9 @@ impl State {
                         ctx.i18n.tr("settings-deblur-status-not-downloaded")
                     }
                     ModelStatus::Downloading { .. } => unreachable!(),
+                    ModelStatus::NeedsValidation => {
+                        ctx.i18n.tr("settings-deblur-status-needs-validation")
+                    }
                     ModelStatus::Validating => ctx.i18n.tr("settings-deblur-status-validating"),
                     ModelStatus::Ready => ctx.i18n.tr("settings-deblur-status-ready"),
                     ModelStatus::Error(msg) => ctx
@@ -981,10 +984,11 @@ impl State {
                         .tr_with_args("settings-deblur-status-error", &[("message", msg.as_str())]),
                 };
 
+                let is_dark = self.theme_mode.is_dark();
                 let status_style = match &self.deblur_model_status {
                     ModelStatus::Ready => theme::success_text_color(),
                     ModelStatus::Error(_) => theme::error_text_color(),
-                    _ => theme::muted_text_color(),
+                    _ => theme::muted_text_color_for_theme(is_dark),
                 };
 
                 let status_display =
@@ -1111,6 +1115,9 @@ impl State {
                         ctx.i18n.tr("settings-upscale-status-not-downloaded")
                     }
                     UpscaleModelStatus::Downloading { .. } => unreachable!(),
+                    UpscaleModelStatus::NeedsValidation => {
+                        ctx.i18n.tr("settings-upscale-status-needs-validation")
+                    }
                     UpscaleModelStatus::Validating => {
                         ctx.i18n.tr("settings-upscale-status-validating")
                     }
@@ -1121,10 +1128,11 @@ impl State {
                     ),
                 };
 
+                let is_dark = self.theme_mode.is_dark();
                 let status_style = match &self.upscale_model_status {
                     UpscaleModelStatus::Ready => theme::success_text_color(),
                     UpscaleModelStatus::Error(_) => theme::error_text_color(),
-                    _ => theme::muted_text_color(),
+                    _ => theme::muted_text_color_for_theme(is_dark),
                 };
 
                 let status_display =

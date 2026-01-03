@@ -545,6 +545,7 @@ fn build_editor_resize_tool<'a>(
         .push(build_bullet(&ctx.i18n.tr("help-editor-resize-lock")))
         .push(build_bullet(&ctx.i18n.tr("help-editor-resize-presets")))
         .push(build_bullet(&ctx.i18n.tr("help-editor-resize-ai-upscale")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-resize-ai-validation")))
         .into();
     (title, content)
 }
@@ -573,6 +574,7 @@ fn build_editor_deblur_tool<'a>(
         .spacing(spacing::XXS)
         .push(build_paragraph(ctx.i18n.tr("help-editor-deblur-desc")))
         .push(build_bullet(&ctx.i18n.tr("help-editor-deblur-enable")))
+        .push(build_bullet(&ctx.i18n.tr("help-editor-deblur-validation")))
         .push(build_bullet(&ctx.i18n.tr("help-editor-deblur-lossless")))
         .into();
     (title, content)

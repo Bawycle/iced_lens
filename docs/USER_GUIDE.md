@@ -219,7 +219,7 @@ Experimental feature using the NAFNet neural network to sharpen blurry images.
 1. Go to Settings → AI / Machine Learning
 2. Enable "AI Deblurring"
 3. Wait for model download (~92 MB from Hugging Face)
-4. Model is validated automatically
+4. Model is validated automatically when you first open the image editor
 
 ### Usage
 
@@ -247,7 +247,7 @@ Enhance image enlargements using the Real-ESRGAN neural network for sharper resu
 1. Go to Settings → AI / Machine Learning
 2. Enable "AI Upscaling"
 3. Wait for model download (~64 MB from Hugging Face)
-4. Model is validated automatically
+4. Model is validated automatically when you first open the image editor
 
 ### Usage
 

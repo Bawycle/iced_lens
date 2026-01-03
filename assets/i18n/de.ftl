@@ -290,6 +290,7 @@ help-editor-resize-dimensions = Geben Sie exakte Breite und Höhe in Pixeln ein
 help-editor-resize-lock = Seitenverhältnis sperren, um Proportionen beizubehalten
 help-editor-resize-presets = Verwenden Sie Voreinstellungen für schnelle Skalierung (25%, 50%, 200%, etc.)
 help-editor-resize-ai-upscale = KI-Upscaling: Verwenden Sie Real-ESRGAN für schärfere Vergrößerungen (in Einstellungen aktivieren)
+help-editor-resize-ai-validation = KI-Modell wird beim ersten Öffnen des Editors validiert (nicht beim Start)
 
 help-editor-light-title = Licht
 help-editor-light-desc = Passen Sie die Helligkeit und den Kontrast Ihres Bildes fein an.
@@ -501,6 +502,7 @@ settings-deblur-status-validating = Modell wird validiert...
 settings-deblur-status-ready = Modell bereit
 settings-deblur-status-error = Fehler: { $message }
 settings-deblur-status-not-downloaded = Modell nicht heruntergeladen
+settings-deblur-status-needs-validation = Modell heruntergeladen (Validierung bei erster Verwendung)
 settings-deblur-enabled = Aktiviert
 settings-deblur-disabled = Deaktiviert
 
@@ -516,6 +518,7 @@ settings-upscale-status-validating = Modell wird validiert...
 settings-upscale-status-ready = Modell bereit
 settings-upscale-status-error = Fehler: { $message }
 settings-upscale-status-not-downloaded = Modell nicht heruntergeladen
+settings-upscale-status-needs-validation = Modell heruntergeladen (Validierung bei erster Verwendung)
 settings-upscale-enabled = Aktiviert
 settings-upscale-disabled = Deaktiviert
 
@@ -539,6 +542,7 @@ image-editor-metadata-strip-gps = GPS-Standortdaten entfernen
 help-editor-deblur-title = KI-Entunschärfung
 help-editor-deblur-desc = Verwenden Sie KI, um unscharfe Bilder mit dem neuronalen Netzwerk NAFNet zu schärfen.
 help-editor-deblur-enable = Aktivieren unter Einstellungen → KI / Maschinelles Lernen (lädt ~92 MB Modell herunter)
+help-editor-deblur-validation = Modell wird beim ersten Öffnen des Editors validiert (nicht beim Start)
 help-editor-deblur-lossless = Für beste Qualität als verlustfreies WebP oder PNG exportieren
 
 # KI-Benachrichtigungen

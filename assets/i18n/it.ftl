@@ -290,6 +290,7 @@ help-editor-resize-dimensions = Inserisci larghezza e altezza esatte in pixel
 help-editor-resize-lock = Blocca le proporzioni per mantenere le proporzioni
 help-editor-resize-presets = Usa le preimpostazioni per ridimensionamento rapido (25%, 50%, 200%, etc.)
 help-editor-resize-ai-upscale = Upscaling IA: Usa Real-ESRGAN per ingrandimenti più nitidi (attivare nelle Impostazioni)
+help-editor-resize-ai-validation = Il modello IA viene validato al primo accesso all'editor (non all'avvio)
 
 help-editor-light-title = Luce
 help-editor-light-desc = Regola finemente la luminosità e il contrasto della tua immagine.
@@ -501,6 +502,7 @@ settings-deblur-status-validating = Validazione del modello in corso...
 settings-deblur-status-ready = Modello pronto
 settings-deblur-status-error = Errore: { $message }
 settings-deblur-status-not-downloaded = Modello non scaricato
+settings-deblur-status-needs-validation = Modello scaricato (validazione al primo utilizzo)
 settings-deblur-enabled = Abilitato
 settings-deblur-disabled = Disabilitato
 
@@ -516,6 +518,7 @@ settings-upscale-status-validating = Validazione del modello in corso...
 settings-upscale-status-ready = Modello pronto
 settings-upscale-status-error = Errore: { $message }
 settings-upscale-status-not-downloaded = Modello non scaricato
+settings-upscale-status-needs-validation = Modello scaricato (validazione al primo utilizzo)
 settings-upscale-enabled = Abilitato
 settings-upscale-disabled = Disabilitato
 
@@ -539,6 +542,7 @@ image-editor-metadata-strip-gps = Rimuovi dati posizione GPS
 help-editor-deblur-title = Sfocatura IA
 help-editor-deblur-desc = Usa l'IA per migliorare la nitidezza delle immagini sfocate con la rete neurale NAFNet.
 help-editor-deblur-enable = Abilita in Impostazioni → IA / Apprendimento automatico (scarica modello di ~92 MB)
+help-editor-deblur-validation = Il modello viene validato al primo accesso all'editor (non all'avvio)
 help-editor-deblur-lossless = Per una qualità migliore, esporta come WebP lossless o PNG
 
 # Notifiche IA

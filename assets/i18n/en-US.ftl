@@ -290,6 +290,7 @@ help-editor-resize-dimensions = Enter exact width and height in pixels
 help-editor-resize-lock = Lock aspect ratio to maintain proportions
 help-editor-resize-presets = Use presets for quick scaling (25%, 50%, 200%, etc.)
 help-editor-resize-ai-upscale = AI Upscaling: Use Real-ESRGAN for sharper enlargements (enable in Settings)
+help-editor-resize-ai-validation = AI model is validated on first editor access (not at startup)
 
 help-editor-light-title = Light
 help-editor-light-desc = Fine-tune the brightness and contrast of your image.
@@ -502,6 +503,7 @@ settings-deblur-status-validating = Validating model...
 settings-deblur-status-ready = Model ready
 settings-deblur-status-error = Error: { $message }
 settings-deblur-status-not-downloaded = Model not downloaded
+settings-deblur-status-needs-validation = Model downloaded (validation on first use)
 settings-deblur-enabled = Enabled
 settings-deblur-disabled = Disabled
 
@@ -517,6 +519,7 @@ settings-upscale-status-validating = Validating model...
 settings-upscale-status-ready = Model ready
 settings-upscale-status-error = Error: { $message }
 settings-upscale-status-not-downloaded = Model not downloaded
+settings-upscale-status-needs-validation = Model downloaded (validation on first use)
 settings-upscale-enabled = Enabled
 settings-upscale-disabled = Disabled
 
@@ -540,6 +543,7 @@ image-editor-metadata-strip-gps = Strip GPS location data
 help-editor-deblur-title = AI Deblur
 help-editor-deblur-desc = Use AI to sharpen blurry images using the NAFNet neural network.
 help-editor-deblur-enable = Enable in Settings → AI / Machine Learning (downloads ~92 MB model)
+help-editor-deblur-validation = Model is validated on first editor access (not at startup)
 help-editor-deblur-lossless = For best quality, export as WebP lossless or PNG
 
 # AI Notifications

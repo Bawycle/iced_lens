@@ -90,6 +90,9 @@ pub enum UpscaleModelStatus {
     NotDownloaded,
     /// Model is currently being downloaded.
     Downloading { progress: f32 },
+    /// Model is downloaded but validation is deferred until first use.
+    /// Validation will occur when the user enters the image editor.
+    NeedsValidation,
     /// Model is being validated (checksum + test inference).
     Validating,
     /// Model is ready for use.

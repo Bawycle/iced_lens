@@ -148,7 +148,8 @@ pub fn panel<'a>(
                         percent
                     ))
                 }
-                UpscaleModelStatus::Validating => {
+                UpscaleModelStatus::NeedsValidation | UpscaleModelStatus::Validating => {
+                    // NeedsValidation transitions to Validating when entering the editor
                     Some(ctx.i18n.tr("image-editor-resize-ai-model-validating"))
                 }
                 UpscaleModelStatus::Error(msg) => Some(format!(

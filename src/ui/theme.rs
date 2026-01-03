@@ -45,10 +45,22 @@ pub fn success_text_color() -> Color {
     palette::SUCCESS_500
 }
 
-/// Standard color for muted/secondary text.
+/// Standard color for muted/secondary text (light theme only).
+/// For theme-aware muted text, use `muted_text_color_for_theme()` instead.
 #[must_use]
 pub fn muted_text_color() -> Color {
     palette::GRAY_400
+}
+
+/// Theme-aware color for muted/secondary text.
+/// Returns a lighter color for dark themes to ensure readability.
+#[must_use]
+pub fn muted_text_color_for_theme(is_dark_theme: bool) -> Color {
+    if is_dark_theme {
+        palette::GRAY_200 // Lighter color for dark backgrounds
+    } else {
+        palette::GRAY_400 // Darker color for light backgrounds
+    }
 }
 
 // ============================================================================

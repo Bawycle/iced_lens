@@ -290,6 +290,7 @@ help-editor-resize-dimensions = Entrez la largeur et la hauteur exactes en pixel
 help-editor-resize-lock = Verrouillez le ratio pour conserver les proportions
 help-editor-resize-presets = Utilisez les préréglages pour un redimensionnement rapide (25%, 50%, 200%, etc.)
 help-editor-resize-ai-upscale = Upscaling IA : Utilisez Real-ESRGAN pour des agrandissements plus nets (activer dans Paramètres)
+help-editor-resize-ai-validation = Le modèle IA est validé au premier accès à l'éditeur (pas au démarrage)
 
 help-editor-light-title = Lumière
 help-editor-light-desc = Ajustez la luminosité et le contraste de votre image.
@@ -502,6 +503,7 @@ settings-deblur-status-validating = Validation du modèle...
 settings-deblur-status-ready = Modèle prêt
 settings-deblur-status-error = Erreur : { $message }
 settings-deblur-status-not-downloaded = Modèle non téléchargé
+settings-deblur-status-needs-validation = Modèle téléchargé (validation au premier usage)
 settings-deblur-enabled = Activé
 settings-deblur-disabled = Désactivé
 
@@ -517,6 +519,7 @@ settings-upscale-status-validating = Validation du modèle...
 settings-upscale-status-ready = Modèle prêt
 settings-upscale-status-error = Erreur : { $message }
 settings-upscale-status-not-downloaded = Modèle non téléchargé
+settings-upscale-status-needs-validation = Modèle téléchargé (validation au premier usage)
 settings-upscale-enabled = Activé
 settings-upscale-disabled = Désactivé
 
@@ -540,6 +543,7 @@ image-editor-metadata-strip-gps = Supprimer les données GPS
 help-editor-deblur-title = Défloutage IA
 help-editor-deblur-desc = Utilisez l'IA pour améliorer la netteté des images floues avec le réseau neuronal NAFNet.
 help-editor-deblur-enable = À activer dans Paramètres → IA / Apprentissage automatique (télécharge un modèle de ~92 Mo)
+help-editor-deblur-validation = Le modèle est validé au premier accès à l'éditeur (pas au démarrage)
 help-editor-deblur-lossless = Pour une meilleure qualité, exportez en WebP sans perte ou PNG
 
 # Notifications IA

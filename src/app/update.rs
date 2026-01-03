@@ -120,6 +120,7 @@ pub struct UpdateContext<'a> {
     pub help_state: &'a mut help::State,
     pub persisted: &'a mut super::persisted_state::AppState,
     pub notifications: &'a mut notifications::Manager,
+    pub cancellation_token: &'a media::deblur::CancellationToken,
 }
 
 impl UpdateContext<'_> {
@@ -338,6 +339,10 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                 Ok(state) => {
                     *ctx.image_editor = Some(state);
                     *ctx.screen = target;
+
+                    // Trigger deferred AI model validation on first editor access
+                    let validation_task = trigger_deferred_ai_validation(ctx);
+                    return validation_task;
                 }
                 Err(_) => {
                     ctx.notifications.push(notifications::Notification::error(
@@ -1542,5 +1547,91 @@ fn handle_filter_changed(
         persistence::persist_preferences(&mut ctx.preferences_context())
     } else {
         Task::none()
+    }
+}
+
+/// Triggers deferred AI model validation when the user first enters the image editor.
+///
+/// This function checks if any AI models are in the `NeedsValidation` state (meaning
+/// they were downloaded but validation was deferred from startup) and launches the
+/// validation tasks for those models.
+///
+/// Validation is CPU-intensive (loads ONNX model and runs test inference) so we defer
+/// it until the user actually needs the editor, rather than doing it at every app startup.
+pub fn trigger_deferred_ai_validation(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let mut tasks = Vec::new();
+
+    // Check and trigger deblur validation if needed
+    if matches!(
+        ctx.settings.deblur_model_status(),
+        media::deblur::ModelStatus::NeedsValidation
+    ) {
+        ctx.settings
+            .set_deblur_model_status(media::deblur::ModelStatus::Validating);
+
+        let cancel_token = ctx.cancellation_token.clone();
+        let deblur_task = Task::perform(
+            async move {
+                tokio::task::spawn_blocking(move || {
+                    let mut manager = media::deblur::DeblurManager::new();
+                    manager.load_session(Some(&cancel_token))?;
+                    media::deblur::validate_model(&mut manager, Some(&cancel_token))?;
+                    Ok::<(), media::deblur::DeblurError>(())
+                })
+                .await
+                .map_err(|e| media::deblur::DeblurError::InferenceFailed(e.to_string()))?
+            },
+            |result: media::deblur::DeblurResult<()>| match result {
+                Ok(()) => Message::DeblurValidationCompleted {
+                    result: Ok(()),
+                    is_startup: true,
+                },
+                Err(e) => Message::DeblurValidationCompleted {
+                    result: Err(e.to_string()),
+                    is_startup: true,
+                },
+            },
+        );
+        tasks.push(deblur_task);
+    }
+
+    // Check and trigger upscale validation if needed
+    if matches!(
+        ctx.settings.upscale_model_status(),
+        media::upscale::UpscaleModelStatus::NeedsValidation
+    ) {
+        ctx.settings
+            .set_upscale_model_status(media::upscale::UpscaleModelStatus::Validating);
+
+        let cancel_token = ctx.cancellation_token.clone();
+        let upscale_task = Task::perform(
+            async move {
+                tokio::task::spawn_blocking(move || {
+                    let mut manager = media::upscale::UpscaleManager::new();
+                    manager.load_session(Some(&cancel_token))?;
+                    media::upscale::validate_model(&mut manager, Some(&cancel_token))?;
+                    Ok::<(), media::upscale::UpscaleError>(())
+                })
+                .await
+                .map_err(|e| media::upscale::UpscaleError::InferenceFailed(e.to_string()))?
+            },
+            |result: media::upscale::UpscaleResult<()>| match result {
+                Ok(()) => Message::UpscaleValidationCompleted {
+                    result: Ok(()),
+                    is_startup: true,
+                },
+                Err(e) => Message::UpscaleValidationCompleted {
+                    result: Err(e.to_string()),
+                    is_startup: true,
+                },
+            },
+        );
+        tasks.push(upscale_task);
+    }
+
+    if tasks.is_empty() {
+        Task::none()
+    } else {
+        Task::batch(tasks)
     }
 }

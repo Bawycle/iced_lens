@@ -7,8 +7,6 @@
 
 ## Changed
 
-- [] Pour évitér les validations inutiles des modèles AI des outils d'édition d'image, les validation ne doivent plus se faire au lancement de l'pplication, mais la premuière fois (depuis le lancement de l'application) que l'utilisateur se rend dans l'éditeur d'image. Ca évitera une utilisation inetensive inutile du CPU surtout quand l'utiisateur ferme et réouvre l'application fréquemment.
-
 
 ## Planned Features
 

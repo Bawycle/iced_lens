@@ -45,15 +45,16 @@ pub fn panel<'a>(
     let mut content = Column::new().spacing(spacing::SM);
 
     // Lossless export warning
+    let muted_color = theme::muted_text_color_for_theme(ctx.is_dark_theme);
     content = content.push(status_text(
         ctx.i18n.tr("image-editor-deblur-lossless-warning"),
-        theme::muted_text_color(),
+        muted_color,
     ));
 
     if deblur.is_processing {
         content = content.push(status_text(
             ctx.i18n.tr("image-editor-deblur-processing"),
-            theme::muted_text_color(),
+            muted_color,
         ));
         content = content.push(disabled_apply_button(apply_label));
     } else if has_deblur_applied {
@@ -80,6 +81,7 @@ fn build_model_status_ui<'a>(
     apply_label: &str,
     ctx: &ViewContext<'_>,
 ) -> Column<'a, Message> {
+    let muted_color = theme::muted_text_color_for_theme(ctx.is_dark_theme);
     match model_status {
         ModelStatus::Ready => {
             let apply_btn = button(text(apply_label.to_string()).size(typography::BODY_LG))
@@ -88,10 +90,11 @@ fn build_model_status_ui<'a>(
                 .on_press(SidebarMessage::ApplyDeblur.into());
             content.push(apply_btn)
         }
-        ModelStatus::Validating => {
+        ModelStatus::NeedsValidation | ModelStatus::Validating => {
+            // NeedsValidation transitions to Validating when entering the editor
             content = content.push(status_text(
                 ctx.i18n.tr("image-editor-deblur-validating"),
-                theme::muted_text_color(),
+                muted_color,
             ));
             content.push(disabled_apply_button(apply_label.to_string()))
         }
