@@ -194,9 +194,9 @@ impl DeblurManager {
 
         // Get input name from model (NAFNet uses 'lq' for low-quality input)
         let input_name = session
-            .inputs
+            .inputs()
             .first()
-            .map_or_else(|| "lq".to_string(), |i| i.name.clone());
+            .map_or_else(|| "lq".to_string(), |i| i.name().to_string());
 
         // Create tensor reference for inference
         let input_ref = ort::value::TensorRef::from_array_view(&input_tensor)
