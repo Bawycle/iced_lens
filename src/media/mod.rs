@@ -13,6 +13,7 @@ pub mod metadata;
 pub mod metadata_operations;
 pub mod metadata_writer;
 pub mod navigator;
+pub mod prefetch;
 pub mod skip_attempts;
 pub mod upscale;
 pub mod video;

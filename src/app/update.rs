@@ -121,6 +121,7 @@ pub struct UpdateContext<'a> {
     pub persisted: &'a mut super::persisted_state::AppState,
     pub notifications: &'a mut notifications::Manager,
     pub cancellation_token: &'a media::deblur::CancellationToken,
+    pub prefetch_cache: &'a mut media::prefetch::ImagePrefetchCache,
 }
 
 impl UpdateContext<'_> {
@@ -261,7 +262,9 @@ pub fn handle_viewer_message(
                         .auto_dismiss(std::time::Duration::from_secs(8)),
                 );
             }
-            Task::none()
+
+            // Trigger image prefetching for adjacent images
+            trigger_prefetch(ctx)
         }
         component::Effect::FilterChanged(filter_msg) => handle_filter_changed(ctx, filter_msg),
         component::Effect::None => Task::none(),
@@ -1131,6 +1134,17 @@ where
         // Navigator position is only confirmed after successful load via ConfirmNavigation.
         ctx.viewer.current_media_path = Some(path.clone());
 
+        // Check prefetch cache for images
+        if matches!(
+            media::detect_media_type(&path),
+            Some(media::MediaType::Image)
+        ) {
+            if let Some(image_data) = ctx.prefetch_cache.get(&path) {
+                // Cache hit! Return the cached image immediately
+                return Task::done(on_loaded(Ok(MediaData::Image(image_data))));
+            }
+        }
+
         // Set loading state via encapsulated method
         ctx.viewer.start_loading();
 
@@ -1634,4 +1648,66 @@ pub fn trigger_deferred_ai_validation(ctx: &mut UpdateContext<'_>) -> Task<Messa
     } else {
         Task::batch(tasks)
     }
+}
+
+/// Triggers background prefetching of adjacent images for faster navigation.
+///
+/// Uses the navigator's `peek_nth_next_filtered` and `peek_nth_previous_filtered` methods
+/// to find the N next and N previous images (respecting the active filter).
+/// Only images not already in the cache are prefetched.
+fn trigger_prefetch(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    if !ctx.prefetch_cache.is_enabled() {
+        return Task::none();
+    }
+
+    let prefetch_count = ctx.prefetch_cache.prefetch_count();
+
+    // Collect paths to prefetch (N next + N previous images)
+    let mut paths_to_check = Vec::with_capacity(prefetch_count * 2);
+
+    // Get next N images (using filtered navigation to respect active filter)
+    for i in 0..prefetch_count {
+        if let Some(path) = ctx.media_navigator.peek_nth_next_filtered(i) {
+            // Only prefetch images, not videos
+            if matches!(
+                media::detect_media_type(&path),
+                Some(media::MediaType::Image)
+            ) {
+                paths_to_check.push(path);
+            }
+        }
+    }
+
+    // Get previous N images
+    for i in 0..prefetch_count {
+        if let Some(path) = ctx.media_navigator.peek_nth_previous_filtered(i) {
+            // Only prefetch images, not videos
+            if matches!(
+                media::detect_media_type(&path),
+                Some(media::MediaType::Image)
+            ) {
+                paths_to_check.push(path);
+            }
+        }
+    }
+
+    // Filter out paths already in cache
+    let paths_to_prefetch = ctx.prefetch_cache.paths_to_prefetch(&paths_to_check);
+
+    if paths_to_prefetch.is_empty() {
+        return Task::none();
+    }
+
+    // Create prefetch tasks for each path
+    let tasks: Vec<Task<Message>> = paths_to_prefetch
+        .into_iter()
+        .map(|path| {
+            Task::perform(
+                media::prefetch::load_image_for_prefetch(path),
+                |(path, result)| Message::ImagePrefetched { path, result },
+            )
+        })
+        .collect();
+
+    Task::batch(tasks)
 }

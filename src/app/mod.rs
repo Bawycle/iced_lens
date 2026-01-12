@@ -82,6 +82,8 @@ pub struct App {
     shutting_down: bool,
     /// Cancellation token for background tasks (shared with async tasks).
     cancellation_token: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Cache for prefetched images to speed up navigation.
+    prefetch_cache: media::prefetch::ImagePrefetchCache,
 }
 
 impl fmt::Debug for App {
@@ -176,6 +178,7 @@ impl Default for App {
             notifications: notifications::Manager::new(),
             shutting_down: false,
             cancellation_token: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            prefetch_cache: media::prefetch::ImagePrefetchCache::with_defaults(),
         }
     }
 }
@@ -551,6 +554,7 @@ impl App {
             persisted: &mut self.persisted,
             notifications: &mut self.notifications,
             cancellation_token: &self.cancellation_token,
+            prefetch_cache: &mut self.prefetch_cache,
         };
 
         match message {
@@ -721,6 +725,13 @@ impl App {
                     .store(true, std::sync::atomic::Ordering::SeqCst);
                 // Close the window
                 window::close(id)
+            }
+            Message::ImagePrefetched { path, result } => {
+                // Store prefetched image in cache (silently ignore errors)
+                if let Ok(image_data) = result {
+                    self.prefetch_cache.insert(path, image_data);
+                }
+                Task::none()
             }
         }
     }

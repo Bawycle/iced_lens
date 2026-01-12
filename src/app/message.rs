@@ -77,6 +77,11 @@ pub enum Message {
     UpscaleResizeCompleted(Result<Box<image_rs::DynamicImage>, String>),
     /// Window close was requested (user clicked X or pressed Alt+F4).
     WindowCloseRequested(iced::window::Id),
+    /// Result from prefetching an image in the background.
+    ImagePrefetched {
+        path: PathBuf,
+        result: Result<crate::media::ImageData, Error>,
+    },
 }
 
 /// Runtime flags passed in from the CLI or launcher to tweak startup behavior.
