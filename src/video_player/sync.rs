@@ -182,15 +182,18 @@ impl SyncClock {
     }
 
     /// Seeks to a specific position.
+    ///
+    /// Always resets the wall-time reference to prevent A/V sync drift
+    /// when resuming playback after seek.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn seek(&self, target_secs: f64) {
         let pts_us = (target_secs * 1_000_000.0) as u64;
         self.audio_pts_us.store(pts_us, Ordering::SeqCst);
         self.start_pts_us.store(pts_us, Ordering::SeqCst);
-        if self.is_playing.load(Ordering::SeqCst) {
-            self.start_time_us
-                .store(instant_to_us(Instant::now()), Ordering::SeqCst);
-        }
+        // Always reset wall-time reference during seek to prevent A/V sync drift
+        // that can cause frame skipping when playback resumes.
+        self.start_time_us
+            .store(instant_to_us(Instant::now()), Ordering::SeqCst);
     }
 }
 

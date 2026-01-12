@@ -1165,6 +1165,31 @@ impl State {
                 (Effect::None, Task::none())
             }
             Message::PlaybackEvent(event) => {
+                // Check for seeking timeout BEFORE processing event
+                if let Some(ref mut player) = self.video_player {
+                    if matches!(
+                        player.state(),
+                        crate::video_player::PlaybackState::Seeking { .. }
+                    ) {
+                        if let Some(duration) = player.seeking_duration() {
+                            if duration
+                                > std::time::Duration::from_secs(
+                                    crate::config::SEEKING_TIMEOUT_SECS,
+                                )
+                            {
+                                #[cfg(debug_assertions)]
+                                eprintln!(
+                                    "[seeking] Timeout reached ({:.2}s), forcing state transition",
+                                    duration.as_secs_f32()
+                                );
+
+                                // Force complete the seek operation
+                                player.force_complete_seek();
+                            }
+                        }
+                    }
+                }
+
                 match event {
                     PlaybackMessage::Started(command_sender) => {
                         // Store the command sender in the player for pause/play/seek

@@ -545,7 +545,9 @@ fn build_editor_resize_tool<'a>(
         .push(build_bullet(&ctx.i18n.tr("help-editor-resize-lock")))
         .push(build_bullet(&ctx.i18n.tr("help-editor-resize-presets")))
         .push(build_bullet(&ctx.i18n.tr("help-editor-resize-ai-upscale")))
-        .push(build_bullet(&ctx.i18n.tr("help-editor-resize-ai-validation")))
+        .push(build_bullet(
+            &ctx.i18n.tr("help-editor-resize-ai-validation"),
+        ))
         .into();
     (title, content)
 }

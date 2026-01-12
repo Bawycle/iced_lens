@@ -71,6 +71,10 @@ pub const DEFAULT_NORMALIZATION_TARGET_LUFS: f32 = -16.0;
 // Video Seek Defaults
 // ==========================================================================
 
+/// Maximum time to wait for a frame after seeking before forcing state transition.
+/// Prevents getting stuck in Seeking state if A/V sync skips the seek target frame.
+pub const SEEKING_TIMEOUT_SECS: u64 = 1;
+
 /// Default keyboard seek step in seconds (arrow keys).
 pub const DEFAULT_KEYBOARD_SEEK_STEP_SECS: f64 = 2.0;
 

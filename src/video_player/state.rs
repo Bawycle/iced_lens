@@ -15,6 +15,7 @@ use super::DecoderCommand;
 use crate::error::Result;
 use crate::media::VideoData;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// Playback state machine.
 ///
@@ -169,6 +170,10 @@ pub struct VideoPlayer {
     /// Whether audio is auto-muted due to high playback speed.
     /// Separate from user mute to restore audio when speed decreases.
     speed_auto_muted: bool,
+
+    /// Instant when seeking started (for timeout detection).
+    /// None if not currently seeking.
+    seeking_started_at: Option<Instant>,
 }
 
 impl VideoPlayer {
@@ -192,6 +197,7 @@ impl VideoPlayer {
             at_end_of_stream: false,
             playback_speed: super::PlaybackSpeed::default(),
             speed_auto_muted: false,
+            seeking_started_at: None,
         })
     }
 
@@ -425,6 +431,9 @@ impl VideoPlayer {
             resume_playing: should_resume,
         };
 
+        // Track when seeking started (for timeout detection)
+        self.seeking_started_at = Some(Instant::now());
+
         // Update sync clock to seek position
         self.sync_clock.seek(clamped_target);
 
@@ -463,6 +472,9 @@ impl VideoPlayer {
             resume_playing: true, // Always resume playing
         };
 
+        // Track when seeking started (for timeout detection)
+        self.seeking_started_at = Some(Instant::now());
+
         // Update sync clock to seek position
         self.sync_clock.seek(clamped_target);
 
@@ -494,6 +506,9 @@ impl VideoPlayer {
                 self.state = PlaybackState::Playing { position_secs };
             }
             PlaybackState::Seeking { resume_playing, .. } => {
+                // Clear seeking timestamp on successful completion
+                self.seeking_started_at = None;
+
                 // Seek completed - transition to appropriate state
                 if *resume_playing {
                     self.state = PlaybackState::Playing { position_secs };
@@ -531,6 +546,44 @@ impl VideoPlayer {
             resume_playing,
         } = &self.state
         {
+            self.seeking_started_at = None;
+            if *resume_playing {
+                self.state = PlaybackState::Playing {
+                    position_secs: *target_secs,
+                };
+            } else {
+                self.state = PlaybackState::Paused {
+                    position_secs: *target_secs,
+                };
+            }
+        }
+    }
+
+    /// Returns the duration since seeking started, or None if not seeking.
+    ///
+    /// Used for timeout detection to prevent getting stuck in Seeking state
+    /// when A/V sync skips the seek target frame.
+    #[must_use]
+    pub fn seeking_duration(&self) -> Option<Duration> {
+        self.seeking_started_at.map(|start| start.elapsed())
+    }
+
+    /// Forces completion of seek operation (timeout recovery).
+    ///
+    /// Transitions from Seeking to Playing/Paused based on `resume_playing` flag.
+    /// Use this when seek has timed out and no frame has been received.
+    pub fn force_complete_seek(&mut self) {
+        if let PlaybackState::Seeking {
+            target_secs,
+            resume_playing,
+        } = &self.state
+        {
+            #[cfg(debug_assertions)]
+            eprintln!(
+                "[seeking] Force completing seek to {target_secs}s (resume_playing={resume_playing})"
+            );
+
+            self.seeking_started_at = None;
             if *resume_playing {
                 self.state = PlaybackState::Playing {
                     position_secs: *target_secs,
