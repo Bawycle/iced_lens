@@ -345,54 +345,26 @@ impl App {
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
 
-            // Determine if path is a directory or a file and resolve the media path
-            let resolved_path = if path.is_dir() {
-                // Directory path: scan for media files and select the first one
-                match app.media_navigator.scan_from_directory(&path, sort_order) {
-                    Ok(Some(first_media)) => Some(first_media),
-                    Ok(None) => {
-                        // No media files found in directory - start without media
-                        None
-                    }
-                    Err(_) => {
-                        app.notifications.push(notifications::Notification::warning(
-                            "notification-scan-dir-error",
-                        ));
-                        None
-                    }
-                }
+            // Use async scanning for startup to avoid blocking the UI
+            if path.is_dir() {
+                // Directory path: async scan for media files
+                Task::perform(
+                    crate::directory_scanner::scan_directory_direct_async(path, sort_order),
+                    |result| Message::DirectoryScanCompleted {
+                        result,
+                        load_path: None, // Will load first file from list
+                    },
+                )
             } else {
-                // File path: use existing behavior
-                if app
-                    .media_navigator
-                    .scan_directory(&path, sort_order)
-                    .is_err()
-                {
-                    app.notifications.push(notifications::Notification::warning(
-                        "notification-scan-dir-error",
-                    ));
-                }
-                Some(path)
-            };
-
-            if let Some(media_path) = resolved_path {
-                // Synchronize navigator state (single source of truth for current media)
-                app.media_navigator
-                    .set_current_media_path(media_path.clone());
-
-                // Synchronize viewer state
-                app.viewer.current_media_path = Some(media_path.clone());
-
-                // Set loading state via encapsulated method
-                app.viewer.start_loading();
-
-                // Load the media
-                let path_string = media_path.to_string_lossy().into_owned();
-                Task::perform(async move { media::load_media(&path_string) }, |result| {
-                    Message::Viewer(component::Message::MediaLoaded(result))
-                })
-            } else {
-                Task::none()
+                // File path: async scan then load
+                let load_path = path.clone();
+                Task::perform(
+                    crate::directory_scanner::scan_directory_async(path, sort_order),
+                    move |result| Message::DirectoryScanCompleted {
+                        result,
+                        load_path: Some(load_path),
+                    },
+                )
             }
         } else {
             Task::none()
@@ -732,6 +704,39 @@ impl App {
                     self.prefetch_cache.insert(path, image_data);
                 }
                 Task::none()
+            }
+            Message::DirectoryScanCompleted { result, load_path } => {
+                let Ok(media_list) = result else {
+                    self.notifications
+                        .push(notifications::Notification::warning(
+                            "notification-scan-dir-error",
+                        ));
+                    return Task::none();
+                };
+
+                // Update navigator with scanned media list
+                self.media_navigator.set_media_list(media_list);
+
+                // Determine which path to load
+                let path_to_load = load_path.or_else(|| {
+                    // For directory scans, load the first file
+                    self.media_navigator
+                        .current_media_path()
+                        .map(std::path::Path::to_path_buf)
+                });
+
+                // Load the determined path
+                if let Some(path) = path_to_load {
+                    self.media_navigator.set_current_media_path(path.clone());
+                    self.viewer.current_media_path = Some(path.clone());
+                    self.viewer.start_loading();
+                    Task::perform(async move { media::load_media(&path) }, |result| {
+                        Message::Viewer(component::Message::MediaLoaded(result))
+                    })
+                } else {
+                    // No media files found in directory
+                    Task::none()
+                }
             }
         }
     }

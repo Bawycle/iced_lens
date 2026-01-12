@@ -82,6 +82,13 @@ pub enum Message {
         path: PathBuf,
         result: Result<crate::media::ImageData, Error>,
     },
+    /// Result from async directory scanning.
+    DirectoryScanCompleted {
+        /// The scanned media list.
+        result: Result<crate::directory_scanner::MediaList, Error>,
+        /// The path to load after scanning (if any).
+        load_path: Option<PathBuf>,
+    },
 }
 
 /// Runtime flags passed in from the CLI or launcher to tweak startup behavior.

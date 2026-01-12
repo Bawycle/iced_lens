@@ -73,6 +73,11 @@ impl MediaNavigator {
         }
     }
 
+    /// Sets the media list directly (used for async scan results).
+    pub fn set_media_list(&mut self, media_list: MediaList) {
+        self.media_list = media_list;
+    }
+
     /// Scans the directory containing the given media file and updates the media list.
     ///
     /// # Errors

@@ -222,6 +222,40 @@ fn is_supported_media(path: &Path) -> bool {
     media::detect_media_type(path).is_some()
 }
 
+/// Async version of directory scanning for large directories.
+///
+/// This runs the scan in a blocking thread pool to avoid blocking the UI.
+/// Use this for initial scans or when opening directories with many files.
+///
+/// # Errors
+///
+/// Returns an error if the directory cannot be read or the async task panics.
+pub async fn scan_directory_async(
+    current_file: PathBuf,
+    sort_order: SortOrder,
+) -> Result<MediaList> {
+    tokio::task::spawn_blocking(move || MediaList::scan_directory(&current_file, sort_order))
+        .await
+        .map_err(|e| crate::error::Error::Io(format!("Scan task failed: {e}")))?
+}
+
+/// Async version of direct directory scanning for large directories.
+///
+/// This runs the scan in a blocking thread pool to avoid blocking the UI.
+/// Use this when opening a directory path directly.
+///
+/// # Errors
+///
+/// Returns an error if the directory cannot be read or the async task panics.
+pub async fn scan_directory_direct_async(
+    directory: PathBuf,
+    sort_order: SortOrder,
+) -> Result<MediaList> {
+    tokio::task::spawn_blocking(move || MediaList::scan_directory_direct(&directory, sort_order))
+        .await
+        .map_err(|e| crate::error::Error::Io(format!("Scan task failed: {e}")))?
+}
+
 /// Sorts a list of media file paths according to the specified sort order.
 ///
 /// For alphabetical sorting, uses natural lexical sorting which:

@@ -1443,50 +1443,38 @@ pub fn handle_file_dropped(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<M
 
     // Check if it's a directory
     if path.is_dir() {
-        // Scan directory for media and load the first file
+        // Use async scan for directories
         let (config, _) = config::load();
         let sort_order = config.display.sort_order.unwrap_or_default();
-        if ctx
-            .media_navigator
-            .scan_from_directory(&path, sort_order)
-            .is_ok()
-        {
-            if let Some(first_path) = ctx
-                .media_navigator
-                .current_media_path()
-                .map(std::path::Path::to_path_buf)
-            {
-                return load_media_from_path(ctx, first_path);
-            }
-        }
-        // No media found in directory
-        ctx.notifications.push(notifications::Notification::warning(
-            "notification-empty-dir",
-        ));
-        return Task::none();
+        return Task::perform(
+            crate::directory_scanner::scan_directory_direct_async(path, sort_order),
+            |result| Message::DirectoryScanCompleted {
+                result,
+                load_path: None,
+            },
+        );
     }
 
-    // Load the media file (last_open_directory is updated on successful load)
+    // Load the media file (uses async scan for directory)
     load_media_from_path(ctx, path)
 }
 
 /// Internal helper to load media from a path.
-fn load_media_from_path(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<Message> {
-    // Scan the directory for navigation
+///
+/// Uses async directory scanning to avoid blocking the UI.
+fn load_media_from_path(_ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<Message> {
+    // Use async scan for the directory
     let (config, _) = config::load();
     let sort_order = config.display.sort_order.unwrap_or_default();
-    let _ = ctx.media_navigator.scan_directory(&path, sort_order);
 
-    // Set up viewer state
-    ctx.viewer.current_media_path = Some(path.clone());
-
-    // Set loading state via encapsulated method
-    ctx.viewer.start_loading();
-
-    // Load the media
-    Task::perform(async move { media::load_media(&path) }, |result| {
-        Message::Viewer(component::Message::MediaLoaded(result))
-    })
+    let load_path = path.clone();
+    Task::perform(
+        crate::directory_scanner::scan_directory_async(path, sort_order),
+        move |result| Message::DirectoryScanCompleted {
+            result,
+            load_path: Some(load_path),
+        },
+    )
 }
 
 /// Handles filter dropdown messages from the viewer.
