@@ -1,97 +1,276 @@
-# Story 2.4: File Export Implementation
+# Story 2.4: Anonymized File Export
 
 **Epic:** 2 - Anonymization & Export System
-**Status:** Draft
+**Status:** Approved
 **Priority:** High
 **Estimate:** 2-3 hours
-**Depends On:** Story 2.1, 2.2, 2.3
+**Depends On:** Story 1.6, 2.1, 2.2, 2.3
 
 ---
 
 ## Story
 
 **As a** developer,
-**I want** to export diagnostic reports to a file,
-**So that** I can save reports for later analysis or sharing.
+**I want** to export anonymized diagnostic reports to a file,
+**So that** I can share reports without exposing sensitive information.
 
 ---
 
 ## Acceptance Criteria
 
-1. `export_to_file()` function implemented
+### Export Function
+1. `export_to_file()` method added to `DiagnosticsCollector`
 2. Default filename format: `iced_lens_diagnostics_YYYYMMDD_HHMMSS.json`
-3. User can choose save location via native file dialog (if available) or default to user's documents/downloads
-4. Export applies full anonymization pipeline before writing
-5. File is written atomically (temp file + rename) to prevent corruption
-6. Success/failure feedback provided (returns Result)
-7. Integration test verifies file creation and content validity
+3. File written atomically (temp file + rename) to prevent corruption
+4. Returns `Result<PathBuf, ExportError>` with the saved file path
+
+### Anonymization Pipeline
+5. `AnonymizationPipeline` struct combines `PathAnonymizer` + `IdentityAnonymizer`
+6. Pipeline applied to all string fields in events before export:
+   - `UserAction` details
+   - `WarningEvent` message
+   - `ErrorEvent` message
+   - `AppStateEvent` string fields (e.g., `MediaFailed.reason`)
+7. Same salt used within a single export (consistent hashing)
+
+### File Dialog Integration
+8. `export_with_dialog()` opens native save dialog via `rfd`
+9. User can cancel dialog (returns `ExportError::Cancelled`)
+10. Default directory: user's documents folder (`dirs::document_dir()`)
+
+### Quality
+11. Unit tests verify anonymization is applied before export
+12. Integration test verifies file creation and JSON validity
 
 ---
 
 ## Tasks
 
-- [ ] **Task 1:** Create `src/diagnostics/export.rs`
-  - [ ] Define export-related functions
-  - [ ] Import anonymizer and report modules
+### Task 1: Create `AnonymizationPipeline` struct (AC: 5, 7)
+- [ ] Add to `src/diagnostics/anonymizer.rs`
+- [ ] Combine `PathAnonymizer` and `IdentityAnonymizer` with shared seed
+- [ ] Method `anonymize_string(&self, input: &str) -> String`
+- [ ] Apply: paths first, then identity (IPs, domains, username)
 
-- [ ] **Task 2:** Implement `generate_filename()`
-  - [ ] Format: `iced_lens_diagnostics_YYYYMMDD_HHMMSS.json`
-  - [ ] Use chrono for timestamp formatting
+### Task 2: Create `ExportError` enum (AC: 4, 9)
+- [ ] Add to `src/diagnostics/export.rs` (new file)
+- [ ] Variants: `Io(std::io::Error)`, `Serialization(serde_json::Error)`, `Cancelled`
+- [ ] Implement `std::error::Error` and `Display`
 
-- [ ] **Task 3:** Implement `export_to_file()` function
-  - [ ] Accept optional path (use default if None)
-  - [ ] Get report from collector
-  - [ ] Apply full anonymization
-  - [ ] Serialize to JSON
+### Task 3: Implement `generate_default_filename()` (AC: 2)
+- [ ] Format: `iced_lens_diagnostics_YYYYMMDD_HHMMSS.json`
+- [ ] Use `chrono::Local::now()` for timestamp
 
-- [ ] **Task 4:** Implement atomic file write
-  - [ ] Write to temp file first
-  - [ ] Rename to final path on success
-  - [ ] Clean up temp on failure
+### Task 4: Implement `anonymize_event()` helper (AC: 6)
+- [ ] Takes `SerializableEvent` + `AnonymizationPipeline`
+- [ ] Returns new `SerializableEvent` with anonymized string fields
+- [ ] Match on `DiagnosticEventKind` variants to find string fields
 
-- [ ] **Task 5:** Add file dialog integration (optional path)
-  - [ ] Use `rfd` crate (already in project)
-  - [ ] Return selected path or default
+### Task 5: Implement `build_anonymized_report()` (AC: 5, 6)
+- [ ] Add method to `DiagnosticsCollector`
+- [ ] Create `AnonymizationPipeline` with random seed
+- [ ] Apply `anonymize_event()` to all events
+- [ ] Include summary from Story 2.3
 
-- [ ] **Task 6:** Define `ExportError` enum
-  - [ ] IoError, SerializationError, DialogCancelled
-  - [ ] Implement `std::error::Error`
+### Task 6: Implement atomic file write (AC: 3)
+- [ ] Write to `{path}.tmp` first
+- [ ] On success: `std::fs::rename()` to final path
+- [ ] On failure: remove temp file
 
-- [ ] **Task 7:** Write integration test
-  - [ ] Export to temp directory
-  - [ ] Verify file exists
-  - [ ] Verify JSON is valid
-  - [ ] Verify anonymization applied
+### Task 7: Implement `export_to_file()` (AC: 1, 3, 4)
+- [ ] Add method to `DiagnosticsCollector`
+- [ ] Parameter: `path: impl AsRef<Path>`
+- [ ] Call `build_anonymized_report()`
+- [ ] Serialize to pretty JSON
+- [ ] Write atomically
+- [ ] Return `Ok(PathBuf)` or `Err(ExportError)`
 
-- [ ] **Task 8:** Run validation
-  - [ ] `cargo fmt --all`
-  - [ ] `cargo clippy --all --all-targets -- -D warnings`
-  - [ ] `cargo test`
+### Task 8: Implement `export_with_dialog()` (AC: 8, 9, 10)
+- [ ] Add method to `DiagnosticsCollector`
+- [ ] Use `rfd::FileDialog::new().save_file()`
+- [ ] Set default directory and filename
+- [ ] Handle `None` (cancelled) → `ExportError::Cancelled`
+- [ ] Call `export_to_file()` with selected path
 
-- [ ] **Task 9:** Commit changes
-  - [ ] Stage all changes
-  - [ ] Commit with descriptive message following conventional commits
-  - [ ] Reference story number in commit message
+### Task 9: Write unit tests (AC: 11)
+- [ ] Test `AnonymizationPipeline` combines both anonymizers
+- [ ] Test `anonymize_event()` processes all string fields
+- [ ] Test `generate_default_filename()` format
+
+### Task 10: Write integration test (AC: 12)
+- [ ] Export to temp directory
+- [ ] Verify file exists and JSON is valid
+- [ ] Verify no raw IPs/usernames in output
+
+### Task 11: Run validation
+- [ ] `cargo fmt --all`
+- [ ] `cargo clippy --all --all-targets -- -D warnings`
+- [ ] `cargo test`
+
+### Task 12: Commit changes
+- [ ] Stage all changes
+- [ ] Commit: `feat(diagnostics): add anonymized file export [Story 2.4]`
 
 ---
 
 ## Dev Notes
 
-- `rfd` already in Cargo.toml for file dialogs
-- Default location: `dirs::document_dir()` or `dirs::download_dir()`
-- Atomic write prevents corrupted files on crash
+### Source Tree
+
+```
+src/diagnostics/
+├── mod.rs              # MODIFY: export new types
+├── anonymizer.rs       # MODIFY: add AnonymizationPipeline
+├── export.rs           # NEW: ExportError, file operations
+├── collector.rs        # MODIFY: add export methods
+├── report.rs           # EXISTING: DiagnosticReport
+└── events.rs           # EXISTING: event types for matching
+```
+
+### Existing Code
+
+**`collector.rs`** already has:
+- `export_json(&self) -> serde_json::Result<String>` - raw export (no anonymization)
+- `build_report(&self) -> DiagnosticReport` - builds report from buffer
+
+**`anonymizer.rs`** (from Stories 2.1, 2.2) has:
+- `PathAnonymizer` - hashes file paths
+- `IdentityAnonymizer` - hashes IPs, domains, usernames
+
+### AnonymizationPipeline Design
+
+```rust
+/// Combined anonymization pipeline for export.
+pub struct AnonymizationPipeline {
+    path_anonymizer: PathAnonymizer,
+    identity_anonymizer: IdentityAnonymizer,
+}
+
+impl AnonymizationPipeline {
+    /// Creates a new pipeline with random salt.
+    pub fn new() -> Self {
+        let seed = rand::random::<u64>();
+        Self {
+            path_anonymizer: PathAnonymizer::with_seed(seed),
+            identity_anonymizer: IdentityAnonymizer::with_seed(seed),
+        }
+    }
+
+    /// Anonymizes a string by applying all anonymizers in sequence.
+    pub fn anonymize_string(&self, input: &str) -> String {
+        // Identity first (IPs, domains, username), then paths
+        let step1 = self.identity_anonymizer.anonymize_string(input);
+        // PathAnonymizer works on Path, not String - skip for messages
+        // Paths in messages are already sanitized to "<path>" by sanitizer.rs
+        step1
+    }
+}
+```
+
+### Event Anonymization Pattern
+
+```rust
+fn anonymize_event(event: &SerializableEvent, pipeline: &AnonymizationPipeline) -> SerializableEvent {
+    let anonymized_kind = match &event.kind {
+        DiagnosticEventKind::UserAction { action, details } => {
+            DiagnosticEventKind::UserAction {
+                action: action.clone(),
+                details: details.as_ref().map(|d| pipeline.anonymize_string(d)),
+            }
+        }
+        DiagnosticEventKind::Warning { event: w } => {
+            DiagnosticEventKind::Warning {
+                event: WarningEvent {
+                    message: pipeline.anonymize_string(&w.message),
+                    ..w.clone()
+                },
+            }
+        }
+        DiagnosticEventKind::Error { event: e } => {
+            DiagnosticEventKind::Error {
+                event: ErrorEvent {
+                    message: pipeline.anonymize_string(&e.message),
+                    ..e.clone()
+                },
+            }
+        }
+        DiagnosticEventKind::StateChange { event: s } => {
+            // Anonymize string fields in AppStateEvent variants
+            DiagnosticEventKind::StateChange {
+                event: anonymize_state_event(s, pipeline),
+            }
+        }
+        // ResourceSnapshot and Operation don't contain user strings
+        other => other.clone(),
+    };
+
+    SerializableEvent {
+        timestamp_ms: event.timestamp_ms,
+        kind: anonymized_kind,
+    }
+}
+```
+
+### File Dialog Usage
+
+```rust
+use rfd::FileDialog;
+
+pub fn export_with_dialog(&self) -> Result<PathBuf, ExportError> {
+    let default_dir = dirs::document_dir()
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let default_name = generate_default_filename();
+
+    let path = FileDialog::new()
+        .set_directory(&default_dir)
+        .set_file_name(&default_name)
+        .add_filter("JSON", &["json"])
+        .save_file()
+        .ok_or(ExportError::Cancelled)?;
+
+    self.export_to_file(&path)
+}
+```
+
+### Atomic Write Pattern
+
+```rust
+fn write_atomic(path: &Path, content: &str) -> std::io::Result<()> {
+    let temp_path = path.with_extension("json.tmp");
+
+    // Write to temp file
+    std::fs::write(&temp_path, content)?;
+
+    // Atomic rename
+    std::fs::rename(&temp_path, path)?;
+
+    Ok(())
+}
+```
 
 ---
 
 ## Testing
 
 ### Unit Tests
-- Filename generation
-- Atomic write logic
+
+| Test | Input | Expected Output |
+|------|-------|-----------------|
+| `pipeline_anonymizes_ip` | `"Error from 192.168.1.1"` | `"Error from <ip:hash>"` |
+| `pipeline_anonymizes_username` | `"User john logged in"` | `"User <user:hash> logged in"` (if john is system user) |
+| `anonymize_event_warning` | Warning with IP in message | Warning with hashed IP |
+| `anonymize_event_preserves_type` | UserAction event | Same action type, anonymized details |
+| `generate_filename_format` | Current time | `iced_lens_diagnostics_YYYYMMDD_HHMMSS.json` |
+| `atomic_write_creates_file` | Path + content | File exists with content |
+| `atomic_write_no_temp_on_success` | Path + content | No `.tmp` file remains |
 
 ### Integration Tests
-- Full export to temp file
-- JSON validation
+
+| Test | Verification |
+|------|--------------|
+| `export_creates_valid_json` | File exists, parses as JSON, has metadata/events/summary |
+| `export_anonymizes_content` | No raw IPs (192.x.x.x pattern) in output |
+| `export_to_temp_directory` | Works with `tempfile::tempdir()` |
 
 ---
 
@@ -106,6 +285,8 @@
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-01-13 | Story created | PO |
+| 2026-01-13 | PO Validation: Complete rewrite - clarified AC4 anonymization, added AnonymizationPipeline design, Task-AC mapping, source tree, code examples | Sarah (PO) |
 
 ### File List
 <!-- Files created or modified -->
