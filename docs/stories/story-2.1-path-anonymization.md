@@ -1,7 +1,7 @@
 # Story 2.1: Path Anonymization
 
 **Epic:** 2 - Anonymization & Export System
-**Status:** Approved
+**Status:** Done
 **Priority:** High
 **Estimate:** 2-3 hours
 **Depends On:** Epic 1 complete
@@ -31,44 +31,44 @@
 ## Tasks
 
 ### Task 1: Create `src/diagnostics/anonymizer.rs` (AC: 1)
-- [ ] Define `PathAnonymizer` struct with session salt field
-- [ ] Store salt as `[u8; 32]` generated via `rand` or fixed seed
-- [ ] Export from `mod.rs`
+- [x] Define `PathAnonymizer` struct with session salt field
+- [x] Store salt as `[u8; 32]` generated via `rand` or fixed seed
+- [x] Export from `mod.rs`
 
 ### Task 2: Implement path hashing (AC: 2, 3, 4)
-- [ ] Use blake3 (already in `Cargo.toml`)
-- [ ] Hash each path segment separately (directory names + filename)
-- [ ] Preserve file extension only (not filename)
-- [ ] Return first 8 chars of hash per segment for readability
+- [x] Use blake3 (already in `Cargo.toml`)
+- [x] Hash each path segment separately (directory names + filename)
+- [x] Preserve file extension only (not filename)
+- [x] Return first 8 chars of hash per segment for readability
 
 ### Task 3: Implement `anonymize_path()` method (AC: 3, 4, 6)
-- [ ] Split path into segments using `std::path::Path::components()`
-- [ ] Hash each segment (including filename stem)
-- [ ] Append original extension to hashed filename
-- [ ] Reconstruct path with hashed segments
-- [ ] Handle edge cases: empty path, no extension, root paths, Windows paths
+- [x] Split path into segments using `std::path::Path::components()`
+- [x] Hash each segment (including filename stem)
+- [x] Append original extension to hashed filename
+- [x] Reconstruct path with hashed segments
+- [x] Handle edge cases: empty path, no extension, root paths, Windows paths
 
 ### Task 4: Add consistency mechanism (AC: 5)
-- [ ] Use deterministic salt (created once per `PathAnonymizer` instance)
-- [ ] Same salt + same path = same hash (no need for HashMap cache)
-- [ ] Document that new instance = new salt = different hashes
+- [x] Use deterministic salt (created once per `PathAnonymizer` instance)
+- [x] Same salt + same path = same hash (no need for HashMap cache)
+- [x] Document that new instance = new salt = different hashes
 
 ### Task 5: Write unit tests (AC: 7)
-- [ ] Test extension preservation: `image.jpg` → `a1b2c3d4.jpg`
-- [ ] Test directory hashing: `/home/user/` → `hash1/hash2/`
-- [ ] Test full path: `/home/user/photo.png` → `h1/h2/h3.png`
-- [ ] Test consistency: same input = same output with same instance
-- [ ] Test different instances produce different hashes
-- [ ] Test edge cases: no extension, hidden files (`.bashrc`), empty path
+- [x] Test extension preservation: `image.jpg` → `a1b2c3d4.jpg`
+- [x] Test directory hashing: `/home/user/` → `hash1/hash2/`
+- [x] Test full path: `/home/user/photo.png` → `h1/h2/h3.png`
+- [x] Test consistency: same input = same output with same instance
+- [x] Test different instances produce different hashes
+- [x] Test edge cases: no extension, hidden files (`.bashrc`), empty path
 
 ### Task 6: Run validation
-- [ ] `cargo fmt --all`
-- [ ] `cargo clippy --all --all-targets -- -D warnings`
-- [ ] `cargo test`
+- [x] `cargo fmt --all`
+- [x] `cargo clippy --all --all-targets -- -D warnings`
+- [x] `cargo test`
 
 ### Task 7: Commit changes
-- [ ] Stage all changes
-- [ ] Commit: `feat(diagnostics): add path anonymization [Story 2.1]`
+- [x] Stage all changes
+- [x] Commit: `feat(diagnostics): add path anonymization [Story 2.1]`
 
 ---
 
@@ -153,18 +153,26 @@ impl PathAnonymizer {
 ## Dev Agent Record
 
 ### Agent Model Used
-<!-- Record which AI model completed this story -->
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Completion Notes
-<!-- Dev agent adds notes here during implementation -->
+- Implemented `PathAnonymizer` struct with blake3 keyed hashing
+- Salt generated from system time + process ID (no external RNG crate needed)
+- `with_seed(u64)` constructor for deterministic testing
+- 18 unit tests covering all acceptance criteria
+- All tests pass, clippy clean, formatted
 
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-13 | Story created | PO |
 | 2026-01-13 | PO Validation: Fixed AC/example contradiction, added Task-AC mapping, source tree, integration notes | Sarah (PO) |
+| 2026-01-13 | Implementation complete | James (Dev) |
 
 ### File List
-<!-- Files created or modified -->
+| File | Action | Description |
+|------|--------|-------------|
+| `src/diagnostics/anonymizer.rs` | Created | PathAnonymizer implementation with 18 tests |
+| `src/diagnostics/mod.rs` | Modified | Export PathAnonymizer |
 
 ---

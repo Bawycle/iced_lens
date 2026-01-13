@@ -17,6 +17,7 @@ dirs = "6.0"
 exif = { package = "kamadak-exif", version = "0.6" }
 ffmpeg-next = "8.0"
 fluent-bundle = "0.16"
+getrandom = "0.3"
 iced = { version = "0.14", features = ["tokio", "svg", "image", "advanced", "canvas", "wgpu"] }
 iced_aw = { version = "0.13", default-features = false, features = ["date_picker"] }
 image_rs = { package = "image", version = "0.25", features = ["jpeg", "png", "gif", "tiff", "webp", "bmp", "ico"] }

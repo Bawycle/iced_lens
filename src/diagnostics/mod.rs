@@ -17,6 +17,7 @@
 //! and usernames are hashed to protect user privacy while preserving
 //! diagnostic value.
 
+mod anonymizer;
 mod buffer;
 mod collector;
 mod events;
@@ -24,6 +25,7 @@ mod report;
 mod resource_collector;
 mod sanitizer;
 
+pub use anonymizer::PathAnonymizer;
 pub use buffer::{BufferCapacity, CircularBuffer};
 pub use collector::{DiagnosticsCollector, DiagnosticsHandle};
 pub use events::{

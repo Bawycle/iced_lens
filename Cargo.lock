@@ -2406,6 +2406,7 @@ dependencies = [
  "ffmpeg-next",
  "fluent-bundle",
  "futures-util",
+ "getrandom 0.3.4",
  "iced",
  "iced_aw",
  "iced_core",
