@@ -1,6 +1,36 @@
 # Epic 1: Diagnostics Core & Data Collection
 
+**Status:** ✅ Complete (QA Approved 2026-01-13)
+
 **Goal:** Establish the diagnostics module foundation with circular buffer, system metrics collection, event capture, and basic JSON export capability. This epic delivers the core data collection infrastructure that can be validated through tests and debug logging before UI integration.
+
+## Epic Summary
+
+| Story | Title | Status | QA Gate |
+|-------|-------|--------|---------|
+| 1.1 | Module Structure & Circular Buffer | Done | PASS |
+| 1.2 | System Resource Metrics | Done | PASS |
+| 1.3 | User Action Capture | Done | PASS |
+| 1.4 | App State Capture | Done | PASS |
+| 1.5 | Warning/Error Capture | Done | PASS |
+| 1.6 | Basic JSON Export | Done | PASS |
+| 1.7 | Diagnostic Event Instrumentation | Done | PASS |
+| 1.8 | Video Player Instrumentation | Done | PASS |
+| 1.9 | Media Loading Lifecycle | Done | PASS |
+| 1.10 | AI Operation Timing | Done | PASS |
+| 1.11 | Instrumentation Integration Tests | Done | PASS |
+| 1.12 | Notification Diagnostic Types | Done | PASS |
+
+**Deliverables:**
+- `src/diagnostics/` module (4004 lines, 134 tests)
+- Circular buffer with bounded memory
+- Thread-safe resource collection
+- Comprehensive event types (UserAction, AppStateEvent, AppOperation)
+- Privacy-preserving sanitizer
+- JSON export capability
+- Full instrumentation across video player, media loading, AI operations
+
+---
 
 ## Story 1.1: Module Structure and Circular Buffer
 
