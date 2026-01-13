@@ -68,6 +68,7 @@ icns = "0.3"
 [dev-dependencies]
 approx = "0.5"
 criterion = { version = "0.8.1", features = ["html_reports"] }
+serde_json = "1.0"
 tempfile = "3.24.0"
 tokio = { version = "1.48", features = ["macros", "rt", "sync", "time"] }
 

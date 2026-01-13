@@ -175,6 +175,19 @@ pub const PLAYBACK_SPEED_PRESETS: &[f64] = &[
 pub const PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD: f64 = 2.0;
 
 // ==========================================================================
+// Diagnostics Buffer Defaults
+// ==========================================================================
+
+/// Default diagnostics buffer capacity (number of events).
+pub const DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY: usize = 1000;
+
+/// Minimum diagnostics buffer capacity.
+pub const MIN_DIAGNOSTICS_BUFFER_CAPACITY: usize = 100;
+
+/// Maximum diagnostics buffer capacity.
+pub const MAX_DIAGNOSTICS_BUFFER_CAPACITY: usize = 10000;
+
+// ==========================================================================
 // Compile-time Validation
 // ==========================================================================
 
@@ -260,4 +273,10 @@ const _: () = {
     assert!(MAX_MAX_SKIP_ATTEMPTS >= MIN_MAX_SKIP_ATTEMPTS);
     assert!(DEFAULT_MAX_SKIP_ATTEMPTS >= MIN_MAX_SKIP_ATTEMPTS);
     assert!(DEFAULT_MAX_SKIP_ATTEMPTS <= MAX_MAX_SKIP_ATTEMPTS);
+
+    // Diagnostics buffer validation
+    assert!(MIN_DIAGNOSTICS_BUFFER_CAPACITY >= 1);
+    assert!(MAX_DIAGNOSTICS_BUFFER_CAPACITY >= MIN_DIAGNOSTICS_BUFFER_CAPACITY);
+    assert!(DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY >= MIN_DIAGNOSTICS_BUFFER_CAPACITY);
+    assert!(DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY <= MAX_DIAGNOSTICS_BUFFER_CAPACITY);
 };

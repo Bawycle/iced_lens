@@ -1,7 +1,7 @@
 # Story 1.1: Module Structure and Circular Buffer
 
 **Epic:** 1 - Diagnostics Core & Data Collection
-**Status:** Ready
+**Status:** Completed
 **Priority:** High
 **Estimate:** 2-3 hours
 
@@ -29,49 +29,49 @@
 
 ## Tasks
 
-- [ ] **Task 0:** Create feature branch
-  - [ ] Create branch `feature/diagnostics` from `dev`
-  - [ ] Verify branch is active
+- [x] **Task 0:** Create feature branch
+  - [x] Create branch `feature/diagnostics` from `dev`
+  - [x] Verify branch is active
 
-- [ ] **Task 1:** Create `src/diagnostics/` module directory structure
-  - [ ] Create `src/diagnostics/mod.rs` with module exports
-  - [ ] Create `src/diagnostics/buffer.rs` for CircularBuffer
-  - [ ] Create `src/diagnostics/events.rs` for DiagnosticEvent types
-  - [ ] Update `src/lib.rs` to export diagnostics module
+- [x] **Task 1:** Create `src/diagnostics/` module directory structure
+  - [x] Create `src/diagnostics/mod.rs` with module exports
+  - [x] Create `src/diagnostics/buffer.rs` for CircularBuffer
+  - [x] Create `src/diagnostics/events.rs` for DiagnosticEvent types
+  - [x] Update `src/lib.rs` to export diagnostics module
 
-- [ ] **Task 2:** Implement `BufferCapacity` newtype
-  - [ ] Define newtype with configurable min/max bounds
-  - [ ] Add defaults to `src/app/config/defaults.rs`
-  - [ ] Implement `new()`, `value()`, `Default`
+- [x] **Task 2:** Implement `BufferCapacity` newtype
+  - [x] Define newtype with configurable min/max bounds
+  - [x] Add defaults to `src/app/config/defaults.rs`
+  - [x] Implement `new()`, `value()`, `Default`
 
-- [ ] **Task 3:** Implement `CircularBuffer<T>`
-  - [ ] Generic struct with VecDeque or custom ring buffer
-  - [ ] `push()` method that overwrites oldest on overflow
-  - [ ] `iter()` returning chronological iterator
-  - [ ] `len()`, `capacity()`, `clear()`, `is_empty()` methods
+- [x] **Task 3:** Implement `CircularBuffer<T>`
+  - [x] Generic struct with VecDeque or custom ring buffer
+  - [x] `push()` method that overwrites oldest on overflow
+  - [x] `iter()` returning chronological iterator
+  - [x] `len()`, `capacity()`, `clear()`, `is_empty()` methods
 
-- [ ] **Task 4:** Define `DiagnosticEvent` enum
-  - [ ] `ResourceSnapshot` variant (placeholder for now)
-  - [ ] `UserAction` variant (placeholder for now)
-  - [ ] `AppState` variant (placeholder for now)
-  - [ ] `Warning` and `Error` variants (placeholder for now)
-  - [ ] Each variant includes timestamp
+- [x] **Task 4:** Define `DiagnosticEvent` enum
+  - [x] `ResourceSnapshot` variant (placeholder for now)
+  - [x] `UserAction` variant (placeholder for now)
+  - [x] `AppState` variant (placeholder for now)
+  - [x] `Warning` and `Error` variants (placeholder for now)
+  - [x] Each variant includes timestamp
 
-- [ ] **Task 5:** Write unit tests
-  - [ ] Test buffer push and retrieval
-  - [ ] Test overflow behavior (oldest evicted)
-  - [ ] Test iterator chronological order
-  - [ ] Test capacity bounds via newtype
+- [x] **Task 5:** Write unit tests
+  - [x] Test buffer push and retrieval
+  - [x] Test overflow behavior (oldest evicted)
+  - [x] Test iterator chronological order
+  - [x] Test capacity bounds via newtype
 
-- [ ] **Task 6:** Run validation
-  - [ ] `cargo fmt --all`
-  - [ ] `cargo clippy --all --all-targets -- -D warnings`
-  - [ ] `cargo test`
+- [x] **Task 6:** Run validation
+  - [x] `cargo fmt --all`
+  - [x] `cargo clippy --all --all-targets -- -D warnings`
+  - [x] `cargo test`
 
-- [ ] **Task 7:** Commit changes
-  - [ ] Stage all changes
-  - [ ] Commit with descriptive message following conventional commits
-  - [ ] Reference story number in commit message
+- [x] **Task 7:** Commit changes
+  - [x] Stage all changes
+  - [x] Commit with descriptive message following conventional commits
+  - [x] Reference story number in commit message
 
 ---
 
@@ -98,16 +98,28 @@
 ## Dev Agent Record
 
 ### Agent Model Used
-<!-- Record which AI model completed this story -->
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Completion Notes
-<!-- Dev agent adds notes here during implementation -->
+- Created `src/diagnostics/` module with `mod.rs`, `buffer.rs`, `events.rs`
+- Implemented `BufferCapacity` newtype with bounds 100-10000 events
+- Added `CircularBuffer<T>` with VecDeque-based ring buffer
+- Added `with_raw_capacity()` constructor for testing with small capacities
+- Defined `DiagnosticEvent` with `DiagnosticEventKind` enum (placeholder variants)
+- Added serde_json as dev-dependency for JSON serialization tests
+- All 20 diagnostics module tests passing
 
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-01-13 | Initial implementation | Claude Opus 4.5 |
 
 ### File List
-<!-- Files created or modified -->
+- `src/diagnostics/mod.rs` (created)
+- `src/diagnostics/buffer.rs` (created)
+- `src/diagnostics/events.rs` (created)
+- `src/lib.rs` (modified - added diagnostics module)
+- `src/app/config/defaults.rs` (modified - added buffer capacity defaults)
+- `Cargo.toml` (modified - added serde_json dev-dependency)
 
 ---
