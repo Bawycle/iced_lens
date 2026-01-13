@@ -21,11 +21,13 @@ mod buffer;
 mod collector;
 mod events;
 mod resource_collector;
+mod sanitizer;
 
 pub use buffer::{BufferCapacity, CircularBuffer};
 pub use collector::{DiagnosticsCollector, DiagnosticsHandle};
 pub use events::{
     AIModel, AppOperation, AppStateEvent, DiagnosticEvent, DiagnosticEventKind, EditorTool,
-    MediaType, SizeCategory, UserAction,
+    ErrorEvent, MediaType, SizeCategory, UserAction, WarningEvent,
 };
 pub use resource_collector::{ResourceCollector, ResourceMetrics, SamplingInterval};
+pub use sanitizer::{sanitize_message, ErrorType, WarningType};

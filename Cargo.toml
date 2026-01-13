@@ -55,6 +55,7 @@ ndarray = "0.17"
 blake3 = "1.5"
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+regex = "1.12"
 
 [features]
 default = []

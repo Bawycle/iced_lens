@@ -7,8 +7,9 @@
 use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
 
 use super::{
-    AppOperation, AppStateEvent, BufferCapacity, CircularBuffer, DiagnosticEvent,
-    DiagnosticEventKind, ResourceMetrics, UserAction,
+    sanitize_message, AppOperation, AppStateEvent, BufferCapacity, CircularBuffer, DiagnosticEvent,
+    DiagnosticEventKind, ErrorEvent, ErrorType, ResourceMetrics, UserAction, WarningEvent,
+    WarningType,
 };
 
 /// Handle for sending diagnostic events to the collector.
@@ -47,23 +48,55 @@ impl DiagnosticsHandle {
         let _ = self.event_tx.try_send(event);
     }
 
-    /// Logs a warning event.
+    /// Logs a warning event with full details.
     ///
+    /// The message is automatically sanitized to remove file paths.
     /// This method is non-blocking.
-    pub fn log_warning(&self, message: impl Into<String>) {
+    pub fn log_warning(&self, warning_event: WarningEvent) {
+        let sanitized_event = WarningEvent {
+            message: sanitize_message(&warning_event.message),
+            ..warning_event
+        };
         let event = DiagnosticEvent::new(DiagnosticEventKind::Warning {
-            message: message.into(),
+            event: sanitized_event,
         });
         let _ = self.event_tx.try_send(event);
     }
 
-    /// Logs an error event.
+    /// Logs a simple warning message (backward-compatible convenience method).
     ///
+    /// The message is automatically sanitized to remove file paths.
+    /// Uses `WarningType::Other` as the category.
     /// This method is non-blocking.
-    pub fn log_error(&self, message: impl Into<String>) {
+    pub fn log_warning_simple(&self, message: impl Into<String>) {
+        let warning = WarningEvent::new(WarningType::Other, sanitize_message(&message.into()));
+        let event = DiagnosticEvent::new(DiagnosticEventKind::Warning { event: warning });
+        let _ = self.event_tx.try_send(event);
+    }
+
+    /// Logs an error event with full details.
+    ///
+    /// The message is automatically sanitized to remove file paths.
+    /// This method is non-blocking.
+    pub fn log_error(&self, error_event: ErrorEvent) {
+        let sanitized_event = ErrorEvent {
+            message: sanitize_message(&error_event.message),
+            ..error_event
+        };
         let event = DiagnosticEvent::new(DiagnosticEventKind::Error {
-            message: message.into(),
+            event: sanitized_event,
         });
+        let _ = self.event_tx.try_send(event);
+    }
+
+    /// Logs a simple error message (backward-compatible convenience method).
+    ///
+    /// The message is automatically sanitized to remove file paths.
+    /// Uses `ErrorType::Other` as the category.
+    /// This method is non-blocking.
+    pub fn log_error_simple(&self, message: impl Into<String>) {
+        let error = ErrorEvent::new(ErrorType::Other, sanitize_message(&message.into()));
+        let event = DiagnosticEvent::new(DiagnosticEventKind::Error { event: error });
         let _ = self.event_tx.try_send(event);
     }
 
@@ -319,7 +352,10 @@ mod tests {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
         let handle = collector.handle();
 
-        handle.log_warning("test warning message");
+        handle.log_warning(WarningEvent::new(
+            WarningType::FileNotFound,
+            "test warning message",
+        ));
 
         collector.process_pending();
 
@@ -327,8 +363,30 @@ mod tests {
 
         let event = collector.iter().next().unwrap();
         match &event.kind {
-            DiagnosticEventKind::Warning { message } => {
-                assert_eq!(message, "test warning message");
+            DiagnosticEventKind::Warning { event } => {
+                assert_eq!(event.message, "test warning message");
+                assert_eq!(event.warning_type, WarningType::FileNotFound);
+            }
+            _ => panic!("expected Warning event"),
+        }
+    }
+
+    #[test]
+    fn handle_log_warning_simple_sends_to_collector() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_warning_simple("simple warning");
+
+        collector.process_pending();
+
+        assert_eq!(collector.len(), 1);
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Warning { event } => {
+                assert_eq!(event.message, "simple warning");
+                assert_eq!(event.warning_type, WarningType::Other);
             }
             _ => panic!("expected Warning event"),
         }
@@ -339,7 +397,7 @@ mod tests {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
         let handle = collector.handle();
 
-        handle.log_error("test error message");
+        handle.log_error(ErrorEvent::new(ErrorType::IoError, "test error message"));
 
         collector.process_pending();
 
@@ -347,8 +405,30 @@ mod tests {
 
         let event = collector.iter().next().unwrap();
         match &event.kind {
-            DiagnosticEventKind::Error { message } => {
-                assert_eq!(message, "test error message");
+            DiagnosticEventKind::Error { event } => {
+                assert_eq!(event.message, "test error message");
+                assert_eq!(event.error_type, ErrorType::IoError);
+            }
+            _ => panic!("expected Error event"),
+        }
+    }
+
+    #[test]
+    fn handle_log_error_simple_sends_to_collector() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_error_simple("simple error");
+
+        collector.process_pending();
+
+        assert_eq!(collector.len(), 1);
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Error { event } => {
+                assert_eq!(event.message, "simple error");
+                assert_eq!(event.error_type, ErrorType::Other);
             }
             _ => panic!("expected Error event"),
         }
@@ -545,6 +625,68 @@ mod tests {
                 _ => panic!("expected AIDeblurProcess operation"),
             },
             _ => panic!("expected Operation event"),
+        }
+    }
+
+    #[test]
+    fn log_warning_sanitizes_paths() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_warning(WarningEvent::new(
+            WarningType::FileNotFound,
+            "Cannot open /home/user/secret/file.txt",
+        ));
+
+        collector.process_pending();
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Warning { event } => {
+                assert_eq!(event.message, "Cannot open <path>");
+                assert!(!event.message.contains("/home/"));
+            }
+            _ => panic!("expected Warning event"),
+        }
+    }
+
+    #[test]
+    fn log_error_sanitizes_paths() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_error(ErrorEvent::new(
+            ErrorType::IoError,
+            "Failed to read C:\\Users\\name\\private\\data.txt",
+        ));
+
+        collector.process_pending();
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Error { event } => {
+                assert_eq!(event.message, "Failed to read <path>");
+                assert!(!event.message.contains("C:\\"));
+            }
+            _ => panic!("expected Error event"),
+        }
+    }
+
+    #[test]
+    fn log_warning_simple_sanitizes_paths() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_warning_simple("Error at /tmp/iced_lens/cache");
+
+        collector.process_pending();
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Warning { event } => {
+                assert!(!event.message.contains("/tmp/"));
+            }
+            _ => panic!("expected Warning event"),
         }
     }
 }

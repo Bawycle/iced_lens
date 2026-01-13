@@ -8,6 +8,7 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
+use super::sanitizer::{ErrorType, WarningType};
 use super::ResourceMetrics;
 
 // =============================================================================
@@ -490,6 +491,137 @@ pub enum AppOperation {
     },
 }
 
+// =============================================================================
+// Warning and Error Events
+// =============================================================================
+
+/// A warning event with categorization and context.
+///
+/// Warning events capture non-critical issues that may affect behavior
+/// but don't prevent the application from functioning.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WarningEvent {
+    /// Category of the warning
+    pub warning_type: WarningType,
+    /// Sanitized warning message (paths removed)
+    pub message: String,
+    /// Source module that generated the warning
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_module: Option<String>,
+}
+
+impl WarningEvent {
+    /// Creates a new warning event.
+    ///
+    /// # Arguments
+    ///
+    /// * `warning_type` - Category of the warning
+    /// * `message` - Warning message (will be stored as-is, sanitize before calling)
+    #[must_use]
+    pub fn new(warning_type: WarningType, message: impl Into<String>) -> Self {
+        Self {
+            warning_type,
+            message: message.into(),
+            source_module: None,
+        }
+    }
+
+    /// Creates a new warning event with source module information.
+    #[must_use]
+    pub fn with_source(
+        warning_type: WarningType,
+        message: impl Into<String>,
+        source_module: impl Into<String>,
+    ) -> Self {
+        Self {
+            warning_type,
+            message: message.into(),
+            source_module: Some(source_module.into()),
+        }
+    }
+}
+
+/// An error event with categorization, optional error code, and context.
+///
+/// Error events capture critical issues that caused operation failure.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ErrorEvent {
+    /// Category of the error
+    pub error_type: ErrorType,
+    /// Optional error code for specific error identification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// Sanitized error message (paths removed)
+    pub message: String,
+    /// Source module that generated the error
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_module: Option<String>,
+}
+
+impl ErrorEvent {
+    /// Creates a new error event.
+    ///
+    /// # Arguments
+    ///
+    /// * `error_type` - Category of the error
+    /// * `message` - Error message (will be stored as-is, sanitize before calling)
+    #[must_use]
+    pub fn new(error_type: ErrorType, message: impl Into<String>) -> Self {
+        Self {
+            error_type,
+            error_code: None,
+            message: message.into(),
+            source_module: None,
+        }
+    }
+
+    /// Creates a new error event with an error code.
+    #[must_use]
+    pub fn with_code(
+        error_type: ErrorType,
+        error_code: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            error_type,
+            error_code: Some(error_code.into()),
+            message: message.into(),
+            source_module: None,
+        }
+    }
+
+    /// Creates a new error event with source module information.
+    #[must_use]
+    pub fn with_source(
+        error_type: ErrorType,
+        message: impl Into<String>,
+        source_module: impl Into<String>,
+    ) -> Self {
+        Self {
+            error_type,
+            error_code: None,
+            message: message.into(),
+            source_module: Some(source_module.into()),
+        }
+    }
+
+    /// Creates a new error event with both error code and source module.
+    #[must_use]
+    pub fn full(
+        error_type: ErrorType,
+        error_code: impl Into<String>,
+        message: impl Into<String>,
+        source_module: impl Into<String>,
+    ) -> Self {
+        Self {
+            error_type,
+            error_code: Some(error_code.into()),
+            message: message.into(),
+            source_module: Some(source_module.into()),
+        }
+    }
+}
+
 /// A diagnostic event with timestamp.
 ///
 /// Each event captures a specific type of activity or state change
@@ -566,18 +698,18 @@ pub enum DiagnosticEventKind {
         operation: AppOperation,
     },
 
-    /// Non-critical warning.
-    /// Placeholder: Will be expanded in Story 1.5 with warning details.
+    /// Non-critical warning with categorization and context.
     Warning {
-        /// Brief description of the warning
-        message: String,
+        /// The warning event details
+        #[serde(flatten)]
+        event: WarningEvent,
     },
 
-    /// Critical error.
-    /// Placeholder: Will be expanded in Story 1.5 with error details.
+    /// Critical error with categorization and context.
     Error {
-        /// Brief description of the error
-        message: String,
+        /// The error event details
+        #[serde(flatten)]
+        event: ErrorEvent,
     },
 }
 
@@ -634,10 +766,10 @@ mod tests {
             operation: AppOperation::DecodeFrame { duration_ms: 16 },
         };
         let warning = DiagnosticEventKind::Warning {
-            message: "test warning".to_string(),
+            event: WarningEvent::new(WarningType::Other, "test warning"),
         };
         let error = DiagnosticEventKind::Error {
-            message: "test error".to_string(),
+            event: ErrorEvent::new(ErrorType::Other, "test error"),
         };
 
         assert!(matches!(
@@ -654,23 +786,25 @@ mod tests {
     #[test]
     fn diagnostic_event_kind_serializes_to_json() {
         let warning = DiagnosticEventKind::Warning {
-            message: "test warning".to_string(),
+            event: WarningEvent::new(WarningType::FileNotFound, "test warning"),
         };
 
         let json = serde_json::to_string(&warning).expect("serialization should succeed");
         assert!(json.contains("\"type\":\"warning\""));
+        assert!(json.contains("\"warning_type\":\"file_not_found\""));
         assert!(json.contains("\"message\":\"test warning\""));
     }
 
     #[test]
     fn diagnostic_event_kind_deserializes_from_json() {
-        let json = r#"{"type":"error","message":"test error"}"#;
+        let json = r#"{"type":"error","error_type":"io_error","message":"test error"}"#;
         let event: DiagnosticEventKind =
             serde_json::from_str(json).expect("deserialization should succeed");
 
         match event {
-            DiagnosticEventKind::Error { message } => {
-                assert_eq!(message, "test error");
+            DiagnosticEventKind::Error { event } => {
+                assert_eq!(event.message, "test error");
+                assert_eq!(event.error_type, ErrorType::IoError);
             }
             _ => panic!("expected Error variant"),
         }
@@ -959,5 +1093,139 @@ mod tests {
             },
             _ => panic!("expected Operation variant"),
         }
+    }
+
+    // =========================================================================
+    // WarningEvent Tests
+    // =========================================================================
+
+    #[test]
+    fn warning_event_new_creates_event() {
+        let event = WarningEvent::new(WarningType::FileNotFound, "File not found");
+        assert_eq!(event.warning_type, WarningType::FileNotFound);
+        assert_eq!(event.message, "File not found");
+        assert!(event.source_module.is_none());
+    }
+
+    #[test]
+    fn warning_event_with_source_creates_event() {
+        let event = WarningEvent::with_source(
+            WarningType::PermissionDenied,
+            "Access denied",
+            "media_loader",
+        );
+        assert_eq!(event.warning_type, WarningType::PermissionDenied);
+        assert_eq!(event.message, "Access denied");
+        assert_eq!(event.source_module.as_deref(), Some("media_loader"));
+    }
+
+    #[test]
+    fn warning_event_serializes_correctly() {
+        let event = WarningEvent::new(WarningType::NetworkError, "Connection failed");
+        let json = serde_json::to_string(&event).expect("serialization should succeed");
+
+        assert!(json.contains("\"warning_type\":\"network_error\""));
+        assert!(json.contains("\"message\":\"Connection failed\""));
+        // source_module should be omitted when None
+        assert!(!json.contains("source_module"));
+    }
+
+    #[test]
+    fn warning_event_with_source_serializes_correctly() {
+        let event = WarningEvent::with_source(
+            WarningType::UnsupportedFormat,
+            "Unknown codec",
+            "video_player",
+        );
+        let json = serde_json::to_string(&event).expect("serialization should succeed");
+
+        assert!(json.contains("\"warning_type\":\"unsupported_format\""));
+        assert!(json.contains("\"source_module\":\"video_player\""));
+    }
+
+    #[test]
+    fn warning_event_deserializes_correctly() {
+        let json = r#"{"warning_type":"configuration_issue","message":"Invalid setting"}"#;
+        let event: WarningEvent =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        assert_eq!(event.warning_type, WarningType::ConfigurationIssue);
+        assert_eq!(event.message, "Invalid setting");
+        assert!(event.source_module.is_none());
+    }
+
+    // =========================================================================
+    // ErrorEvent Tests
+    // =========================================================================
+
+    #[test]
+    fn error_event_new_creates_event() {
+        let event = ErrorEvent::new(ErrorType::IoError, "Read failed");
+        assert_eq!(event.error_type, ErrorType::IoError);
+        assert_eq!(event.message, "Read failed");
+        assert!(event.error_code.is_none());
+        assert!(event.source_module.is_none());
+    }
+
+    #[test]
+    fn error_event_with_code_creates_event() {
+        let event = ErrorEvent::with_code(ErrorType::DecodeError, "E001", "Invalid header");
+        assert_eq!(event.error_type, ErrorType::DecodeError);
+        assert_eq!(event.error_code.as_deref(), Some("E001"));
+        assert_eq!(event.message, "Invalid header");
+        assert!(event.source_module.is_none());
+    }
+
+    #[test]
+    fn error_event_with_source_creates_event() {
+        let event = ErrorEvent::with_source(ErrorType::ExportError, "Write failed", "exporter");
+        assert_eq!(event.error_type, ErrorType::ExportError);
+        assert_eq!(event.source_module.as_deref(), Some("exporter"));
+        assert!(event.error_code.is_none());
+    }
+
+    #[test]
+    fn error_event_full_creates_event() {
+        let event = ErrorEvent::full(
+            ErrorType::AIModelError,
+            "MODEL_LOAD_001",
+            "Failed to load model",
+            "ai_engine",
+        );
+        assert_eq!(event.error_type, ErrorType::AIModelError);
+        assert_eq!(event.error_code.as_deref(), Some("MODEL_LOAD_001"));
+        assert_eq!(event.message, "Failed to load model");
+        assert_eq!(event.source_module.as_deref(), Some("ai_engine"));
+    }
+
+    #[test]
+    fn error_event_serializes_correctly() {
+        let event = ErrorEvent::new(ErrorType::InternalError, "Unexpected state");
+        let json = serde_json::to_string(&event).expect("serialization should succeed");
+
+        assert!(json.contains("\"error_type\":\"internal_error\""));
+        assert!(json.contains("\"message\":\"Unexpected state\""));
+        // error_code and source_module should be omitted when None
+        assert!(!json.contains("error_code"));
+        assert!(!json.contains("source_module"));
+    }
+
+    #[test]
+    fn error_event_with_code_serializes_correctly() {
+        let event = ErrorEvent::with_code(ErrorType::IoError, "ENOENT", "File not found");
+        let json = serde_json::to_string(&event).expect("serialization should succeed");
+
+        assert!(json.contains("\"error_code\":\"ENOENT\""));
+    }
+
+    #[test]
+    fn error_event_deserializes_correctly() {
+        let json =
+            r#"{"error_type":"decode_error","error_code":"DEC_001","message":"Invalid frame"}"#;
+        let event: ErrorEvent = serde_json::from_str(json).expect("deserialization should succeed");
+
+        assert_eq!(event.error_type, ErrorType::DecodeError);
+        assert_eq!(event.error_code.as_deref(), Some("DEC_001"));
+        assert_eq!(event.message, "Invalid frame");
     }
 }

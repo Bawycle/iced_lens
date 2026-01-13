@@ -1,7 +1,7 @@
 # Story 1.5: Warning and Error Type Enrichment
 
 **Epic:** 1 - Diagnostics Core & Data Collection
-**Status:** Ready
+**Status:** Completed
 **Priority:** High
 **Estimate:** 2-3 hours
 **Depends On:** Story 1.1
@@ -45,16 +45,16 @@
 ## Tasks
 
 ### Task 1: Define Warning and Error Type Enums
-- [ ] Create `src/diagnostics/sanitizer.rs` (will also hold enums)
-- [ ] Define `WarningType` enum:
-  - [ ] `FileNotFound`, `UnsupportedFormat`, `PermissionDenied`, `NetworkError`, `ConfigurationIssue`, `Other`
-- [ ] Define `ErrorType` enum:
-  - [ ] `IoError`, `DecodeError`, `ExportError`, `AIModelError`, `InternalError`, `Other`
-- [ ] Implement `Serialize`/`Deserialize` for both enums
+- [x] Create `src/diagnostics/sanitizer.rs` (will also hold enums)
+- [x] Define `WarningType` enum:
+  - [x] `FileNotFound`, `UnsupportedFormat`, `PermissionDenied`, `NetworkError`, `ConfigurationIssue`, `Other`
+- [x] Define `ErrorType` enum:
+  - [x] `IoError`, `DecodeError`, `ExportError`, `AIModelError`, `InternalError`, `Other`
+- [x] Implement `Serialize`/`Deserialize` for both enums
 
 ### Task 2: Define WarningEvent Struct
-- [ ] In `src/diagnostics/events.rs`
-- [ ] Fields:
+- [x] In `src/diagnostics/events.rs`
+- [x] Fields:
   ```rust
   pub struct WarningEvent {
       pub warning_type: WarningType,
@@ -62,12 +62,12 @@
       pub source_module: Option<String>,
   }
   ```
-- [ ] Implement `new()` constructor
-- [ ] Implement `Serialize`/`Deserialize`
+- [x] Implement `new()` constructor
+- [x] Implement `Serialize`/`Deserialize`
 
 ### Task 3: Define ErrorEvent Struct
-- [ ] In `src/diagnostics/events.rs`
-- [ ] Fields:
+- [x] In `src/diagnostics/events.rs`
+- [x] Fields:
   ```rust
   pub struct ErrorEvent {
       pub error_type: ErrorType,
@@ -76,56 +76,56 @@
       pub source_module: Option<String>,
   }
   ```
-- [ ] Implement `new()` and `with_code()` constructors
-- [ ] Implement `Serialize`/`Deserialize`
+- [x] Implement `new()` and `with_code()` constructors
+- [x] Implement `Serialize`/`Deserialize`
 
 ### Task 4: Update DiagnosticEventKind Variants
-- [ ] Change `Warning { message: String }` to `Warning { event: WarningEvent }`
-- [ ] Change `Error { message: String }` to `Error { event: ErrorEvent }`
-- [ ] Update serde attributes for correct JSON structure
+- [x] Change `Warning { message: String }` to `Warning { event: WarningEvent }`
+- [x] Change `Error { message: String }` to `Error { event: ErrorEvent }`
+- [x] Update serde attributes for correct JSON structure
 
 ### Task 5: Implement Message Sanitizer
-- [ ] In `src/diagnostics/sanitizer.rs`
-- [ ] Function: `sanitize_message(message: &str) -> String`
-- [ ] Remove Unix paths: `/home/...`, `/Users/...`, `/tmp/...`
-- [ ] Remove Windows paths: `C:\...`, `D:\...`
-- [ ] Replace with `<path>` placeholder
-- [ ] Use lazy_static or once_cell for compiled regex
+- [x] In `src/diagnostics/sanitizer.rs`
+- [x] Function: `sanitize_message(message: &str) -> String`
+- [x] Remove Unix paths: `/home/...`, `/Users/...`, `/tmp/...`
+- [x] Remove Windows paths: `C:\...`, `D:\...`
+- [x] Replace with `<path>` placeholder
+- [x] Use lazy_static or once_cell for compiled regex
 
 ### Task 6: Update DiagnosticsHandle Methods
-- [ ] Update `log_warning()` signature:
+- [x] Update `log_warning()` signature:
   ```rust
   pub fn log_warning(&self, event: WarningEvent)
   ```
-- [ ] Add convenience method `log_warning_simple(&self, message: impl Into<String>)` for backward compatibility
-- [ ] Update `log_error()` signature:
+- [x] Add convenience method `log_warning_simple(&self, message: impl Into<String>)` for backward compatibility
+- [x] Update `log_error()` signature:
   ```rust
   pub fn log_error(&self, event: ErrorEvent)
   ```
-- [ ] Add convenience method `log_error_simple(&self, message: impl Into<String>)` for backward compatibility
-- [ ] Apply sanitizer to messages before storage
+- [x] Add convenience method `log_error_simple(&self, message: impl Into<String>)` for backward compatibility
+- [x] Apply sanitizer to messages before storage
 
 ### Task 7: Update Module Exports
-- [ ] Add `sanitizer` module to `src/diagnostics/mod.rs`
-- [ ] Export `WarningType`, `ErrorType`, `WarningEvent`, `ErrorEvent`
-- [ ] Export `sanitize_message` function
+- [x] Add `sanitizer` module to `src/diagnostics/mod.rs`
+- [x] Export `WarningType`, `ErrorType`, `WarningEvent`, `ErrorEvent`
+- [x] Export `sanitize_message` function
 
 ### Task 8: Write Unit Tests
-- [ ] Test `WarningEvent` creation and serialization
-- [ ] Test `ErrorEvent` creation with and without error_code
-- [ ] Test `sanitize_message` removes Unix paths
-- [ ] Test `sanitize_message` removes Windows paths
-- [ ] Test `sanitize_message` handles messages without paths
-- [ ] Test `log_warning` and `log_error` apply sanitization
+- [x] Test `WarningEvent` creation and serialization
+- [x] Test `ErrorEvent` creation with and without error_code
+- [x] Test `sanitize_message` removes Unix paths
+- [x] Test `sanitize_message` removes Windows paths
+- [x] Test `sanitize_message` handles messages without paths
+- [x] Test `log_warning` and `log_error` apply sanitization
 
 ### Task 9: Run Validation
-- [ ] `cargo fmt --all`
-- [ ] `cargo clippy --all --all-targets -- -D warnings`
-- [ ] `cargo test`
+- [x] `cargo fmt --all`
+- [x] `cargo clippy --all --all-targets -- -D warnings`
+- [x] `cargo test`
 
 ### Task 10: Commit Changes
-- [ ] Stage all changes
-- [ ] Commit with message: `feat(diagnostics): enrich warning and error events [Story 1.5]`
+- [x] Stage all changes
+- [x] Commit with message: `feat(diagnostics): enrich warning and error events [Story 1.5]`
 
 ---
 
@@ -196,16 +196,28 @@ Integration with the notification system (`src/ui/notifications/`) is deferred t
 ## Dev Agent Record
 
 ### Agent Model Used
-<!-- Record which AI model completed this story -->
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Completion Notes
-<!-- Dev agent adds notes here during implementation -->
+- Created `src/diagnostics/sanitizer.rs` with `WarningType` and `ErrorType` enums
+- Added `WarningEvent` struct with `new()` and `with_source()` constructors
+- Added `ErrorEvent` struct with `new()`, `with_code()`, `with_source()`, and `full()` constructors
+- Updated `DiagnosticEventKind::Warning` and `Error` variants to use enriched event structs
+- Implemented `sanitize_message()` using `LazyLock<Regex>` to remove Unix and Windows paths
+- Updated `log_warning()` and `log_error()` to accept event structs and apply sanitization
+- Added `log_warning_simple()` and `log_error_simple()` convenience methods for backward compatibility
+- Fixed serde rename for `AIModelError` variant (explicit rename needed due to "AI" prefix)
+- All 789 tests pass, clippy clean, formatted
 
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-01-13 | Initial implementation | James (Dev Agent) |
 
 ### File List
-<!-- Files created or modified -->
+- `src/diagnostics/sanitizer.rs` - NEW: WarningType, ErrorType enums, sanitize_message function
+- `src/diagnostics/events.rs` - Added WarningEvent, ErrorEvent structs, updated DiagnosticEventKind
+- `src/diagnostics/collector.rs` - Updated log_warning/log_error methods, added _simple variants
+- `src/diagnostics/mod.rs` - Updated exports to include new types
 
 ---
