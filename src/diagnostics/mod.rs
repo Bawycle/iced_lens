@@ -20,6 +20,7 @@
 mod buffer;
 mod collector;
 mod events;
+mod report;
 mod resource_collector;
 mod sanitizer;
 
@@ -29,5 +30,6 @@ pub use events::{
     AIModel, AppOperation, AppStateEvent, DiagnosticEvent, DiagnosticEventKind, EditorTool,
     ErrorEvent, MediaType, SizeCategory, UserAction, WarningEvent,
 };
+pub use report::{DiagnosticReport, ReportMetadata, SerializableEvent, SystemInfo};
 pub use resource_collector::{ResourceCollector, ResourceMetrics, SamplingInterval};
 pub use sanitizer::{sanitize_message, ErrorType, WarningType};

@@ -662,7 +662,7 @@ impl DiagnosticEvent {
 /// The type and associated data for a diagnostic event.
 ///
 /// This enum categorizes events and holds the specific data for each type.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DiagnosticEventKind {
     /// System resource metrics snapshot.

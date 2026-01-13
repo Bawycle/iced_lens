@@ -66,15 +66,15 @@ static PATH_PATTERNS: LazyLock<Regex> = LazyLock::new(|| {
     // Character class [^\s"'()\[\]] excludes whitespace and common string delimiters
     Regex::new(concat!(
         r#"("#,
-        r#"/home/[^\s"'()\[\]]+"#,           // Linux home
-        r#"|/Users/[^\s"'()\[\]]+"#,         // macOS home
-        r#"|/tmp/[^\s"'()\[\]]+"#,           // Temp directory
-        r#"|/var/[^\s"'()\[\]]+"#,           // Variable data
-        r#"|/etc/[^\s"'()\[\]]+"#,           // Config files
-        r#"|/opt/[^\s"'()\[\]]+"#,           // Optional software
-        r#"|~/[^\s"'()\[\]]+"#,              // Home shortcut (all platforms)
-        r#"|[A-Za-z]:\\[^\s"'()\[\]]+"#,     // Windows drive paths (C:\, D:\, etc.)
-        r#"|\\\\[^\s"'()\[\]]+"#,            // Windows UNC paths (\\server\share)
+        r#"/home/[^\s"'()\[\]]+"#,       // Linux home
+        r#"|/Users/[^\s"'()\[\]]+"#,     // macOS home
+        r#"|/tmp/[^\s"'()\[\]]+"#,       // Temp directory
+        r#"|/var/[^\s"'()\[\]]+"#,       // Variable data
+        r#"|/etc/[^\s"'()\[\]]+"#,       // Config files
+        r#"|/opt/[^\s"'()\[\]]+"#,       // Optional software
+        r#"|~/[^\s"'()\[\]]+"#,          // Home shortcut (all platforms)
+        r#"|[A-Za-z]:\\[^\s"'()\[\]]+"#, // Windows drive paths (C:\, D:\, etc.)
+        r#"|\\\\[^\s"'()\[\]]+"#,        // Windows UNC paths (\\server\share)
         r#")"#,
     ))
     .expect("path regex should compile")

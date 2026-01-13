@@ -4,12 +4,15 @@
 //! This module provides the central collector that receives events from
 //! various parts of the application and stores them in a circular buffer.
 
+use std::time::Instant;
+
+use chrono::{DateTime, Utc};
 use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
 
 use super::{
     sanitize_message, AppOperation, AppStateEvent, BufferCapacity, CircularBuffer, DiagnosticEvent,
-    DiagnosticEventKind, ErrorEvent, ErrorType, ResourceMetrics, UserAction, WarningEvent,
-    WarningType,
+    DiagnosticEventKind, DiagnosticReport, ErrorEvent, ErrorType, ReportMetadata, ResourceMetrics,
+    SerializableEvent, SystemInfo, UserAction, WarningEvent, WarningType,
 };
 
 /// Handle for sending diagnostic events to the collector.
@@ -147,6 +150,10 @@ pub struct DiagnosticsCollector {
     event_rx: Receiver<DiagnosticEvent>,
     /// Sender stored to create handles.
     event_tx: Sender<DiagnosticEvent>,
+    /// When collection started (monotonic clock for duration calculations).
+    collection_started_at: Instant,
+    /// When collection started (wall clock for report metadata).
+    collection_started_at_utc: DateTime<Utc>,
 }
 
 /// Default channel capacity for event buffering.
@@ -163,6 +170,8 @@ impl DiagnosticsCollector {
             buffer: CircularBuffer::new(capacity),
             event_rx,
             event_tx,
+            collection_started_at: Instant::now(),
+            collection_started_at_utc: Utc::now(),
         }
     }
 
@@ -245,6 +254,49 @@ impl DiagnosticsCollector {
     #[must_use]
     pub fn capacity(&self) -> usize {
         self.buffer.capacity()
+    }
+
+    /// Exports all collected events as a JSON diagnostic report.
+    ///
+    /// The report includes:
+    /// - Metadata (report ID, timestamps, version, event count)
+    /// - System information (OS, CPU cores, RAM)
+    /// - All events with relative timestamps
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JSON serialization fails.
+    pub fn export_json(&self) -> serde_json::Result<String> {
+        let report = self.build_report();
+        serde_json::to_string_pretty(&report)
+    }
+
+    /// Builds a diagnostic report from the current buffer contents.
+    #[allow(clippy::cast_possible_truncation)] // Duration in ms fits comfortably in u64
+    fn build_report(&self) -> DiagnosticReport {
+        let collection_duration_ms = self.collection_started_at.elapsed().as_millis() as u64;
+
+        let events: Vec<SerializableEvent> = self
+            .buffer
+            .iter()
+            .map(|event| {
+                SerializableEvent::new(
+                    event.timestamp,
+                    self.collection_started_at,
+                    event.kind.clone(),
+                )
+            })
+            .collect();
+
+        let metadata = ReportMetadata::new(
+            self.collection_started_at_utc,
+            collection_duration_ms,
+            events.len(),
+        );
+
+        let system_info = SystemInfo::collect();
+
+        DiagnosticReport::new(metadata, system_info, events)
     }
 }
 
@@ -688,5 +740,141 @@ mod tests {
             }
             _ => panic!("expected Warning event"),
         }
+    }
+
+    // =========================================================================
+    // Integration Tests for JSON Export
+    // =========================================================================
+
+    #[test]
+    fn export_json_full_pipeline() {
+        use crate::diagnostics::ResourceMetrics;
+
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        // Add sample events via handle (async path)
+        handle.log_resource_snapshot(ResourceMetrics::new(
+            25.5,
+            2_000_000_000,
+            8_000_000_000,
+            500,
+            1000,
+        ));
+        handle.log_action(UserAction::NavigateNext);
+        handle.log_warning(WarningEvent::new(
+            WarningType::UnsupportedFormat,
+            "Test warning message",
+        ));
+        handle.log_error(ErrorEvent::new(
+            ErrorType::DecodeError,
+            "Test error message",
+        ));
+
+        // Process pending events
+        collector.process_pending();
+
+        // Also add some events directly (sync path)
+        collector.log_state(AppStateEvent::MediaLoaded {
+            media_type: crate::diagnostics::MediaType::Image,
+            size_category: crate::diagnostics::SizeCategory::Small,
+        });
+        collector.log_operation(AppOperation::DecodeFrame { duration_ms: 8 });
+
+        // Export to JSON
+        let json = collector.export_json().expect("export should succeed");
+
+        // Parse JSON to verify structure
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json).expect("JSON should be parseable");
+
+        // Verify metadata section
+        let metadata = parsed.get("metadata").expect("should have metadata");
+        assert!(metadata.get("report_id").is_some());
+        assert!(metadata.get("generated_at").is_some());
+        assert!(metadata.get("iced_lens_version").is_some());
+        assert!(metadata.get("collection_started_at").is_some());
+        assert!(metadata.get("collection_duration_ms").is_some());
+        assert_eq!(metadata.get("event_count").unwrap().as_u64().unwrap(), 6);
+
+        // Verify system_info section
+        let system_info = parsed.get("system_info").expect("should have system_info");
+        assert!(system_info.get("os").is_some());
+        assert!(system_info.get("os_version").is_some());
+        assert!(system_info.get("cpu_cores").is_some());
+        assert!(system_info.get("ram_total_mb").is_some());
+
+        // Verify events section
+        let events = parsed
+            .get("events")
+            .expect("should have events")
+            .as_array()
+            .expect("events should be array");
+        assert_eq!(events.len(), 6);
+
+        // Verify each event has timestamp_ms and type
+        for event in events {
+            assert!(event.get("timestamp_ms").is_some());
+            assert!(event.get("type").is_some());
+        }
+
+        // Verify event types in order
+        assert_eq!(events[0].get("type").unwrap(), "resource_snapshot");
+        assert_eq!(events[1].get("type").unwrap(), "user_action");
+        assert_eq!(events[2].get("type").unwrap(), "warning");
+        assert_eq!(events[3].get("type").unwrap(), "error");
+        assert_eq!(events[4].get("type").unwrap(), "app_state");
+        assert_eq!(events[5].get("type").unwrap(), "operation");
+    }
+
+    #[test]
+    fn export_json_with_empty_buffer() {
+        let collector = DiagnosticsCollector::new(BufferCapacity::default());
+
+        let json = collector.export_json().expect("export should succeed");
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        let events = parsed.get("events").unwrap().as_array().unwrap();
+        assert!(events.is_empty());
+
+        let event_count = parsed
+            .get("metadata")
+            .unwrap()
+            .get("event_count")
+            .unwrap()
+            .as_u64()
+            .unwrap();
+        assert_eq!(event_count, 0);
+    }
+
+    #[test]
+    fn export_json_timestamps_are_relative() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+
+        // First event should have timestamp near 0
+        collector.log_action(UserAction::NavigateNext);
+
+        // Wait a bit
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Second event should have timestamp around 50ms
+        collector.log_action(UserAction::NavigatePrevious);
+
+        let json = collector.export_json().expect("export should succeed");
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        let events = parsed.get("events").unwrap().as_array().unwrap();
+
+        let ts0 = events[0].get("timestamp_ms").unwrap().as_u64().unwrap();
+        let ts1 = events[1].get("timestamp_ms").unwrap().as_u64().unwrap();
+
+        // First timestamp should be very small (< 10ms since collector creation)
+        assert!(ts0 < 10, "first timestamp should be near 0, got {ts0}");
+
+        // Second timestamp should be at least 50ms after the first
+        assert!(
+            ts1 >= ts0 + 50,
+            "second timestamp should be at least 50ms after first: ts0={ts0}, ts1={ts1}"
+        );
     }
 }
