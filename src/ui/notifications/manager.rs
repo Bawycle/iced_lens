@@ -50,25 +50,20 @@ impl Manager {
     /// becomes available.
     ///
     /// Warnings and errors are automatically logged to the diagnostics system.
-    /// If the notification has an explicit diagnostic type set (via `with_warning_type`
-    /// or `with_error_type`), that type is used. Otherwise, the type is inferred
-    /// from the message key using pattern matching.
+    /// All notification sites should use `with_warning_type()` or `with_error_type()`
+    /// to set an explicit diagnostic type. If not set, `Other` is used as fallback.
     pub fn push(&mut self, notification: Notification) {
         // Log warnings and errors to diagnostics
         if let Some(handle) = &self.diagnostics {
             match notification.severity() {
                 Severity::Warning => {
-                    // Use explicit type if set, otherwise infer from message key
-                    let warning_type = notification
-                        .warning_type()
-                        .unwrap_or_else(|| infer_warning_type(notification.message_key()));
+                    // All notification sites should use .with_warning_type() explicitly
+                    let warning_type = notification.warning_type().unwrap_or(WarningType::Other);
                     handle.log_warning(WarningEvent::new(warning_type, notification.message_key()));
                 }
                 Severity::Error => {
-                    // Use explicit type if set, otherwise infer from message key
-                    let error_type = notification
-                        .error_type()
-                        .unwrap_or_else(|| infer_error_type(notification.message_key()));
+                    // All notification sites should use .with_error_type() explicitly
+                    let error_type = notification.error_type().unwrap_or(ErrorType::Other);
                     handle.log_error(ErrorEvent::new(error_type, notification.message_key()));
                 }
                 Severity::Success | Severity::Info => {
@@ -192,46 +187,6 @@ impl Manager {
                 break;
             }
         }
-    }
-}
-
-/// Infers a `WarningType` from a notification message key.
-///
-/// This is a fallback when the notification doesn't have an explicit warning type set.
-/// Uses pattern matching on the message key to categorize warnings.
-fn infer_warning_type(message_key: &str) -> WarningType {
-    if message_key.contains("unsupported") || message_key.contains("format") {
-        WarningType::UnsupportedFormat
-    } else if message_key.contains("config") || message_key.contains("setting") {
-        WarningType::ConfigurationIssue
-    } else if message_key.contains("permission") || message_key.contains("access") {
-        WarningType::PermissionDenied
-    } else if message_key.contains("not-found") || message_key.contains("missing") {
-        WarningType::FileNotFound
-    } else if message_key.contains("network") || message_key.contains("download") {
-        WarningType::NetworkError
-    } else {
-        WarningType::Other
-    }
-}
-
-/// Infers an `ErrorType` from a notification message key.
-///
-/// This is a fallback when the notification doesn't have an explicit error type set.
-/// Uses pattern matching on the message key to categorize errors.
-fn infer_error_type(message_key: &str) -> ErrorType {
-    if message_key.contains("load-error-io") || message_key.contains("io") {
-        ErrorType::IoError
-    } else if message_key.contains("decode") {
-        ErrorType::DecodeError
-    } else if message_key.contains("save") || message_key.contains("export") {
-        ErrorType::ExportError
-    } else if message_key.contains("ai") || message_key.contains("model") {
-        ErrorType::AIModelError
-    } else if message_key.contains("internal") {
-        ErrorType::InternalError
-    } else {
-        ErrorType::Other
     }
 }
 

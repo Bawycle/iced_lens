@@ -21,7 +21,9 @@ mod view;
 pub use message::{Flags, Message};
 pub use screen::Screen;
 
-use crate::diagnostics::{AppOperation, AppStateEvent, DiagnosticsCollector, SizeCategory};
+use crate::diagnostics::{
+    AppOperation, AppStateEvent, DiagnosticsCollector, ErrorType, SizeCategory, WarningType,
+};
 use crate::media::metadata::MediaMetadata;
 use crate::media::{self, MaxSkipAttempts, MediaData, MediaNavigator};
 use crate::ui::help;
@@ -351,12 +353,16 @@ impl App {
 
         // Show warnings for config/state loading issues
         if let Some(key) = config_warning {
-            app.notifications
-                .push(notifications::Notification::warning(&key));
+            app.notifications.push(
+                notifications::Notification::warning(&key)
+                    .with_warning_type(WarningType::ConfigurationIssue),
+            );
         }
         if let Some(key) = state_warning {
-            app.notifications
-                .push(notifications::Notification::warning(&key));
+            app.notifications.push(
+                notifications::Notification::warning(&key)
+                    .with_warning_type(WarningType::ConfigurationIssue),
+            );
         }
 
         let task = if let Some(path_str) = flags.file_path {
@@ -583,9 +589,10 @@ impl App {
 
                 // Also check for loading timeout
                 if self.viewer.check_loading_timeout() {
-                    self.notifications.push(notifications::Notification::error(
-                        "notification-load-error-timeout",
-                    ));
+                    self.notifications.push(
+                        notifications::Notification::error("notification-load-error-timeout")
+                            .with_error_type(ErrorType::IoError),
+                    );
                 }
 
                 // Tick notification manager to handle auto-dismiss
@@ -610,8 +617,10 @@ impl App {
                                 // Remember the save directory for next time
                                 self.persisted.set_last_save_directory_from_file(&path);
                                 if let Some(key) = self.persisted.save() {
-                                    self.notifications
-                                        .push(notifications::Notification::warning(&key));
+                                    self.notifications.push(
+                                        notifications::Notification::warning(&key)
+                                            .with_warning_type(WarningType::ConfigurationIssue),
+                                    );
                                 }
 
                                 // Rescan directory if saved in the same folder as current media
@@ -621,9 +630,10 @@ impl App {
                                 );
                             }
                             Err(_err) => {
-                                self.notifications.push(notifications::Notification::error(
-                                    "notification-save-error",
-                                ));
+                                self.notifications.push(
+                                    notifications::Notification::error("notification-save-error")
+                                        .with_error_type(ErrorType::ExportError),
+                                );
                             }
                         }
                     }
@@ -646,14 +656,19 @@ impl App {
                             // Remember the save directory for next time
                             self.persisted.set_last_save_directory_from_file(&path);
                             if let Some(key) = self.persisted.save() {
-                                self.notifications
-                                    .push(notifications::Notification::warning(&key));
+                                self.notifications.push(
+                                    notifications::Notification::warning(&key)
+                                        .with_warning_type(WarningType::ConfigurationIssue),
+                                );
                             }
                         }
                         Err(_err) => {
-                            self.notifications.push(notifications::Notification::error(
-                                "notification-frame-capture-error",
-                            ));
+                            self.notifications.push(
+                                notifications::Notification::error(
+                                    "notification-frame-capture-error",
+                                )
+                                .with_error_type(ErrorType::ExportError),
+                            );
                         }
                     }
                 }
@@ -670,9 +685,10 @@ impl App {
                         self.screen = Screen::ImageEditor;
                     }
                     Err(_) => {
-                        self.notifications.push(notifications::Notification::error(
-                            "notification-editor-frame-error",
-                        ));
+                        self.notifications.push(
+                            notifications::Notification::error("notification-editor-frame-error")
+                                .with_error_type(ErrorType::InternalError),
+                        );
                     }
                 }
                 Task::none()
@@ -734,10 +750,10 @@ impl App {
             }
             Message::DirectoryScanCompleted { result, load_path } => {
                 let Ok(media_list) = result else {
-                    self.notifications
-                        .push(notifications::Notification::warning(
-                            "notification-scan-dir-error",
-                        ));
+                    self.notifications.push(
+                        notifications::Notification::warning("notification-scan-dir-error")
+                            .with_warning_type(WarningType::Other),
+                    );
                     return Task::none();
                 };
 
@@ -908,15 +924,17 @@ impl App {
         // Use media_navigator as single source of truth for current path
         if let Some(source_path) = self.media_navigator.current_media_path() {
             if let Err(_e) = std::fs::copy(source_path, path) {
-                self.notifications.push(notifications::Notification::error(
-                    "notification-metadata-save-error",
-                ));
+                self.notifications.push(
+                    notifications::Notification::error("notification-metadata-save-error")
+                        .with_error_type(ErrorType::IoError),
+                );
                 return Task::none();
             }
         } else {
-            self.notifications.push(notifications::Notification::error(
-                "notification-metadata-save-error",
-            ));
+            self.notifications.push(
+                notifications::Notification::error("notification-metadata-save-error")
+                    .with_error_type(ErrorType::IoError),
+            );
             return Task::none();
         }
 
@@ -927,8 +945,10 @@ impl App {
                     // Remember the save directory
                     self.persisted.set_last_save_directory_from_file(path);
                     if let Some(key) = self.persisted.save() {
-                        self.notifications
-                            .push(notifications::Notification::warning(&key));
+                        self.notifications.push(
+                            notifications::Notification::warning(&key)
+                                .with_warning_type(WarningType::ConfigurationIssue),
+                        );
                     }
 
                     // Refresh metadata display
@@ -946,9 +966,10 @@ impl App {
                 Err(_e) => {
                     // Clean up: remove the copied file if write failed
                     let _ = std::fs::remove_file(path);
-                    self.notifications.push(notifications::Notification::error(
-                        "notification-metadata-save-error",
-                    ));
+                    self.notifications.push(
+                        notifications::Notification::error("notification-metadata-save-error")
+                            .with_error_type(ErrorType::IoError),
+                    );
                 }
             }
         }
@@ -1000,6 +1021,7 @@ impl App {
                     .set_deblur_model_status(media::deblur::ModelStatus::Error(e.clone()));
                 self.notifications.push(
                     notifications::Notification::error("notification-deblur-download-error")
+                        .with_error_type(ErrorType::AIModelError)
                         .with_arg("error", e),
                 );
                 Task::none()
@@ -1030,8 +1052,10 @@ impl App {
                 self.settings.set_enable_deblur(true);
                 self.persisted.enable_deblur = true;
                 if let Some(key) = self.persisted.save() {
-                    self.notifications
-                        .push(notifications::Notification::warning(&key));
+                    self.notifications.push(
+                        notifications::Notification::warning(&key)
+                            .with_warning_type(WarningType::ConfigurationIssue),
+                    );
                 }
                 // Only show success notification for user-initiated activation, not startup
                 if !is_startup {
@@ -1048,13 +1072,16 @@ impl App {
                 self.settings.set_enable_deblur(false);
                 self.persisted.enable_deblur = false;
                 if let Some(key) = self.persisted.save() {
-                    self.notifications
-                        .push(notifications::Notification::warning(&key));
+                    self.notifications.push(
+                        notifications::Notification::warning(&key)
+                            .with_warning_type(WarningType::ConfigurationIssue),
+                    );
                 }
                 // Delete the invalid model file
                 let _ = std::fs::remove_file(media::deblur::get_model_path());
                 self.notifications.push(
                     notifications::Notification::error("notification-deblur-validation-error")
+                        .with_error_type(ErrorType::AIModelError)
                         .with_arg("error", e),
                 );
             }
@@ -1106,6 +1133,7 @@ impl App {
                     .set_upscale_model_status(media::upscale::UpscaleModelStatus::Error(e.clone()));
                 self.notifications.push(
                     notifications::Notification::error("notification-upscale-download-error")
+                        .with_error_type(ErrorType::AIModelError)
                         .with_arg("error", e),
                 );
                 Task::none()
@@ -1132,8 +1160,10 @@ impl App {
                 self.settings.set_enable_upscale(true);
                 self.persisted.enable_upscale = true;
                 if let Some(key) = self.persisted.save() {
-                    self.notifications
-                        .push(notifications::Notification::warning(&key));
+                    self.notifications.push(
+                        notifications::Notification::warning(&key)
+                            .with_warning_type(WarningType::ConfigurationIssue),
+                    );
                 }
                 // Only show success notification for user-initiated activation, not startup
                 if !is_startup {
@@ -1150,13 +1180,16 @@ impl App {
                 self.settings.set_enable_upscale(false);
                 self.persisted.enable_upscale = false;
                 if let Some(key) = self.persisted.save() {
-                    self.notifications
-                        .push(notifications::Notification::warning(&key));
+                    self.notifications.push(
+                        notifications::Notification::warning(&key)
+                            .with_warning_type(WarningType::ConfigurationIssue),
+                    );
                 }
                 // Delete the invalid model file
                 let _ = std::fs::remove_file(media::upscale::get_model_path());
                 self.notifications.push(
                     notifications::Notification::error("notification-upscale-validation-error")
+                        .with_error_type(ErrorType::AIModelError)
                         .with_arg("error", e),
                 );
             }
@@ -1199,6 +1232,7 @@ impl App {
                         notifications::Notification::warning(
                             "notification-skipped-corrupted-files",
                         )
+                        .with_warning_type(WarningType::UnsupportedFormat)
                         .with_arg("files", files_text)
                         .auto_dismiss(std::time::Duration::from_secs(8)),
                     );
@@ -1211,9 +1245,10 @@ impl App {
                     self.image_editor = Some(new_editor_state);
                 }
                 Err(_) => {
-                    self.notifications.push(notifications::Notification::error(
-                        "notification-editor-create-error",
-                    ));
+                    self.notifications.push(
+                        notifications::Notification::error("notification-editor-create-error")
+                            .with_error_type(ErrorType::InternalError),
+                    );
                 }
             }
             Task::none()
@@ -1278,6 +1313,7 @@ impl App {
                                 notifications::Notification::warning(
                                     "notification-skipped-corrupted-files",
                                 )
+                                .with_warning_type(WarningType::UnsupportedFormat)
                                 .with_arg("files", files_text)
                                 .auto_dismiss(std::time::Duration::from_secs(8)),
                             );
@@ -1291,6 +1327,7 @@ impl App {
                             notifications::Notification::warning(
                                 "notification-skipped-corrupted-files",
                             )
+                            .with_warning_type(WarningType::UnsupportedFormat)
                             .with_arg("files", files_text)
                             .auto_dismiss(std::time::Duration::from_secs(8)),
                         );
@@ -1302,9 +1339,10 @@ impl App {
                     // come from navigation. Kept as defensive fallback.
                     #[cfg(debug_assertions)]
                     eprintln!("[WARN] Unexpected DirectOpen in image editor error handler");
-                    self.notifications.push(notifications::Notification::error(
-                        "notification-load-error",
-                    ));
+                    self.notifications.push(
+                        notifications::Notification::error("notification-load-error")
+                            .with_error_type(ErrorType::DecodeError),
+                    );
                     Task::none()
                 }
             }

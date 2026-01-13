@@ -6,7 +6,7 @@
 
 use super::{notifications, persistence, Message, Screen};
 use crate::config;
-use crate::diagnostics::{AppStateEvent, DiagnosticsHandle, UserAction};
+use crate::diagnostics::{AppStateEvent, DiagnosticsHandle, ErrorType, UserAction, WarningType};
 use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
 use crate::media::{
@@ -160,8 +160,10 @@ fn handle_successful_media_load(ctx: &mut UpdateContext<'_>) {
         *ctx.current_metadata = media::metadata::extract_metadata(path);
         ctx.persisted.set_last_open_directory_from_file(path);
         if let Some(key) = ctx.persisted.save() {
-            ctx.notifications
-                .push(notifications::Notification::warning(&key));
+            ctx.notifications.push(
+                notifications::Notification::warning(&key)
+                    .with_warning_type(WarningType::ConfigurationIssue),
+            );
         }
     } else {
         *ctx.current_metadata = None;
@@ -228,7 +230,8 @@ pub fn handle_viewer_message(
             handle_open_file_dialog(ctx.persisted.last_open_directory.clone())
         }
         component::Effect::ShowErrorNotification { key, args } => {
-            let mut notification = notifications::Notification::error(key);
+            let mut notification =
+                notifications::Notification::error(key).with_error_type(ErrorType::DecodeError);
             for (arg_key, arg_value) in args {
                 notification = notification.with_arg(arg_key, arg_value);
             }
@@ -244,6 +247,7 @@ pub fn handle_viewer_message(
             let files_text = format_skipped_files_message(ctx.i18n, &skipped_files);
             ctx.notifications.push(
                 notifications::Notification::warning("notification-skipped-corrupted-files")
+                    .with_warning_type(WarningType::UnsupportedFormat)
                     .with_arg("files", files_text)
                     .auto_dismiss(std::time::Duration::from_secs(8)),
             );
@@ -261,6 +265,7 @@ pub fn handle_viewer_message(
                 let files_text = format_skipped_files_message(ctx.i18n, &skipped_files);
                 ctx.notifications.push(
                     notifications::Notification::warning("notification-skipped-corrupted-files")
+                        .with_warning_type(WarningType::UnsupportedFormat)
                         .with_arg("files", files_text)
                         .auto_dismiss(std::time::Duration::from_secs(8)),
                 );
@@ -339,9 +344,10 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                 .scan_directory(&image_path, sort_order)
                 .is_err()
             {
-                ctx.notifications.push(notifications::Notification::warning(
-                    "notification-scan-dir-error",
-                ));
+                ctx.notifications.push(
+                    notifications::Notification::warning("notification-scan-dir-error")
+                        .with_warning_type(WarningType::Other),
+                );
             }
 
             match ImageEditorState::new(image_path, &image_data) {
@@ -359,9 +365,10 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                     return validation_task;
                 }
                 Err(_) => {
-                    ctx.notifications.push(notifications::Notification::error(
-                        "notification-editor-create-error",
-                    ));
+                    ctx.notifications.push(
+                        notifications::Notification::error("notification-editor-create-error")
+                            .with_error_type(ErrorType::InternalError),
+                    );
                 }
             }
             return Task::none();
@@ -553,8 +560,10 @@ pub fn handle_settings_message(
             // User disabled the feature - persist the state and delete the model
             ctx.persisted.enable_deblur = false;
             if let Some(key) = ctx.persisted.save() {
-                ctx.notifications
-                    .push(notifications::Notification::warning(&key));
+                ctx.notifications.push(
+                    notifications::Notification::warning(&key)
+                        .with_warning_type(WarningType::ConfigurationIssue),
+                );
             }
             // Delete the model file
             let _ = std::fs::remove_file(crate::media::deblur::get_model_path());
@@ -654,8 +663,10 @@ pub fn handle_settings_message(
         SettingsEvent::DisableUpscale => {
             ctx.persisted.enable_upscale = false;
             if let Some(key) = ctx.persisted.save() {
-                ctx.notifications
-                    .push(notifications::Notification::warning(&key));
+                ctx.notifications.push(
+                    notifications::Notification::warning(&key)
+                        .with_warning_type(WarningType::ConfigurationIssue),
+                );
             }
             let _ = std::fs::remove_file(crate::media::upscale::get_model_path());
             Task::none()
@@ -1048,9 +1059,12 @@ pub fn handle_metadata_panel_message(
             if let Some(editor_state) = ctx.metadata_editor_state.as_mut() {
                 if !editor_state.validate_all() {
                     // Validation failed - show error notification
-                    ctx.notifications.push(notifications::Notification::error(
-                        "notification-metadata-validation-error",
-                    ));
+                    ctx.notifications.push(
+                        notifications::Notification::error(
+                            "notification-metadata-validation-error",
+                        )
+                        .with_error_type(ErrorType::Other),
+                    );
                     return Task::none();
                 }
 
@@ -1073,9 +1087,10 @@ pub fn handle_metadata_panel_message(
                     }
                     Err(_e) => {
                         // Show error notification
-                        ctx.notifications.push(notifications::Notification::error(
-                            "notification-metadata-save-error",
-                        ));
+                        ctx.notifications.push(
+                            notifications::Notification::error("notification-metadata-save-error")
+                                .with_error_type(ErrorType::IoError),
+                        );
                     }
                 }
             }
@@ -1085,9 +1100,12 @@ pub fn handle_metadata_panel_message(
             // Validate all fields before showing dialog
             if let Some(editor_state) = ctx.metadata_editor_state.as_mut() {
                 if !editor_state.validate_all() {
-                    ctx.notifications.push(notifications::Notification::error(
-                        "notification-metadata-validation-error",
-                    ));
+                    ctx.notifications.push(
+                        notifications::Notification::error(
+                            "notification-metadata-validation-error",
+                        )
+                        .with_error_type(ErrorType::Other),
+                    );
                     return Task::none();
                 }
             }
@@ -1388,9 +1406,10 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
             }
         }
         Err(_err) => {
-            ctx.notifications.push(notifications::Notification::error(
-                "notification-delete-error",
-            ));
+            ctx.notifications.push(
+                notifications::Notification::error("notification-delete-error")
+                    .with_error_type(ErrorType::IoError),
+            );
             Task::none()
         }
     }
