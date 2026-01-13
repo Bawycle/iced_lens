@@ -1,7 +1,7 @@
 # Story 1.11: Instrumentation Integration Tests
 
 **Epic:** 1 - Diagnostics Core & Data Collection
-**Status:** Ready
+**Status:** Done
 **Priority:** Medium
 **Estimate:** 1 hour
 **Depends On:** Story 1.7, Story 1.8, Story 1.9, Story 1.10
@@ -34,42 +34,42 @@
 ## Tasks
 
 ### Task 1: User Action Event Tests (AC: 1, 5, 6)
-- [ ] In `src/diagnostics/collector.rs`, add tests after existing tests (~line 800):
-  - [ ] `test_navigate_actions_have_correct_structure`
-  - [ ] `test_load_media_captures_source`
-  - [ ] `test_editor_actions_captured`
-- [ ] Verify event content matches expected structure
+- [x] In `src/diagnostics/collector.rs`, add tests after existing tests (~line 800):
+  - [x] `test_navigate_actions_have_correct_structure`
+  - [x] `test_load_media_captures_source`
+  - [x] `test_editor_actions_captured`
+- [x] Verify event content matches expected structure
 
 ### Task 2: State Transition Event Tests (AC: 2, 5, 6)
-- [ ] Add tests for state events:
-  - [ ] `test_editor_opened_closed_lifecycle`
-  - [ ] `test_video_state_events_captured` (VideoPlaying, VideoPaused, etc.)
-  - [ ] `test_media_loading_lifecycle_events` (Started, Loaded, Failed)
-- [ ] Verify state event fields are correct
+- [x] Add tests for state events:
+  - [x] `test_editor_opened_closed_lifecycle`
+  - [x] `test_video_state_events_captured` (VideoPlaying, VideoPaused, etc.)
+  - [x] `test_media_loading_lifecycle_events` (Started, Loaded, Failed)
+- [x] Verify state event fields are correct
 
 ### Task 3: Operation Event Tests (AC: 3, 5, 6, 7)
-- [ ] Add tests for operation events:
-  - [ ] `test_ai_deblur_operation_has_valid_duration`
-  - [ ] `test_ai_upscale_operation_has_scale_factor`
-  - [ ] `test_video_seek_operation_has_distance`
-- [ ] Verify duration_ms > 0 for all operations
-- [ ] Verify duration_ms < 300_000 (5 min timeout)
+- [x] Add tests for operation events:
+  - [x] `test_ai_deblur_operation_has_valid_duration`
+  - [x] `test_ai_upscale_operation_has_scale_factor`
+  - [x] `test_video_seek_operation_has_distance`
+- [x] Verify duration_ms > 0 for all operations
+- [x] Verify duration_ms < 300_000 (5 min timeout)
 
 ### Task 4: Warning/Error Event Tests (AC: 4, 6)
-- [ ] Add tests for warning/error events:
-  - [ ] `test_warning_event_has_correct_type`
-  - [ ] `test_error_event_has_correct_type`
-  - [ ] `test_warning_error_messages_sanitized`
-- [ ] Verify type mapping matches expected categories
+- [x] Add tests for warning/error events:
+  - [x] `test_warning_event_has_correct_type`
+  - [x] `test_error_event_has_correct_type`
+  - [x] `test_warning_error_messages_sanitized`
+- [x] Verify type mapping matches expected categories
 
 ### Task 5: Run Validation
-- [ ] `cargo fmt --all`
-- [ ] `cargo clippy --all --all-targets -- -D warnings`
-- [ ] `cargo test`
+- [x] `cargo fmt --all`
+- [x] `cargo clippy --all --all-targets -- -D warnings`
+- [x] `cargo test`
 
 ### Task 6: Commit Changes
-- [ ] Stage all changes
-- [ ] Commit with message: `test(diagnostics): add instrumentation integration tests [Story 1.11]`
+- [x] Stage all changes
+- [x] Commit with message: `test(diagnostics): add instrumentation integration tests [Story 1.11]`
 
 ---
 
@@ -391,10 +391,16 @@ True integration tests (testing App-level handlers) would require mocking the fu
 
 ## Dev Agent Record
 
+### File List
+| File | Action | Description |
+|------|--------|-------------|
+| `src/diagnostics/collector.rs` | Modified | Added 12 integration tests for instrumentation verification |
+
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-13 | Story created from Story 1.8 split | Claude Opus 4.5 |
 | 2026-01-13 | PO Validation: Fixed API usage, added test file location, complete test examples, Task-AC mappings | PO Validation |
+| 2026-01-13 | Implementation complete: all ACs implemented, tests passing | Dev (Claude Opus 4.5) |
 
 ---

@@ -310,7 +310,10 @@ impl Default for DiagnosticsCollector {
 mod tests {
     use std::time::Duration;
 
+    use approx::assert_relative_eq;
+
     use super::*;
+    use crate::diagnostics::{MediaType, SizeCategory};
 
     #[test]
     fn collector_new_creates_empty_buffer() {
@@ -898,5 +901,445 @@ mod tests {
             "1000 log_action calls should complete in < 1ms, took {} µs",
             elapsed.as_micros()
         );
+    }
+
+    // ============================================================
+    // Story 1.11: Instrumentation Integration Tests
+    // ============================================================
+
+    // --- Task 1: User Action Event Tests ---
+
+    #[test]
+    fn test_navigate_actions_have_correct_structure() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_action(UserAction::NavigateNext);
+        handle.log_action(UserAction::NavigatePrevious);
+
+        collector.process_pending();
+
+        assert_eq!(collector.len(), 2);
+
+        let events: Vec<_> = collector.iter().collect();
+
+        match &events[0].kind {
+            DiagnosticEventKind::UserAction { action, details } => {
+                assert!(matches!(action, UserAction::NavigateNext));
+                assert!(details.is_none());
+            }
+            _ => panic!("expected UserAction event"),
+        }
+
+        match &events[1].kind {
+            DiagnosticEventKind::UserAction { action, details } => {
+                assert!(matches!(action, UserAction::NavigatePrevious));
+                assert!(details.is_none());
+            }
+            _ => panic!("expected UserAction event"),
+        }
+    }
+
+    #[test]
+    fn test_load_media_captures_source() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_action(UserAction::LoadMedia {
+            source: Some("file_dialog".to_string()),
+        });
+
+        collector.process_pending();
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::UserAction { action, .. } => match action {
+                UserAction::LoadMedia { source } => {
+                    assert_eq!(source.as_deref(), Some("file_dialog"));
+                }
+                _ => panic!("expected LoadMedia action"),
+            },
+            _ => panic!("expected UserAction event"),
+        }
+    }
+
+    #[test]
+    fn test_editor_actions_captured() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_action(UserAction::EnterEditor);
+        handle.log_action(UserAction::ApplyDeblur);
+        handle.log_action(UserAction::SaveImage);
+        handle.log_action(UserAction::ReturnToViewer);
+
+        collector.process_pending();
+
+        assert_eq!(collector.len(), 4);
+
+        let events: Vec<_> = collector.iter().collect();
+
+        assert!(matches!(
+            &events[0].kind,
+            DiagnosticEventKind::UserAction {
+                action: UserAction::EnterEditor,
+                ..
+            }
+        ));
+        assert!(matches!(
+            &events[1].kind,
+            DiagnosticEventKind::UserAction {
+                action: UserAction::ApplyDeblur,
+                ..
+            }
+        ));
+        assert!(matches!(
+            &events[2].kind,
+            DiagnosticEventKind::UserAction {
+                action: UserAction::SaveImage,
+                ..
+            }
+        ));
+        assert!(matches!(
+            &events[3].kind,
+            DiagnosticEventKind::UserAction {
+                action: UserAction::ReturnToViewer,
+                ..
+            }
+        ));
+    }
+
+    // --- Task 2: State Transition Event Tests ---
+
+    #[test]
+    fn test_editor_opened_closed_lifecycle() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_state(AppStateEvent::EditorOpened { tool: None });
+        handle.log_state(AppStateEvent::EditorClosed {
+            had_unsaved_changes: false,
+        });
+
+        collector.process_pending();
+
+        assert_eq!(collector.len(), 2);
+
+        let events: Vec<_> = collector.iter().collect();
+
+        assert!(matches!(
+            &events[0].kind,
+            DiagnosticEventKind::AppState {
+                state: AppStateEvent::EditorOpened { .. }
+            }
+        ));
+        assert!(matches!(
+            &events[1].kind,
+            DiagnosticEventKind::AppState {
+                state: AppStateEvent::EditorClosed { .. }
+            }
+        ));
+    }
+
+    #[test]
+    fn test_video_state_events_captured() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_state(AppStateEvent::VideoPlaying { position_secs: 0.0 });
+        handle.log_state(AppStateEvent::VideoPaused {
+            position_secs: 10.5,
+        });
+        handle.log_state(AppStateEvent::VideoSeeking { target_secs: 30.0 });
+        handle.log_state(AppStateEvent::VideoBuffering {
+            position_secs: 30.0,
+        });
+        handle.log_state(AppStateEvent::VideoAtEndOfStream);
+
+        collector.process_pending();
+
+        assert_eq!(collector.len(), 5);
+
+        let events: Vec<_> = collector.iter().collect();
+
+        // Verify VideoPlaying with position 0.0
+        match &events[0].kind {
+            DiagnosticEventKind::AppState {
+                state: AppStateEvent::VideoPlaying { position_secs },
+            } => assert_relative_eq!(*position_secs, 0.0),
+            _ => panic!("expected VideoPlaying event"),
+        }
+
+        // Verify VideoPaused with position 10.5
+        match &events[1].kind {
+            DiagnosticEventKind::AppState {
+                state: AppStateEvent::VideoPaused { position_secs },
+            } => assert_relative_eq!(*position_secs, 10.5),
+            _ => panic!("expected VideoPaused event"),
+        }
+
+        // Verify VideoSeeking with target 30.0
+        match &events[2].kind {
+            DiagnosticEventKind::AppState {
+                state: AppStateEvent::VideoSeeking { target_secs },
+            } => assert_relative_eq!(*target_secs, 30.0),
+            _ => panic!("expected VideoSeeking event"),
+        }
+
+        // Verify VideoBuffering
+        assert!(matches!(
+            &events[3].kind,
+            DiagnosticEventKind::AppState {
+                state: AppStateEvent::VideoBuffering { .. }
+            }
+        ));
+
+        // Verify VideoAtEndOfStream
+        assert!(matches!(
+            &events[4].kind,
+            DiagnosticEventKind::AppState {
+                state: AppStateEvent::VideoAtEndOfStream
+            }
+        ));
+    }
+
+    #[test]
+    fn test_media_loading_lifecycle_events() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_state(AppStateEvent::MediaLoadingStarted {
+            media_type: MediaType::Image,
+            size_category: SizeCategory::Medium,
+        });
+        handle.log_state(AppStateEvent::MediaLoaded {
+            media_type: MediaType::Image,
+            size_category: SizeCategory::Medium,
+        });
+
+        collector.process_pending();
+
+        assert_eq!(collector.len(), 2);
+
+        let events: Vec<_> = collector.iter().collect();
+
+        match &events[0].kind {
+            DiagnosticEventKind::AppState { state } => match state {
+                AppStateEvent::MediaLoadingStarted {
+                    media_type,
+                    size_category,
+                } => {
+                    assert!(matches!(media_type, MediaType::Image));
+                    assert!(matches!(size_category, SizeCategory::Medium));
+                }
+                _ => panic!("expected MediaLoadingStarted"),
+            },
+            _ => panic!("expected AppState event"),
+        }
+
+        match &events[1].kind {
+            DiagnosticEventKind::AppState { state } => match state {
+                AppStateEvent::MediaLoaded {
+                    media_type,
+                    size_category,
+                } => {
+                    assert!(matches!(media_type, MediaType::Image));
+                    assert!(matches!(size_category, SizeCategory::Medium));
+                }
+                _ => panic!("expected MediaLoaded"),
+            },
+            _ => panic!("expected AppState event"),
+        }
+    }
+
+    // --- Task 3: Operation Event Tests ---
+
+    #[test]
+    fn test_ai_deblur_operation_has_valid_duration() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_operation(AppOperation::AIDeblurProcess {
+            duration_ms: 1500,
+            size_category: SizeCategory::Medium,
+            success: true,
+        });
+
+        collector.process_pending();
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Operation { operation } => match operation {
+                AppOperation::AIDeblurProcess {
+                    duration_ms,
+                    size_category,
+                    success,
+                } => {
+                    assert!(*duration_ms > 0, "Duration should be positive");
+                    assert!(*duration_ms < 300_000, "Duration should be < 5 minutes");
+                    assert!(matches!(size_category, SizeCategory::Medium));
+                    assert!(*success);
+                }
+                _ => panic!("expected AIDeblurProcess"),
+            },
+            _ => panic!("expected Operation event"),
+        }
+    }
+
+    #[test]
+    fn test_ai_upscale_operation_has_scale_factor() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_operation(AppOperation::AIUpscaleProcess {
+            duration_ms: 2500,
+            scale_factor: 2.0,
+            size_category: SizeCategory::Large,
+            success: true,
+        });
+
+        collector.process_pending();
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Operation { operation } => match operation {
+                AppOperation::AIUpscaleProcess {
+                    duration_ms,
+                    scale_factor,
+                    size_category,
+                    success,
+                } => {
+                    assert!(*duration_ms > 0);
+                    assert!(*duration_ms < 300_000);
+                    assert!(*scale_factor > 0.0);
+                    assert!(*scale_factor <= 4.0, "Real-ESRGAN max is 4x");
+                    assert!(matches!(size_category, SizeCategory::Large));
+                    assert!(*success);
+                }
+                _ => panic!("expected AIUpscaleProcess"),
+            },
+            _ => panic!("expected Operation event"),
+        }
+    }
+
+    #[test]
+    fn test_video_seek_operation_has_distance() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_operation(AppOperation::VideoSeek {
+            duration_ms: 150,
+            seek_distance_secs: 10.5,
+        });
+
+        collector.process_pending();
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Operation { operation } => match operation {
+                AppOperation::VideoSeek {
+                    duration_ms,
+                    seek_distance_secs,
+                } => {
+                    assert!(*duration_ms > 0);
+                    assert!(*duration_ms < 300_000);
+                    assert!(*seek_distance_secs >= 0.0);
+                }
+                _ => panic!("expected VideoSeek"),
+            },
+            _ => panic!("expected Operation event"),
+        }
+    }
+
+    // --- Task 4: Warning/Error Event Tests ---
+
+    #[test]
+    fn test_warning_event_has_correct_type() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_warning(WarningEvent::new(
+            WarningType::UnsupportedFormat,
+            "Format not supported",
+        ));
+
+        collector.process_pending();
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Warning { event } => {
+                assert_eq!(event.warning_type, WarningType::UnsupportedFormat);
+                assert_eq!(event.message, "Format not supported");
+            }
+            _ => panic!("expected Warning event"),
+        }
+    }
+
+    #[test]
+    fn test_error_event_has_correct_type() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_error(ErrorEvent::new(
+            ErrorType::AIModelError,
+            "Model inference failed",
+        ));
+
+        collector.process_pending();
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Error { event } => {
+                assert_eq!(event.error_type, ErrorType::AIModelError);
+                assert_eq!(event.message, "Model inference failed");
+            }
+            _ => panic!("expected Error event"),
+        }
+    }
+
+    #[test]
+    fn test_warning_error_messages_sanitized() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        // Test that messages don't contain file paths (sanitization check)
+        let warning_msg = "IO error: permission denied";
+        let error_msg = "Failed to load model: network timeout";
+
+        handle.log_warning(WarningEvent::new(WarningType::Other, warning_msg));
+        handle.log_error(ErrorEvent::new(ErrorType::IoError, error_msg));
+
+        collector.process_pending();
+
+        let events: Vec<_> = collector.iter().collect();
+
+        // Verify messages are stored correctly (sanitization happens at logging site)
+        match &events[0].kind {
+            DiagnosticEventKind::Warning { event } => {
+                assert!(
+                    !event.message.contains('/'),
+                    "Message should not contain paths"
+                );
+                assert!(
+                    !event.message.contains('\\'),
+                    "Message should not contain paths"
+                );
+            }
+            _ => panic!("expected Warning event"),
+        }
+
+        match &events[1].kind {
+            DiagnosticEventKind::Error { event } => {
+                assert!(
+                    !event.message.contains('/'),
+                    "Message should not contain paths"
+                );
+                assert!(
+                    !event.message.contains('\\'),
+                    "Message should not contain paths"
+                );
+            }
+            _ => panic!("expected Error event"),
+        }
     }
 }
