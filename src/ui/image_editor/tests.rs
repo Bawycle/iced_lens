@@ -27,14 +27,15 @@ fn new_editor_state_has_no_changes() {
 
 #[test]
 fn new_editor_state_initializes_resize() {
+    use crate::test_utils::assert_abs_diff_eq;
     let (_dir, path, img) = create_test_image(4, 3);
     let state = State::new(path, &img).expect("editor state");
 
     assert_eq!(state.resize.width, 4);
     assert_eq!(state.resize.height, 3);
-    assert_eq!(state.resize.scale.value(), 100.0);
+    assert_abs_diff_eq!(state.resize.scale.value(), 100.0);
     assert!(state.resize.lock_aspect);
-    assert_eq!(state.resize.original_aspect, 4.0 / 3.0);
+    assert_abs_diff_eq!(state.resize.original_aspect, 4.0 / 3.0);
 }
 
 #[test]

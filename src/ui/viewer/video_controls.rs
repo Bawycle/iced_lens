@@ -530,11 +530,12 @@ mod tests {
 
     #[test]
     fn playback_state_defaults() {
+        use crate::test_utils::assert_abs_diff_eq;
         let state = PlaybackState::default();
         assert!(!state.is_playing);
-        assert_eq!(state.position_secs, 0.0);
-        assert_eq!(state.duration_secs, 0.0);
-        assert_eq!(state.volume, 1.0);
+        assert_abs_diff_eq!(state.position_secs, 0.0);
+        assert_abs_diff_eq!(state.duration_secs, 0.0);
+        assert_abs_diff_eq!(state.volume, 1.0);
         assert!(!state.muted);
         assert!(!state.loop_enabled);
         assert!(state.seek_preview_position.is_none());
@@ -565,6 +566,7 @@ mod tests {
 
     #[test]
     fn timeline_position_uses_seconds() {
+        use crate::test_utils::assert_abs_diff_eq;
         let state = PlaybackState {
             is_playing: true,
             position_secs: 30.0,
@@ -584,12 +586,13 @@ mod tests {
         // Position is in seconds
         let position = state.seek_preview_position.unwrap_or(state.position_secs);
 
-        assert_eq!(position, 30.0);
-        assert_eq!(state.duration_secs, 120.0);
+        assert_abs_diff_eq!(position, 30.0);
+        assert_abs_diff_eq!(state.duration_secs, 120.0);
     }
 
     #[test]
     fn timeline_position_handles_zero_duration() {
+        use crate::test_utils::assert_abs_diff_eq;
         let state = PlaybackState {
             is_playing: false,
             position_secs: 10.0,
@@ -611,12 +614,13 @@ mod tests {
 
         // Position is 10 seconds, but slider range is 0..=0
         // so the slider will clamp to 0
-        assert_eq!(position, 10.0);
-        assert_eq!(state.duration_secs, 0.0);
+        assert_abs_diff_eq!(position, 10.0);
+        assert_abs_diff_eq!(state.duration_secs, 0.0);
     }
 
     #[test]
     fn timeline_uses_preview_position_when_set() {
+        use crate::test_utils::assert_abs_diff_eq;
         let state = PlaybackState {
             is_playing: true,
             position_secs: 30.0,
@@ -637,7 +641,7 @@ mod tests {
         let position = state.seek_preview_position.unwrap_or(state.position_secs);
 
         // Should use preview position (90s) not playback position (30s)
-        assert_eq!(position, 90.0);
+        assert_abs_diff_eq!(position, 90.0);
     }
 
     #[test]
@@ -662,8 +666,9 @@ mod tests {
 
     #[test]
     fn playback_state_default_speed() {
+        use crate::test_utils::assert_abs_diff_eq;
         let state = PlaybackState::default();
-        assert_eq!(state.playback_speed, 1.0);
+        assert_abs_diff_eq!(state.playback_speed, 1.0);
         assert!(!state.speed_auto_muted);
     }
 

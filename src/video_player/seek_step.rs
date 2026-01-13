@@ -69,14 +69,15 @@ impl Default for KeyboardSeekStep {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
 
     #[test]
     fn new_clamps_to_valid_range() {
-        assert_eq!(
+        assert_abs_diff_eq!(
             KeyboardSeekStep::new(0.0).value(),
             MIN_KEYBOARD_SEEK_STEP_SECS
         );
-        assert_eq!(
+        assert_abs_diff_eq!(
             KeyboardSeekStep::new(100.0).value(),
             MAX_KEYBOARD_SEEK_STEP_SECS
         );
@@ -84,14 +85,14 @@ mod tests {
 
     #[test]
     fn new_accepts_valid_values() {
-        assert_eq!(KeyboardSeekStep::new(0.5).value(), 0.5);
-        assert_eq!(KeyboardSeekStep::new(5.0).value(), 5.0);
-        assert_eq!(KeyboardSeekStep::new(30.0).value(), 30.0);
+        assert_abs_diff_eq!(KeyboardSeekStep::new(0.5).value(), 0.5);
+        assert_abs_diff_eq!(KeyboardSeekStep::new(5.0).value(), 5.0);
+        assert_abs_diff_eq!(KeyboardSeekStep::new(30.0).value(), 30.0);
     }
 
     #[test]
     fn default_returns_expected_value() {
-        assert_eq!(
+        assert_abs_diff_eq!(
             KeyboardSeekStep::default().value(),
             DEFAULT_KEYBOARD_SEEK_STEP_SECS
         );

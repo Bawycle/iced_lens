@@ -263,13 +263,14 @@ pub fn format_number(value: f32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
 
     #[test]
     fn default_zoom_state_is_consistent() {
         let state = ZoomState::default();
         assert!(state.fit_to_window);
-        assert_eq!(state.zoom_percent, DEFAULT_ZOOM_PERCENT);
-        assert_eq!(state.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert_abs_diff_eq!(state.zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert_abs_diff_eq!(state.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert!(!state.zoom_input_dirty);
         assert!(state.zoom_input_error_key.is_none());
     }
@@ -283,7 +284,7 @@ mod tests {
 
         state.apply_manual_zoom(9999.0);
 
-        assert_eq!(state.zoom_percent, MAX_ZOOM_PERCENT);
+        assert_abs_diff_eq!(state.zoom_percent, MAX_ZOOM_PERCENT);
         assert!(!state.fit_to_window);
         assert!(!state.zoom_input_dirty);
     }
@@ -297,9 +298,9 @@ mod tests {
         };
 
         state.zoom_in();
-        assert_eq!(state.zoom_percent, 110.0);
+        assert_abs_diff_eq!(state.zoom_percent, 110.0);
 
         state.zoom_out();
-        assert_eq!(state.zoom_percent, 100.0);
+        assert_abs_diff_eq!(state.zoom_percent, 100.0);
     }
 }

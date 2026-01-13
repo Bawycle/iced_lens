@@ -93,17 +93,18 @@ impl Default for PlaybackSpeed {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
 
     #[test]
     fn new_clamps_to_valid_range() {
-        assert_eq!(PlaybackSpeed::new(0.01).value(), MIN_PLAYBACK_SPEED);
-        assert_eq!(PlaybackSpeed::new(100.0).value(), MAX_PLAYBACK_SPEED);
-        assert_eq!(PlaybackSpeed::new(2.0).value(), 2.0);
+        assert_abs_diff_eq!(PlaybackSpeed::new(0.01).value(), MIN_PLAYBACK_SPEED);
+        assert_abs_diff_eq!(PlaybackSpeed::new(100.0).value(), MAX_PLAYBACK_SPEED);
+        assert_abs_diff_eq!(PlaybackSpeed::new(2.0).value(), 2.0);
     }
 
     #[test]
     fn default_is_normal_speed() {
-        assert_eq!(PlaybackSpeed::default().value(), 1.0);
+        assert_abs_diff_eq!(PlaybackSpeed::default().value(), 1.0);
     }
 
     #[test]
@@ -122,7 +123,7 @@ mod tests {
 
         // At max, stays at max
         let max_speed = PlaybackSpeed::new(MAX_PLAYBACK_SPEED);
-        assert_eq!(max_speed.increase().value(), MAX_PLAYBACK_SPEED);
+        assert_abs_diff_eq!(max_speed.increase().value(), MAX_PLAYBACK_SPEED);
     }
 
     #[test]
@@ -133,7 +134,7 @@ mod tests {
 
         // At min, stays at min
         let min_speed = PlaybackSpeed::new(MIN_PLAYBACK_SPEED);
-        assert_eq!(min_speed.decrease().value(), MIN_PLAYBACK_SPEED);
+        assert_abs_diff_eq!(min_speed.decrease().value(), MIN_PLAYBACK_SPEED);
     }
 
     #[test]

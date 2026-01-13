@@ -89,28 +89,29 @@ pub fn micros_to_pts(micros: i64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
 
     #[test]
     fn secs_to_micros_converts_correctly() {
-        assert_eq!(secs_to_micros(1.0), 1_000_000.0);
-        assert_eq!(secs_to_micros(0.5), 500_000.0);
-        assert_eq!(secs_to_micros(0.0), 0.0);
-        assert_eq!(secs_to_micros(2.5), 2_500_000.0);
+        assert_abs_diff_eq!(secs_to_micros(1.0), 1_000_000.0);
+        assert_abs_diff_eq!(secs_to_micros(0.5), 500_000.0);
+        assert_abs_diff_eq!(secs_to_micros(0.0), 0.0);
+        assert_abs_diff_eq!(secs_to_micros(2.5), 2_500_000.0);
     }
 
     #[test]
     fn micros_to_secs_converts_correctly() {
-        assert_eq!(micros_to_secs(1_000_000.0), 1.0);
-        assert_eq!(micros_to_secs(500_000.0), 0.5);
-        assert_eq!(micros_to_secs(0.0), 0.0);
-        assert_eq!(micros_to_secs(2_500_000.0), 2.5);
+        assert_abs_diff_eq!(micros_to_secs(1_000_000.0), 1.0);
+        assert_abs_diff_eq!(micros_to_secs(500_000.0), 0.5);
+        assert_abs_diff_eq!(micros_to_secs(0.0), 0.0);
+        assert_abs_diff_eq!(micros_to_secs(2_500_000.0), 2.5);
     }
 
     #[test]
     fn f64_round_trip_preserves_value() {
         let original = 123.456_789;
         let result = micros_to_secs(secs_to_micros(original));
-        assert!((original - result).abs() < 1e-10);
+        assert_abs_diff_eq!(original, result, epsilon = 1e-10);
     }
 
     #[test]
@@ -123,9 +124,9 @@ mod tests {
 
     #[test]
     fn micros_to_pts_converts_correctly() {
-        assert_eq!(micros_to_pts(1_000_000), 1.0);
-        assert_eq!(micros_to_pts(500_000), 0.5);
-        assert_eq!(micros_to_pts(0), 0.0);
+        assert_abs_diff_eq!(micros_to_pts(1_000_000), 1.0);
+        assert_abs_diff_eq!(micros_to_pts(500_000), 0.5);
+        assert_abs_diff_eq!(micros_to_pts(0), 0.0);
     }
 
     #[test]
@@ -134,12 +135,12 @@ mod tests {
         let micros = pts_to_micros(pts_secs);
         let back = micros_to_pts(micros);
         // Should be accurate to microsecond precision
-        assert!((pts_secs - back).abs() < 0.000_001);
+        assert_abs_diff_eq!(pts_secs, back, epsilon = 0.000_001);
     }
 
     #[test]
     fn micros_per_second_constant() {
-        assert_eq!(MICROS_PER_SECOND, 1_000_000.0);
+        assert_abs_diff_eq!(MICROS_PER_SECOND, 1_000_000.0);
     }
 
     #[test]
@@ -147,8 +148,8 @@ mod tests {
         // 24 hours in seconds
         let day_secs = 24.0 * 60.0 * 60.0;
         let day_micros = secs_to_micros(day_secs);
-        assert_eq!(day_micros, 86_400_000_000.0);
-        assert_eq!(micros_to_secs(day_micros), day_secs);
+        assert_abs_diff_eq!(day_micros, 86_400_000_000.0);
+        assert_abs_diff_eq!(micros_to_secs(day_micros), day_secs);
     }
 
     #[test]
@@ -156,7 +157,7 @@ mod tests {
         // 0.0001 seconds = 100 microseconds
         let sub_ms = 0.0001;
         let micros = secs_to_micros(sub_ms);
-        assert_eq!(micros, 100.0);
-        assert_eq!(micros_to_secs(micros), sub_ms);
+        assert_abs_diff_eq!(micros, 100.0);
+        assert_abs_diff_eq!(micros_to_secs(micros), sub_ms);
     }
 }

@@ -325,6 +325,7 @@ pub fn centered_error_view<Message: Clone + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_ne;
 
     #[derive(Debug, Clone)]
     enum TestMessage {
@@ -338,9 +339,9 @@ mod tests {
         let warning_color = ErrorSeverity::Warning.color();
         let info_color = ErrorSeverity::Info.color();
 
-        assert_ne!(error_color.r, warning_color.r);
-        assert_ne!(warning_color.r, info_color.r);
-        assert_ne!(error_color.r, info_color.r);
+        assert_abs_diff_ne!(error_color.r, warning_color.r);
+        assert_abs_diff_ne!(warning_color.r, info_color.r);
+        assert_abs_diff_ne!(error_color.r, info_color.r);
     }
 
     #[test]

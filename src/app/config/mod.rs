@@ -793,9 +793,10 @@ mod tests {
 
     #[test]
     fn volume_constants_are_valid() {
-        assert_eq!(DEFAULT_VOLUME, 0.8);
-        assert_eq!(MIN_VOLUME, 0.0);
-        assert_eq!(MAX_VOLUME, 1.5); // 150% amplification
+        use crate::test_utils::assert_abs_diff_eq;
+        assert_abs_diff_eq!(DEFAULT_VOLUME, 0.8);
+        assert_abs_diff_eq!(MIN_VOLUME, 0.0);
+        assert_abs_diff_eq!(MAX_VOLUME, 1.5); // 150% amplification
         let step = VOLUME_STEP;
         let default = DEFAULT_VOLUME;
         let min = MIN_VOLUME;

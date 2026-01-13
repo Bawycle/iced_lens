@@ -236,13 +236,14 @@ mod tests {
 
     #[test]
     fn scaled_size_respects_zoom_percent() {
+        use crate::test_utils::assert_abs_diff_eq;
         let media = sample_media();
         let viewport = viewport_with_bounds();
         let state = ViewerState::new(Some(&media), &viewport, 200.0, None);
 
         let size = state.scaled_media_size().expect("size");
-        assert_eq!(size.width, 2.0);
-        assert_eq!(size.height, 2.0);
+        assert_abs_diff_eq!(size.width, 2.0);
+        assert_abs_diff_eq!(size.height, 2.0);
     }
 
     #[test]

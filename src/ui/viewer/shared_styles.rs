@@ -74,11 +74,12 @@ const _: () = {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
     use crate::ui::design_tokens::{sizing, spacing};
 
     #[test]
     fn constants_use_design_tokens() {
-        assert_eq!(CONTROL_SPACING, spacing::XS);
-        assert_eq!(ICON_SIZE, sizing::ICON_LG);
+        assert_abs_diff_eq!(CONTROL_SPACING, spacing::XS);
+        assert_abs_diff_eq!(ICON_SIZE, sizing::ICON_LG);
     }
 }

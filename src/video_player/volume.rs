@@ -80,17 +80,18 @@ impl Default for Volume {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
 
     #[test]
     fn new_clamps_to_valid_range() {
-        assert_eq!(Volume::new(-0.5).value(), MIN_VOLUME);
-        assert_eq!(Volume::new(1.5).value(), MAX_VOLUME);
-        assert_eq!(Volume::new(0.5).value(), 0.5);
+        assert_abs_diff_eq!(Volume::new(-0.5).value(), MIN_VOLUME);
+        assert_abs_diff_eq!(Volume::new(1.5).value(), MAX_VOLUME);
+        assert_abs_diff_eq!(Volume::new(0.5).value(), 0.5);
     }
 
     #[test]
     fn default_is_expected_volume() {
-        assert_eq!(Volume::default().value(), DEFAULT_VOLUME);
+        assert_abs_diff_eq!(Volume::default().value(), DEFAULT_VOLUME);
     }
 
     #[test]
@@ -105,22 +106,22 @@ mod tests {
     fn increase_adds_step() {
         let vol = Volume::new(0.5);
         let louder = vol.increase();
-        assert!((louder.value() - (0.5 + VOLUME_STEP)).abs() < 0.001);
+        assert_abs_diff_eq!(louder.value(), 0.5 + VOLUME_STEP, epsilon = 0.001);
 
         // At max, stays at max
         let max_vol = Volume::new(MAX_VOLUME);
-        assert_eq!(max_vol.increase().value(), MAX_VOLUME);
+        assert_abs_diff_eq!(max_vol.increase().value(), MAX_VOLUME);
     }
 
     #[test]
     fn decrease_subtracts_step() {
         let vol = Volume::new(0.5);
         let quieter = vol.decrease();
-        assert!((quieter.value() - (0.5 - VOLUME_STEP)).abs() < 0.001);
+        assert_abs_diff_eq!(quieter.value(), 0.5 - VOLUME_STEP, epsilon = 0.001);
 
         // At min, stays at min
         let min_vol = Volume::new(MIN_VOLUME);
-        assert_eq!(min_vol.decrease().value(), MIN_VOLUME);
+        assert_abs_diff_eq!(min_vol.decrease().value(), MIN_VOLUME);
     }
 
     #[test]

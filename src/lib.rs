@@ -19,6 +19,9 @@ pub use app::config;
 pub use app::i18n;
 
 #[cfg(test)]
+pub mod test_utils;
+
+#[cfg(test)]
 mod tests {
     // This is where common library tests can go
 }

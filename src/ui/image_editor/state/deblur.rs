@@ -142,13 +142,14 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
 
     #[test]
     fn deblur_state_default_not_busy() {
         let state = DeblurState::default();
         assert!(!state.is_busy());
         assert!(!state.is_processing);
-        assert_eq!(state.progress, 0.0);
+        assert_abs_diff_eq!(state.progress, 0.0);
         assert!(!state.cancel_requested);
     }
 
@@ -159,7 +160,7 @@ mod tests {
 
         assert!(state.is_busy());
         assert!(state.is_processing);
-        assert_eq!(state.progress, 0.0);
+        assert_abs_diff_eq!(state.progress, 0.0);
         assert!(!state.cancel_requested);
     }
 
@@ -169,13 +170,13 @@ mod tests {
         state.start_processing();
 
         state.set_progress(0.5);
-        assert_eq!(state.progress, 0.5);
+        assert_abs_diff_eq!(state.progress, 0.5);
 
         state.set_progress(1.5);
-        assert_eq!(state.progress, 1.0);
+        assert_abs_diff_eq!(state.progress, 1.0);
 
         state.set_progress(-0.5);
-        assert_eq!(state.progress, 0.0);
+        assert_abs_diff_eq!(state.progress, 0.0);
     }
 
     #[test]
@@ -202,7 +203,7 @@ mod tests {
         state.finish_processing();
 
         assert!(!state.is_busy());
-        assert_eq!(state.progress, 0.0);
+        assert_abs_diff_eq!(state.progress, 0.0);
         assert!(!state.cancel_requested);
     }
 }

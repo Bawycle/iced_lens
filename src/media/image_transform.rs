@@ -444,32 +444,35 @@ mod tests {
     #[test]
     fn resize_scale_clamps_to_valid_range() {
         use crate::app::config::{MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT};
+        use crate::test_utils::assert_abs_diff_eq;
 
         // Below minimum
         let too_small = ResizeScale::new(5.0);
-        assert_eq!(too_small.value(), MIN_RESIZE_SCALE_PERCENT);
+        assert_abs_diff_eq!(too_small.value(), MIN_RESIZE_SCALE_PERCENT);
 
         // Above maximum
         let too_large = ResizeScale::new(1000.0);
-        assert_eq!(too_large.value(), MAX_RESIZE_SCALE_PERCENT);
+        assert_abs_diff_eq!(too_large.value(), MAX_RESIZE_SCALE_PERCENT);
 
         // Valid value
         let valid = ResizeScale::new(150.0);
-        assert_eq!(valid.value(), 150.0);
+        assert_abs_diff_eq!(valid.value(), 150.0);
     }
 
     #[test]
     fn resize_scale_default_is_100_percent() {
+        use crate::test_utils::assert_abs_diff_eq;
         let scale = ResizeScale::default();
-        assert_eq!(scale.value(), 100.0);
+        assert_abs_diff_eq!(scale.value(), 100.0);
         assert!(scale.is_original());
     }
 
     #[test]
     fn resize_scale_as_factor_converts_correctly() {
-        assert_eq!(ResizeScale::new(100.0).as_factor(), 1.0);
-        assert_eq!(ResizeScale::new(200.0).as_factor(), 2.0);
-        assert_eq!(ResizeScale::new(50.0).as_factor(), 0.5);
+        use crate::test_utils::assert_abs_diff_eq;
+        assert_abs_diff_eq!(ResizeScale::new(100.0).as_factor(), 1.0);
+        assert_abs_diff_eq!(ResizeScale::new(200.0).as_factor(), 2.0);
+        assert_abs_diff_eq!(ResizeScale::new(50.0).as_factor(), 0.5);
     }
 
     #[test]

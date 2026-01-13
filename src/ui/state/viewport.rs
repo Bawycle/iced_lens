@@ -112,13 +112,14 @@ impl ViewportState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
     use iced::{Point, Size};
 
     #[test]
     fn default_viewport_has_zero_offset() {
         let state = ViewportState::default();
-        assert_eq!(state.offset.x, 0.0);
-        assert_eq!(state.offset.y, 0.0);
+        assert_abs_diff_eq!(state.offset.x, 0.0);
+        assert_abs_diff_eq!(state.offset.y, 0.0);
         assert!(state.bounds.is_none());
     }
 
@@ -128,12 +129,12 @@ mod tests {
         let bounds = Rectangle::new(Point::new(0.0, 0.0), Size::new(400.0, 300.0));
 
         state.update(bounds, AbsoluteOffset { x: 10.0, y: 5.0 });
-        assert_eq!(state.previous_offset.x, 0.0);
-        assert_eq!(state.offset.x, 10.0);
+        assert_abs_diff_eq!(state.previous_offset.x, 0.0);
+        assert_abs_diff_eq!(state.offset.x, 10.0);
 
         state.update(bounds, AbsoluteOffset { x: 20.0, y: 15.0 });
-        assert_eq!(state.previous_offset.x, 10.0);
-        assert_eq!(state.offset.x, 20.0);
+        assert_abs_diff_eq!(state.previous_offset.x, 10.0);
+        assert_abs_diff_eq!(state.offset.x, 20.0);
     }
 
     #[test]

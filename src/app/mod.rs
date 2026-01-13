@@ -1348,13 +1348,14 @@ mod tests {
 
     #[test]
     fn default_zoom_state_is_consistent() {
+        use crate::test_utils::assert_abs_diff_eq;
         let app = App::default();
 
         let zoom = &app.viewer.zoom;
         assert!(zoom.fit_to_window);
-        assert_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert_abs_diff_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert_eq!(zoom.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));
-        assert_eq!(zoom.zoom_step.value(), DEFAULT_ZOOM_STEP_PERCENT);
+        assert_abs_diff_eq!(zoom.zoom_step.value(), DEFAULT_ZOOM_STEP_PERCENT);
         assert_eq!(
             app.settings.background_theme(),
             config::BackgroundTheme::default()
@@ -1363,6 +1364,7 @@ mod tests {
 
     #[test]
     fn zoom_step_changes_commit_when_leaving_settings() {
+        use crate::test_utils::assert_abs_diff_eq;
         with_temp_config_dir(|_| {
             let mut app = App {
                 screen: Screen::Settings,
@@ -1375,7 +1377,7 @@ mod tests {
             let _ = app.update(Message::SwitchScreen(Screen::Viewer));
 
             assert_eq!(app.screen, Screen::Viewer);
-            assert_eq!(app.viewer.zoom_step_percent(), 25.0);
+            assert_abs_diff_eq!(app.viewer.zoom_step_percent(), 25.0);
             assert_eq!(app.settings.zoom_step_input_value(), "25");
             assert!(!app.settings.zoom_step_input_dirty());
             assert!(app.settings.zoom_step_error_key().is_none());
@@ -1384,6 +1386,7 @@ mod tests {
 
     #[test]
     fn invalid_zoom_step_prevents_leaving_settings() {
+        use crate::test_utils::assert_abs_diff_eq;
         with_temp_config_dir(|_| {
             let mut app = App {
                 screen: Screen::Settings,
@@ -1401,12 +1404,13 @@ mod tests {
                 Some(ZOOM_STEP_INVALID_KEY)
             );
             assert!(app.settings.zoom_step_input_dirty());
-            assert_eq!(app.viewer.zoom_step_percent(), DEFAULT_ZOOM_STEP_PERCENT);
+            assert_abs_diff_eq!(app.viewer.zoom_step_percent(), DEFAULT_ZOOM_STEP_PERCENT);
         });
     }
 
     #[test]
     fn out_of_range_zoom_step_shows_error_and_stays_in_settings() {
+        use crate::test_utils::assert_abs_diff_eq;
         with_temp_config_dir(|_| {
             let mut app = App {
                 screen: Screen::Settings,
@@ -1424,7 +1428,7 @@ mod tests {
                 Some(ZOOM_STEP_RANGE_KEY)
             );
             assert!(app.settings.zoom_step_input_dirty());
-            assert_eq!(app.viewer.zoom_step_percent(), DEFAULT_ZOOM_STEP_PERCENT);
+            assert_abs_diff_eq!(app.viewer.zoom_step_percent(), DEFAULT_ZOOM_STEP_PERCENT);
         });
     }
 
@@ -1461,6 +1465,7 @@ mod tests {
 
     #[test]
     fn submitting_valid_zoom_input_updates_zoom() {
+        use crate::test_utils::assert_abs_diff_eq;
         let mut app = App::default();
         let zoom = app.viewer.zoom_state_mut();
         zoom.zoom_input = "150".into();
@@ -1471,8 +1476,8 @@ mod tests {
         )));
 
         let zoom = app.viewer.zoom_state();
-        assert_eq!(zoom.zoom_percent, 150.0);
-        assert_eq!(zoom.manual_zoom_percent, 150.0);
+        assert_abs_diff_eq!(zoom.zoom_percent, 150.0);
+        assert_abs_diff_eq!(zoom.manual_zoom_percent, 150.0);
         assert_eq!(zoom.zoom_input, format_number(150.0));
         assert!(!zoom.fit_to_window);
         assert!(zoom.zoom_input_error_key.is_none());
@@ -1480,6 +1485,7 @@ mod tests {
 
     #[test]
     fn submitting_out_of_range_zoom_clamps_value() {
+        use crate::test_utils::assert_abs_diff_eq;
         let mut app = App::default();
         let zoom = app.viewer.zoom_state_mut();
         zoom.zoom_input = "9999".into();
@@ -1489,14 +1495,15 @@ mod tests {
         )));
 
         let zoom = app.viewer.zoom_state();
-        assert_eq!(zoom.zoom_percent, MAX_ZOOM_PERCENT);
+        assert_abs_diff_eq!(zoom.zoom_percent, MAX_ZOOM_PERCENT);
         assert_eq!(zoom.zoom_input, format_number(MAX_ZOOM_PERCENT));
-        assert_eq!(zoom.manual_zoom_percent, MAX_ZOOM_PERCENT);
+        assert_abs_diff_eq!(zoom.manual_zoom_percent, MAX_ZOOM_PERCENT);
         assert!(!zoom.fit_to_window);
     }
 
     #[test]
     fn submitting_invalid_zoom_sets_error() {
+        use crate::test_utils::assert_abs_diff_eq;
         let mut app = App::default();
         let zoom = app.viewer.zoom_state_mut();
         zoom.fit_to_window = true;
@@ -1507,7 +1514,7 @@ mod tests {
         )));
 
         let zoom = app.viewer.zoom_state();
-        assert_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert_abs_diff_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert!(zoom.fit_to_window);
         assert_eq!(
             zoom.zoom_input_error_key,
@@ -1517,6 +1524,7 @@ mod tests {
 
     #[test]
     fn reset_zoom_restores_defaults() {
+        use crate::test_utils::assert_abs_diff_eq;
         let mut app = App::default();
         let zoom = app.viewer.zoom_state_mut();
         zoom.zoom_percent = 250.0;
@@ -1529,14 +1537,15 @@ mod tests {
         )));
 
         let zoom = app.viewer.zoom_state();
-        assert_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
-        assert_eq!(zoom.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert_abs_diff_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
+        assert_abs_diff_eq!(zoom.manual_zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert_eq!(zoom.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));
         assert!(!zoom.fit_to_window);
     }
 
     #[test]
     fn toggling_fit_to_window_updates_zoom() {
+        use crate::test_utils::assert_abs_diff_eq;
         let mut app = App::default();
         let _ = app.viewer.handle_message(
             component::Message::MediaLoaded(Ok(build_media(2000, 1000))),
@@ -1558,7 +1567,7 @@ mod tests {
         let zoom = app.viewer.zoom_state();
         assert!(zoom.fit_to_window);
         let fit_zoom = app.viewer.compute_fit_zoom_percent().unwrap();
-        assert_eq!(zoom.zoom_percent, fit_zoom);
+        assert_abs_diff_eq!(zoom.zoom_percent, fit_zoom);
         assert_eq!(zoom.zoom_input, format_number(fit_zoom));
     }
 
@@ -1586,6 +1595,7 @@ mod tests {
 
     #[test]
     fn wheel_scroll_applies_zoom_step_when_over_image() {
+        use crate::test_utils::assert_abs_diff_eq;
         let mut app = App::default();
         app.viewer.set_zoom_step_percent(15.0);
         let zoom = app.viewer.zoom_state_mut();
@@ -1609,13 +1619,14 @@ mod tests {
         }));
 
         let zoom = app.viewer.zoom_state();
-        assert_eq!(zoom.zoom_percent, 115.0);
-        assert_eq!(zoom.manual_zoom_percent, 115.0);
+        assert_abs_diff_eq!(zoom.zoom_percent, 115.0);
+        assert_abs_diff_eq!(zoom.manual_zoom_percent, 115.0);
         assert!(!zoom.fit_to_window);
     }
 
     #[test]
     fn wheel_scroll_ignored_when_cursor_not_over_image() {
+        use crate::test_utils::assert_abs_diff_eq;
         let mut app = App::default();
         app.viewer.set_zoom_step_percent(20.0);
 
@@ -1646,8 +1657,8 @@ mod tests {
         }));
 
         let zoom = app.viewer.zoom_state();
-        assert_eq!(zoom.zoom_percent, 150.0);
-        assert_eq!(zoom.manual_zoom_percent, 150.0);
+        assert_abs_diff_eq!(zoom.zoom_percent, 150.0);
+        assert_abs_diff_eq!(zoom.manual_zoom_percent, 150.0);
         assert!(!zoom.fit_to_window);
     }
 

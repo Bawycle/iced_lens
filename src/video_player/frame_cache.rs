@@ -449,6 +449,7 @@ impl std::fmt::Debug for FrameCache {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
     use crate::video_player::time_units::micros_to_pts;
 
     fn create_test_frame(pts_secs: f64, size: usize) -> DecodedFrame {
@@ -479,7 +480,7 @@ mod tests {
 
         let retrieved = cache.get(1.0);
         assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().pts_secs, 1.0);
+        assert_abs_diff_eq!(retrieved.unwrap().pts_secs, 1.0);
     }
 
     #[test]
@@ -532,7 +533,7 @@ mod tests {
         // Search for 1.01 seconds (10ms away, within 50ms tolerance)
         let found = cache.get_nearest(1.01);
         assert!(found.is_some());
-        assert_eq!(found.unwrap().pts_secs, 1.0);
+        assert_abs_diff_eq!(found.unwrap().pts_secs, 1.0);
     }
 
     #[test]
@@ -559,12 +560,12 @@ mod tests {
         // Should find frame at 2.0 when seeking to 2.5
         let found = cache.get_at_or_before(2.5);
         assert!(found.is_some());
-        assert_eq!(found.unwrap().pts_secs, 2.0);
+        assert_abs_diff_eq!(found.unwrap().pts_secs, 2.0);
 
         // Should find frame at 1.0 when seeking to 1.0
         let found = cache.get_at_or_before(1.0);
         assert!(found.is_some());
-        assert_eq!(found.unwrap().pts_secs, 1.0);
+        assert_abs_diff_eq!(found.unwrap().pts_secs, 1.0);
     }
 
     #[test]
@@ -598,7 +599,7 @@ mod tests {
         assert_eq!(cache.stats().misses, 1);
 
         // Hit rate should be 50%
-        assert!((cache.stats().hit_rate() - 50.0).abs() < 0.01);
+        assert_abs_diff_eq!(cache.stats().hit_rate(), 50.0, epsilon = 0.01);
     }
 
     #[test]
@@ -608,7 +609,7 @@ mod tests {
         let back = micros_to_pts(micros);
 
         // Should be accurate to microsecond precision
-        assert!((pts_secs - back).abs() < 0.000_001);
+        assert_abs_diff_eq!(pts_secs, back, epsilon = 0.000_001);
     }
 
     #[test]

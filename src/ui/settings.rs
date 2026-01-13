@@ -1434,6 +1434,7 @@ fn parse_number(input: &str) -> Option<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::assert_abs_diff_eq;
 
     #[test]
     fn new_state_clamps_zoom_step() {
@@ -1444,7 +1445,7 @@ mod tests {
             ..StateConfig::default()
         };
         let state = State::new(config);
-        assert_eq!(state.zoom_step_percent, MAX_ZOOM_STEP_PERCENT);
+        assert_abs_diff_eq!(state.zoom_step_percent, MAX_ZOOM_STEP_PERCENT);
         assert_eq!(state.zoom_step_input, format_number(MAX_ZOOM_STEP_PERCENT));
     }
 
@@ -1471,7 +1472,7 @@ mod tests {
         let mut state = State::default();
         state.update(Message::ZoomStepInputChanged("15".into()));
         let result = state.ensure_zoom_step_committed().unwrap();
-        assert_eq!(result, Some(15.0));
-        assert_eq!(state.zoom_step_percent, 15.0);
+        assert_abs_diff_eq!(result.unwrap(), 15.0);
+        assert_abs_diff_eq!(state.zoom_step_percent, 15.0);
     }
 }
