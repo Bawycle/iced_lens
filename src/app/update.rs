@@ -26,6 +26,7 @@ use crate::video_player::KeyboardSeekStep;
 pub use crate::ui::viewer::NavigationDirection;
 use iced::{window, Point, Size, Task};
 use std::path::PathBuf;
+use std::time::Instant;
 
 /// Navigation mode determines which media types to include.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,6 +126,12 @@ pub struct UpdateContext<'a> {
     pub prefetch_cache: &'a mut media::prefetch::ImagePrefetchCache,
     /// Handle for logging diagnostic events.
     pub diagnostics: &'a DiagnosticsHandle,
+    /// Timestamp when AI deblur operation started (for duration tracking).
+    pub deblur_started_at: &'a mut Option<Instant>,
+    /// Timestamp when AI upscale operation started (for duration tracking).
+    pub upscale_started_at: &'a mut Option<Instant>,
+    /// Scale factor for current upscale operation.
+    pub upscale_scale_factor: &'a mut Option<f32>,
 }
 
 impl UpdateContext<'_> {
@@ -755,6 +762,13 @@ fn handle_deblur_request(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         return Task::none();
     };
 
+    // Store start time for duration tracking
+    *ctx.deblur_started_at = Some(Instant::now());
+
+    // Log state event for diagnostics
+    ctx.diagnostics
+        .log_state(AppStateEvent::EditorDeblurStarted);
+
     // Get the current working image from the editor
     let working_image = editor_state.working_image().clone();
 
@@ -798,6 +812,18 @@ fn handle_upscale_resize_request(
     if use_ai_upscale {
         // Get the current working image from the editor
         let working_image = editor_state.working_image().clone();
+
+        // Store start time and calculate scale factor for duration tracking
+        *ctx.upscale_started_at = Some(Instant::now());
+        // Precision/truncation acceptable for ratio calculation (scale_factor is approximate)
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+        let scale_factor = {
+            let original_pixels =
+                f64::from(working_image.width()) * f64::from(working_image.height());
+            let target_pixels = f64::from(target_width) * f64::from(target_height);
+            (target_pixels / original_pixels).sqrt() as f32
+        };
+        *ctx.upscale_scale_factor = Some(scale_factor);
 
         // Run the AI upscale + Lanczos resize in a blocking task
         Task::perform(

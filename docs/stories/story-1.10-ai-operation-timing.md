@@ -1,7 +1,7 @@
 # Story 1.10: AI Operation Timing Instrumentation
 
 **Epic:** 1 - Diagnostics Core & Data Collection
-**Status:** Ready
+**Status:** Done
 **Priority:** Medium
 **Estimate:** 1.5 hours
 **Depends On:** Story 1.7
@@ -43,49 +43,46 @@
 ## Tasks
 
 ### Task 1: Add Timing Fields to App State (AC: 5)
-- [ ] In `src/app/mod.rs`, add timing fields to `App` struct:
-  - [ ] `deblur_started_at: Option<Instant>`
-  - [ ] `upscale_started_at: Option<Instant>`
-  - [ ] `upscale_scale_factor: Option<f32>`
-- [ ] Initialize to `None` in `App::new()`
+- [x] In `src/app/mod.rs`, add timing fields to `App` struct:
+  - [x] `deblur_started_at: Option<Instant>`
+  - [x] `upscale_started_at: Option<Instant>`
+  - [x] `upscale_scale_factor: Option<f32>`
+- [x] Initialize to `None` in `App::new()`
 
 ### Task 2: Instrument AI Deblur Start (AC: 1, 5)
-- [ ] In `src/app/update.rs`, `handle_editor_event()` for `ApplyDeblur` (~line 740):
-  - [ ] Store `Instant::now()` in `app.deblur_started_at`
-  - [ ] Call `ctx.diagnostics.log_state(AppStateEvent::EditorDeblurStarted)`
-- [ ] Call `handle_deblur_request()` as before
+- [x] In `src/app/update.rs`, `handle_deblur_request()`:
+  - [x] Store `Instant::now()` in `ctx.deblur_started_at`
+  - [x] Call `ctx.diagnostics.log_state(AppStateEvent::EditorDeblurStarted)`
 
 ### Task 3: Instrument AI Deblur Completion (AC: 2, 3, 6)
-- [ ] In `src/app/mod.rs`, `handle_deblur_apply_completed()` (~line 759):
-  - [ ] Calculate `duration_ms` from `deblur_started_at`
-  - [ ] Calculate `size_category` from image dimensions
-  - [ ] On success: `log_operation(AIDeblurProcess { duration_ms, size_category, success: true })`
-  - [ ] On success: `log_state(EditorDeblurCompleted)`
-  - [ ] On error: `log_operation(AIDeblurProcess { ..., success: false })`
-  - [ ] On cancel: `log_state(EditorDeblurCancelled)` (if applicable)
+- [x] In `src/app/mod.rs`, `handle_deblur_apply_completed()`:
+  - [x] Calculate `duration_ms` from `deblur_started_at`
+  - [x] Calculate `size_category` from image dimensions
+  - [x] On success: `log_operation(AIDeblurProcess { duration_ms, size_category, success: true })`
+  - [x] On success: `log_state(EditorDeblurCompleted)`
+  - [x] On error: `log_operation(AIDeblurProcess { ..., success: false })`
 
 ### Task 4: Instrument AI Upscale Start (AC: 5)
-- [ ] In `src/app/update.rs`, `handle_upscale_resize_request()` (~line 789):
-  - [ ] Store `Instant::now()` in `app.upscale_started_at`
-  - [ ] Calculate and store `scale_factor` before async task
-  - [ ] Note: No state event for upscale start (not in AC)
+- [x] In `src/app/update.rs`, `handle_upscale_resize_request()`:
+  - [x] Store `Instant::now()` in `ctx.upscale_started_at`
+  - [x] Calculate and store `scale_factor` before async task
 
 ### Task 5: Instrument AI Upscale Completion (AC: 4, 6)
-- [ ] In `src/app/mod.rs`, `handle_upscale_resize_completed()` (~line 791):
-  - [ ] Calculate `duration_ms` from `upscale_started_at`
-  - [ ] Calculate `size_category` from original image dimensions
-  - [ ] Retrieve stored `scale_factor`
-  - [ ] On success: `log_operation(AIUpscaleProcess { duration_ms, scale_factor, size_category, success: true })`
-  - [ ] On error: `log_operation(AIUpscaleProcess { ..., success: false })`
+- [x] In `src/app/mod.rs`, `handle_upscale_resize_completed()`:
+  - [x] Calculate `duration_ms` from `upscale_started_at`
+  - [x] Calculate `size_category` from original image dimensions
+  - [x] Retrieve stored `scale_factor`
+  - [x] On success: `log_operation(AIUpscaleProcess { duration_ms, scale_factor, size_category, success: true })`
+  - [x] On error: `log_operation(AIUpscaleProcess { ..., success: false })`
 
 ### Task 6: Run Validation (AC: 7)
-- [ ] `cargo fmt --all`
-- [ ] `cargo clippy --all --all-targets -- -D warnings`
-- [ ] `cargo test`
+- [x] `cargo fmt --all`
+- [x] `cargo clippy --all --all-targets -- -D warnings`
+- [x] `cargo test`
 
 ### Task 7: Commit Changes
-- [ ] Stage all changes
-- [ ] Commit with message: `feat(diagnostics): instrument AI operations [Story 1.10]`
+- [x] Stage all changes
+- [x] Commit with message: `feat(diagnostics): instrument AI operations [Story 1.10]`
 
 ---
 
@@ -386,10 +383,17 @@ fn ai_operation_duration_is_positive() {
 
 ## Dev Agent Record
 
+### File List
+| File | Action | Description |
+|------|--------|-------------|
+| `src/app/mod.rs` | Modified | Added timing fields, instrumented deblur/upscale completion handlers |
+| `src/app/update.rs` | Modified | Added timing fields to UpdateContext, instrumented deblur/upscale start |
+
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-13 | Story created from Story 1.8 split | Claude Opus 4.5 |
 | 2026-01-13 | PO Validation: Added comprehensive Dev Notes, Testing section, Task-AC mappings, async timing strategy | PO Validation |
+| 2026-01-13 | Implementation complete: all ACs implemented, tests passing | Dev (Claude Opus 4.5) |
 
 ---

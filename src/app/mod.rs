@@ -21,7 +21,7 @@ mod view;
 pub use message::{Flags, Message};
 pub use screen::Screen;
 
-use crate::diagnostics::DiagnosticsCollector;
+use crate::diagnostics::{AppOperation, AppStateEvent, DiagnosticsCollector, SizeCategory};
 use crate::media::metadata::MediaMetadata;
 use crate::media::{self, MaxSkipAttempts, MediaData, MediaNavigator};
 use crate::ui::help;
@@ -36,6 +36,7 @@ use crate::video_player::{create_lufs_cache, SharedLufsCache};
 use i18n::fluent::I18n;
 use iced::{window, Element, Subscription, Task, Theme};
 use std::fmt;
+use std::time::Instant;
 
 /// Root Iced application state that bridges UI components, localization, and
 /// persisted preferences.
@@ -87,6 +88,12 @@ pub struct App {
     prefetch_cache: media::prefetch::ImagePrefetchCache,
     /// Diagnostics collector for capturing application events.
     diagnostics: DiagnosticsCollector,
+    /// Timestamp when AI deblur operation started (for duration tracking).
+    deblur_started_at: Option<Instant>,
+    /// Timestamp when AI upscale operation started (for duration tracking).
+    upscale_started_at: Option<Instant>,
+    /// Scale factor for current upscale operation (stored at start for completion handler).
+    upscale_scale_factor: Option<f32>,
 }
 
 impl fmt::Debug for App {
@@ -183,6 +190,9 @@ impl Default for App {
             cancellation_token: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             prefetch_cache: media::prefetch::ImagePrefetchCache::with_defaults(),
             diagnostics: DiagnosticsCollector::default(),
+            deblur_started_at: None,
+            upscale_started_at: None,
+            upscale_scale_factor: None,
         }
     }
 }
@@ -538,6 +548,9 @@ impl App {
             cancellation_token: &self.cancellation_token,
             prefetch_cache: &mut self.prefetch_cache,
             diagnostics: &diagnostics_handle,
+            deblur_started_at: &mut self.deblur_started_at,
+            upscale_started_at: &mut self.upscale_started_at,
+            upscale_scale_factor: &mut self.upscale_scale_factor,
         };
 
         match message {
@@ -765,9 +778,34 @@ impl App {
             return Task::none();
         }
 
+        // Calculate duration from start time
+        // Truncation is safe: millis won't exceed u64::MAX for practical durations
+        #[allow(clippy::cast_possible_truncation)]
+        let duration_ms = self
+            .deblur_started_at
+            .take()
+            .map_or(0, |start| start.elapsed().as_millis() as u64);
+
+        let diagnostics_handle = self.diagnostics.handle();
+
         if let Some(editor) = self.image_editor.as_mut() {
+            // Calculate size category from image dimensions (RGBA = 4 bytes per pixel)
+            let (w, h) = (
+                editor.working_image().width(),
+                editor.working_image().height(),
+            );
+            let size_category = SizeCategory::from_bytes(u64::from(w) * u64::from(h) * 4);
+
             match result {
                 Ok(deblurred_image) => {
+                    // Log operation with success
+                    diagnostics_handle.log_operation(AppOperation::AIDeblurProcess {
+                        duration_ms,
+                        size_category,
+                        success: true,
+                    });
+                    diagnostics_handle.log_state(AppStateEvent::EditorDeblurCompleted);
+
                     editor.apply_deblur_result(*deblurred_image);
                     self.notifications
                         .push(notifications::Notification::success(
@@ -775,6 +813,13 @@ impl App {
                         ));
                 }
                 Err(e) => {
+                    // Log operation with failure
+                    diagnostics_handle.log_operation(AppOperation::AIDeblurProcess {
+                        duration_ms,
+                        size_category,
+                        success: false,
+                    });
+
                     editor.deblur_failed();
                     self.notifications.push(
                         notifications::Notification::error("notification-deblur-apply-error")
@@ -797,9 +842,35 @@ impl App {
             return Task::none();
         }
 
+        // Calculate duration from start time
+        // Truncation is safe: millis won't exceed u64::MAX for practical durations
+        #[allow(clippy::cast_possible_truncation)]
+        let duration_ms = self
+            .upscale_started_at
+            .take()
+            .map_or(0, |start| start.elapsed().as_millis() as u64);
+
+        let scale_factor = self.upscale_scale_factor.take().unwrap_or(1.0);
+        let diagnostics_handle = self.diagnostics.handle();
+
         if let Some(editor) = self.image_editor.as_mut() {
+            // Calculate size category from original image dimensions (RGBA = 4 bytes per pixel)
+            let (w, h) = (
+                editor.working_image().width(),
+                editor.working_image().height(),
+            );
+            let size_category = SizeCategory::from_bytes(u64::from(w) * u64::from(h) * 4);
+
             match result {
                 Ok(upscaled_image) => {
+                    // Log operation with success
+                    diagnostics_handle.log_operation(AppOperation::AIUpscaleProcess {
+                        duration_ms,
+                        scale_factor,
+                        size_category,
+                        success: true,
+                    });
+
                     // apply_upscale_resize_result clears the processing state
                     editor.apply_upscale_resize_result(*upscaled_image);
                     self.notifications
@@ -808,6 +879,14 @@ impl App {
                         ));
                 }
                 Err(e) => {
+                    // Log operation with failure
+                    diagnostics_handle.log_operation(AppOperation::AIUpscaleProcess {
+                        duration_ms,
+                        scale_factor,
+                        size_category,
+                        success: false,
+                    });
+
                     // Clear processing state on error
                     editor.clear_upscale_processing();
                     self.notifications.push(
