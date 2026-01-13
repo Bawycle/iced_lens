@@ -24,5 +24,8 @@ mod resource_collector;
 
 pub use buffer::{BufferCapacity, CircularBuffer};
 pub use collector::{DiagnosticsCollector, DiagnosticsHandle};
-pub use events::{DiagnosticEvent, DiagnosticEventKind, UserAction};
+pub use events::{
+    AIModel, AppOperation, AppStateEvent, DiagnosticEvent, DiagnosticEventKind, EditorTool,
+    MediaType, SizeCategory, UserAction,
+};
 pub use resource_collector::{ResourceCollector, ResourceMetrics, SamplingInterval};

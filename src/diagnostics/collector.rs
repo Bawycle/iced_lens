@@ -7,8 +7,8 @@
 use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
 
 use super::{
-    BufferCapacity, CircularBuffer, DiagnosticEvent, DiagnosticEventKind, ResourceMetrics,
-    UserAction,
+    AppOperation, AppStateEvent, BufferCapacity, CircularBuffer, DiagnosticEvent,
+    DiagnosticEventKind, ResourceMetrics, UserAction,
 };
 
 /// Handle for sending diagnostic events to the collector.
@@ -64,6 +64,24 @@ impl DiagnosticsHandle {
         let event = DiagnosticEvent::new(DiagnosticEventKind::Error {
             message: message.into(),
         });
+        let _ = self.event_tx.try_send(event);
+    }
+
+    /// Logs an application state change event.
+    ///
+    /// This method is non-blocking and will drop the event if the
+    /// internal channel is full (backpressure protection).
+    pub fn log_state(&self, state: AppStateEvent) {
+        let event = DiagnosticEvent::new(DiagnosticEventKind::AppState { state });
+        let _ = self.event_tx.try_send(event);
+    }
+
+    /// Logs an application operation event with performance metrics.
+    ///
+    /// This method is non-blocking and will drop the event if the
+    /// internal channel is full (backpressure protection).
+    pub fn log_operation(&self, operation: AppOperation) {
+        let event = DiagnosticEvent::new(DiagnosticEventKind::Operation { operation });
         let _ = self.event_tx.try_send(event);
     }
 
@@ -147,6 +165,24 @@ impl DiagnosticsCollector {
     /// Logs an action with details directly to the buffer.
     pub fn log_action_with_details(&mut self, action: UserAction, details: Option<String>) {
         let event = DiagnosticEvent::new(DiagnosticEventKind::UserAction { action, details });
+        self.buffer.push(event);
+    }
+
+    /// Logs a state change directly to the buffer (bypassing the channel).
+    ///
+    /// Use this for synchronous logging when you have direct access
+    /// to the collector (e.g., in the main update loop).
+    pub fn log_state(&mut self, state: AppStateEvent) {
+        let event = DiagnosticEvent::new(DiagnosticEventKind::AppState { state });
+        self.buffer.push(event);
+    }
+
+    /// Logs an operation directly to the buffer (bypassing the channel).
+    ///
+    /// Use this for synchronous logging when you have direct access
+    /// to the collector (e.g., in the main update loop).
+    pub fn log_operation(&mut self, operation: AppOperation) {
+        let event = DiagnosticEvent::new(DiagnosticEventKind::Operation { operation });
         self.buffer.push(event);
     }
 
@@ -414,5 +450,101 @@ mod tests {
         assert!(json.contains("\"type\":\"user_action\""));
         assert!(json.contains("\"action\":\"toggle_fullscreen\""));
         assert!(json.contains("\"details\":\"keyboard shortcut\""));
+    }
+
+    #[test]
+    fn collector_log_state_stores_event() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+
+        collector.log_state(AppStateEvent::VideoPlaying {
+            position_secs: 10.5,
+        });
+
+        assert_eq!(collector.len(), 1);
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::AppState { state } => {
+                assert!(matches!(state, AppStateEvent::VideoPlaying { .. }));
+            }
+            _ => panic!("expected AppState event"),
+        }
+    }
+
+    #[test]
+    fn collector_log_operation_stores_event() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+
+        collector.log_operation(AppOperation::DecodeFrame { duration_ms: 16 });
+
+        assert_eq!(collector.len(), 1);
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Operation { operation } => {
+                assert!(matches!(operation, AppOperation::DecodeFrame { .. }));
+            }
+            _ => panic!("expected Operation event"),
+        }
+    }
+
+    #[test]
+    fn handle_log_state_sends_to_collector() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_state(AppStateEvent::EditorOpened { tool: None });
+
+        // Event is in channel, not yet in buffer
+        assert!(collector.is_empty());
+
+        // Process pending events
+        collector.process_pending();
+
+        assert_eq!(collector.len(), 1);
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::AppState { state } => {
+                assert!(matches!(state, AppStateEvent::EditorOpened { .. }));
+            }
+            _ => panic!("expected AppState event"),
+        }
+    }
+
+    #[test]
+    fn handle_log_operation_sends_to_collector() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        handle.log_operation(AppOperation::AIDeblurProcess {
+            duration_ms: 1500,
+            size_category: crate::diagnostics::SizeCategory::Medium,
+            success: true,
+        });
+
+        // Event is in channel, not yet in buffer
+        assert!(collector.is_empty());
+
+        // Process pending events
+        collector.process_pending();
+
+        assert_eq!(collector.len(), 1);
+
+        let event = collector.iter().next().unwrap();
+        match &event.kind {
+            DiagnosticEventKind::Operation { operation } => match operation {
+                AppOperation::AIDeblurProcess {
+                    duration_ms,
+                    success,
+                    ..
+                } => {
+                    assert_eq!(*duration_ms, 1500);
+                    assert!(*success);
+                }
+                _ => panic!("expected AIDeblurProcess operation"),
+            },
+            _ => panic!("expected Operation event"),
+        }
     }
 }
