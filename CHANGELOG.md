@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Image prefetching:** adjacent images are preloaded in the background for faster navigation. Uses an LRU cache (32 MB default) to store 2 images ahead and 2 behind current position.
 - **Metadata preservation options:** checkboxes in the editor sidebar to control metadata when saving.
   - Add software tag and modification date (default: on)
   - Strip GPS location data (shown only if image has GPS coordinates)
@@ -15,9 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Editable processing metadata:** software and modification date fields can now be edited in the metadata panel, like other metadata fields.
 
 ### Changed
+- Directory scanning is now asynchronous, preventing UI freezes when opening folders with many files (especially with date-based sorting).
 - AI model validation (for deblur and upscale) is now deferred until the user first enters the image editor. This avoids CPU-intensive operations at startup, especially when the user frequently opens and closes the application without using the editor.
 
 ### Fixed
+- Video player no longer gets stuck after seeking. Previously, A/V sync could skip the target frame, leaving the player unresponsive.
 - Edited images now preserve original metadata (EXIF, XMP, ICC) when saved. Previously, all metadata was lost.
 - EXIF orientation is now automatically reset after rotation/flip transformations.
 - Image editor now correctly saves files with uppercase extensions (`.JPG`, `.PNG`).
