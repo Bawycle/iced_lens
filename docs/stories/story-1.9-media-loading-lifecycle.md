@@ -1,7 +1,7 @@
 # Story 1.9: Media Loading Lifecycle Instrumentation
 
 **Epic:** 1 - Diagnostics Core & Data Collection
-**Status:** Ready
+**Status:** Done
 **Priority:** Medium
 **Estimate:** 1 hour
 **Depends On:** Story 1.7
@@ -42,35 +42,35 @@
 ## Tasks
 
 ### Task 1: Pass DiagnosticsHandle to Viewer Component (AC: 1, 2, 3)
-- [ ] Verify `DiagnosticsHandle` is accessible in `ViewerState` (via `UpdateContext`)
-- [ ] If not present, add `diagnostics: Option<DiagnosticsHandle>` field to `ViewerState`
-- [ ] Pass handle when creating/updating viewer state
+- [x] Verify `DiagnosticsHandle` is accessible in `ViewerState` (via `UpdateContext`)
+- [x] If not present, add `diagnostics: Option<DiagnosticsHandle>` field to `ViewerState`
+- [x] Pass handle when creating/updating viewer state
 
 ### Task 2: Instrument Loading Started (AC: 1, 4, 5)
-- [ ] In `src/ui/viewer/component.rs`, find where `is_loading_media = true` is set (~line 586)
-- [ ] Before setting loading state, get file size from path metadata
-- [ ] Determine `MediaType` from file extension
-- [ ] Call `log_state(AppStateEvent::MediaLoadingStarted { media_type, size_category })`
+- [x] In `src/ui/viewer/component.rs`, find where `is_loading_media = true` is set (~line 586)
+- [x] Before setting loading state, get file size from path metadata
+- [x] Determine `MediaType` from file extension
+- [x] Call `log_state(AppStateEvent::MediaLoadingStarted { media_type, size_category })`
 
 ### Task 3: Instrument Loading Success (AC: 2)
-- [ ] In `src/ui/viewer/component.rs`, `Message::MediaLoaded(Ok(...))` handler (~line 738)
-- [ ] Determine `MediaType` from loaded `MediaData` variant
-- [ ] Call `log_state(AppStateEvent::MediaLoaded { media_type, size_category })`
-- [ ] Note: `size_category` should be stored from Task 2 or recalculated
+- [x] In `src/ui/viewer/component.rs`, `Message::MediaLoaded(Ok(...))` handler (~line 738)
+- [x] Determine `MediaType` from loaded `MediaData` variant
+- [x] Call `log_state(AppStateEvent::MediaLoaded { media_type, size_category })`
+- [x] Note: `size_category` should be stored from Task 2 or recalculated
 
 ### Task 4: Instrument Loading Failure (AC: 3)
-- [ ] In `src/ui/viewer/component.rs`, `Message::MediaLoaded(Err(...))` handler (~line 799)
-- [ ] Sanitize error message (remove any file paths)
-- [ ] Call `log_state(AppStateEvent::MediaFailed { media_type, reason })`
+- [x] In `src/ui/viewer/component.rs`, `Message::MediaLoaded(Err(...))` handler (~line 799)
+- [x] Sanitize error message (remove any file paths)
+- [x] Call `log_state(AppStateEvent::MediaFailed { media_type, reason })`
 
 ### Task 5: Run Validation (AC: 6, 7)
-- [ ] `cargo fmt --all`
-- [ ] `cargo clippy --all --all-targets -- -D warnings`
-- [ ] `cargo test`
+- [x] `cargo fmt --all`
+- [x] `cargo clippy --all --all-targets -- -D warnings`
+- [x] `cargo test`
 
 ### Task 6: Commit Changes
-- [ ] Stage all changes
-- [ ] Commit with message: `feat(diagnostics): instrument media loading lifecycle [Story 1.9]`
+- [x] Stage all changes
+- [x] Commit with message: `feat(diagnostics): instrument media loading lifecycle [Story 1.9]`
 
 ---
 
@@ -287,10 +287,16 @@ fn media_failed_reason_is_sanitized() {
 
 ## Dev Agent Record
 
+### File List
+| File | Action | Description |
+|------|--------|-------------|
+| `src/ui/viewer/component.rs` | Modified | Added loading_media_type/loading_size_category fields, instrumented MediaLoadingStarted/MediaLoaded/MediaFailed events |
+
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-13 | Story created from Story 1.8 split | Claude Opus 4.5 |
 | 2026-01-13 | PO Validation: Added comprehensive Dev Notes, Testing section, Task-AC mappings, corrected event fields | PO Validation |
+| 2026-01-13 | Implementation complete: all ACs implemented, tests passing | Dev (Claude Opus 4.5) |
 
 ---

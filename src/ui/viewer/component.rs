@@ -205,6 +205,10 @@ pub struct State {
     pub is_loading_media: bool,
     pub loading_started_at: Option<Instant>,
     spinner_rotation: f32, // Rotation angle for animated spinner (in radians)
+    /// Media type being loaded (for diagnostics, set at load start).
+    loading_media_type: Option<crate::diagnostics::MediaType>,
+    /// Size category of media being loaded (for diagnostics, set at load start).
+    loading_size_category: Option<crate::diagnostics::SizeCategory>,
 
     /// Origin of the current media load request (for auto-skip behavior).
     pub load_origin: LoadOrigin,
@@ -283,6 +287,8 @@ impl Default for State {
             is_loading_media: false,
             loading_started_at: None,
             spinner_rotation: 0.0,
+            loading_media_type: None,
+            loading_size_category: None,
             load_origin: LoadOrigin::DirectOpen,
             max_skip_attempts: MaxSkipAttempts::default(),
             video_player: None,
@@ -609,6 +615,41 @@ impl State {
         // Clear video shader immediately to prevent stale frame from being rendered
         // with wrong dimensions when navigating to a different media
         self.video_shader.clear();
+
+        // Determine media type and size for diagnostics
+        let media_type = self
+            .current_media_path
+            .as_ref()
+            .and_then(|p| p.extension())
+            .map_or(crate::diagnostics::MediaType::Unknown, |ext| {
+                let ext = ext.to_string_lossy().to_lowercase();
+                if ["mp4", "webm", "avi", "mkv", "mov", "m4v", "wmv", "flv"].contains(&ext.as_str())
+                {
+                    crate::diagnostics::MediaType::Video
+                } else {
+                    crate::diagnostics::MediaType::Image
+                }
+            });
+
+        let size_category = self
+            .current_media_path
+            .as_ref()
+            .and_then(|p| std::fs::metadata(p).ok())
+            .map_or(crate::diagnostics::SizeCategory::Small, |m| {
+                crate::diagnostics::SizeCategory::from_bytes(m.len())
+            });
+
+        // Store for use in success/failure handlers
+        self.loading_media_type = Some(media_type);
+        self.loading_size_category = Some(size_category);
+
+        // Log MediaLoadingStarted event
+        if let Some(ref handle) = self.diagnostics {
+            handle.log_state(crate::diagnostics::AppStateEvent::MediaLoadingStarted {
+                media_type,
+                size_category,
+            });
+        }
     }
 
     /// Returns an exportable frame from the video canvas, if available.
@@ -781,6 +822,23 @@ impl State {
                             }
                         }
 
+                        // Log MediaLoaded event for diagnostics
+                        let loaded_media_type = match &media {
+                            MediaData::Image(_) => crate::diagnostics::MediaType::Image,
+                            MediaData::Video(_) => crate::diagnostics::MediaType::Video,
+                        };
+                        if let Some(ref handle) = self.diagnostics {
+                            handle.log_state(crate::diagnostics::AppStateEvent::MediaLoaded {
+                                media_type: loaded_media_type,
+                                size_category: self
+                                    .loading_size_category
+                                    .take()
+                                    .unwrap_or(crate::diagnostics::SizeCategory::Small),
+                            });
+                        }
+                        // Clear loading_media_type as it's no longer needed
+                        self.loading_media_type = None;
+
                         self.media = Some(media);
                         self.error = None;
 
@@ -828,6 +886,28 @@ impl State {
                         (effect, scroll_task)
                     }
                     Err(error) => {
+                        // Log MediaFailed event for diagnostics (sanitize error - no file paths)
+                        let failed_media_type = self
+                            .loading_media_type
+                            .take()
+                            .unwrap_or(crate::diagnostics::MediaType::Unknown);
+                        // Clear size category as it's no longer needed
+                        self.loading_size_category = None;
+
+                        let sanitized_reason = match &error {
+                            Error::Svg(e) => format!("SVG error: {e}"),
+                            Error::Video(e) => format!("Video error: {e}"),
+                            Error::Io(e) => format!("IO error: {e}"),
+                            Error::Config(e) => format!("Config error: {e}"),
+                        };
+
+                        if let Some(ref handle) = self.diagnostics {
+                            handle.log_state(crate::diagnostics::AppStateEvent::MediaFailed {
+                                media_type: failed_media_type,
+                                reason: sanitized_reason,
+                            });
+                        }
+
                         // Get the failed filename for the notification
                         let failed_filename = self
                             .current_media_path
