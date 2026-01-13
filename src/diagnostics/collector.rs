@@ -19,7 +19,7 @@ use super::{
 ///
 /// This handle is cheap to clone and can be shared across threads.
 /// Events are sent via a bounded channel to avoid blocking the UI thread.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DiagnosticsHandle {
     event_tx: Sender<DiagnosticEvent>,
 }

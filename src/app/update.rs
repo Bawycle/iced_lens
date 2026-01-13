@@ -6,6 +6,7 @@
 
 use super::{notifications, persistence, Message, Screen};
 use crate::config;
+use crate::diagnostics::{AppStateEvent, DiagnosticsHandle, UserAction};
 use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
 use crate::media::{
@@ -122,6 +123,8 @@ pub struct UpdateContext<'a> {
     pub notifications: &'a mut notifications::Manager,
     pub cancellation_token: &'a media::deblur::CancellationToken,
     pub prefetch_cache: &'a mut media::prefetch::ImagePrefetchCache,
+    /// Handle for logging diagnostic events.
+    pub diagnostics: &'a DiagnosticsHandle,
 }
 
 impl UpdateContext<'_> {
@@ -318,9 +321,12 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
             let image_data = match media_data {
                 MediaData::Image(img) => img,
                 MediaData::Video(_) => {
-                    ctx.notifications.push(notifications::Notification::warning(
-                        "notification-video-editing-unsupported",
-                    ));
+                    ctx.notifications.push(
+                        notifications::Notification::warning(
+                            "notification-video-editing-unsupported",
+                        )
+                        .with_warning_type(crate::diagnostics::WarningType::UnsupportedFormat),
+                    );
                     return Task::none();
                 }
             };
@@ -343,6 +349,11 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                     *ctx.image_editor = Some(state);
                     *ctx.screen = target;
 
+                    // Log editor opened event
+                    ctx.diagnostics.log_state(AppStateEvent::EditorOpened {
+                        tool: None, // No tool selected initially
+                    });
+
                     // Trigger deferred AI model validation on first editor access
                     let validation_task = trigger_deferred_ai_validation(ctx);
                     return validation_task;
@@ -361,6 +372,16 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
 
     // Handle Editor → Viewer transition
     if matches!(target, Screen::Viewer) && matches!(ctx.screen, Screen::ImageEditor) {
+        // Check if editor had unsaved changes before closing
+        let had_unsaved_changes = ctx
+            .image_editor
+            .as_ref()
+            .is_some_and(ImageEditorState::has_unsaved_changes);
+
+        ctx.diagnostics.log_state(AppStateEvent::EditorClosed {
+            had_unsaved_changes,
+        });
+
         *ctx.image_editor = None;
         *ctx.screen = target;
         return Task::none();
@@ -661,6 +682,12 @@ pub fn handle_editor_message(
             // Get the image source before dropping the editor
             let image_source = editor_state.image_source().clone();
 
+            // Log editor closed event before dropping editor state
+            let had_unsaved_changes = editor_state.has_unsaved_changes();
+            ctx.diagnostics.log_state(AppStateEvent::EditorClosed {
+                had_unsaved_changes,
+            });
+
             *ctx.image_editor = None;
             *ctx.screen = Screen::Viewer;
 
@@ -695,9 +722,10 @@ pub fn handle_editor_message(
                         ));
                     }
                     Err(_err) => {
-                        ctx.notifications.push(notifications::Notification::error(
-                            "notification-save-error",
-                        ));
+                        ctx.notifications.push(
+                            notifications::Notification::error("notification-save-error")
+                                .with_error_type(crate::diagnostics::ErrorType::ExportError),
+                        );
                     }
                 }
             }
@@ -885,18 +913,24 @@ pub fn handle_navbar_message(
     match navbar::update(message, ctx.menu_open) {
         NavbarEvent::None => Task::none(),
         NavbarEvent::OpenSettings => {
+            ctx.diagnostics.log_action(UserAction::OpenSettings);
             *ctx.screen = Screen::Settings;
             Task::none()
         }
         NavbarEvent::OpenHelp => {
+            ctx.diagnostics.log_action(UserAction::OpenHelp);
             *ctx.screen = Screen::Help;
             Task::none()
         }
         NavbarEvent::OpenAbout => {
+            ctx.diagnostics.log_action(UserAction::OpenAbout);
             *ctx.screen = Screen::About;
             Task::none()
         }
-        NavbarEvent::EnterEditor => handle_screen_switch(ctx, Screen::ImageEditor),
+        NavbarEvent::EnterEditor => {
+            ctx.diagnostics.log_action(UserAction::EnterEditor);
+            handle_screen_switch(ctx, Screen::ImageEditor)
+        }
         NavbarEvent::ToggleInfoPanel => {
             *ctx.info_panel_open = !*ctx.info_panel_open;
             Task::none()
@@ -1170,6 +1204,8 @@ where
 
 /// Handles navigation to next media (images and videos).
 pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    ctx.diagnostics.log_action(UserAction::NavigateNext);
+
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
     // Set load origin for auto-skip on failure
     ctx.viewer.set_navigation_origin(NavigationDirection::Next);
@@ -1183,6 +1219,8 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
 /// Handles navigation to previous media (images and videos).
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    ctx.diagnostics.log_action(UserAction::NavigatePrevious);
+
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
     // Set load origin for auto-skip on failure
     ctx.viewer
@@ -1416,6 +1454,10 @@ pub fn handle_open_file_dialog_result(
         return Task::none();
     };
 
+    ctx.diagnostics.log_action(UserAction::LoadMedia {
+        source: Some("file_dialog".to_string()),
+    });
+
     // Load the media (last_open_directory is updated on successful load)
     load_media_from_path(ctx, path)
 }
@@ -1440,6 +1482,10 @@ pub fn handle_file_dropped(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<M
         }
     }
     // If cursor position is unknown, accept the drop (better UX than silent rejection)
+
+    ctx.diagnostics.log_action(UserAction::LoadMedia {
+        source: Some("drag_drop".to_string()),
+    });
 
     // Check if it's a directory
     if path.is_dir() {

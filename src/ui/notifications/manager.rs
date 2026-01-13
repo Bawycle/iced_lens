@@ -4,7 +4,8 @@
 //! The `Manager` handles queuing, display timing, and dismissal of notifications.
 //! It limits the number of visible toasts and manages auto-dismiss timers.
 
-use super::notification::{Notification, NotificationId};
+use super::notification::{Notification, NotificationId, Severity};
+use crate::diagnostics::{DiagnosticsHandle, ErrorEvent, ErrorType, WarningEvent, WarningType};
 use std::collections::VecDeque;
 
 /// Maximum number of notifications visible at once.
@@ -26,6 +27,8 @@ pub struct Manager {
     visible: VecDeque<Notification>,
     /// Queued notifications waiting to be displayed.
     queue: VecDeque<Notification>,
+    /// Optional diagnostics handle for logging warnings/errors.
+    diagnostics: Option<DiagnosticsHandle>,
 }
 
 impl Manager {
@@ -35,12 +38,45 @@ impl Manager {
         Self::default()
     }
 
+    /// Sets the diagnostics handle for logging warnings and errors.
+    pub fn set_diagnostics(&mut self, handle: DiagnosticsHandle) {
+        self.diagnostics = Some(handle);
+    }
+
     /// Pushes a new notification to be displayed.
     ///
     /// If fewer than `MAX_VISIBLE` notifications are showing, it's displayed
     /// immediately. Otherwise, it's added to the queue and shown when space
     /// becomes available.
+    ///
+    /// Warnings and errors are automatically logged to the diagnostics system.
+    /// If the notification has an explicit diagnostic type set (via `with_warning_type`
+    /// or `with_error_type`), that type is used. Otherwise, the type is inferred
+    /// from the message key using pattern matching.
     pub fn push(&mut self, notification: Notification) {
+        // Log warnings and errors to diagnostics
+        if let Some(handle) = &self.diagnostics {
+            match notification.severity() {
+                Severity::Warning => {
+                    // Use explicit type if set, otherwise infer from message key
+                    let warning_type = notification
+                        .warning_type()
+                        .unwrap_or_else(|| infer_warning_type(notification.message_key()));
+                    handle.log_warning(WarningEvent::new(warning_type, notification.message_key()));
+                }
+                Severity::Error => {
+                    // Use explicit type if set, otherwise infer from message key
+                    let error_type = notification
+                        .error_type()
+                        .unwrap_or_else(|| infer_error_type(notification.message_key()));
+                    handle.log_error(ErrorEvent::new(error_type, notification.message_key()));
+                }
+                Severity::Success | Severity::Info => {
+                    // Success and Info notifications are not logged as diagnostic events
+                }
+            }
+        }
+
         if self.visible.len() < MAX_VISIBLE {
             self.visible.push_front(notification);
         } else {
@@ -156,6 +192,46 @@ impl Manager {
                 break;
             }
         }
+    }
+}
+
+/// Infers a `WarningType` from a notification message key.
+///
+/// This is a fallback when the notification doesn't have an explicit warning type set.
+/// Uses pattern matching on the message key to categorize warnings.
+fn infer_warning_type(message_key: &str) -> WarningType {
+    if message_key.contains("unsupported") || message_key.contains("format") {
+        WarningType::UnsupportedFormat
+    } else if message_key.contains("config") || message_key.contains("setting") {
+        WarningType::ConfigurationIssue
+    } else if message_key.contains("permission") || message_key.contains("access") {
+        WarningType::PermissionDenied
+    } else if message_key.contains("not-found") || message_key.contains("missing") {
+        WarningType::FileNotFound
+    } else if message_key.contains("network") || message_key.contains("download") {
+        WarningType::NetworkError
+    } else {
+        WarningType::Other
+    }
+}
+
+/// Infers an `ErrorType` from a notification message key.
+///
+/// This is a fallback when the notification doesn't have an explicit error type set.
+/// Uses pattern matching on the message key to categorize errors.
+fn infer_error_type(message_key: &str) -> ErrorType {
+    if message_key.contains("load-error-io") || message_key.contains("io") {
+        ErrorType::IoError
+    } else if message_key.contains("decode") {
+        ErrorType::DecodeError
+    } else if message_key.contains("save") || message_key.contains("export") {
+        ErrorType::ExportError
+    } else if message_key.contains("ai") || message_key.contains("model") {
+        ErrorType::AIModelError
+    } else if message_key.contains("internal") {
+        ErrorType::InternalError
+    } else {
+        ErrorType::Other
     }
 }
 

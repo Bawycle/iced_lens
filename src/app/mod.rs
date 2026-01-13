@@ -21,6 +21,7 @@ mod view;
 pub use message::{Flags, Message};
 pub use screen::Screen;
 
+use crate::diagnostics::DiagnosticsCollector;
 use crate::media::metadata::MediaMetadata;
 use crate::media::{self, MaxSkipAttempts, MediaData, MediaNavigator};
 use crate::ui::help;
@@ -84,6 +85,8 @@ pub struct App {
     cancellation_token: std::sync::Arc<std::sync::atomic::AtomicBool>,
     /// Cache for prefetched images to speed up navigation.
     prefetch_cache: media::prefetch::ImagePrefetchCache,
+    /// Diagnostics collector for capturing application events.
+    diagnostics: DiagnosticsCollector,
 }
 
 impl fmt::Debug for App {
@@ -179,6 +182,7 @@ impl Default for App {
             shutting_down: false,
             cancellation_token: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             prefetch_cache: media::prefetch::ImagePrefetchCache::with_defaults(),
+            diagnostics: DiagnosticsCollector::default(),
         }
     }
 }
@@ -198,6 +202,9 @@ impl App {
             i18n,
             ..Self::default()
         };
+
+        // Initialize diagnostics handle in notification manager for automatic warning/error capture
+        app.notifications.set_diagnostics(app.diagnostics.handle());
 
         app.theme_mode = config.general.theme_mode;
 
@@ -505,6 +512,9 @@ impl App {
             self.window_size = Some(*size);
         }
 
+        // Get diagnostics handle before creating context (to avoid borrow issues)
+        let diagnostics_handle = self.diagnostics.handle();
+
         let mut ctx = update::UpdateContext {
             i18n: &mut self.i18n,
             screen: &mut self.screen,
@@ -527,6 +537,7 @@ impl App {
             notifications: &mut self.notifications,
             cancellation_token: &self.cancellation_token,
             prefetch_cache: &mut self.prefetch_cache,
+            diagnostics: &diagnostics_handle,
         };
 
         match message {
@@ -566,6 +577,9 @@ impl App {
 
                 // Tick notification manager to handle auto-dismiss
                 self.notifications.tick();
+
+                // Process pending diagnostic events from channel to buffer
+                self.diagnostics.process_pending();
 
                 Task::none()
             }
@@ -764,6 +778,7 @@ impl App {
                     editor.deblur_failed();
                     self.notifications.push(
                         notifications::Notification::error("notification-deblur-apply-error")
+                            .with_error_type(crate::diagnostics::ErrorType::AIModelError)
                             .with_arg("error", e),
                     );
                 }
@@ -797,6 +812,7 @@ impl App {
                     editor.clear_upscale_processing();
                     self.notifications.push(
                         notifications::Notification::error("notification-upscale-resize-error")
+                            .with_error_type(crate::diagnostics::ErrorType::AIModelError)
                             .with_arg("error", e),
                     );
                 }

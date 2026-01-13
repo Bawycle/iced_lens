@@ -1,7 +1,7 @@
 # Story 1.7: Diagnostic Event Instrumentation
 
 **Epic:** 1 - Diagnostics Core & Data Collection
-**Status:** Ready
+**Status:** Done (Core) - Full coverage in Stories 1.8-1.11, cleanup in 1.12
 **Priority:** High
 **Estimate:** 4-5 hours
 **Depends On:** Story 1.3, Story 1.4, Story 1.5
@@ -54,24 +54,24 @@
 ## Tasks
 
 ### Task 1: Initialize DiagnosticsHandle in App
-- [ ] Create `DiagnosticsCollector` instance in app initialization
-- [ ] Store `DiagnosticsHandle` in app state or context
-- [ ] Ensure handle is accessible from message handlers
+- [x] Create `DiagnosticsCollector` instance in app initialization
+- [x] Store `DiagnosticsHandle` in app state or context
+- [x] Ensure handle is accessible from message handlers
 
 ### Task 2: Instrument User Actions in update.rs
-- [ ] In `src/app/update.rs`
-- [ ] Add `log_action()` calls for:
-  - [ ] `NavigateNext` in `handle_navigate_next`
-  - [ ] `NavigatePrevious` in `handle_navigate_previous`
-  - [ ] `LoadMedia` in `handle_open_file_dialog_result` (source: file_dialog)
-  - [ ] `LoadMedia` in `handle_file_dropped` (source: drag_drop)
-  - [ ] `TogglePlayback` in playback toggle handler
-  - [ ] `SeekVideo` in seek handler
-  - [ ] `OpenSettings` in `handle_navbar_message`
-  - [ ] `EnterEditor` in editor entry handler
+- [x] In `src/app/update.rs`
+- [x] Add `log_action()` calls for:
+  - [x] `NavigateNext` in `handle_navigate_next`
+  - [x] `NavigatePrevious` in `handle_navigate_previous`
+  - [x] `LoadMedia` in `handle_open_file_dialog_result` (source: file_dialog)
+  - [x] `LoadMedia` in `handle_file_dropped` (source: drag_drop)
+  - [ ] `TogglePlayback` in playback toggle handler (deferred)
+  - [ ] `SeekVideo` in seek handler (deferred)
+  - [x] `OpenSettings` in `handle_navbar_message`
+  - [x] `EnterEditor` in editor entry handler
 
 ### Task 3: Instrument Video Playback States
-- [ ] In `src/video_player/` (state.rs or relevant handler)
+- [ ] In `src/video_player/` (state.rs or relevant handler) (deferred)
 - [ ] Add `log_state()` calls for:
   - [ ] `VideoPlaying` when playback starts
   - [ ] `VideoPaused` when playback pauses
@@ -82,7 +82,7 @@
 - [ ] Pass `DiagnosticsHandle` to video player component
 
 ### Task 4: Instrument Media Loading Lifecycle
-- [ ] In `src/app/update.rs` or media loading handler
+- [ ] In `src/app/update.rs` or media loading handler (deferred)
 - [ ] Add `log_state()` calls for:
   - [ ] `MediaLoadingStarted` with media_type and size_category
   - [ ] `MediaLoaded` on successful load
@@ -90,14 +90,14 @@
 - [ ] Calculate `SizeCategory` from file metadata
 
 ### Task 5: Instrument Editor Session
-- [ ] In `src/ui/image_editor/` handlers
-- [ ] Add `log_state()` calls for:
-  - [ ] `EditorOpened` when editor screen activated
-  - [ ] `EditorClosed` with `had_unsaved_changes` flag
-- [ ] Track unsaved changes state for closure event
+- [x] In `src/ui/image_editor/` handlers
+- [x] Add `log_state()` calls for:
+  - [x] `EditorOpened` when editor screen activated
+  - [x] `EditorClosed` with `had_unsaved_changes` flag
+- [x] Track unsaved changes state for closure event
 
 ### Task 6: Instrument AI Deblur Operation
-- [ ] In `src/ui/image_editor/state/deblur.rs` or handler
+- [ ] In `src/ui/image_editor/state/deblur.rs` or handler (deferred)
 - [ ] Capture start time with `Instant::now()`
 - [ ] Add `log_state()` for `EditorDeblurStarted`
 - [ ] On completion, calculate duration and call `log_operation()` with:
@@ -105,31 +105,31 @@
 - [ ] Add `log_state()` for `EditorDeblurCompleted` or `EditorDeblurCancelled`
 
 ### Task 7: Instrument AI Upscale Operation
-- [ ] In resize handler where AI upscale is triggered
+- [ ] In resize handler where AI upscale is triggered (deferred)
 - [ ] Capture start time with `Instant::now()`
 - [ ] On completion, calculate duration and call `log_operation()` with:
   - [ ] `AIUpscaleProcess { duration_ms, scale_factor, size_category, success }`
 
 ### Task 8: Instrument Video Seek Operation
-- [ ] In video player seek handler
+- [ ] In video player seek handler (deferred)
 - [ ] Capture start time and initial position
 - [ ] On seek completion, calculate duration and call `log_operation()` with:
   - [ ] `VideoSeek { duration_ms, seek_distance_secs }`
 
 ### Task 9: Instrument Warning/Error Capture
-- [ ] In `src/ui/notifications/manager.rs`
-- [ ] Modify `Manager::push()` to accept optional `DiagnosticsHandle`
-- [ ] When `Notification` with `Severity::Warning` is pushed:
-  - [ ] Call `log_warning()` with `WarningEvent`
-  - [ ] Map `notification.message_key()` to `WarningType`
-- [ ] When `Notification` with `Severity::Error` is pushed:
-  - [ ] Call `log_error()` with `ErrorEvent`
-  - [ ] Map `notification.message_key()` to `ErrorType`
-- [ ] Update all call sites of `Manager::push()` to pass diagnostics handle
-- [ ] Alternative: Store `DiagnosticsHandle` in `Manager` struct at construction
+- [x] In `src/ui/notifications/manager.rs`
+- [x] Modify `Manager::push()` to accept optional `DiagnosticsHandle`
+- [x] When `Notification` with `Severity::Warning` is pushed:
+  - [x] Call `log_warning()` with `WarningEvent`
+  - [x] Map `notification.message_key()` to `WarningType`
+- [x] When `Notification` with `Severity::Error` is pushed:
+  - [x] Call `log_error()` with `ErrorEvent`
+  - [x] Map `notification.message_key()` to `ErrorType`
+- [x] Update all call sites of `Manager::push()` to pass diagnostics handle
+- [x] Alternative: Store `DiagnosticsHandle` in `Manager` struct at construction
 
 ### Task 10: Write Integration Tests
-- [ ] Test user action events are captured (navigate, load, playback)
+- [ ] Test user action events are captured (navigate, load, playback) (deferred)
 - [ ] Test video state events are captured during playback simulation
 - [ ] Test media loading events are captured
 - [ ] Test editor session events are captured
@@ -137,13 +137,13 @@
 - [ ] Test warning/error events are captured from notifications
 
 ### Task 11: Run Validation
-- [ ] `cargo fmt --all`
-- [ ] `cargo clippy --all --all-targets -- -D warnings`
-- [ ] `cargo test`
+- [x] `cargo fmt --all`
+- [x] `cargo clippy --all --all-targets -- -D warnings`
+- [x] `cargo test`
 
 ### Task 12: Commit Changes
-- [ ] Stage all changes
-- [ ] Commit with message: `feat(diagnostics): instrument diagnostic events [Story 1.7]`
+- [x] Stage all changes
+- [x] Commit with message: `feat(diagnostics): instrument diagnostic events [Story 1.7]`
 
 ---
 
@@ -258,16 +258,57 @@ fn handle_navigate_next(&mut self) {
 ## Dev Agent Record
 
 ### Agent Model Used
-<!-- Record which AI model completed this story -->
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Completion Notes
-<!-- Dev agent adds notes here during implementation -->
+**Status: Partial Implementation**
+
+Completed:
+- Infrastructure setup: `DiagnosticsCollector` in App, handle passed via `UpdateContext`
+- User actions: NavigateNext, NavigatePrevious, LoadMedia (file_dialog/drag_drop), OpenSettings, OpenHelp, OpenAbout, EnterEditor
+- State events: EditorOpened, EditorClosed with had_unsaved_changes tracking
+- Warning/Error capture: Integrated into notification `Manager::push()` with automatic type mapping
+- Periodic event processing via `process_pending()` in tick handler
+
+Deferred to follow-up stories:
+- **Story 1.8**: Video player instrumentation (states + seek operation + TogglePlayback/SeekVideo actions)
+- **Story 1.9**: Media loading lifecycle (MediaLoadingStarted/Loaded/Failed)
+- **Story 1.10**: AI operations with duration tracking (deblur + upscale)
+- **Story 1.11**: Integration tests for instrumented events
+- **Story 1.12**: Notification diagnostic types migration (~40 sites)
+
+The core acceptance criteria are partially met:
+- ✅ 6 user actions instrumented (NavigateNext, NavigatePrevious, LoadMedia x2, OpenSettings, EnterEditor)
+- ✅ 2 state transitions instrumented (EditorOpened, EditorClosed)
+- ✅ Automatic warning/error capture from notifications
+- ⏳ Operations with duration tracking (requires more invasive changes)
+
+All 787 tests pass, clippy clean, code formatted.
+
+### Explicit Diagnostic Types for Notifications
+
+The notification system now supports explicit diagnostic types via `with_warning_type()` and `with_error_type()` builder methods.
+
+**Migrated (4 examples):**
+- `notification-deblur-apply-error` → `ErrorType::AIModelError`
+- `notification-upscale-resize-error` → `ErrorType::AIModelError`
+- `notification-save-error` → `ErrorType::ExportError`
+- `notification-video-editing-unsupported` → `WarningType::UnsupportedFormat`
+
+**Remaining migration tracked in Story 1.12** (~40 sites). The fallback inference continues to work correctly in the meantime.
 
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-01-13 | Initial partial implementation | Claude Opus 4.5 |
+| 2026-01-13 | Added explicit diagnostic types to Notification, fixed EditorClosed in ExitEditor | Claude Opus 4.5 |
+| 2026-01-13 | PO Review: Updated status, created Story 1.12 for migration, updated 1.8 for missing actions | PO (Sarah) |
 
 ### File List
-<!-- Files created or modified -->
+- `src/app/mod.rs` (modified - added DiagnosticsCollector field, process_pending in tick)
+- `src/app/update.rs` (modified - added DiagnosticsHandle to UpdateContext, instrumented handlers)
+- `src/ui/notifications/manager.rs` (modified - automatic warning/error capture with fallback inference)
+- `src/ui/notifications/notification.rs` (modified - added warning_type/error_type fields and builders)
+- `src/diagnostics/collector.rs` (modified - added Debug derive to DiagnosticsHandle)
 
 ---
