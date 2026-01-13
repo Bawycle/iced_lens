@@ -18,9 +18,11 @@
 //! diagnostic value.
 
 mod buffer;
+mod collector;
 mod events;
 mod resource_collector;
 
 pub use buffer::{BufferCapacity, CircularBuffer};
-pub use events::{DiagnosticEvent, DiagnosticEventKind};
+pub use collector::{DiagnosticsCollector, DiagnosticsHandle};
+pub use events::{DiagnosticEvent, DiagnosticEventKind, UserAction};
 pub use resource_collector::{ResourceCollector, ResourceMetrics, SamplingInterval};

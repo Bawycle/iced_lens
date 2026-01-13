@@ -10,6 +10,150 @@ use serde::{Deserialize, Serialize};
 
 use super::ResourceMetrics;
 
+/// User-initiated actions that can be captured for diagnostics.
+///
+/// These actions represent meaningful user interactions that help
+/// understand what the user was doing when issues occurred.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum UserAction {
+    // ==========================================================================
+    // Navigation Actions
+    // ==========================================================================
+    /// Navigate to the next media file.
+    NavigateNext,
+
+    /// Navigate to the previous media file.
+    NavigatePrevious,
+
+    /// Load a media file (via file dialog, drag-drop, or CLI).
+    LoadMedia {
+        /// Optional context (e.g., `file_dialog`, `drag_drop`, `cli`).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source: Option<String>,
+    },
+
+    /// Delete the current media file.
+    DeleteMedia,
+
+    // ==========================================================================
+    // Playback Actions (Video)
+    // ==========================================================================
+    /// Toggle play/pause state.
+    TogglePlayback,
+
+    /// Seek to a specific position in the video.
+    SeekVideo {
+        /// Target position in seconds.
+        position_secs: f64,
+    },
+
+    /// Step forward one frame (when paused).
+    StepForward,
+
+    /// Step backward one frame (when paused).
+    StepBackward,
+
+    /// Change playback speed.
+    SetPlaybackSpeed {
+        /// New playback speed multiplier.
+        speed: f64,
+    },
+
+    /// Toggle loop mode.
+    ToggleLoop,
+
+    // ==========================================================================
+    // Audio Actions
+    // ==========================================================================
+    /// Change volume level.
+    SetVolume {
+        /// Volume level (0.0 to 1.5).
+        volume: f32,
+    },
+
+    /// Toggle mute state.
+    ToggleMute,
+
+    // ==========================================================================
+    // View Actions
+    // ==========================================================================
+    /// Zoom in on the current media.
+    ZoomIn,
+
+    /// Zoom out on the current media.
+    ZoomOut,
+
+    /// Reset zoom to default (100%).
+    ResetZoom,
+
+    /// Toggle fit-to-window mode.
+    ToggleFitToWindow,
+
+    /// Toggle fullscreen mode.
+    ToggleFullscreen,
+
+    /// Exit fullscreen mode.
+    ExitFullscreen,
+
+    /// Rotate media clockwise (90°).
+    RotateClockwise,
+
+    /// Rotate media counter-clockwise (90°).
+    RotateCounterClockwise,
+
+    // ==========================================================================
+    // Screen Navigation
+    // ==========================================================================
+    /// Open settings screen.
+    OpenSettings,
+
+    /// Open help screen.
+    OpenHelp,
+
+    /// Open about screen.
+    OpenAbout,
+
+    /// Enter image editor.
+    EnterEditor,
+
+    /// Return to viewer from another screen.
+    ReturnToViewer,
+
+    // ==========================================================================
+    // Capture/Export Actions
+    // ==========================================================================
+    /// Capture current video frame.
+    CaptureFrame,
+
+    /// Export/save file.
+    ExportFile,
+
+    // ==========================================================================
+    // Editor Actions
+    // ==========================================================================
+    /// Apply crop operation.
+    ApplyCrop,
+
+    /// Apply resize operation.
+    ApplyResize,
+
+    /// Apply AI deblur.
+    ApplyDeblur,
+
+    /// Apply AI upscale.
+    ApplyUpscale,
+
+    /// Undo last edit.
+    Undo,
+
+    /// Redo last undone edit.
+    Redo,
+
+    /// Save edited image.
+    SaveImage,
+}
+
 /// A diagnostic event with timestamp.
 ///
 /// Each event captures a specific type of activity or state change
@@ -62,11 +206,13 @@ pub enum DiagnosticEventKind {
     },
 
     /// User-initiated action.
-    /// Placeholder: Will be expanded in Story 1.3 with action types.
+    /// Captures what the user was doing for diagnostic correlation.
     UserAction {
-        /// Placeholder field for future action data
+        /// The specific action performed.
+        action: UserAction,
+        /// Optional additional details (e.g., filename, error context).
         #[serde(skip_serializing_if = "Option::is_none")]
-        placeholder: Option<String>,
+        details: Option<String>,
     },
 
     /// Application state change.
@@ -118,7 +264,10 @@ mod tests {
     fn diagnostic_event_with_timestamp_uses_provided_timestamp() {
         let timestamp = Instant::now();
         let event = DiagnosticEvent::with_timestamp(
-            DiagnosticEventKind::UserAction { placeholder: None },
+            DiagnosticEventKind::UserAction {
+                action: UserAction::NavigateNext,
+                details: None,
+            },
             timestamp,
         );
 
@@ -131,7 +280,10 @@ mod tests {
         let resource = DiagnosticEventKind::ResourceSnapshot {
             metrics: sample_metrics(),
         };
-        let action = DiagnosticEventKind::UserAction { placeholder: None };
+        let action = DiagnosticEventKind::UserAction {
+            action: UserAction::TogglePlayback,
+            details: None,
+        };
         let state = DiagnosticEventKind::AppState { placeholder: None };
         let warning = DiagnosticEventKind::Warning {
             message: "test warning".to_string(),
