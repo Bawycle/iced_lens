@@ -17,12 +17,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Gemini cli
-.gemini/
-
-# Claude code
-.claude/
-
 # Added by cargo
 /target
 
@@ -40,5 +34,19 @@ tests/data/*.mov
 tests/data/*.mkv
 tests/samples/
 
-# GitHub Actions
+# GitHub
 .github/workflows/
+.github/chatmodes/
+
+# Gemini cli
+.gemini/
+
+# Claude code
+.claude/
+
+# Windsurf
+.windsurf/
+
+# BMad
+.bmad-core/
+web-bundles/
