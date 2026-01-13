@@ -1285,6 +1285,12 @@ mod tests {
     use std::sync::{Mutex, OnceLock};
     use tempfile::tempdir;
 
+    /// Creates a test diagnostics handle for use in tests.
+    fn test_diagnostics() -> crate::diagnostics::DiagnosticsHandle {
+        use crate::diagnostics::{BufferCapacity, DiagnosticsCollector};
+        DiagnosticsCollector::new(BufferCapacity::default()).handle()
+    }
+
     fn config_env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
@@ -1566,6 +1572,7 @@ mod tests {
         let _ = app.viewer.handle_message(
             component::Message::MediaLoaded(Ok(build_media(2000, 1000))),
             &app.i18n,
+            &test_diagnostics(),
         );
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
             Point::new(0.0, 0.0),
@@ -1619,6 +1626,7 @@ mod tests {
         let _ = app.viewer.handle_message(
             component::Message::MediaLoaded(Ok(build_media(800, 600))),
             &app.i18n,
+            &test_diagnostics(),
         );
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
             Point::new(10.0, 10.0),
@@ -1650,6 +1658,7 @@ mod tests {
         let _ = app.viewer.handle_message(
             component::Message::MediaLoaded(Ok(build_media(800, 600))),
             &app.i18n,
+            &test_diagnostics(),
         );
 
         // Configure zoom after loading to set up test state

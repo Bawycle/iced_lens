@@ -12,6 +12,7 @@
 use super::subscription::DecoderCommandSender;
 use super::sync::{SharedSyncClock, SyncClock};
 use super::DecoderCommand;
+use crate::diagnostics::{AppOperation, AppStateEvent, DiagnosticsHandle};
 use crate::error::Result;
 use crate::media::VideoData;
 use std::sync::Arc;
@@ -174,6 +175,13 @@ pub struct VideoPlayer {
     /// Instant when seeking started (for timeout detection).
     /// None if not currently seeking.
     seeking_started_at: Option<Instant>,
+
+    /// Handle for logging diagnostic events.
+    /// Set via `set_diagnostics()` when the player is attached to a viewer.
+    diagnostics: Option<DiagnosticsHandle>,
+
+    /// Position when seek was initiated (for calculating seek distance).
+    seek_initial_position: Option<f64>,
 }
 
 impl VideoPlayer {
@@ -198,7 +206,39 @@ impl VideoPlayer {
             playback_speed: super::PlaybackSpeed::default(),
             speed_auto_muted: false,
             seeking_started_at: None,
+            diagnostics: None,
+            seek_initial_position: None,
         })
+    }
+
+    /// Sets the diagnostics handle for logging events.
+    ///
+    /// This should be called after creating the player to enable
+    /// instrumentation of playback events.
+    pub fn set_diagnostics(&mut self, handle: DiagnosticsHandle) {
+        self.diagnostics = Some(handle);
+    }
+
+    /// Logs `VideoSeek` operation completion and clears seek tracking state.
+    ///
+    /// Called from all seek completion paths to ensure consistent logging
+    /// and cleanup of `seek_initial_position`.
+    fn log_seek_completion(&mut self, final_position: f64) {
+        if let Some(ref handle) = self.diagnostics {
+            // SAFETY: u64 can hold 584 million years of milliseconds; seek never takes that long
+            #[allow(clippy::cast_possible_truncation)]
+            let duration_ms = self
+                .seeking_started_at
+                .map_or(0, |start| start.elapsed().as_millis() as u64);
+            let seek_distance_secs = self
+                .seek_initial_position
+                .map_or(0.0, |initial| (final_position - initial).abs());
+            handle.log_operation(AppOperation::VideoSeek {
+                duration_ms,
+                seek_distance_secs,
+            });
+        }
+        self.seek_initial_position = None;
     }
 
     /// Returns a clone of the sync clock for sharing with audio output.
@@ -276,6 +316,11 @@ impl VideoPlayer {
     /// Called when `EndOfStream` event is received from the decoder.
     pub fn set_at_end_of_stream(&mut self) {
         self.at_end_of_stream = true;
+
+        // Log state event for diagnostics
+        if let Some(ref handle) = self.diagnostics {
+            handle.log_state(AppStateEvent::VideoAtEndOfStream);
+        }
     }
 
     /// Resets the history position to indicate no backward stepping is available.
@@ -320,6 +365,13 @@ impl VideoPlayer {
             }
         };
 
+        // Log state event for diagnostics
+        if let Some(ref handle) = self.diagnostics {
+            handle.log_state(AppStateEvent::VideoPlaying {
+                position_secs: position,
+            });
+        }
+
         // Exit stepping mode - reset history position
         self.history_position = 0;
 
@@ -351,9 +403,13 @@ impl VideoPlayer {
     /// Also pauses the sync clock.
     pub fn pause(&mut self) {
         if let PlaybackState::Playing { position_secs } = &self.state {
-            self.state = PlaybackState::Paused {
-                position_secs: *position_secs,
-            };
+            let pos = *position_secs;
+            self.state = PlaybackState::Paused { position_secs: pos };
+
+            // Log state event for diagnostics
+            if let Some(ref handle) = self.diagnostics {
+                handle.log_state(AppStateEvent::VideoPaused { position_secs: pos });
+            }
 
             // Pause sync clock
             self.sync_clock.pause();
@@ -415,6 +471,9 @@ impl VideoPlayer {
     pub fn seek(&mut self, target_secs: f64) {
         let clamped_target = target_secs.max(0.0).min(self.video_data.duration_secs);
 
+        // Store initial position for seek distance calculation (Task 1.8)
+        self.seek_initial_position = self.state.position();
+
         // Exit stepping mode - seek breaks frame continuity
         self.history_position = 0;
 
@@ -430,6 +489,13 @@ impl VideoPlayer {
             target_secs: clamped_target,
             resume_playing: should_resume,
         };
+
+        // Log state event for diagnostics
+        if let Some(ref handle) = self.diagnostics {
+            handle.log_state(AppStateEvent::VideoSeeking {
+                target_secs: clamped_target,
+            });
+        }
 
         // Track when seeking started (for timeout detection)
         self.seeking_started_at = Some(Instant::now());
@@ -505,12 +571,22 @@ impl VideoPlayer {
                 // Keep buffering state but update position
                 self.state = PlaybackState::Playing { position_secs };
             }
-            PlaybackState::Seeking { resume_playing, .. } => {
+            PlaybackState::Seeking {
+                resume_playing,
+                target_secs,
+            } => {
+                // Extract values before mutable borrow
+                let target = *target_secs;
+                let resume = *resume_playing;
+
+                // Log seek completion and clear tracking state
+                self.log_seek_completion(target);
+
                 // Clear seeking timestamp on successful completion
                 self.seeking_started_at = None;
 
                 // Seek completed - transition to appropriate state
-                if *resume_playing {
+                if resume {
                     self.state = PlaybackState::Playing { position_secs };
                 } else {
                     self.state = PlaybackState::Paused { position_secs };
@@ -530,10 +606,22 @@ impl VideoPlayer {
     /// Transitions to buffering state.
     pub fn set_buffering(&mut self, position_secs: f64) {
         self.state = PlaybackState::Buffering { position_secs };
+
+        // Log state event for diagnostics
+        if let Some(ref handle) = self.diagnostics {
+            handle.log_state(AppStateEvent::VideoBuffering { position_secs });
+        }
     }
 
     /// Transitions to error state with the given message.
     pub fn set_error(&mut self, message: String) {
+        // Log state event for diagnostics (before moving message)
+        if let Some(ref handle) = self.diagnostics {
+            handle.log_state(AppStateEvent::VideoError {
+                message: message.clone(),
+            });
+        }
+
         self.state = PlaybackState::Error { message };
     }
 
@@ -546,14 +634,20 @@ impl VideoPlayer {
             resume_playing,
         } = &self.state
         {
+            let target = *target_secs;
+            let resume = *resume_playing;
+
+            // Log seek completion and clear tracking state
+            self.log_seek_completion(target);
             self.seeking_started_at = None;
-            if *resume_playing {
+
+            if resume {
                 self.state = PlaybackState::Playing {
-                    position_secs: *target_secs,
+                    position_secs: target,
                 };
             } else {
                 self.state = PlaybackState::Paused {
-                    position_secs: *target_secs,
+                    position_secs: target,
                 };
             }
         }
@@ -578,19 +672,24 @@ impl VideoPlayer {
             resume_playing,
         } = &self.state
         {
-            #[cfg(debug_assertions)]
-            eprintln!(
-                "[seeking] Force completing seek to {target_secs}s (resume_playing={resume_playing})"
-            );
+            // Extract values before mutable borrow
+            let target = *target_secs;
+            let resume = *resume_playing;
 
+            #[cfg(debug_assertions)]
+            eprintln!("[seeking] Force completing seek to {target}s (resume_playing={resume})");
+
+            // Log seek completion and clear tracking state
+            self.log_seek_completion(target);
             self.seeking_started_at = None;
-            if *resume_playing {
+
+            if resume {
                 self.state = PlaybackState::Playing {
-                    position_secs: *target_secs,
+                    position_secs: target,
                 };
             } else {
                 self.state = PlaybackState::Paused {
-                    position_secs: *target_secs,
+                    position_secs: target,
                 };
             }
         }

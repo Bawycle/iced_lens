@@ -877,4 +877,26 @@ mod tests {
             "second timestamp should be at least 50ms after first: ts0={ts0}, ts1={ts1}"
         );
     }
+
+    #[test]
+    fn instrumentation_overhead_is_minimal() {
+        use std::time::Instant;
+
+        let collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        // Measure time to log 1000 events via handle (channel-based, non-blocking)
+        let start = Instant::now();
+        for _ in 0..1000 {
+            handle.log_action(UserAction::TogglePlayback);
+        }
+        let elapsed = start.elapsed();
+
+        // Should complete 1000 logs in < 1ms (channel send is very fast)
+        assert!(
+            elapsed.as_micros() < 1000,
+            "1000 log_action calls should complete in < 1ms, took {} µs",
+            elapsed.as_micros()
+        );
+    }
 }

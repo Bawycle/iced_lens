@@ -146,6 +146,22 @@ impl UpdateContext<'_> {
     }
 }
 
+/// Handles state updates after successful media load.
+fn handle_successful_media_load(ctx: &mut UpdateContext<'_>) {
+    *ctx.metadata_editor_state = None;
+    if let Some(path) = ctx.viewer.current_media_path.as_ref() {
+        *ctx.current_metadata = media::metadata::extract_metadata(path);
+        ctx.persisted.set_last_open_directory_from_file(path);
+        if let Some(key) = ctx.persisted.save() {
+            ctx.notifications
+                .push(notifications::Notification::warning(&key));
+        }
+    } else {
+        *ctx.current_metadata = None;
+    }
+    ctx.notifications.clear_load_errors();
+}
+
 /// Handles viewer component messages.
 pub fn handle_viewer_message(
     ctx: &mut UpdateContext<'_>,
@@ -155,36 +171,13 @@ pub fn handle_viewer_message(
         *ctx.window_id = Some(*window);
     }
 
-    // Check if this is a successful MediaLoaded message to extract metadata
     let is_successful_load = matches!(&message, component::Message::MediaLoaded(Ok(_)));
+    let (effect, task) = ctx
+        .viewer
+        .handle_message(message, ctx.i18n, ctx.diagnostics);
 
-    let (effect, task) = ctx.viewer.handle_message(message, ctx.i18n);
-
-    // Handle successful media load
     if is_successful_load {
-        // Exit metadata edit mode (new media loaded = new context)
-        *ctx.metadata_editor_state = None;
-
-        // Use viewer.current_media_path as the source of truth for metadata extraction.
-        // This is the path of the media that was just loaded, which is guaranteed to be
-        // correct at this point. The navigator may not yet be synchronized (ConfirmNavigation
-        // effect is processed later).
-        if let Some(path) = ctx.viewer.current_media_path.as_ref() {
-            // Extract metadata
-            *ctx.current_metadata = media::metadata::extract_metadata(path);
-
-            // Remember the directory for next time and persist
-            ctx.persisted.set_last_open_directory_from_file(path);
-            if let Some(key) = ctx.persisted.save() {
-                ctx.notifications
-                    .push(notifications::Notification::warning(&key));
-            }
-        } else {
-            *ctx.current_metadata = None;
-        }
-
-        // Clear any stale load error notifications (UX: state consistency)
-        ctx.notifications.clear_load_errors();
+        handle_successful_media_load(ctx);
     }
 
     let viewer_task = task.map(Message::Viewer);
@@ -943,9 +936,11 @@ pub fn handle_navbar_message(
                 | filter_dropdown::Message::ConsumeClick
                 | filter_dropdown::Message::DateSegmentChanged { .. } => {
                     // These are local dropdown state messages - forward to viewer component
-                    let (effect, task) = ctx
-                        .viewer
-                        .handle_message(component::Message::FilterDropdown(filter_msg), ctx.i18n);
+                    let (effect, task) = ctx.viewer.handle_message(
+                        component::Message::FilterDropdown(filter_msg),
+                        ctx.i18n,
+                        ctx.diagnostics,
+                    );
                     // Handle any effects from the viewer
                     // Only FilterChanged and None are expected from FilterDropdown messages
                     let effect_task = match effect {

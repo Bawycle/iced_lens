@@ -1,7 +1,7 @@
 # Story 1.8: Video Player Instrumentation
 
 **Epic:** 1 - Diagnostics Core & Data Collection
-**Status:** Ready
+**Status:** Done
 **Priority:** Medium
 **Estimate:** 2 hours
 **Depends On:** Story 1.7
@@ -50,45 +50,45 @@
 ## Tasks
 
 ### Task 1: Pass DiagnosticsHandle to Video Player (AC: 1, 2)
-- [ ] Add `diagnostics: Option<DiagnosticsHandle>` field to `VideoPlayer` struct in `state.rs`
-- [ ] Add `pub fn set_diagnostics(&mut self, handle: DiagnosticsHandle)` method
-- [ ] Call `set_diagnostics()` when VideoPlayer is created in `component.rs`
-- [ ] Verify handle is accessible in `play()`, `pause()`, `seek()` methods
+- [x] Add `diagnostics: Option<DiagnosticsHandle>` field to `VideoPlayer` struct in `state.rs`
+- [x] Add `pub fn set_diagnostics(&mut self, handle: DiagnosticsHandle)` method
+- [x] Call `set_diagnostics()` when VideoPlayer is created in `component.rs`
+- [x] Verify handle is accessible in `play()`, `pause()`, `seek()` methods
 
 ### Task 2: Instrument User Actions (AC: 3)
-- [ ] In `src/ui/viewer/component.rs`, `match video_msg` block (~line 984):
-  - [ ] Add `log_action(UserAction::TogglePlayback)` in `VM::TogglePlayback` handler
-  - [ ] Add `log_action(UserAction::SeekVideo { position_secs })` in `VM::SeekCommit` handler
+- [x] In `src/ui/viewer/component.rs`, `match video_msg` block (~line 984):
+  - [x] Add `log_action(UserAction::TogglePlayback)` in `VM::TogglePlayback` handler
+  - [x] Add `log_action(UserAction::SeekVideo { position_secs })` in `VM::SeekCommit` handler
 
 ### Task 3: Instrument Video Playback States (AC: 4)
-- [ ] In `src/video_player/state.rs`:
-  - [ ] Add `log_state(VideoPlaying)` at end of `play()` method (line 299)
-  - [ ] Add `log_state(VideoPaused)` at end of `pause()` method (line 352)
-  - [ ] Add `log_state(VideoSeeking)` at start of `seek()` method (line 415)
-  - [ ] Add `log_state(VideoBuffering)` in `set_buffering()` method (line 531)
-  - [ ] Add `log_state(VideoError)` in `set_error()` method (line 536)
-  - [ ] Add `log_state(VideoAtEndOfStream)` in `set_at_end_of_stream()` method (line 277)
+- [x] In `src/video_player/state.rs`:
+  - [x] Add `log_state(VideoPlaying)` at end of `play()` method (line 299)
+  - [x] Add `log_state(VideoPaused)` at end of `pause()` method (line 352)
+  - [x] Add `log_state(VideoSeeking)` at start of `seek()` method (line 415)
+  - [x] Add `log_state(VideoBuffering)` in `set_buffering()` method (line 531)
+  - [x] Add `log_state(VideoError)` in `set_error()` method (line 536)
+  - [x] Add `log_state(VideoAtEndOfStream)` in `set_at_end_of_stream()` method (line 277)
 
 ### Task 4: Instrument Video Seek Operation (AC: 5)
-- [ ] Reuse existing `seeking_started_at: Option<Instant>` field (line 176)
-- [ ] Store initial position when seek starts
-- [ ] On seek completion (in `complete_seek` or equivalent):
-  - [ ] Calculate `duration_ms = seeking_started_at.elapsed().as_millis()`
-  - [ ] Calculate `seek_distance_secs = (final_pos - initial_pos).abs()`
-  - [ ] Call `log_operation(AppOperation::VideoSeek { duration_ms, seek_distance_secs })`
+- [x] Reuse existing `seeking_started_at: Option<Instant>` field (line 176)
+- [x] Store initial position when seek starts
+- [x] On seek completion (in `complete_seek` or equivalent):
+  - [x] Calculate `duration_ms = seeking_started_at.elapsed().as_millis()`
+  - [x] Calculate `seek_distance_secs = (final_pos - initial_pos).abs()`
+  - [x] Call `log_operation(AppOperation::VideoSeek { duration_ms, seek_distance_secs })`
 
 ### Task 5: Add Tests (AC: 6, 7)
-- [ ] Add test `instrumentation_overhead_is_minimal` in `collector.rs`
-- [ ] Verify non-blocking behavior (channel-based logging)
+- [x] Add test `instrumentation_overhead_is_minimal` in `collector.rs`
+- [x] Verify non-blocking behavior (channel-based logging)
 
 ### Task 6: Run Validation
-- [ ] `cargo fmt --all`
-- [ ] `cargo clippy --all --all-targets -- -D warnings`
-- [ ] `cargo test`
+- [x] `cargo fmt --all`
+- [x] `cargo clippy --all --all-targets -- -D warnings`
+- [x] `cargo test`
 
 ### Task 7: Commit Changes
-- [ ] Stage all changes
-- [ ] Commit with message: `feat(diagnostics): instrument video player [Story 1.8]`
+- [x] Stage all changes
+- [x] Commit with message: `feat(diagnostics): instrument video player [Story 1.8]`
 
 ---
 
@@ -282,11 +282,21 @@ fn instrumentation_overhead_is_minimal() {
 
 ## Dev Agent Record
 
+### File List
+| File | Action | Description |
+|------|--------|-------------|
+| `src/video_player/state.rs` | Modified | Added DiagnosticsHandle, instrumented play/pause/seek/buffering/error/end-of-stream |
+| `src/ui/viewer/component.rs` | Modified | Pass DiagnosticsHandle to VideoPlayer, instrument TogglePlayback/SeekVideo |
+| `src/app/update.rs` | Modified | Pass diagnostics to handle_message, extract handle_successful_media_load helper |
+| `src/app/mod.rs` | Modified | Add test_diagnostics() helper for tests |
+| `src/diagnostics/collector.rs` | Modified | Add instrumentation_overhead_is_minimal test |
+
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-13 | Story created from Story 1.8 split | Claude Opus 4.5 |
 | 2026-01-13 | Added TogglePlayback/SeekVideo user actions (deferred from 1.7) | PO Review |
 | 2026-01-13 | Added comprehensive Dev Notes (source tree, handler locations, imports, patterns), Testing section, Task-AC mappings | PO Validation |
+| 2026-01-13 | Implementation complete: all AC implemented, tests passing | Dev (James) |
 
 ---
