@@ -187,6 +187,15 @@ pub const MIN_DIAGNOSTICS_BUFFER_CAPACITY: usize = 100;
 /// Maximum diagnostics buffer capacity.
 pub const MAX_DIAGNOSTICS_BUFFER_CAPACITY: usize = 10000;
 
+/// Default sampling interval for resource metrics (in milliseconds).
+pub const DEFAULT_SAMPLING_INTERVAL_MS: u64 = 1000;
+
+/// Minimum sampling interval (in milliseconds).
+pub const MIN_SAMPLING_INTERVAL_MS: u64 = 100;
+
+/// Maximum sampling interval (in milliseconds).
+pub const MAX_SAMPLING_INTERVAL_MS: u64 = 60000;
+
 // ==========================================================================
 // Compile-time Validation
 // ==========================================================================
@@ -279,4 +288,10 @@ const _: () = {
     assert!(MAX_DIAGNOSTICS_BUFFER_CAPACITY >= MIN_DIAGNOSTICS_BUFFER_CAPACITY);
     assert!(DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY >= MIN_DIAGNOSTICS_BUFFER_CAPACITY);
     assert!(DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY <= MAX_DIAGNOSTICS_BUFFER_CAPACITY);
+
+    // Sampling interval validation
+    assert!(MIN_SAMPLING_INTERVAL_MS >= 1);
+    assert!(MAX_SAMPLING_INTERVAL_MS >= MIN_SAMPLING_INTERVAL_MS);
+    assert!(DEFAULT_SAMPLING_INTERVAL_MS >= MIN_SAMPLING_INTERVAL_MS);
+    assert!(DEFAULT_SAMPLING_INTERVAL_MS <= MAX_SAMPLING_INTERVAL_MS);
 };

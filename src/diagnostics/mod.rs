@@ -19,6 +19,8 @@
 
 mod buffer;
 mod events;
+mod resource_collector;
 
 pub use buffer::{BufferCapacity, CircularBuffer};
-pub use events::DiagnosticEvent;
+pub use events::{DiagnosticEvent, DiagnosticEventKind};
+pub use resource_collector::{ResourceCollector, ResourceMetrics, SamplingInterval};

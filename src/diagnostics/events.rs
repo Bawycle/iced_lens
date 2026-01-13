@@ -8,6 +8,8 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
+use super::ResourceMetrics;
+
 /// A diagnostic event with timestamp.
 ///
 /// Each event captures a specific type of activity or state change
@@ -53,11 +55,10 @@ impl DiagnosticEvent {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DiagnosticEventKind {
     /// System resource metrics snapshot.
-    /// Placeholder: Will be expanded in Story 1.2 with CPU, RAM, disk data.
+    /// Contains CPU, RAM, and disk I/O measurements.
     ResourceSnapshot {
-        /// Placeholder field for future resource data
-        #[serde(skip_serializing_if = "Option::is_none")]
-        placeholder: Option<String>,
+        /// The collected resource metrics
+        metrics: ResourceMetrics,
     },
 
     /// User-initiated action.
@@ -93,13 +94,20 @@ pub enum DiagnosticEventKind {
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
+
     use super::*;
+
+    fn sample_metrics() -> ResourceMetrics {
+        ResourceMetrics::new(50.0, 4_000_000_000, 8_000_000_000, 1000, 2000)
+    }
 
     #[test]
     fn diagnostic_event_new_creates_with_current_timestamp() {
         let before = Instant::now();
-        let event =
-            DiagnosticEvent::new(DiagnosticEventKind::ResourceSnapshot { placeholder: None });
+        let event = DiagnosticEvent::new(DiagnosticEventKind::ResourceSnapshot {
+            metrics: sample_metrics(),
+        });
         let after = Instant::now();
 
         assert!(event.timestamp >= before);
@@ -120,7 +128,9 @@ mod tests {
     #[test]
     fn diagnostic_event_kind_variants_exist() {
         // Verify all variants can be constructed and pattern-matched
-        let resource = DiagnosticEventKind::ResourceSnapshot { placeholder: None };
+        let resource = DiagnosticEventKind::ResourceSnapshot {
+            metrics: sample_metrics(),
+        };
         let action = DiagnosticEventKind::UserAction { placeholder: None };
         let state = DiagnosticEventKind::AppState { placeholder: None };
         let warning = DiagnosticEventKind::Warning {
@@ -166,22 +176,29 @@ mod tests {
     }
 
     #[test]
-    fn diagnostic_event_kind_skips_none_placeholders() {
-        let resource = DiagnosticEventKind::ResourceSnapshot { placeholder: None };
-        let json = serde_json::to_string(&resource).expect("serialization should succeed");
-
-        // Should not contain "placeholder" field when None
-        assert!(!json.contains("placeholder"));
-        assert_eq!(json, r#"{"type":"resource_snapshot"}"#);
-    }
-
-    #[test]
-    fn diagnostic_event_kind_includes_some_placeholders() {
+    fn resource_snapshot_serializes_with_metrics() {
         let resource = DiagnosticEventKind::ResourceSnapshot {
-            placeholder: Some("test".to_string()),
+            metrics: sample_metrics(),
         };
         let json = serde_json::to_string(&resource).expect("serialization should succeed");
 
-        assert!(json.contains("\"placeholder\":\"test\""));
+        assert!(json.contains("\"type\":\"resource_snapshot\""));
+        assert!(json.contains("\"cpu_percent\":50.0"));
+        assert!(json.contains("\"ram_used_bytes\":4000000000"));
+    }
+
+    #[test]
+    fn resource_snapshot_deserializes_from_json() {
+        let json = r#"{"type":"resource_snapshot","metrics":{"cpu_percent":25.0,"ram_used_bytes":2000000000,"ram_total_bytes":8000000000,"disk_read_bytes":100,"disk_write_bytes":200}}"#;
+        let event: DiagnosticEventKind =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match event {
+            DiagnosticEventKind::ResourceSnapshot { metrics } => {
+                assert_relative_eq!(metrics.cpu_percent, 25.0, epsilon = 0.01);
+                assert_eq!(metrics.ram_used_bytes, 2_000_000_000);
+            }
+            _ => panic!("expected ResourceSnapshot variant"),
+        }
     }
 }
