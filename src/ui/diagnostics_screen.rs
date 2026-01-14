@@ -8,9 +8,10 @@ use std::time::Duration;
 
 use crate::diagnostics::CollectionStatus;
 use crate::i18n::fluent::I18n;
-use crate::ui::design_tokens::{palette, radius, spacing, typography};
+use crate::ui::action_icons;
+use crate::ui::design_tokens::{palette, radius, sizing, spacing, typography};
 use iced::{
-    alignment::Horizontal,
+    alignment::{Horizontal, Vertical},
     widget::{button, container, scrollable, text, toggler, Column, Row, Space, Text},
     Border, Color, Element, Length,
 };
@@ -24,6 +25,8 @@ pub struct ViewContext<'a> {
     pub event_count: usize,
     /// Duration since collection started.
     pub collection_duration: Duration,
+    /// Whether the dark theme is active (for icon selection).
+    pub is_dark_theme: bool,
 }
 
 /// Messages emitted by the diagnostics screen.
@@ -34,6 +37,10 @@ pub enum Message {
     RefreshStatus,
     /// Toggle resource collection on/off.
     ToggleResourceCollection(bool),
+    /// Export diagnostic report to file.
+    ExportToFile,
+    /// Copy diagnostic report to clipboard.
+    ExportToClipboard,
 }
 
 /// Events propagated to the parent application.
@@ -43,6 +50,10 @@ pub enum Event {
     BackToViewer,
     /// Request to toggle resource collection.
     ToggleResourceCollection(bool),
+    /// Request to export diagnostic report to file.
+    ExportToFile,
+    /// Request to copy diagnostic report to clipboard.
+    ExportToClipboard,
 }
 
 /// Process a diagnostics screen message and return the corresponding event.
@@ -52,6 +63,8 @@ pub fn update(message: &Message) -> Event {
         Message::BackToViewer => Event::BackToViewer,
         Message::RefreshStatus => Event::None,
         Message::ToggleResourceCollection(enabled) => Event::ToggleResourceCollection(*enabled),
+        Message::ExportToFile => Event::ExportToFile,
+        Message::ExportToClipboard => Event::ExportToClipboard,
     }
 }
 
@@ -168,6 +181,49 @@ fn build_toggle_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .into()
 }
 
+/// Builds the export buttons section.
+fn build_export_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let can_export = ctx.event_count > 0;
+
+    // Export to File button (icon + text)
+    let file_icon =
+        action_icons::diagnostics::export_file(ctx.is_dark_theme).width(sizing::ICON_SM);
+    let file_content = Row::new()
+        .spacing(spacing::XS)
+        .align_y(Vertical::Center)
+        .push(file_icon)
+        .push(text(ctx.i18n.tr("diagnostics-export-file")).size(typography::BODY));
+
+    let file_button = button(file_content).padding([spacing::XS, spacing::SM]);
+    let file_button = if can_export {
+        file_button.on_press(Message::ExportToFile)
+    } else {
+        file_button // Disabled - no on_press
+    };
+
+    // Copy to Clipboard button (icon + text)
+    let clipboard_icon =
+        action_icons::diagnostics::export_clipboard(ctx.is_dark_theme).width(sizing::ICON_SM);
+    let clipboard_content = Row::new()
+        .spacing(spacing::XS)
+        .align_y(Vertical::Center)
+        .push(clipboard_icon)
+        .push(text(ctx.i18n.tr("diagnostics-export-clipboard")).size(typography::BODY));
+
+    let clipboard_button = button(clipboard_content).padding([spacing::XS, spacing::SM]);
+    let clipboard_button = if can_export {
+        clipboard_button.on_press(Message::ExportToClipboard)
+    } else {
+        clipboard_button // Disabled - no on_press
+    };
+
+    Row::new()
+        .spacing(spacing::SM)
+        .push(file_button)
+        .push(clipboard_button)
+        .into()
+}
+
 /// Render the diagnostics screen.
 #[must_use]
 #[allow(clippy::needless_pass_by_value)] // ViewContext is small and consumed
@@ -181,6 +237,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
 
     let toggle_section = build_toggle_section(&ctx);
     let status_section = build_status_section(&ctx);
+    let export_section = build_export_section(&ctx);
 
     let content = Column::new()
         .width(Length::Fill)
@@ -190,7 +247,8 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
         .push(back_button)
         .push(title)
         .push(toggle_section)
-        .push(status_section);
+        .push(status_section)
+        .push(export_section);
 
     scrollable(content).into()
 }
@@ -209,6 +267,7 @@ mod tests {
             status: CollectionStatus::Disabled,
             event_count: 0,
             collection_duration: Duration::from_secs(0),
+            is_dark_theme: false,
         };
         let _element = view(ctx);
     }
@@ -232,6 +291,18 @@ mod tests {
 
         let event = update(&Message::ToggleResourceCollection(false));
         assert!(matches!(event, Event::ToggleResourceCollection(false)));
+    }
+
+    #[test]
+    fn export_to_file_emits_event() {
+        let event = update(&Message::ExportToFile);
+        assert!(matches!(event, Event::ExportToFile));
+    }
+
+    #[test]
+    fn export_to_clipboard_emits_event() {
+        let event = update(&Message::ExportToClipboard);
+        assert!(matches!(event, Event::ExportToClipboard));
     }
 
     #[test]

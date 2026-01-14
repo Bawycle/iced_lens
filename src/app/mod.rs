@@ -532,6 +532,59 @@ impl App {
             self.window_size = Some(*size);
         }
 
+        // Handle diagnostics exports before creating context (need access to self.notifications)
+        if let Message::Diagnostics(ref diagnostics_message) = message {
+            match diagnostics_message {
+                diagnostics_screen::Message::ToggleResourceCollection(enabled) => {
+                    if *enabled {
+                        self.diagnostics.enable_resource_collection();
+                    } else {
+                        self.diagnostics.disable_resource_collection();
+                    }
+                }
+                diagnostics_screen::Message::ExportToFile => {
+                    match self.diagnostics.export_with_dialog() {
+                        Ok(_path) => {
+                            self.notifications
+                                .push(notifications::Notification::success(
+                                    "notification-diagnostics-export-success",
+                                ));
+                        }
+                        Err(crate::diagnostics::ExportError::Cancelled) => {
+                            // User cancelled, no notification needed
+                        }
+                        Err(_) => {
+                            self.notifications.push(
+                                notifications::Notification::error(
+                                    "notification-diagnostics-export-error",
+                                )
+                                .with_error_type(ErrorType::ExportError),
+                            );
+                        }
+                    }
+                }
+                diagnostics_screen::Message::ExportToClipboard => {
+                    match self.diagnostics.export_to_clipboard() {
+                        Ok(()) => {
+                            self.notifications
+                                .push(notifications::Notification::success(
+                                    "notification-diagnostics-clipboard-success",
+                                ));
+                        }
+                        Err(_) => {
+                            self.notifications.push(
+                                notifications::Notification::error(
+                                    "notification-diagnostics-clipboard-error",
+                                )
+                                .with_error_type(ErrorType::ExportError),
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
         // Get diagnostics handle before creating context (to avoid borrow issues)
         let diagnostics_handle = self.diagnostics.handle();
 
@@ -580,16 +633,7 @@ impl App {
             Message::Help(help_message) => update::handle_help_message(&mut ctx, help_message),
             Message::About(about_message) => update::handle_about_message(&mut ctx, &about_message),
             Message::Diagnostics(diagnostics_message) => {
-                // Handle toggle event directly since we need access to DiagnosticsCollector
-                if let diagnostics_screen::Message::ToggleResourceCollection(enabled) =
-                    &diagnostics_message
-                {
-                    if *enabled {
-                        self.diagnostics.enable_resource_collection();
-                    } else {
-                        self.diagnostics.disable_resource_collection();
-                    }
-                }
+                // Toggle and export handled before ctx creation to avoid borrow conflicts
                 update::handle_diagnostics_message(&mut ctx, &diagnostics_message)
             }
             Message::MetadataPanel(panel_message) => {

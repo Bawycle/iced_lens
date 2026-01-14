@@ -573,3 +573,11 @@ diagnostics-events-running-for = Eventi: { $duration }
 diagnostics-resources-running-for = Risorse: { $duration }
 diagnostics-buffer-count = Buffer: { $count } eventi
 diagnostics-toggle-label = Abilita raccolta risorse
+diagnostics-export-file = Esporta su file
+diagnostics-export-clipboard = Copia negli appunti
+
+# Notifiche diagnostica
+notification-diagnostics-export-success = Diagnostica esportata con successo
+notification-diagnostics-export-error = Esportazione diagnostica fallita
+notification-diagnostics-clipboard-success = Diagnostica copiata negli appunti
+notification-diagnostics-clipboard-error = Copia diagnostica negli appunti fallita

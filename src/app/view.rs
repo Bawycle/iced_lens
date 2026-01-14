@@ -141,6 +141,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
             ctx.diagnostics_status,
             ctx.diagnostics_event_count,
             ctx.diagnostics_collection_duration,
+            ctx.is_dark_theme,
         ),
     };
 
@@ -388,12 +389,14 @@ fn view_diagnostics(
     status: CollectionStatus,
     event_count: usize,
     collection_duration: Duration,
+    is_dark_theme: bool,
 ) -> Element<'_, Message> {
     diagnostics_screen::view(DiagnosticsViewContext {
         i18n,
         status,
         event_count,
         collection_duration,
+        is_dark_theme,
     })
     .map(Message::Diagnostics)
 }

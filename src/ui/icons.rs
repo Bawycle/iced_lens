@@ -340,6 +340,23 @@ define_icon!(
 );
 
 // =============================================================================
+// Diagnostics Screen Icons
+// =============================================================================
+
+define_icon!(
+    arrow_down_bar,
+    dark,
+    "arrow_down_bar.png",
+    "Arrow down bar icon: arrow pointing down with horizontal line at bottom."
+);
+define_icon!(
+    clipboard,
+    dark,
+    "clipboard.png",
+    "Clipboard icon: clipboard shape with clip at top."
+);
+
+// =============================================================================
 // Light Icons (White variants for toolbars and dark theme UI)
 // =============================================================================
 
@@ -545,6 +562,20 @@ pub mod light {
         light,
         "checkmark.png",
         "Checkmark icon (white): for notifications."
+    );
+
+    // Diagnostics screen icons
+    define_icon!(
+        arrow_down_bar,
+        light,
+        "arrow_down_bar.png",
+        "Arrow down bar icon (white): for diagnostics export."
+    );
+    define_icon!(
+        clipboard,
+        light,
+        "clipboard.png",
+        "Clipboard icon (white): for diagnostics export."
     );
 }
 

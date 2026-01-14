@@ -1039,6 +1039,10 @@ pub fn handle_diagnostics_message(
             // Toggle is handled directly in App::update() since it needs DiagnosticsCollector
             Task::none()
         }
+        DiagnosticsEvent::ExportToFile | DiagnosticsEvent::ExportToClipboard => {
+            // Export is handled directly in App::update() since it needs DiagnosticsCollector
+            Task::none()
+        }
     }
 }
 

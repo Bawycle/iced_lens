@@ -401,5 +401,8 @@ fn needs_light_variant(name: &str) -> bool {
             // Notifications
             | "warning"
             | "checkmark"
+            // Diagnostics screen
+            | "arrow_down_bar"
+            | "clipboard"
     )
 }
