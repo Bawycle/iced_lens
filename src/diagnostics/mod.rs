@@ -25,7 +25,7 @@ mod report;
 mod resource_collector;
 mod sanitizer;
 
-pub use anonymizer::PathAnonymizer;
+pub use anonymizer::{IdentityAnonymizer, PathAnonymizer};
 pub use buffer::{BufferCapacity, CircularBuffer};
 pub use collector::{DiagnosticsCollector, DiagnosticsHandle};
 pub use events::{
