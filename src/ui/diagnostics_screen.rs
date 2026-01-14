@@ -11,7 +11,7 @@ use crate::i18n::fluent::I18n;
 use crate::ui::design_tokens::{palette, radius, spacing, typography};
 use iced::{
     alignment::Horizontal,
-    widget::{button, container, scrollable, text, Column, Row, Text},
+    widget::{button, container, scrollable, text, toggler, Column, Row, Space, Text},
     Border, Color, Element, Length,
 };
 
@@ -32,6 +32,8 @@ pub enum Message {
     BackToViewer,
     /// Refresh status on subscription tick.
     RefreshStatus,
+    /// Toggle resource collection on/off.
+    ToggleResourceCollection(bool),
 }
 
 /// Events propagated to the parent application.
@@ -39,6 +41,8 @@ pub enum Message {
 pub enum Event {
     None,
     BackToViewer,
+    /// Request to toggle resource collection.
+    ToggleResourceCollection(bool),
 }
 
 /// Process a diagnostics screen message and return the corresponding event.
@@ -47,6 +51,7 @@ pub fn update(message: &Message) -> Event {
     match message {
         Message::BackToViewer => Event::BackToViewer,
         Message::RefreshStatus => Event::None,
+        Message::ToggleResourceCollection(enabled) => Event::ToggleResourceCollection(*enabled),
     }
 }
 
@@ -91,7 +96,7 @@ fn build_status_indicator(color: Color) -> Element<'static, Message> {
         .into()
 }
 
-/// Builds the status section showing collection state, duration, and buffer count.
+/// Builds the status section showing collection state, durations, and buffer count.
 fn build_status_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
     let color = status_color(&ctx.status);
 
@@ -111,11 +116,12 @@ fn build_status_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .push(build_status_indicator(color))
         .push(Text::new(status_text).size(typography::BODY));
 
-    // Duration text
-    let duration_str = format_duration(ctx.collection_duration);
-    let duration_text = ctx
-        .i18n
-        .tr_with_args("diagnostics-running-for", &[("duration", &duration_str)]);
+    // Event collection duration (always running since app start)
+    let event_duration_str = format_duration(ctx.collection_duration);
+    let event_duration_text = ctx.i18n.tr_with_args(
+        "diagnostics-events-running-for",
+        &[("duration", &event_duration_str)],
+    );
 
     // Buffer count text
     let count_str = ctx.event_count.to_string();
@@ -123,11 +129,42 @@ fn build_status_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
         .i18n
         .tr_with_args("diagnostics-buffer-count", &[("count", &count_str)]);
 
-    Column::new()
+    let mut column = Column::new()
         .spacing(spacing::SM)
         .push(status_row)
-        .push(Text::new(duration_text).size(typography::BODY))
+        .push(Text::new(event_duration_text).size(typography::BODY));
+
+    // Resource collection duration (only when enabled)
+    if let CollectionStatus::Enabled { started_at } = &ctx.status {
+        let resource_duration_str = format_duration(started_at.elapsed());
+        let resource_duration_text = ctx.i18n.tr_with_args(
+            "diagnostics-resources-running-for",
+            &[("duration", &resource_duration_str)],
+        );
+        column = column.push(Text::new(resource_duration_text).size(typography::BODY));
+    }
+
+    column
         .push(Text::new(buffer_text).size(typography::BODY))
+        .into()
+}
+
+/// Builds the toggle section for enabling/disabling resource collection.
+fn build_toggle_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    let is_enabled = matches!(ctx.status, CollectionStatus::Enabled { .. });
+
+    let label = Text::new(ctx.i18n.tr("diagnostics-toggle-label")).size(typography::BODY);
+
+    let toggle = toggler(is_enabled)
+        .on_toggle(Message::ToggleResourceCollection)
+        .size(20.0); // Match existing IcedLens style
+
+    Row::new()
+        .spacing(spacing::SM)
+        .align_y(iced::Alignment::Center)
+        .push(label)
+        .push(Space::new().width(Length::Fill))
+        .push(toggle)
         .into()
 }
 
@@ -142,6 +179,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
 
     let title = Text::new(ctx.i18n.tr("diagnostics-title")).size(typography::TITLE_LG);
 
+    let toggle_section = build_toggle_section(&ctx);
     let status_section = build_status_section(&ctx);
 
     let content = Column::new()
@@ -151,6 +189,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
         .padding(spacing::MD)
         .push(back_button)
         .push(title)
+        .push(toggle_section)
         .push(status_section);
 
     scrollable(content).into()
@@ -184,6 +223,15 @@ mod tests {
     fn refresh_status_emits_none() {
         let event = update(&Message::RefreshStatus);
         assert!(matches!(event, Event::None));
+    }
+
+    #[test]
+    fn toggle_resource_collection_emits_event() {
+        let event = update(&Message::ToggleResourceCollection(true));
+        assert!(matches!(event, Event::ToggleResourceCollection(true)));
+
+        let event = update(&Message::ToggleResourceCollection(false));
+        assert!(matches!(event, Event::ToggleResourceCollection(false)));
     }
 
     #[test]

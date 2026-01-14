@@ -1035,6 +1035,10 @@ pub fn handle_diagnostics_message(
             *ctx.screen = Screen::Viewer;
             Task::none()
         }
+        DiagnosticsEvent::ToggleResourceCollection(_) => {
+            // Toggle is handled directly in App::update() since it needs DiagnosticsCollector
+            Task::none()
+        }
     }
 }
 

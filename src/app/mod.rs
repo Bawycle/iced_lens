@@ -26,6 +26,7 @@ use crate::diagnostics::{
 };
 use crate::media::metadata::MediaMetadata;
 use crate::media::{self, MaxSkipAttempts, MediaData, MediaNavigator};
+use crate::ui::diagnostics_screen;
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
 use crate::ui::metadata_panel::MetadataEditorState;
@@ -579,6 +580,16 @@ impl App {
             Message::Help(help_message) => update::handle_help_message(&mut ctx, help_message),
             Message::About(about_message) => update::handle_about_message(&mut ctx, &about_message),
             Message::Diagnostics(diagnostics_message) => {
+                // Handle toggle event directly since we need access to DiagnosticsCollector
+                if let diagnostics_screen::Message::ToggleResourceCollection(enabled) =
+                    &diagnostics_message
+                {
+                    if *enabled {
+                        self.diagnostics.enable_resource_collection();
+                    } else {
+                        self.diagnostics.disable_resource_collection();
+                    }
+                }
                 update::handle_diagnostics_message(&mut ctx, &diagnostics_message)
             }
             Message::MetadataPanel(panel_message) => {

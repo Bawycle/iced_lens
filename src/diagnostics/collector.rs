@@ -14,6 +14,7 @@ use super::anonymizer::AnonymizationPipeline;
 use super::export::{
     anonymize_event, default_export_directory, generate_default_filename, write_atomic, ExportError,
 };
+use super::resource_collector::{ResourceCollector, SamplingInterval};
 use super::{
     sanitize_message, AppOperation, AppStateEvent, BufferCapacity, CircularBuffer, DiagnosticEvent,
     DiagnosticEventKind, DiagnosticReport, ErrorEvent, ErrorType, ReportMetadata, ResourceMetrics,
@@ -159,6 +160,12 @@ pub struct DiagnosticsCollector {
     collection_started_at: Instant,
     /// When collection started (wall clock for report metadata).
     collection_started_at_utc: DateTime<Utc>,
+    /// Optional resource collector for system metrics (CPU/RAM/disk).
+    resource_collector: Option<ResourceCollector>,
+    /// Channel to receive metrics from `ResourceCollector`.
+    resource_metrics_rx: Option<Receiver<ResourceMetrics>>,
+    /// When resource collection was enabled (for duration tracking).
+    resource_collection_started_at: Option<Instant>,
 }
 
 /// Default channel capacity for event buffering.
@@ -177,6 +184,9 @@ impl DiagnosticsCollector {
             event_tx,
             collection_started_at: Instant::now(),
             collection_started_at_utc: Utc::now(),
+            resource_collector: None,
+            resource_metrics_rx: None,
+            resource_collection_started_at: None,
         }
     }
 
@@ -191,13 +201,22 @@ impl DiagnosticsCollector {
         }
     }
 
-    /// Processes all pending events from the channel.
+    /// Processes all pending events from channels.
     ///
     /// Call this periodically (e.g., on each UI tick) to drain the
-    /// event channel and store events in the buffer.
+    /// event channels and store events in the buffer.
     pub fn process_pending(&mut self) {
+        // Process diagnostic events
         while let Ok(event) = self.event_rx.try_recv() {
             self.buffer.push(event);
+        }
+
+        // Process resource metrics from ResourceCollector
+        if let Some(ref rx) = self.resource_metrics_rx {
+            while let Ok(metrics) = rx.try_recv() {
+                let event = DiagnosticEvent::new(DiagnosticEventKind::ResourceSnapshot { metrics });
+                self.buffer.push(event);
+            }
         }
     }
 
@@ -261,15 +280,55 @@ impl DiagnosticsCollector {
         self.buffer.capacity()
     }
 
+    /// Enables resource collection (CPU/RAM/disk metrics).
+    ///
+    /// Starts a background thread that samples system metrics at the
+    /// default interval and sends them to the event buffer.
+    ///
+    /// If resource collection is already enabled, this is a no-op.
+    pub fn enable_resource_collection(&mut self) {
+        if self.resource_collector.is_some() {
+            return; // Already enabled
+        }
+
+        let (metrics_tx, metrics_rx) = bounded(DEFAULT_CHANNEL_CAPACITY);
+        let collector = ResourceCollector::start(SamplingInterval::default(), metrics_tx);
+
+        self.resource_collector = Some(collector);
+        self.resource_metrics_rx = Some(metrics_rx);
+        self.resource_collection_started_at = Some(Instant::now());
+    }
+
+    /// Disables resource collection.
+    ///
+    /// Stops the background thread. Existing metrics in buffer are preserved.
+    pub fn disable_resource_collection(&mut self) {
+        if let Some(mut collector) = self.resource_collector.take() {
+            collector.stop();
+        }
+        self.resource_metrics_rx = None;
+        self.resource_collection_started_at = None;
+    }
+
+    /// Returns true if resource collection is currently enabled.
+    #[must_use]
+    pub fn is_resource_collection_enabled(&self) -> bool {
+        self.resource_collector
+            .as_ref()
+            .is_some_and(ResourceCollector::is_running)
+    }
+
     /// Returns the current collection status.
     ///
-    /// Note: Until Story 3.3 integrates `ResourceCollector`, this always
-    /// returns `Disabled` for resource collection. Event collection is
-    /// always active.
+    /// Returns `Enabled` when resource collection is active, `Disabled` otherwise.
+    /// Event collection (user actions, errors, warnings) is always active.
     #[must_use]
     pub fn get_status(&self) -> super::CollectionStatus {
-        // Placeholder until ResourceCollector is integrated in Story 3.3
-        // For now, report as Disabled since no resource metrics are being collected
+        if let Some(started_at) = self.resource_collection_started_at {
+            if self.is_resource_collection_enabled() {
+                return super::CollectionStatus::Enabled { started_at };
+            }
+        }
         super::CollectionStatus::Disabled
     }
 
@@ -1680,7 +1739,7 @@ mod tests {
     #[test]
     fn get_status_returns_disabled_by_default() {
         let collector = DiagnosticsCollector::new(BufferCapacity::default());
-        // Until ResourceCollector is integrated in Story 3.3, status is always Disabled
+        // Resource collection is disabled by default
         assert!(matches!(
             collector.get_status(),
             crate::diagnostics::CollectionStatus::Disabled
@@ -1711,5 +1770,87 @@ mod tests {
         std::thread::sleep(Duration::from_millis(50));
         let duration2 = collector.get_collection_duration();
         assert!(duration2 > duration1, "Duration should increase over time");
+    }
+
+    // ============================================================
+    // Story 3.3: Resource Collection Toggle Tests
+    // ============================================================
+
+    #[test]
+    fn enable_resource_collection_starts_collector() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        assert!(!collector.is_resource_collection_enabled());
+
+        collector.enable_resource_collection();
+        assert!(collector.is_resource_collection_enabled());
+
+        collector.disable_resource_collection();
+        assert!(!collector.is_resource_collection_enabled());
+    }
+
+    #[test]
+    fn enable_twice_is_idempotent() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        collector.enable_resource_collection();
+        collector.enable_resource_collection(); // Should not panic or create duplicate
+        assert!(collector.is_resource_collection_enabled());
+
+        collector.disable_resource_collection();
+    }
+
+    #[test]
+    fn get_status_reflects_collection_state() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        assert!(matches!(
+            collector.get_status(),
+            crate::diagnostics::CollectionStatus::Disabled
+        ));
+
+        collector.enable_resource_collection();
+        assert!(matches!(
+            collector.get_status(),
+            crate::diagnostics::CollectionStatus::Enabled { .. }
+        ));
+
+        collector.disable_resource_collection();
+        assert!(matches!(
+            collector.get_status(),
+            crate::diagnostics::CollectionStatus::Disabled
+        ));
+    }
+
+    #[test]
+    fn process_pending_drains_resource_metrics() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        collector.enable_resource_collection();
+
+        // Wait for at least one metric (sampling default is 1s)
+        std::thread::sleep(Duration::from_millis(1500));
+        collector.process_pending();
+
+        // Should have at least one ResourceSnapshot event
+        let has_resource_snapshot = collector
+            .iter()
+            .any(|e| matches!(e.kind, DiagnosticEventKind::ResourceSnapshot { .. }));
+        assert!(
+            has_resource_snapshot,
+            "Should have captured resource metrics"
+        );
+
+        collector.disable_resource_collection();
+    }
+
+    #[test]
+    fn disable_preserves_existing_events() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        collector.log_action(UserAction::NavigateNext);
+        collector.enable_resource_collection();
+        std::thread::sleep(Duration::from_millis(200));
+        collector.process_pending();
+
+        let count_before = collector.len();
+        collector.disable_resource_collection();
+
+        assert_eq!(collector.len(), count_before, "Events should be preserved");
     }
 }

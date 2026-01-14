@@ -1,7 +1,7 @@
 # Story 3.3: Collection Toggle Control
 
 **Epic:** 3 - UI Integration
-**Status:** Approved
+**Status:** Ready for Review
 **Priority:** High
 **Estimate:** 3-4 hours
 **Depends On:** Story 3.1, Story 3.2
@@ -32,54 +32,54 @@
 
 ## Tasks
 
-- [ ] **Task 1:** Integrate `ResourceCollector` into `DiagnosticsCollector` (AC: 3)
-  - [ ] Add `resource_collector: Option<ResourceCollector>` field
-  - [ ] Add `resource_metrics_rx: Option<Receiver<ResourceMetrics>>` for receiving metrics
-  - [ ] Modify `process_pending()` to also drain metrics channel
-  - [ ] Store received metrics as `DiagnosticEventKind::ResourceSnapshot`
+- [x] **Task 1:** Integrate `ResourceCollector` into `DiagnosticsCollector` (AC: 3)
+  - [x] Add `resource_collector: Option<ResourceCollector>` field
+  - [x] Add `resource_metrics_rx: Option<Receiver<ResourceMetrics>>` for receiving metrics
+  - [x] Modify `process_pending()` to also drain metrics channel
+  - [x] Store received metrics as `DiagnosticEventKind::ResourceSnapshot`
 
-- [ ] **Task 2:** Add enable/disable methods to `DiagnosticsCollector` (AC: 3, 4)
-  - [ ] `enable_resource_collection(&mut self)` - starts ResourceCollector
-  - [ ] `disable_resource_collection(&mut self)` - stops ResourceCollector
-  - [ ] Update `get_status()` to return `Enabled` when ResourceCollector is running
+- [x] **Task 2:** Add enable/disable methods to `DiagnosticsCollector` (AC: 3, 4)
+  - [x] `enable_resource_collection(&mut self)` - starts ResourceCollector
+  - [x] `disable_resource_collection(&mut self)` - stops ResourceCollector
+  - [x] Update `get_status()` to return `Enabled` when ResourceCollector is running
 
-- [ ] **Task 3:** Implement toggle widget in `diagnostics_screen.rs` (AC: 1, 2, 6)
-  - [ ] Use `iced::widget::toggler`
-  - [ ] Label: "Enable Resource Collection" (i18n)
-  - [ ] Match existing style: `.size(20.0)`
-  - [ ] Pass current status from ViewContext
+- [x] **Task 3:** Implement toggle widget in `diagnostics_screen.rs` (AC: 1, 2, 6)
+  - [x] Use `iced::widget::toggler`
+  - [x] Label: "Enable Resource Collection" (i18n)
+  - [x] Match existing style: `.size(20.0)`
+  - [x] Pass current status from ViewContext
 
-- [ ] **Task 4:** Add toggle messages (AC: 4)
-  - [ ] Add `Message::ToggleResourceCollection` to `diagnostics_screen`
-  - [ ] Add `Event::ToggleResourceCollection(bool)` for parent
-  - [ ] Handle in `update()` - emit event to App
+- [x] **Task 4:** Add toggle messages (AC: 4)
+  - [x] Add `Message::ToggleResourceCollection` to `diagnostics_screen`
+  - [x] Add `Event::ToggleResourceCollection(bool)` for parent
+  - [x] Handle in `update()` - emit event to App
 
-- [ ] **Task 5:** Handle toggle in App (AC: 3, 4, 5)
-  - [ ] Handle `diagnostics_screen::Event::ToggleResourceCollection`
-  - [ ] Call `diagnostics.enable_resource_collection()` or `disable_resource_collection()`
-  - [ ] State persists in `DiagnosticsCollector` during session
+- [x] **Task 5:** Handle toggle in App (AC: 3, 4, 5)
+  - [x] Handle `diagnostics_screen::Event::ToggleResourceCollection`
+  - [x] Call `diagnostics.enable_resource_collection()` or `disable_resource_collection()`
+  - [x] State persists in `DiagnosticsCollector` during session
 
-- [ ] **Task 6:** Update `CollectionStatus` logic (AC: 4)
-  - [ ] `get_status()` returns `Enabled` when `resource_collector.is_some()` and running
-  - [ ] `get_status()` returns `Disabled` when stopped or None
-  - [ ] Include `started_at` from ResourceCollector creation time
+- [x] **Task 6:** Update `CollectionStatus` logic (AC: 4)
+  - [x] `get_status()` returns `Enabled` when `resource_collector.is_some()` and running
+  - [x] `get_status()` returns `Disabled` when stopped or None
+  - [x] Include `started_at` from ResourceCollector creation time
 
-- [ ] **Task 7:** Add i18n keys (AC: 6)
-  - [ ] English and French keys for toggle label
+- [x] **Task 7:** Add i18n keys (AC: 6)
+  - [x] English and French keys for toggle label
 
-- [ ] **Task 8:** Write unit tests (AC: 3, 4)
-  - [ ] Test enable/disable methods
-  - [ ] Test status transitions
-  - [ ] Test metrics flow to buffer
+- [x] **Task 8:** Write unit tests (AC: 3, 4)
+  - [x] Test enable/disable methods
+  - [x] Test status transitions
+  - [x] Test metrics flow to buffer
 
-- [ ] **Task 9:** Run validation
-  - [ ] `cargo fmt --all`
-  - [ ] `cargo clippy --all --all-targets -- -D warnings`
-  - [ ] `cargo test`
+- [x] **Task 9:** Run validation
+  - [x] `cargo fmt --all`
+  - [x] `cargo clippy --all --all-targets -- -D warnings`
+  - [x] `cargo test`
 
-- [ ] **Task 10:** Commit changes
-  - [ ] Stage all changes
-  - [ ] Commit: `feat(diagnostics): add resource collection toggle [Story 3.3]`
+- [x] **Task 10:** Commit changes
+  - [x] Stage all changes
+  - [x] Commit: `feat(diagnostics): add resource collection toggle [Story 3.3]`
 
 ---
 
@@ -393,19 +393,33 @@ mod tests {
 ## Dev Agent Record
 
 ### Agent Model Used
-<!-- Record which AI model completed this story -->
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Completion Notes
-<!-- Dev agent adds notes here during implementation -->
+- Integrated ResourceCollector into DiagnosticsCollector with enable/disable methods
+- Added toggler widget following IcedLens style (size 20.0)
+- Toggle event handled directly in App::update() since UpdateContext only has DiagnosticsHandle
+- Added i18n keys for all 5 languages (en-US, fr, de, es, it)
+- All 6 new unit tests pass, 895 total library tests pass
+- Full validation: fmt, clippy (no warnings), all tests pass
 
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-14 | Story created | PM |
 | 2026-01-14 | PO Validation: Added ResourceCollector integration, Source Tree, code examples, architecture diagram, aligned with CollectionStatus | Sarah (PO) |
+| 2026-01-14 | Implementation complete, all tasks done | James (Dev Agent) |
 
 ### File List
-<!-- Files created or modified -->
+- `src/diagnostics/collector.rs` - Added ResourceCollector integration, enable/disable methods, updated get_status(), 5 new tests
+- `src/ui/diagnostics_screen.rs` - Added toggle widget, ToggleResourceCollection message/event, 1 new test
+- `src/app/mod.rs` - Added diagnostics_screen import, toggle event handling
+- `src/app/update.rs` - Added ToggleResourceCollection event case
+- `assets/i18n/en-US.ftl` - Added diagnostics-toggle-label key
+- `assets/i18n/fr.ftl` - Added diagnostics-toggle-label key
+- `assets/i18n/de.ftl` - Added diagnostics-toggle-label key
+- `assets/i18n/es.ftl` - Added diagnostics-toggle-label key
+- `assets/i18n/it.ftl` - Added diagnostics-toggle-label key
 
 ---
 
