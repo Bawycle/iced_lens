@@ -32,6 +32,8 @@ pub use events::{
     AIModel, AppOperation, AppStateEvent, DiagnosticEvent, DiagnosticEventKind, EditorTool,
     ErrorEvent, MediaType, SizeCategory, UserAction, WarningEvent,
 };
-pub use report::{DiagnosticReport, ReportMetadata, SerializableEvent, SystemInfo};
+pub use report::{
+    DiagnosticReport, ReportMetadata, ReportSummary, ResourceStats, SerializableEvent, SystemInfo,
+};
 pub use resource_collector::{ResourceCollector, ResourceMetrics, SamplingInterval};
 pub use sanitizer::{sanitize_message, ErrorType, WarningType};

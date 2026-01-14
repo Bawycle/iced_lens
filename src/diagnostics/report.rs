@@ -4,6 +4,7 @@
 //! This module provides structures for building diagnostic reports
 //! that can be exported as JSON for debugging and analysis.
 
+use std::collections::HashMap;
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
@@ -124,6 +125,98 @@ impl SerializableEvent {
 }
 
 // =============================================================================
+// Report Summary
+// =============================================================================
+
+/// Resource usage statistics calculated from `ResourceSnapshot` events.
+///
+/// All fields are optional since there may be no resource snapshots in a report.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ResourceStats {
+    /// Minimum CPU usage percentage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_min: Option<f32>,
+    /// Maximum CPU usage percentage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_max: Option<f32>,
+    /// Average CPU usage percentage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_avg: Option<f32>,
+    /// Minimum RAM usage in megabytes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ram_min_mb: Option<u64>,
+    /// Maximum RAM usage in megabytes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ram_max_mb: Option<u64>,
+    /// Average RAM usage in megabytes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ram_avg_mb: Option<u64>,
+}
+
+/// Summary statistics for a diagnostic report.
+///
+/// Provides quick overview of collected events without parsing all event data.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ReportSummary {
+    /// Count of events by type (e.g., `"user_action": 15`, `"resource_snapshot": 120`)
+    pub event_counts: HashMap<String, usize>,
+    /// Resource usage statistics (present only if `ResourceSnapshot` events exist)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_stats: Option<ResourceStats>,
+}
+
+impl ReportSummary {
+    /// Computes summary statistics from a list of serializable events.
+    ///
+    /// # Behavior
+    ///
+    /// - Counts events by their `DiagnosticEventKind` variant
+    /// - Calculates min/max/avg CPU and RAM from `ResourceSnapshot` events
+    /// - Returns empty counts and `None` stats for empty event list
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)] // Length of events fits in f32
+    pub fn from_events(events: &[SerializableEvent]) -> Self {
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        let mut cpu_values: Vec<f32> = Vec::new();
+        let mut ram_values: Vec<u64> = Vec::new();
+
+        for event in events {
+            let type_name = match &event.kind {
+                DiagnosticEventKind::UserAction { .. } => "user_action",
+                DiagnosticEventKind::AppState { .. } => "app_state",
+                DiagnosticEventKind::Operation { .. } => "operation",
+                DiagnosticEventKind::Warning { .. } => "warning",
+                DiagnosticEventKind::Error { .. } => "error",
+                DiagnosticEventKind::ResourceSnapshot { metrics } => {
+                    cpu_values.push(metrics.cpu_percent);
+                    ram_values.push(metrics.ram_used_bytes / (1024 * 1024));
+                    "resource_snapshot"
+                }
+            };
+            *counts.entry(type_name.to_string()).or_insert(0) += 1;
+        }
+
+        let resource_stats = if cpu_values.is_empty() {
+            None
+        } else {
+            Some(ResourceStats {
+                cpu_min: cpu_values.iter().copied().reduce(f32::min),
+                cpu_max: cpu_values.iter().copied().reduce(f32::max),
+                cpu_avg: Some(cpu_values.iter().sum::<f32>() / cpu_values.len() as f32),
+                ram_min_mb: ram_values.iter().min().copied(),
+                ram_max_mb: ram_values.iter().max().copied(),
+                ram_avg_mb: Some(ram_values.iter().sum::<u64>() / ram_values.len() as u64),
+            })
+        };
+
+        Self {
+            event_counts: counts,
+            resource_stats,
+        }
+    }
+}
+
+// =============================================================================
 // Diagnostic Report
 // =============================================================================
 
@@ -136,12 +229,33 @@ pub struct DiagnosticReport {
     pub system_info: SystemInfo,
     /// Collected events
     pub events: Vec<SerializableEvent>,
+    /// Summary statistics (computed from events)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<ReportSummary>,
 }
 
 impl DiagnosticReport {
-    /// Creates a new diagnostic report.
+    /// Creates a new diagnostic report with summary computed automatically.
     #[must_use]
     pub fn new(
+        metadata: ReportMetadata,
+        system_info: SystemInfo,
+        events: Vec<SerializableEvent>,
+    ) -> Self {
+        let summary = Some(ReportSummary::from_events(&events));
+        Self {
+            metadata,
+            system_info,
+            events,
+            summary,
+        }
+    }
+
+    /// Creates a new diagnostic report without computing a summary.
+    ///
+    /// Useful when deserializing an existing report.
+    #[must_use]
+    pub fn without_summary(
         metadata: ReportMetadata,
         system_info: SystemInfo,
         events: Vec<SerializableEvent>,
@@ -150,6 +264,7 @@ impl DiagnosticReport {
             metadata,
             system_info,
             events,
+            summary: None,
         }
     }
 
@@ -335,5 +450,255 @@ mod tests {
         let events = parsed.get("events").unwrap().as_array().unwrap();
 
         assert!(events.is_empty());
+    }
+
+    // =========================================================================
+    // ReportSummary Tests
+    // =========================================================================
+
+    #[test]
+    fn summary_empty_events_has_empty_counts_and_no_stats() {
+        let summary = ReportSummary::from_events(&[]);
+
+        assert!(summary.event_counts.is_empty());
+        assert!(summary.resource_stats.is_none());
+    }
+
+    #[test]
+    fn summary_user_actions_only() {
+        let start = Instant::now();
+        let events = vec![
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::UserAction {
+                    action: UserAction::NavigateNext,
+                    details: None,
+                },
+            ),
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::UserAction {
+                    action: UserAction::TogglePlayback,
+                    details: None,
+                },
+            ),
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::UserAction {
+                    action: UserAction::ZoomIn,
+                    details: None,
+                },
+            ),
+        ];
+
+        let summary = ReportSummary::from_events(&events);
+
+        assert_eq!(summary.event_counts.get("user_action"), Some(&3));
+        assert_eq!(summary.event_counts.len(), 1);
+        assert!(summary.resource_stats.is_none());
+    }
+
+    #[test]
+    fn summary_mixed_events() {
+        let start = Instant::now();
+        let events = vec![
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::UserAction {
+                    action: UserAction::NavigateNext,
+                    details: None,
+                },
+            ),
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::UserAction {
+                    action: UserAction::TogglePlayback,
+                    details: None,
+                },
+            ),
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::Warning {
+                    event: crate::diagnostics::WarningEvent {
+                        warning_type: crate::diagnostics::WarningType::FileNotFound,
+                        message: "test".to_string(),
+                        source_module: None,
+                    },
+                },
+            ),
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::Error {
+                    event: crate::diagnostics::ErrorEvent {
+                        error_type: crate::diagnostics::ErrorType::IoError,
+                        error_code: None,
+                        message: "test".to_string(),
+                        source_module: None,
+                    },
+                },
+            ),
+        ];
+
+        let summary = ReportSummary::from_events(&events);
+
+        assert_eq!(summary.event_counts.get("user_action"), Some(&2));
+        assert_eq!(summary.event_counts.get("warning"), Some(&1));
+        assert_eq!(summary.event_counts.get("error"), Some(&1));
+        assert_eq!(summary.event_counts.len(), 3);
+        assert!(summary.resource_stats.is_none());
+    }
+
+    #[test]
+    fn summary_resource_stats_calculated() {
+        let start = Instant::now();
+        let events = vec![
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::ResourceSnapshot {
+                    metrics: ResourceMetrics::new(
+                        10.0,
+                        1024 * 1024 * 1024, // 1 GB
+                        8 * 1024 * 1024 * 1024,
+                        0,
+                        0,
+                    ),
+                },
+            ),
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::ResourceSnapshot {
+                    metrics: ResourceMetrics::new(
+                        20.0,
+                        2 * 1024 * 1024 * 1024, // 2 GB
+                        8 * 1024 * 1024 * 1024,
+                        0,
+                        0,
+                    ),
+                },
+            ),
+            SerializableEvent::new(
+                start,
+                start,
+                DiagnosticEventKind::ResourceSnapshot {
+                    metrics: ResourceMetrics::new(
+                        30.0,
+                        3 * 1024 * 1024 * 1024, // 3 GB
+                        8 * 1024 * 1024 * 1024,
+                        0,
+                        0,
+                    ),
+                },
+            ),
+        ];
+
+        let summary = ReportSummary::from_events(&events);
+
+        assert_eq!(summary.event_counts.get("resource_snapshot"), Some(&3));
+
+        let stats = summary.resource_stats.expect("should have resource stats");
+        assert_eq!(stats.cpu_min, Some(10.0));
+        assert_eq!(stats.cpu_max, Some(30.0));
+        assert_eq!(stats.cpu_avg, Some(20.0));
+        assert_eq!(stats.ram_min_mb, Some(1024));
+        assert_eq!(stats.ram_max_mb, Some(3072));
+        assert_eq!(stats.ram_avg_mb, Some(2048));
+    }
+
+    #[test]
+    fn summary_serializes_to_json() {
+        let start = Instant::now();
+        let events = vec![SerializableEvent::new(
+            start,
+            start,
+            DiagnosticEventKind::ResourceSnapshot {
+                metrics: ResourceMetrics::new(
+                    50.0,
+                    2 * 1024 * 1024 * 1024,
+                    8 * 1024 * 1024 * 1024,
+                    0,
+                    0,
+                ),
+            },
+        )];
+
+        let summary = ReportSummary::from_events(&events);
+        let json = serde_json::to_string(&summary).expect("serialization should succeed");
+
+        assert!(json.contains("\"event_counts\""));
+        assert!(json.contains("\"resource_snapshot\":1"));
+        assert!(json.contains("\"resource_stats\""));
+        assert!(json.contains("\"cpu_min\":50.0"));
+        assert!(json.contains("\"cpu_max\":50.0"));
+        assert!(json.contains("\"cpu_avg\":50.0"));
+    }
+
+    #[test]
+    fn summary_skips_none_resource_stats_in_json() {
+        let start = Instant::now();
+        let events = vec![SerializableEvent::new(
+            start,
+            start,
+            DiagnosticEventKind::UserAction {
+                action: UserAction::NavigateNext,
+                details: None,
+            },
+        )];
+
+        let summary = ReportSummary::from_events(&events);
+        let json = serde_json::to_string(&summary).expect("serialization should succeed");
+
+        // resource_stats should be omitted when None
+        assert!(!json.contains("\"resource_stats\""));
+    }
+
+    #[test]
+    fn diagnostic_report_includes_summary() {
+        let start = Utc::now();
+        let metadata = ReportMetadata::new(start, 1000, 2);
+        let system_info = SystemInfo::collect();
+
+        let instant_start = Instant::now();
+        let events = vec![
+            SerializableEvent::new(
+                instant_start,
+                instant_start,
+                DiagnosticEventKind::UserAction {
+                    action: UserAction::NavigateNext,
+                    details: None,
+                },
+            ),
+            SerializableEvent::new(
+                instant_start,
+                instant_start,
+                DiagnosticEventKind::ResourceSnapshot {
+                    metrics: ResourceMetrics::new(
+                        25.0,
+                        1024 * 1024 * 1024,
+                        8 * 1024 * 1024 * 1024,
+                        0,
+                        0,
+                    ),
+                },
+            ),
+        ];
+
+        let report = DiagnosticReport::new(metadata, system_info, events);
+        let json = report.to_json().expect("JSON export should succeed");
+
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert!(parsed.get("summary").is_some());
+        let summary = parsed.get("summary").unwrap();
+        assert!(summary.get("event_counts").is_some());
+        assert!(summary.get("resource_stats").is_some());
     }
 }
