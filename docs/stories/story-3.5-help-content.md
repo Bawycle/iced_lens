@@ -1,7 +1,7 @@
 # Story 3.5: Information and Help Content
 
 **Epic:** 3 - UI Integration
-**Status:** Draft
+**Status:** Approved
 **Priority:** Medium
 **Estimate:** 1-2 hours
 **Depends On:** Story 3.1
@@ -21,50 +21,56 @@
 1. Brief description of the Diagnostics tool purpose (2-3 sentences)
 2. Summary of what data is collected (bullet list)
 3. Privacy assurance statement (data is anonymized, never sent automatically)
-4. Link or reference to documentation for more details (if docs exist)
+4. Link or reference to USER_GUIDE.md for more details
 5. Content is concise and doesn't clutter the interface
-6. Text follows existing typography styles
+6. Text follows existing typography styles (design tokens)
 7. Content is translatable (uses i18n system)
 
 ---
 
 ## Tasks
 
-- [ ] **Task 1:** Add description section to diagnostics_screen
-  - [ ] 2-3 sentences explaining purpose
-  - [ ] Place below status, above controls
+- [ ] **Task 1:** Add info section to diagnostics_screen (AC: 1, 5, 6)
+  - [ ] Create `build_info_section()` function following about.rs pattern
+  - [ ] Use `icons::info()` for section header
+  - [ ] 2-3 sentences explaining Diagnostics purpose
+  - [ ] Place below header, above status section
 
-- [ ] **Task 2:** Add data collection summary
+- [ ] **Task 2:** Add data collection summary (AC: 2, 5, 6)
+  - [ ] Create `build_data_collected_section()` function
   - [ ] Bullet list of what's collected:
     - System resources (CPU, RAM, disk)
-    - User actions
-    - Application states
+    - User actions (navigation, edits)
+    - Application states (screen, mode)
     - Warnings and errors
   - [ ] Use `typography::BODY` for text
+  - [ ] Use `"• {item}"` format for bullets
 
-- [ ] **Task 3:** Add privacy assurance
+- [ ] **Task 3:** Add privacy assurance (AC: 3, 5, 6)
+  - [ ] Add privacy notice within info section
   - [ ] "All data is anonymized before export"
   - [ ] "Data is never sent automatically"
-  - [ ] Use subtle styling (secondary text color)
+  - [ ] Use `palette::GRAY_400` for subtle secondary text styling
 
-- [ ] **Task 4:** Add i18n keys
-  - [ ] diagnostics-description
-  - [ ] diagnostics-data-collected-title
-  - [ ] diagnostics-data-item-resources
-  - [ ] diagnostics-data-item-actions
-  - [ ] diagnostics-data-item-states
-  - [ ] diagnostics-data-item-errors
-  - [ ] diagnostics-privacy-notice
+- [ ] **Task 4:** Add documentation reference (AC: 4, 5)
+  - [ ] Add link/reference to USER_GUIDE.md
+  - [ ] Display repository URL (docs/USER_GUIDE.md)
+  - [ ] Follow `build_link_item()` pattern from about.rs
 
-- [ ] **Task 5:** Update all .ftl translation files
-  - [ ] English (en.ftl)
-  - [ ] French (fr.ftl) if exists
-  - [ ] Other languages as needed
+- [ ] **Task 5:** Add i18n keys (AC: 7)
+  - [ ] `diagnostics-info-title` - section title
+  - [ ] `diagnostics-info-description` - purpose description
+  - [ ] `diagnostics-data-collected-title` - data collected header
+  - [ ] `diagnostics-data-item-resources` - "System resources (CPU, RAM, disk)"
+  - [ ] `diagnostics-data-item-actions` - "User actions"
+  - [ ] `diagnostics-data-item-states` - "Application states"
+  - [ ] `diagnostics-data-item-errors` - "Warnings and errors"
+  - [ ] `diagnostics-privacy-notice` - privacy assurance text
+  - [ ] `diagnostics-docs-link` - documentation link label
 
-- [ ] **Task 6:** Style content appropriately
-  - [ ] Use design tokens for typography
-  - [ ] Adequate spacing between sections
-  - [ ] Don't overwhelm the interface
+- [ ] **Task 6:** Update i18n translation files (AC: 7)
+  - [ ] English (`assets/i18n/en-US.ftl`)
+  - [ ] French (`assets/i18n/fr.ftl`)
 
 - [ ] **Task 7:** Run validation
   - [ ] `cargo fmt --all`
@@ -73,28 +79,186 @@
 
 - [ ] **Task 8:** Commit changes
   - [ ] Stage all changes
-  - [ ] Commit with descriptive message following conventional commits
-  - [ ] Reference story number in commit message
+  - [ ] Commit: `feat(ui): add diagnostics help content [Story 3.5]`
 
 ---
 
 ## Dev Notes
 
-- Keep content minimal - users are developers who need quick access
-- Privacy notice is important for trust
-- Follow existing help/about content patterns
+### Source Tree
+
+```
+src/ui/
+├── diagnostics_screen.rs  # MODIFY: Add info section, data collected, privacy notice
+├── about.rs               # REFERENCE: build_section() pattern, build_link_item()
+├── icons.rs               # REFERENCE: icons::info()
+└── design_tokens.rs       # REFERENCE: typography, spacing, palette
+
+assets/i18n/
+├── en-US.ftl              # MODIFY: Add diagnostics info keys
+└── fr.ftl                 # MODIFY: Add diagnostics info keys
+
+docs/
+└── USER_GUIDE.md          # REFERENCE: Documentation to link to
+```
+
+### UI Pattern (following about.rs)
+
+```rust
+// In src/ui/diagnostics_screen.rs
+
+use crate::ui::design_tokens::{palette, radius, sizing, spacing, typography};
+use crate::ui::icons;
+use iced::widget::{container, rule, text, Column, Container, Row, Text};
+
+/// Documentation URL for diagnostics.
+const DOCS_URL: &str = "https://codeberg.org/Bawycle/iced_lens/src/branch/master/docs/USER_GUIDE.md";
+
+fn build_info_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    // Description
+    let description = Text::new(ctx.i18n.tr("diagnostics-info-description"))
+        .size(typography::BODY);
+
+    // Data collected list
+    let data_list = Column::new()
+        .spacing(spacing::XS)
+        .push(Text::new(ctx.i18n.tr("diagnostics-data-collected-title"))
+            .size(typography::BODY_LG))
+        .push(build_data_item(ctx.i18n.tr("diagnostics-data-item-resources")))
+        .push(build_data_item(ctx.i18n.tr("diagnostics-data-item-actions")))
+        .push(build_data_item(ctx.i18n.tr("diagnostics-data-item-states")))
+        .push(build_data_item(ctx.i18n.tr("diagnostics-data-item-errors")));
+
+    // Privacy notice (subtle styling)
+    let privacy = Text::new(ctx.i18n.tr("diagnostics-privacy-notice"))
+        .size(typography::BODY)
+        .color(palette::GRAY_400);
+
+    // Documentation link
+    let docs_link = build_link_item(
+        &ctx.i18n.tr("diagnostics-docs-link"),
+        DOCS_URL,
+    );
+
+    let content = Column::new()
+        .spacing(spacing::SM)
+        .push(description)
+        .push(data_list)
+        .push(privacy)
+        .push(docs_link);
+
+    build_section(
+        icons::info(),
+        ctx.i18n.tr("diagnostics-info-title"),
+        content.into(),
+    )
+}
+
+/// Build a bullet point item.
+fn build_data_item<'a>(description: &str) -> Element<'a, Message> {
+    Text::new(format!("• {description}"))
+        .size(typography::BODY)
+        .into()
+}
+
+/// Build a link item with label and URL (same pattern as about.rs).
+fn build_link_item<'a>(label: &str, url: &'a str) -> Element<'a, Message> {
+    Row::new()
+        .spacing(spacing::SM)
+        .push(Text::new(format!("{label}:")).size(typography::BODY))
+        .push(Text::new(url).size(typography::BODY))
+        .into()
+}
+
+/// Build a section with icon, title, and content (same pattern as about.rs).
+fn build_section(
+    icon: iced::widget::Image<iced::widget::image::Handle>,
+    title: String,
+    content: Element<'_, Message>,
+) -> Element<'_, Message> {
+    let icon_sized = icons::sized(icon, sizing::ICON_MD);
+
+    let header = Row::new()
+        .spacing(spacing::SM)
+        .align_y(Vertical::Center)
+        .push(icon_sized)
+        .push(Text::new(title).size(typography::TITLE_SM));
+
+    let inner = Column::new()
+        .spacing(spacing::SM)
+        .push(header)
+        .push(rule::horizontal(1))
+        .push(content);
+
+    Container::new(inner)
+        .padding(spacing::MD)
+        .width(Length::Fill)
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.extended_palette().background.weak.color.into()),
+            border: Border {
+                radius: radius::MD.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
+}
+```
+
+### I18n Keys
+
+```ftl
+# English (assets/i18n/en-US.ftl)
+diagnostics-info-title = About Diagnostics
+diagnostics-info-description = The Diagnostics tool collects runtime information to help troubleshoot issues. Generate a report to share with support or analyze application behavior.
+diagnostics-data-collected-title = Data collected:
+diagnostics-data-item-resources = System resources (CPU, RAM, disk usage)
+diagnostics-data-item-actions = User actions (navigation, edits, commands)
+diagnostics-data-item-states = Application states (screen, mode, settings)
+diagnostics-data-item-errors = Warnings and errors
+diagnostics-privacy-notice = All data is anonymized before export. Nothing is sent automatically.
+diagnostics-docs-link = Documentation
+
+# French (assets/i18n/fr.ftl)
+diagnostics-info-title = À propos des Diagnostics
+diagnostics-info-description = L'outil de diagnostic collecte des informations d'exécution pour aider à résoudre les problèmes. Générez un rapport à partager avec le support ou pour analyser le comportement de l'application.
+diagnostics-data-collected-title = Données collectées :
+diagnostics-data-item-resources = Ressources système (CPU, RAM, utilisation disque)
+diagnostics-data-item-actions = Actions utilisateur (navigation, éditions, commandes)
+diagnostics-data-item-states = États de l'application (écran, mode, paramètres)
+diagnostics-data-item-errors = Avertissements et erreurs
+diagnostics-privacy-notice = Toutes les données sont anonymisées avant export. Rien n'est envoyé automatiquement.
+diagnostics-docs-link = Documentation
+```
+
+### Design Decisions
+
+1. **Single info section**: Rather than multiple scattered sections, combine description, data list, and privacy notice in one cohesive block for better readability.
+
+2. **Reuse about.rs pattern**: The `build_section()` pattern provides consistent styling with other help/about screens.
+
+3. **Privacy prominence**: Privacy notice uses subtle gray color to indicate secondary information while still being visible.
+
+4. **Concise content**: Keep descriptions minimal - developers want quick access to functionality, not lengthy explanations.
 
 ---
 
 ## Testing
 
 ### Unit Tests
-- None (static content)
+
+None required - this is static informational content.
 
 ### Manual Tests
-- Content displays correctly
-- Translations work
-- Doesn't clutter interface
+
+| Test | Steps | Expected Result |
+|------|-------|-----------------|
+| Content display | Open Diagnostics screen | Info section visible with description, data list, privacy notice |
+| Typography | Check text sizes | Matches BODY/BODY_LG/TITLE_SM tokens |
+| Translations | Switch language to French | All text displays in French |
+| Layout | View on different window sizes | Content doesn't overflow or clip |
+| Link display | Check documentation URL | URL is visible and correctly formatted |
+| Visual consistency | Compare with About screen | Section styling matches (icon, header, container) |
 
 ---
 
@@ -109,8 +273,16 @@
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-01-14 | Story created | PM |
+| 2026-01-14 | PO Validation: Added Source Tree, code examples following about.rs pattern, Task-AC mapping, i18n keys, fixed file paths, added QA Results section | Sarah (PO) |
 
 ### File List
 <!-- Files created or modified -->
+
+---
+
+## QA Results
+
+<!-- QA agent adds results here after review -->
 
 ---
