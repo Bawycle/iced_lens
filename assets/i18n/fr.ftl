@@ -567,3 +567,8 @@ notification-upscale-resize-error = Échec de l'agrandissement IA : { $error }
 # Écran de diagnostics
 diagnostics-title = Diagnostics
 diagnostics-back-button = Retour
+diagnostics-status-enabled = Collecte : Activée
+diagnostics-status-disabled = Collecte : Désactivée
+diagnostics-status-error = Collecte : Erreur
+diagnostics-running-for = En cours depuis { $duration }
+diagnostics-buffer-count = Buffer : { $count } événements

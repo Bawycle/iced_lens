@@ -26,9 +26,29 @@ mod report;
 mod resource_collector;
 mod sanitizer;
 
+use std::time::Instant;
+
+/// Current status of diagnostic data collection.
+#[derive(Debug, Clone)]
+pub enum CollectionStatus {
+    /// Resource collection is disabled (`ResourceCollector` not running).
+    Disabled,
+    /// Resource collection is active.
+    Enabled {
+        /// When collection started (monotonic).
+        started_at: Instant,
+    },
+    /// Resource collection encountered an error.
+    Error {
+        /// Error description.
+        message: String,
+    },
+}
+
 pub use anonymizer::{AnonymizationPipeline, IdentityAnonymizer, PathAnonymizer};
 pub use buffer::{BufferCapacity, CircularBuffer};
 pub use collector::{DiagnosticsCollector, DiagnosticsHandle};
+// CollectionStatus is defined at module level and exported directly
 pub use events::{
     AIModel, AppOperation, AppStateEvent, DiagnosticEvent, DiagnosticEventKind, EditorTool,
     ErrorEvent, MediaType, SizeCategory, UserAction, WarningEvent,

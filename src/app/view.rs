@@ -6,6 +6,7 @@
 
 use super::{Message, Screen};
 use crate::config;
+use crate::diagnostics::CollectionStatus;
 use crate::i18n::fluent::I18n;
 use crate::media::deblur::ModelStatus;
 use crate::media::metadata::MediaMetadata;
@@ -25,6 +26,7 @@ use iced::{
     widget::{mouse_area, Container, Row, Stack, Text},
     Element, Length,
 };
+use std::time::Duration;
 
 /// Context required to render the application view.
 // Allow excessive bools: UI context structs legitimately need multiple boolean flags
@@ -67,6 +69,12 @@ pub struct ViewContext<'a> {
     pub total_count: usize,
     /// Filtered count of media files.
     pub filtered_count: usize,
+    /// Current diagnostics collection status.
+    pub diagnostics_status: CollectionStatus,
+    /// Number of events in the diagnostics buffer.
+    pub diagnostics_event_count: usize,
+    /// Duration since diagnostics collection started.
+    pub diagnostics_collection_duration: Duration,
 }
 
 /// Context required to render the viewer screen.
@@ -128,7 +136,12 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
         ),
         Screen::Help => view_help(ctx.help_state, ctx.i18n, ctx.is_dark_theme),
         Screen::About => view_about(ctx.i18n),
-        Screen::Diagnostics => view_diagnostics(ctx.i18n),
+        Screen::Diagnostics => view_diagnostics(
+            ctx.i18n,
+            ctx.diagnostics_status,
+            ctx.diagnostics_event_count,
+            ctx.diagnostics_collection_duration,
+        ),
     };
 
     let main_content = Container::new(current_view)
@@ -370,6 +383,17 @@ fn view_about(i18n: &I18n) -> Element<'_, Message> {
     about::view(AboutViewContext { i18n }).map(Message::About)
 }
 
-fn view_diagnostics(i18n: &I18n) -> Element<'_, Message> {
-    diagnostics_screen::view(DiagnosticsViewContext { i18n }).map(Message::Diagnostics)
+fn view_diagnostics(
+    i18n: &I18n,
+    status: CollectionStatus,
+    event_count: usize,
+    collection_duration: Duration,
+) -> Element<'_, Message> {
+    diagnostics_screen::view(DiagnosticsViewContext {
+        i18n,
+        status,
+        event_count,
+        collection_duration,
+    })
+    .map(Message::Diagnostics)
 }

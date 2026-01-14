@@ -511,7 +511,10 @@ impl App {
                 editor.subscription().map(Message::ImageEditor)
             });
 
-        Subscription::batch([event_sub, tick_sub, video_sub, editor_sub])
+        // Diagnostics screen refresh subscription
+        let diagnostics_sub = subscription::create_diagnostics_subscription(self.screen);
+
+        Subscription::batch([event_sub, tick_sub, video_sub, editor_sub, diagnostics_sub])
     }
 
     // Allow too_many_lines: match dispatcher inherent to Elm architecture.
@@ -1382,6 +1385,9 @@ impl App {
             filter: self.media_navigator.filter(),
             total_count: self.media_navigator.navigation_info().total_count,
             filtered_count: self.media_navigator.navigation_info().filtered_count,
+            diagnostics_status: self.diagnostics.get_status(),
+            diagnostics_event_count: self.diagnostics.len(),
+            diagnostics_collection_duration: self.diagnostics.get_collection_duration(),
         })
     }
 }

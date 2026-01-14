@@ -261,6 +261,24 @@ impl DiagnosticsCollector {
         self.buffer.capacity()
     }
 
+    /// Returns the current collection status.
+    ///
+    /// Note: Until Story 3.3 integrates `ResourceCollector`, this always
+    /// returns `Disabled` for resource collection. Event collection is
+    /// always active.
+    #[must_use]
+    pub fn get_status(&self) -> super::CollectionStatus {
+        // Placeholder until ResourceCollector is integrated in Story 3.3
+        // For now, report as Disabled since no resource metrics are being collected
+        super::CollectionStatus::Disabled
+    }
+
+    /// Returns how long the collector has been running.
+    #[must_use]
+    pub fn get_collection_duration(&self) -> std::time::Duration {
+        self.collection_started_at.elapsed()
+    }
+
     /// Exports all collected events as a JSON diagnostic report.
     ///
     /// The report includes:
@@ -1653,5 +1671,45 @@ mod tests {
             json.len() < crate::diagnostics::MAX_CLIPBOARD_SIZE_BYTES,
             "Normal report should be well under 10 MB limit"
         );
+    }
+
+    // ============================================================
+    // Story 3.2: Collection Status Tests
+    // ============================================================
+
+    #[test]
+    fn get_status_returns_disabled_by_default() {
+        let collector = DiagnosticsCollector::new(BufferCapacity::default());
+        // Until ResourceCollector is integrated in Story 3.3, status is always Disabled
+        assert!(matches!(
+            collector.get_status(),
+            crate::diagnostics::CollectionStatus::Disabled
+        ));
+    }
+
+    #[test]
+    fn get_collection_duration_increases_over_time() {
+        let collector = DiagnosticsCollector::new(BufferCapacity::default());
+        std::thread::sleep(Duration::from_millis(100));
+        let duration = collector.get_collection_duration();
+        assert!(
+            duration.as_millis() >= 100,
+            "Duration should be at least 100ms, got {}ms",
+            duration.as_millis()
+        );
+    }
+
+    #[test]
+    fn get_collection_duration_returns_elapsed_time() {
+        let collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let duration1 = collector.get_collection_duration();
+
+        // Duration should be small initially
+        assert!(duration1.as_secs() < 1, "Initial duration should be < 1s");
+
+        // After a short delay, duration should increase
+        std::thread::sleep(Duration::from_millis(50));
+        let duration2 = collector.get_collection_duration();
+        assert!(duration2 > duration1, "Duration should increase over time");
     }
 }

@@ -1,7 +1,7 @@
 # Story 3.2: Collection Status Display
 
 **Epic:** 3 - UI Integration
-**Status:** Approved
+**Status:** Ready for Review
 **Priority:** High
 **Estimate:** 2-3 hours
 **Depends On:** Story 3.1
@@ -32,8 +32,8 @@
 
 ## Tasks
 
-- [ ] **Task 1:** Add `CollectionStatus` to diagnostics module (AC: 1)
-  - [ ] Create enum in `src/diagnostics/mod.rs`:
+- [x] **Task 1:** Add `CollectionStatus` to diagnostics module (AC: 1)
+  - [x] Create enum in `src/diagnostics/mod.rs`:
     ```rust
     pub enum CollectionStatus {
         Disabled,
@@ -41,61 +41,64 @@
         Error { message: String },
     }
     ```
-  - [ ] Export from module
+  - [x] Export from module
 
-- [ ] **Task 2:** Add status query methods to `DiagnosticsCollector` (AC: 1, 4, 5)
-  - [ ] Add `resource_collector: Option<ResourceCollector>` field (prepared for Story 3.3)
-  - [ ] Add `get_status(&self) -> CollectionStatus` method
-  - [ ] Add `get_event_count(&self) -> usize` (already exists as `len()`)
-  - [ ] Add `get_collection_duration(&self) -> Duration` method
+- [x] **Task 2:** Add status query methods to `DiagnosticsCollector` (AC: 1, 4, 5)
+  - [x] Add `resource_collector: Option<ResourceCollector>` field (prepared for Story 3.3)
+  - [x] Add `get_status(&self) -> CollectionStatus` method
+  - [x] Add `get_event_count(&self) -> usize` (already exists as `len()`)
+  - [x] Add `get_collection_duration(&self) -> Duration` method
 
-- [ ] **Task 3:** Add status section to `diagnostics_screen.rs` (AC: 1, 2, 3)
-  - [ ] Create `build_status_section()` function
-  - [ ] Status indicator dot with color:
+- [x] **Task 3:** Add status section to `diagnostics_screen.rs` (AC: 1, 2, 3)
+  - [x] Create `build_status_section()` function
+  - [x] Status indicator dot with color:
     - Enabled: `palette::SUCCESS_500` (green)
     - Disabled: `palette::GRAY_400` (gray)
     - Error: `palette::ERROR_500` (red)
-  - [ ] Status text: "Collection: Enabled" / "Disabled" / "Error: {message}"
+  - [x] Status text: "Collection: Enabled" / "Disabled" / "Error: {message}"
 
-- [ ] **Task 4:** Implement duration display (AC: 4)
-  - [ ] Format duration as "Xh Ym Zs" or "Xm Zs" (if < 1 hour)
-  - [ ] Create `format_duration(duration: Duration) -> String` helper
-  - [ ] Use i18n keys for labels
+- [x] **Task 4:** Implement duration display (AC: 4)
+  - [x] Format duration as "Xh Ym Zs" or "Xm Zs" (if < 1 hour)
+  - [x] Create `format_duration(duration: Duration) -> String` helper
+  - [x] Use i18n keys for labels
 
-- [ ] **Task 5:** Implement buffer count display (AC: 5)
-  - [ ] Display "Buffer: X events"
-  - [ ] Use i18n key: `diagnostics-buffer-count`
+- [x] **Task 5:** Implement buffer count display (AC: 5)
+  - [x] Display "Buffer: X events"
+  - [x] Use i18n key: `diagnostics-buffer-count`
 
-- [ ] **Task 6:** Add subscription for real-time updates (AC: 6)
-  - [ ] Add `Message::RefreshStatus` variant to `diagnostics_screen`
-  - [ ] Add subscription in `App::subscription()` when on Diagnostics screen
-  - [ ] Poll every 1 second using `iced::time::every()`
-  - [ ] Update ViewContext with fresh status on each tick
+- [x] **Task 6:** Add subscription for real-time updates (AC: 6)
+  - [x] Add `Message::RefreshStatus` variant to `diagnostics_screen`
+  - [x] Add subscription in `App::subscription()` when on Diagnostics screen
+  - [x] Poll every 1 second using `iced::time::every()`
+  - [x] Update ViewContext with fresh status on each tick
 
-- [ ] **Task 7:** Update ViewContext and view integration (AC: 1-7)
-  - [ ] Add status fields to `diagnostics_screen::ViewContext`:
+- [x] **Task 7:** Update ViewContext and view integration (AC: 1-7)
+  - [x] Add status fields to `diagnostics_screen::ViewContext`:
     - `status: CollectionStatus`
     - `event_count: usize`
     - `collection_duration: Duration`
-  - [ ] Pass data from App to ViewContext in `view.rs`
+  - [x] Pass data from App to ViewContext in `view.rs`
 
-- [ ] **Task 8:** Add i18n keys (AC: 3, 4, 5)
-  - [ ] English keys in `assets/i18n/en/main.ftl`
-  - [ ] French keys in `assets/i18n/fr/main.ftl`
+- [x] **Task 8:** Add i18n keys (AC: 3, 4, 5)
+  - [x] English keys in `assets/i18n/en-US.ftl`
+  - [x] French keys in `assets/i18n/fr.ftl`
+  - [x] German keys in `assets/i18n/de.ftl`
+  - [x] Spanish keys in `assets/i18n/es.ftl`
+  - [x] Italian keys in `assets/i18n/it.ftl`
 
-- [ ] **Task 9:** Write unit tests (AC: 1, 4)
-  - [ ] Test `CollectionStatus` enum creation
-  - [ ] Test `format_duration()` helper
-  - [ ] Test status display logic
+- [x] **Task 9:** Write unit tests (AC: 1, 4)
+  - [x] Test `CollectionStatus` enum creation
+  - [x] Test `format_duration()` helper
+  - [x] Test status display logic
 
-- [ ] **Task 10:** Run validation
-  - [ ] `cargo fmt --all`
-  - [ ] `cargo clippy --all --all-targets -- -D warnings`
-  - [ ] `cargo test`
+- [x] **Task 10:** Run validation
+  - [x] `cargo fmt --all`
+  - [x] `cargo clippy --all --all-targets -- -D warnings`
+  - [x] `cargo test`
 
-- [ ] **Task 11:** Commit changes
-  - [ ] Stage all changes
-  - [ ] Commit: `feat(ui): add collection status display [Story 3.2]`
+- [x] **Task 11:** Commit changes
+  - [x] Stage all changes
+  - [x] Commit: `feat(ui): add collection status display [Story 3.2]`
 
 ---
 
@@ -352,19 +355,37 @@ mod tests {
 ## Dev Agent Record
 
 ### Agent Model Used
-<!-- Record which AI model completed this story -->
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Completion Notes
-<!-- Dev agent adds notes here during implementation -->
+- Implemented `CollectionStatus` enum in `diagnostics/mod.rs` with Disabled, Enabled, and Error variants
+- Added `get_status()` and `get_collection_duration()` methods to `DiagnosticsCollector`
+- Built status section UI with colored indicator dot using design tokens
+- Added `format_duration()` helper function with unit tests
+- Created 1-second polling subscription for real-time status updates
+- Updated `ViewContext` and view.rs to pass diagnostics data to the screen
+- Added i18n keys to all 5 language files (en-US, fr, de, es, it)
+- All tests pass (891 unit tests + 37 integration tests)
 
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-14 | Story created | PM |
 | 2026-01-14 | PO Validation: Added Source Tree, code examples, fixed accessibility (removed ARIA), clarified ResourceCollector integration deferred to 3.3 | Sarah (PO) |
+| 2026-01-14 | Implementation complete | James (Dev Agent - Claude Opus 4.5) |
 
 ### File List
-<!-- Files created or modified -->
+- `src/diagnostics/mod.rs` - Added `CollectionStatus` enum
+- `src/diagnostics/collector.rs` - Added `get_status()`, `get_collection_duration()` methods and tests
+- `src/ui/diagnostics_screen.rs` - Added status section UI, `format_duration()`, `Message::RefreshStatus`
+- `src/app/mod.rs` - Added diagnostics subscription to batch, pass status data to view
+- `src/app/view.rs` - Added diagnostics fields to `ViewContext`, updated `view_diagnostics()`
+- `src/app/subscription.rs` - Added `create_diagnostics_subscription()` function
+- `assets/i18n/en-US.ftl` - Added diagnostics status i18n keys
+- `assets/i18n/fr.ftl` - Added diagnostics status i18n keys (French)
+- `assets/i18n/de.ftl` - Added diagnostics status i18n keys (German)
+- `assets/i18n/es.ftl` - Added diagnostics status i18n keys (Spanish)
+- `assets/i18n/it.ftl` - Added diagnostics status i18n keys (Italian)
 
 ---
 

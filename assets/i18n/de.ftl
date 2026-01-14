@@ -566,3 +566,8 @@ notification-upscale-resize-error = KI-Hochskalierung fehlgeschlagen: { $error }
 # Diagnose-Bildschirm
 diagnostics-title = Diagnose
 diagnostics-back-button = Zurück zum Viewer
+diagnostics-status-enabled = Sammlung: Aktiviert
+diagnostics-status-disabled = Sammlung: Deaktiviert
+diagnostics-status-error = Sammlung: Fehler
+diagnostics-running-for = Läuft seit { $duration }
+diagnostics-buffer-count = Puffer: { $count } Ereignisse

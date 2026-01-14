@@ -566,3 +566,8 @@ notification-upscale-resize-error = Errore di upscaling IA: { $error }
 # Schermata di diagnostica
 diagnostics-title = Diagnostica
 diagnostics-back-button = Torna al visualizzatore
+diagnostics-status-enabled = Raccolta: Abilitata
+diagnostics-status-disabled = Raccolta: Disabilitata
+diagnostics-status-error = Raccolta: Errore
+diagnostics-running-for = In esecuzione da { $duration }
+diagnostics-buffer-count = Buffer: { $count } eventi

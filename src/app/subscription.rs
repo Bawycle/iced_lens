@@ -5,9 +5,11 @@
 //! to the appropriate screen components based on the current application state.
 
 use super::{Message, Screen};
+use crate::ui::diagnostics_screen;
 use crate::ui::viewer::component;
 use crate::video_player::SharedLufsCache;
 use iced::{event, time, Subscription};
+use std::time::Duration;
 
 /// Creates the appropriate event subscription based on the current screen.
 ///
@@ -172,4 +174,17 @@ pub fn create_video_subscription(
     viewer
         .subscription(lufs_cache, audio_normalization, frame_cache_mb, history_mb)
         .map(Message::Viewer)
+}
+
+/// Creates a subscription for refreshing the diagnostics screen status.
+///
+/// Polls every 1 second when on the Diagnostics screen to update
+/// status, duration, and buffer count displays in real-time.
+pub fn create_diagnostics_subscription(screen: Screen) -> Subscription<Message> {
+    if screen == Screen::Diagnostics {
+        time::every(Duration::from_secs(1))
+            .map(|_| Message::Diagnostics(diagnostics_screen::Message::RefreshStatus))
+    } else {
+        Subscription::none()
+    }
 }

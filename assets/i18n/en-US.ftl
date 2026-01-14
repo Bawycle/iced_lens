@@ -567,3 +567,8 @@ notification-upscale-resize-error = AI upscaling failed: { $error }
 # Diagnostics screen
 diagnostics-title = Diagnostics
 diagnostics-back-button = Back to Viewer
+diagnostics-status-enabled = Collection: Enabled
+diagnostics-status-disabled = Collection: Disabled
+diagnostics-status-error = Collection: Error
+diagnostics-running-for = Running for { $duration }
+diagnostics-buffer-count = Buffer: { $count } events
