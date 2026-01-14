@@ -116,8 +116,8 @@ pub fn create_event_subscription(screen: Screen) -> Subscription<Message> {
                 }
             })
         }
-        Screen::Settings | Screen::Help | Screen::About => {
-            // In settings/help/about screens, only route non-wheel events to viewer
+        Screen::Settings | Screen::Help | Screen::About | Screen::Diagnostics => {
+            // In settings/help/about/diagnostics screens, only route non-wheel events to viewer
             // (wheel events are used by scrollable content)
             event::listen_with(|event, status, window_id| {
                 // Handle window close request for cleanup

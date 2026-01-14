@@ -383,6 +383,7 @@ fn needs_light_variant(name: &str) -> bool {
             | "ellipsis_horizontal"
             // Navbar
             | "hamburger"
+            | "activity"
             // Viewer toolbar
             | "zoom_in"
             | "zoom_out"

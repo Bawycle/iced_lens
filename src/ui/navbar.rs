@@ -48,6 +48,7 @@ pub enum Message {
     OpenSettings,
     OpenHelp,
     OpenAbout,
+    OpenDiagnostics,
     EnterEditor,
     ToggleInfoPanel,
     /// Filter dropdown messages.
@@ -61,6 +62,7 @@ pub enum Event {
     OpenSettings,
     OpenHelp,
     OpenAbout,
+    OpenDiagnostics,
     EnterEditor,
     ToggleInfoPanel,
     /// Filter dropdown message to be handled by the app.
@@ -89,6 +91,10 @@ pub fn update(message: Message, menu_open: &mut bool) -> Event {
         Message::OpenAbout => {
             *menu_open = false;
             Event::OpenAbout
+        }
+        Message::OpenDiagnostics => {
+            *menu_open = false;
+            Event::OpenDiagnostics
         }
         Message::EnterEditor => {
             *menu_open = false;
@@ -216,9 +222,16 @@ fn build_dropdown<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
 
     let about_item = build_menu_item(icons::info(), ctx.i18n.tr("menu-about"), Message::OpenAbout);
 
+    let diagnostics_item = build_menu_item(
+        action_icons::navigation::diagnostics(),
+        ctx.i18n.tr("menu-diagnostics"),
+        Message::OpenDiagnostics,
+    );
+
     let menu_column = Column::new()
         .spacing(spacing::XXS)
         .push(settings_item)
+        .push(diagnostics_item)
         .push(help_item)
         .push(about_item);
 

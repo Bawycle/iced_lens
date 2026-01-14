@@ -13,6 +13,7 @@ use crate::media::navigator::NavigationInfo;
 use crate::media::upscale::UpscaleModelStatus;
 use crate::ui::about::{self, ViewContext as AboutViewContext};
 use crate::ui::design_tokens::spacing;
+use crate::ui::diagnostics_screen::{self, ViewContext as DiagnosticsViewContext};
 use crate::ui::help::{self, ViewContext as HelpViewContext};
 use crate::ui::image_editor::{self, State as ImageEditorState};
 use crate::ui::metadata_panel::{self, MetadataEditorState, PanelContext as MetadataPanelContext};
@@ -127,6 +128,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
         ),
         Screen::Help => view_help(ctx.help_state, ctx.i18n, ctx.is_dark_theme),
         Screen::About => view_about(ctx.i18n),
+        Screen::Diagnostics => view_diagnostics(ctx.i18n),
     };
 
     let main_content = Container::new(current_view)
@@ -366,4 +368,8 @@ fn view_help<'a>(
 
 fn view_about(i18n: &I18n) -> Element<'_, Message> {
     about::view(AboutViewContext { i18n }).map(Message::About)
+}
+
+fn view_diagnostics(i18n: &I18n) -> Element<'_, Message> {
+    diagnostics_screen::view(DiagnosticsViewContext { i18n }).map(Message::Diagnostics)
 }

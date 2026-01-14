@@ -9,4 +9,5 @@ pub enum Screen {
     ImageEditor,
     Help,
     About,
+    Diagnostics,
 }

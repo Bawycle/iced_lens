@@ -30,6 +30,7 @@ pub mod about;
 pub mod action_icons;
 pub mod components;
 pub mod design_tokens;
+pub mod diagnostics_screen;
 pub mod help;
 pub mod icons;
 pub mod image_editor;

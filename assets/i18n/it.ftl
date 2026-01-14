@@ -191,6 +191,7 @@ error-video-seek-timeout = La ricerca della posizione è scaduta. La posizione d
 menu-settings = Impostazioni
 menu-help = Aiuto
 menu-about = Informazioni
+menu-diagnostics = Diagnostica
 navbar-edit-button = Modifica
 
 # Help screen
@@ -561,3 +562,7 @@ notification-upscale-download-error = Impossibile scaricare il modello di upscal
 notification-upscale-validation-error = Validazione del modello fallita: { $error }
 notification-upscale-resize-success = Immagine ridimensionata con upscaling IA
 notification-upscale-resize-error = Errore di upscaling IA: { $error }
+
+# Schermata di diagnostica
+diagnostics-title = Diagnostica
+diagnostics-back-button = Torna al visualizzatore

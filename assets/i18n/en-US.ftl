@@ -191,6 +191,7 @@ error-video-seek-timeout = Seeking timed out. The target position may be beyond 
 menu-settings = Settings
 menu-help = Help
 menu-about = About
+menu-diagnostics = Diagnostics
 navbar-edit-button = Edit
 
 # Help screen
@@ -562,3 +563,7 @@ notification-upscale-download-error = Failed to download upscale model: { $error
 notification-upscale-validation-error = Model validation failed: { $error }
 notification-upscale-resize-success = Image resized with AI upscaling
 notification-upscale-resize-error = AI upscaling failed: { $error }
+
+# Diagnostics screen
+diagnostics-title = Diagnostics
+diagnostics-back-button = Back to Viewer

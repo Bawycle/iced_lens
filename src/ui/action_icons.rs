@@ -421,6 +421,12 @@ pub mod navigation {
         icons::info()
     }
 
+    /// Open diagnostics screen.
+    #[must_use]
+    pub fn diagnostics() -> Image<Handle> {
+        icons::activity()
+    }
+
     /// Close / dismiss.
     #[must_use]
     pub fn close() -> Image<Handle> {
@@ -721,6 +727,7 @@ mod tests {
         let _ = navigation::settings();
         let _ = navigation::help();
         let _ = navigation::about();
+        let _ = navigation::diagnostics();
         let _ = navigation::close();
         // Test both theme variants
         let _ = navigation::collapse_left_panel(false);

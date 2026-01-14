@@ -5,6 +5,7 @@ use crate::error::Error;
 use crate::media::frame_export::ExportableFrame;
 use crate::media::MediaData;
 use crate::ui::about;
+use crate::ui::diagnostics_screen;
 use crate::ui::help;
 use crate::ui::image_editor;
 use crate::ui::metadata_panel;
@@ -28,6 +29,7 @@ pub enum Message {
     Navbar(navbar::Message),
     Help(help::Message),
     About(about::Message),
+    Diagnostics(diagnostics_screen::Message),
     MetadataPanel(metadata_panel::Message),
     Notification(notifications::NotificationMessage),
     ImageEditorLoaded(Result<MediaData, Error>),

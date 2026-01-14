@@ -575,6 +575,9 @@ impl App {
             }
             Message::Help(help_message) => update::handle_help_message(&mut ctx, help_message),
             Message::About(about_message) => update::handle_about_message(&mut ctx, &about_message),
+            Message::Diagnostics(diagnostics_message) => {
+                update::handle_diagnostics_message(&mut ctx, &diagnostics_message)
+            }
             Message::MetadataPanel(panel_message) => {
                 update::handle_metadata_panel_message(&mut ctx, panel_message)
             }

@@ -191,6 +191,7 @@ error-video-seek-timeout = Die Suche ist abgelaufen. Die Zielposition liegt mög
 menu-settings = Einstellungen
 menu-help = Hilfe
 menu-about = Über
+menu-diagnostics = Diagnose
 navbar-edit-button = Bearbeiten
 
 # Help screen
@@ -561,3 +562,7 @@ notification-upscale-download-error = Herunterladen des Hochskalierungs-Modells 
 notification-upscale-validation-error = Modellvalidierung fehlgeschlagen: { $error }
 notification-upscale-resize-success = Bild mit KI-Hochskalierung vergrößert
 notification-upscale-resize-error = KI-Hochskalierung fehlgeschlagen: { $error }
+
+# Diagnose-Bildschirm
+diagnostics-title = Diagnose
+diagnostics-back-button = Zurück zum Viewer

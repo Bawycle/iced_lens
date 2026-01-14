@@ -210,6 +210,9 @@ pub enum UserAction {
     /// Open about screen.
     OpenAbout,
 
+    /// Open diagnostics screen.
+    OpenDiagnostics,
+
     /// Enter image editor.
     EnterEditor,
 

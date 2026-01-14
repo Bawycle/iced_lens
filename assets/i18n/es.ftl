@@ -191,6 +191,7 @@ error-video-seek-timeout = La búsqueda de posición expiró. La posición objet
 menu-settings = Configuración
 menu-help = Ayuda
 menu-about = Acerca de
+menu-diagnostics = Diagnósticos
 navbar-edit-button = Editar
 
 # Help screen
@@ -561,3 +562,7 @@ notification-upscale-download-error = Error al descargar el modelo de escalado: 
 notification-upscale-validation-error = Error en la validación del modelo: { $error }
 notification-upscale-resize-success = Imagen redimensionada con escalado IA
 notification-upscale-resize-error = Error en el escalado IA: { $error }
+
+# Pantalla de diagnósticos
+diagnostics-title = Diagnósticos
+diagnostics-back-button = Volver al visor

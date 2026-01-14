@@ -14,6 +14,7 @@ use crate::media::{
 };
 use crate::ui::about::{self, Event as AboutEvent};
 use crate::ui::design_tokens::sizing;
+use crate::ui::diagnostics_screen::{self, Event as DiagnosticsEvent};
 use crate::ui::help::{self, Event as HelpEvent};
 use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
 use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent, MetadataEditorState};
@@ -957,6 +958,11 @@ pub fn handle_navbar_message(
             *ctx.screen = Screen::About;
             Task::none()
         }
+        NavbarEvent::OpenDiagnostics => {
+            ctx.diagnostics.log_action(UserAction::OpenDiagnostics);
+            *ctx.screen = Screen::Diagnostics;
+            Task::none()
+        }
         NavbarEvent::EnterEditor => {
             ctx.diagnostics.log_action(UserAction::EnterEditor);
             handle_screen_switch(ctx, Screen::ImageEditor)
@@ -1012,6 +1018,20 @@ pub fn handle_about_message(
     match about::update(message) {
         AboutEvent::None => Task::none(),
         AboutEvent::BackToViewer => {
+            *ctx.screen = Screen::Viewer;
+            Task::none()
+        }
+    }
+}
+
+/// Handles diagnostics screen messages.
+pub fn handle_diagnostics_message(
+    ctx: &mut UpdateContext<'_>,
+    message: &diagnostics_screen::Message,
+) -> Task<Message> {
+    match diagnostics_screen::update(message) {
+        DiagnosticsEvent::None => Task::none(),
+        DiagnosticsEvent::BackToViewer => {
             *ctx.screen = Screen::Viewer;
             Task::none()
         }

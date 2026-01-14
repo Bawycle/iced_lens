@@ -149,6 +149,12 @@ define_icon!(
     "Checkmark icon: check/tick mark for success."
 );
 define_icon!(cross, dark, "cross.png", "Cross icon: X mark shape.");
+define_icon!(
+    activity,
+    dark,
+    "activity.png",
+    "Activity icon: heartbeat/pulse line (zigzag EKG-style)."
+);
 
 // =============================================================================
 // Zoom & View Icons
@@ -425,6 +431,12 @@ pub mod light {
         "hamburger.png",
         "Hamburger menu icon (white): for navbar."
     );
+    define_icon!(
+        activity,
+        light,
+        "activity.png",
+        "Activity icon (white): heartbeat/pulse line for navbar."
+    );
 
     // Video toolbar icons
     define_icon!(play, light, "play.png", "Play icon (white): for toolbar.");
@@ -676,6 +688,7 @@ mod tests {
         let _ = warning();
         let _ = checkmark();
         let _ = cross();
+        let _ = activity();
     }
 
     #[test]
@@ -704,6 +717,7 @@ mod tests {
         let _ = light::triangle_plus();
         // Navbar
         let _ = light::hamburger();
+        let _ = light::activity();
         // Video toolbar
         let _ = light::play();
         let _ = light::pause();

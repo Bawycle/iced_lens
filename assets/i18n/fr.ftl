@@ -191,6 +191,7 @@ error-video-seek-timeout = La recherche de position a expiré. La position cible
 menu-settings = Paramètres
 menu-help = Aide
 menu-about = À propos
+menu-diagnostics = Diagnostics
 navbar-edit-button = Éditer
 
 # Écran d'aide
@@ -562,3 +563,7 @@ notification-upscale-download-error = Échec du téléchargement du modèle upsc
 notification-upscale-validation-error = Échec de la validation du modèle : { $error }
 notification-upscale-resize-success = Image redimensionnée avec l'agrandissement IA
 notification-upscale-resize-error = Échec de l'agrandissement IA : { $error }
+
+# Écran de diagnostics
+diagnostics-title = Diagnostics
+diagnostics-back-button = Retour
