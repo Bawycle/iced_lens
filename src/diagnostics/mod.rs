@@ -33,7 +33,7 @@ pub use events::{
     AIModel, AppOperation, AppStateEvent, DiagnosticEvent, DiagnosticEventKind, EditorTool,
     ErrorEvent, MediaType, SizeCategory, UserAction, WarningEvent,
 };
-pub use export::ExportError;
+pub use export::{ExportError, MAX_CLIPBOARD_SIZE_BYTES};
 pub use report::{
     DiagnosticReport, ReportMetadata, ReportSummary, ResourceStats, SerializableEvent, SystemInfo,
 };

@@ -1,7 +1,7 @@
 # Story 2.5: Clipboard Export
 
 **Epic:** 2 - Anonymization & Export System
-**Status:** Approved
+**Status:** Done
 **Priority:** High
 **Estimate:** 1-2 hours
 **Depends On:** Story 2.4
@@ -39,39 +39,39 @@
 ## Tasks
 
 ### Task 1: Add `arboard` dependency (AC: 2)
-- [ ] Add `arboard = "3.4"` to `Cargo.toml`
-- [ ] Verify compilation on current platform
+- [x] Add `arboard = "3.6"` to `Cargo.toml`
+- [x] Verify compilation on current platform
 
 ### Task 2: Add `Clipboard` variant to `ExportError` (AC: 6)
-- [ ] Add `Clipboard(String)` variant to `ExportError` in `export.rs`
-- [ ] Update `Display` impl with descriptive message
+- [x] Add `Clipboard(String)` variant to `ExportError` in `export.rs`
+- [x] Update `Display` impl with descriptive message
 
 ### Task 3: Implement `export_to_clipboard()` (AC: 1, 3, 4, 5)
-- [ ] Add method to `DiagnosticsCollector`
-- [ ] Call `build_anonymized_report()` (from Story 2.4)
-- [ ] Serialize to pretty JSON
-- [ ] Create `arboard::Clipboard` instance
-- [ ] Set text content
-- [ ] Map arboard errors to `ExportError::Clipboard`
+- [x] Add method to `DiagnosticsCollector`
+- [x] Call `build_anonymized_report()` (from Story 2.4)
+- [x] Serialize to pretty JSON
+- [x] Create `arboard::Clipboard` instance
+- [x] Set text content
+- [x] Map arboard errors to `ExportError::Clipboard`
 
 ### Task 4: Handle platform-specific issues (AC: 7, 8)
-- [ ] arboard handles X11/Wayland automatically
-- [ ] Handle `arboard::Error` variants appropriately
-- [ ] Document headless system limitations
+- [x] arboard handles X11/Wayland automatically
+- [x] Handle `arboard::Error` variants appropriately
+- [x] Document headless system limitations
 
 ### Task 5: Write unit tests (AC: 3, 6)
-- [ ] Test success case (if clipboard available)
-- [ ] Test error variant is correctly constructed
-- [ ] Use `#[ignore]` for CI environments without clipboard
+- [x] Test success case (if clipboard available)
+- [x] Test error variant is correctly constructed
+- [x] Use `#[ignore]` for CI environments without clipboard
 
 ### Task 6: Run validation
-- [ ] `cargo fmt --all`
-- [ ] `cargo clippy --all --all-targets -- -D warnings`
-- [ ] `cargo test`
+- [x] `cargo fmt --all`
+- [x] `cargo clippy --all --all-targets -- -D warnings`
+- [x] `cargo test`
 
 ### Task 7: Commit changes
-- [ ] Stage all changes
-- [ ] Commit: `feat(diagnostics): add clipboard export [Story 2.5]`
+- [x] Stage all changes
+- [x] Commit: `feat(diagnostics): add clipboard export [Story 2.5]`
 
 ---
 
@@ -213,18 +213,91 @@ fn clipboard_export_works() {
 ## Dev Agent Record
 
 ### Agent Model Used
-<!-- Record which AI model completed this story -->
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Completion Notes
-<!-- Dev agent adds notes here during implementation -->
+- Added `arboard = "3.6"` dependency for cross-platform clipboard access
+- Added `Clipboard(String)` variant to `ExportError` with Display impl
+- Implemented `export_to_clipboard()` method reusing `build_anonymized_report()`
+- Added 2 tests: error display test + ignored clipboard functionality test
+- All 207 tests pass, 1 ignored, clippy clean, formatted
+- **Enhancement:** Added `ContentTooLarge` error variant with 10 MB size check before clipboard copy
+- Added `MAX_CLIPBOARD_SIZE_BYTES` constant (10 MB) exported from module
+- Added 4 new tests for size check functionality
+- All 211 tests pass, 1 ignored, clippy clean, formatted
 
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-13 | Story created | PO |
 | 2026-01-13 | PO Validation: Fixed dependency (2.4 only), added Task-AC mapping, source tree, code examples, platform notes | Sarah (PO) |
+| 2026-01-14 | Implementation complete | James (Dev) |
+| 2026-01-14 | QA review processed - Gate PASS, no fixes required | James (Dev) |
+| 2026-01-14 | Enhancement: Added ContentTooLarge error + 10 MB size check (QA future recommendation) | James (Dev) |
 
 ### File List
-<!-- Files created or modified -->
+| File | Action | Description |
+|------|--------|-------------|
+| `Cargo.toml` | Modified | Added arboard = "3.6" |
+| `src/diagnostics/export.rs` | Modified | Added Clipboard + ContentTooLarge variants, MAX_CLIPBOARD_SIZE_BYTES constant, 4 tests |
+| `src/diagnostics/collector.rs` | Modified | Added export_to_clipboard() with size check, 3 tests |
+| `src/diagnostics/mod.rs` | Modified | Export MAX_CLIPBOARD_SIZE_BYTES constant |
 
 ---
+
+## QA Results
+
+### Review Date: 2026-01-14 (Updated)
+
+### Reviewed By: Quinn (Test Architect)
+
+### Code Quality Assessment
+
+Minimal, focused implementation that correctly reuses the anonymization pipeline from Story 2.4. `arboard` crate handles cross-platform clipboard access transparently. Error handling is appropriate for headless/permission scenarios.
+
+**Enhancement Implemented:** The previously recommended size check has been added with `ContentTooLarge` error variant and `MAX_CLIPBOARD_SIZE_BYTES` constant (10 MB). This prevents silent failures on very large reports.
+
+### Refactoring Performed
+
+None required - code quality is production-ready.
+
+### Compliance Check
+
+- Coding Standards: ✓ Error mapping follows project patterns
+- Project Structure: ✓ Method correctly placed in collector.rs
+- Testing Strategy: ✓ 6 tests (3 functional + 1 ignored for CI + 2 size check tests)
+- All ACs Met: ✓ All 8 acceptance criteria verified
+
+### Improvements Checklist
+
+- [x] `export_to_clipboard()` method (AC: 1, 3)
+- [x] Uses `arboard` crate (AC: 2)
+- [x] Same anonymized JSON as file export (AC: 4, 5)
+- [x] `Clipboard` error variant added (AC: 6)
+- [x] Graceful handling for headless/permissions (AC: 7)
+- [x] Cross-platform support via arboard (AC: 8)
+- [x] **Enhancement:** `ContentTooLarge` error with 10 MB size check
+- [x] **Enhancement:** `MAX_CLIPBOARD_SIZE_BYTES` constant exported
+
+### Security Review
+
+- Same anonymization as file export
+- No PII in clipboard content
+
+### Performance Considerations
+
+- Size check prevents large clipboard operations that could cause performance issues
+- arboard handles platform-specific clipboard efficiently
+- Pretty JSON for readability when pasting
+
+### Files Modified During Review
+
+None
+
+### Gate Status
+
+Gate: PASS → docs/qa/gates/2.5-clipboard-export.yml
+
+### Recommended Status
+
+✓ Ready for Done

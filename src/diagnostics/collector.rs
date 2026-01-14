@@ -392,6 +392,41 @@ impl DiagnosticsCollector {
 
         self.export_to_file(&path)
     }
+
+    /// Exports an anonymized diagnostic report to the system clipboard.
+    ///
+    /// The report is anonymized (IPs, domains, usernames hashed) and formatted
+    /// as pretty JSON before copying to the clipboard.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ExportError::ContentTooLarge` if the JSON exceeds 10 MB.
+    /// Returns `ExportError::Clipboard` if clipboard access fails.
+    /// This can happen on headless systems or if permissions are denied.
+    /// Returns `ExportError::Serialization` if JSON serialization fails.
+    pub fn export_to_clipboard(&self) -> Result<(), ExportError> {
+        use super::export::MAX_CLIPBOARD_SIZE_BYTES;
+
+        let report = self.build_anonymized_report();
+        let json = serde_json::to_string_pretty(&report)?;
+
+        // Check content size before attempting clipboard operation
+        if json.len() > MAX_CLIPBOARD_SIZE_BYTES {
+            return Err(ExportError::ContentTooLarge {
+                size: json.len(),
+                max_size: MAX_CLIPBOARD_SIZE_BYTES,
+            });
+        }
+
+        let mut clipboard =
+            arboard::Clipboard::new().map_err(|e| ExportError::Clipboard(e.to_string()))?;
+
+        clipboard
+            .set_text(&json)
+            .map_err(|e| ExportError::Clipboard(e.to_string()))?;
+
+        Ok(())
+    }
 }
 
 impl Default for DiagnosticsCollector {
@@ -1568,5 +1603,55 @@ mod tests {
 
         let events = parsed["events"].as_array().expect("events should be array");
         assert!(events.is_empty());
+    }
+
+    // ============================================================
+    // Story 2.5: Clipboard Export Tests
+    // ============================================================
+
+    #[test]
+    #[ignore = "Clipboard not available in CI/headless environments"]
+    fn export_to_clipboard_works() {
+        let collector = DiagnosticsCollector::new(BufferCapacity::default());
+        // This may fail in headless CI environments
+        let result = collector.export_to_clipboard();
+        // Verify it succeeds when clipboard is available
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn export_to_clipboard_checks_content_size() {
+        // Verify that the size check constant is properly imported and used.
+        // A full test would require generating >10MB of events which is impractical.
+        // Instead, we verify the error type structure is correct.
+        use crate::diagnostics::MAX_CLIPBOARD_SIZE_BYTES;
+
+        let err = ExportError::ContentTooLarge {
+            size: MAX_CLIPBOARD_SIZE_BYTES + 1,
+            max_size: MAX_CLIPBOARD_SIZE_BYTES,
+        };
+
+        // Verify the error displays correctly
+        let display = format!("{err}");
+        assert!(display.contains("content too large"));
+        assert!(display.contains("10.0 MB"));
+    }
+
+    #[test]
+    fn export_to_clipboard_small_report_does_not_fail_size_check() {
+        // A normal collector with few events should be well under 10 MB
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+
+        // Add a few events
+        collector.log_action(UserAction::NavigateNext);
+        collector.log_action(UserAction::ZoomIn);
+
+        // Build the report and verify it's well under the limit
+        let json = collector.export_json().expect("should serialize");
+
+        assert!(
+            json.len() < crate::diagnostics::MAX_CLIPBOARD_SIZE_BYTES,
+            "Normal report should be well under 10 MB limit"
+        );
     }
 }

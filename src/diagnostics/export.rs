@@ -18,6 +18,12 @@ use super::report::SerializableEvent;
 // Export Error
 // =============================================================================
 
+/// Maximum clipboard content size in bytes (10 MB).
+///
+/// Clipboard operations with very large content can cause performance issues
+/// or fail on some platforms. This limit provides a reasonable safety margin.
+pub const MAX_CLIPBOARD_SIZE_BYTES: usize = 10 * 1024 * 1024;
+
 /// Errors that can occur during diagnostic report export.
 #[derive(Debug)]
 pub enum ExportError {
@@ -27,6 +33,15 @@ pub enum ExportError {
     Serialization(serde_json::Error),
     /// User cancelled the file dialog.
     Cancelled,
+    /// Clipboard access error.
+    Clipboard(String),
+    /// Content exceeds maximum size for clipboard export.
+    ContentTooLarge {
+        /// Actual size in bytes.
+        size: usize,
+        /// Maximum allowed size in bytes.
+        max_size: usize,
+    },
 }
 
 impl std::fmt::Display for ExportError {
@@ -35,6 +50,16 @@ impl std::fmt::Display for ExportError {
             Self::Io(err) => write!(f, "I/O error: {err}"),
             Self::Serialization(err) => write!(f, "serialization error: {err}"),
             Self::Cancelled => write!(f, "export cancelled"),
+            Self::Clipboard(msg) => write!(f, "clipboard error: {msg}"),
+            #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for display
+            Self::ContentTooLarge { size, max_size } => {
+                let size_mb = *size as f64 / (1024.0 * 1024.0);
+                let max_mb = *max_size as f64 / (1024.0 * 1024.0);
+                write!(
+                    f,
+                    "content too large for clipboard: {size_mb:.1} MB exceeds {max_mb:.1} MB limit"
+                )
+            }
         }
     }
 }
@@ -44,7 +69,7 @@ impl std::error::Error for ExportError {
         match self {
             Self::Io(err) => Some(err),
             Self::Serialization(err) => Some(err),
-            Self::Cancelled => None,
+            Self::Cancelled | Self::Clipboard(_) | Self::ContentTooLarge { .. } => None,
         }
     }
 }
@@ -238,6 +263,32 @@ mod tests {
         let io_err = io::Error::new(io::ErrorKind::PermissionDenied, "access denied");
         let export_err: ExportError = io_err.into();
         assert!(matches!(export_err, ExportError::Io(_)));
+    }
+
+    #[test]
+    fn export_error_clipboard_displays_correctly() {
+        let err = ExportError::Clipboard("clipboard unavailable".to_string());
+        let display = format!("{err}");
+        assert!(display.contains("clipboard error"));
+        assert!(display.contains("clipboard unavailable"));
+    }
+
+    #[test]
+    fn export_error_content_too_large_displays_correctly() {
+        let err = ExportError::ContentTooLarge {
+            size: 15 * 1024 * 1024,     // 15 MB
+            max_size: 10 * 1024 * 1024, // 10 MB
+        };
+        let display = format!("{err}");
+        assert!(display.contains("content too large"));
+        assert!(display.contains("15.0 MB"));
+        assert!(display.contains("10.0 MB"));
+    }
+
+    #[test]
+    fn max_clipboard_size_is_reasonable() {
+        // Verify the constant is set to 10 MB
+        assert_eq!(MAX_CLIPBOARD_SIZE_BYTES, 10 * 1024 * 1024);
     }
 
     // =========================================================================
