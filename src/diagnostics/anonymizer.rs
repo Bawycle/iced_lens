@@ -462,6 +462,72 @@ impl Default for IdentityAnonymizer {
     }
 }
 
+// =============================================================================
+// Anonymization Pipeline
+// =============================================================================
+
+/// Combined anonymization pipeline for export.
+///
+/// Wraps `IdentityAnonymizer` to anonymize IPs, domains, and usernames
+/// in diagnostic event strings.
+///
+/// # Note
+///
+/// File paths are already sanitized to `<path>` at collection time by
+/// `sanitizer.rs`, so path anonymization is not needed in the export pipeline.
+///
+/// # Example
+///
+/// ```
+/// use iced_lens::diagnostics::AnonymizationPipeline;
+///
+/// let pipeline = AnonymizationPipeline::new();
+/// let message = "Error from 192.168.1.1 at example.com";
+/// let anonymized = pipeline.anonymize_string(message);
+/// // Result: "Error from <ip:hash> at <domain:hash>.com"
+/// ```
+#[derive(Debug, Clone)]
+pub struct AnonymizationPipeline {
+    /// Identity anonymizer (for IPs, domains, usernames)
+    identity_anonymizer: IdentityAnonymizer,
+}
+
+impl AnonymizationPipeline {
+    /// Creates a new pipeline with random salt.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the operating system fails to provide random bytes.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            identity_anonymizer: IdentityAnonymizer::new(),
+        }
+    }
+
+    /// Creates a new pipeline with a deterministic seed.
+    ///
+    /// This is useful for testing where reproducible hashes are needed.
+    #[must_use]
+    pub fn with_seed(seed: u64) -> Self {
+        Self {
+            identity_anonymizer: IdentityAnonymizer::with_seed(seed),
+        }
+    }
+
+    /// Anonymizes a string by hashing IPs, domains, and usernames.
+    #[must_use]
+    pub fn anonymize_string(&self, input: &str) -> String {
+        self.identity_anonymizer.anonymize_string(input)
+    }
+}
+
+impl Default for AnonymizationPipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

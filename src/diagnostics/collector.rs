@@ -4,11 +4,16 @@
 //! This module provides the central collector that receives events from
 //! various parts of the application and stores them in a circular buffer.
 
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
 use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
 
+use super::anonymizer::AnonymizationPipeline;
+use super::export::{
+    anonymize_event, default_export_directory, generate_default_filename, write_atomic, ExportError,
+};
 use super::{
     sanitize_message, AppOperation, AppStateEvent, BufferCapacity, CircularBuffer, DiagnosticEvent,
     DiagnosticEventKind, DiagnosticReport, ErrorEvent, ErrorType, ReportMetadata, ResourceMetrics,
@@ -297,6 +302,95 @@ impl DiagnosticsCollector {
         let system_info = SystemInfo::collect();
 
         DiagnosticReport::new(metadata, system_info, events)
+    }
+
+    /// Builds an anonymized diagnostic report.
+    ///
+    /// All string fields that may contain PII (IP addresses, domains, usernames)
+    /// are processed through the anonymization pipeline before inclusion.
+    #[allow(clippy::cast_possible_truncation)] // Duration in ms fits comfortably in u64
+    fn build_anonymized_report(&self) -> DiagnosticReport {
+        let pipeline = AnonymizationPipeline::new();
+        let collection_duration_ms = self.collection_started_at.elapsed().as_millis() as u64;
+
+        let events: Vec<SerializableEvent> = self
+            .buffer
+            .iter()
+            .map(|event| {
+                let serializable = SerializableEvent::new(
+                    event.timestamp,
+                    self.collection_started_at,
+                    event.kind.clone(),
+                );
+                anonymize_event(&serializable, &pipeline)
+            })
+            .collect();
+
+        let metadata = ReportMetadata::new(
+            self.collection_started_at_utc,
+            collection_duration_ms,
+            events.len(),
+        );
+
+        let system_info = SystemInfo::collect();
+
+        DiagnosticReport::new(metadata, system_info, events)
+    }
+
+    /// Exports an anonymized diagnostic report to a file.
+    ///
+    /// The report is anonymized (IPs, domains, usernames hashed) before writing.
+    /// The file is written atomically to prevent corruption.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path where the report should be saved
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(PathBuf)` with the actual path written, or an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ExportError::Io` if file operations fail.
+    /// Returns `ExportError::Serialization` if JSON serialization fails.
+    pub fn export_to_file(&self, path: impl AsRef<Path>) -> Result<PathBuf, ExportError> {
+        let path = path.as_ref();
+        let report = self.build_anonymized_report();
+        let json = serde_json::to_string_pretty(&report)?;
+
+        write_atomic(path, &json)?;
+
+        Ok(path.to_path_buf())
+    }
+
+    /// Exports an anonymized diagnostic report using a native file dialog.
+    ///
+    /// Opens a save file dialog with a default filename and the user's
+    /// Documents folder as the initial directory. The report is anonymized
+    /// before saving.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(PathBuf)` with the path where the file was saved.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ExportError::Cancelled` if the user cancels the dialog.
+    /// Returns `ExportError::Io` if file operations fail.
+    /// Returns `ExportError::Serialization` if JSON serialization fails.
+    pub fn export_with_dialog(&self) -> Result<PathBuf, ExportError> {
+        let default_dir = default_export_directory();
+        let default_name = generate_default_filename();
+
+        let path = rfd::FileDialog::new()
+            .set_directory(&default_dir)
+            .set_file_name(&default_name)
+            .add_filter("JSON", &["json"])
+            .save_file()
+            .ok_or(ExportError::Cancelled)?;
+
+        self.export_to_file(&path)
     }
 }
 
@@ -1341,5 +1435,138 @@ mod tests {
             }
             _ => panic!("expected Error event"),
         }
+    }
+
+    // ============================================================
+    // Story 2.4: File Export Integration Tests
+    // ============================================================
+
+    #[test]
+    fn export_to_file_creates_valid_json() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+
+        // Add some events
+        collector.log_action(UserAction::NavigateNext);
+        collector.log_state(AppStateEvent::MediaLoaded {
+            media_type: MediaType::Image,
+            size_category: SizeCategory::Small,
+        });
+
+        // Export to temp file
+        let temp_dir = tempfile::tempdir().expect("should create temp dir");
+        let path = temp_dir.path().join("test_export.json");
+
+        let result = collector.export_to_file(&path);
+        assert!(result.is_ok());
+
+        // Verify file exists and contains valid JSON
+        let content = std::fs::read_to_string(&path).expect("should read file");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&content).expect("should parse as JSON");
+
+        // Verify structure
+        assert!(parsed.get("metadata").is_some());
+        assert!(parsed.get("system_info").is_some());
+        assert!(parsed.get("events").is_some());
+        assert!(parsed.get("summary").is_some());
+
+        // Verify event count
+        let events = parsed["events"].as_array().expect("events should be array");
+        assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn export_to_file_anonymizes_ip_addresses() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        // Add event with IP address in message
+        handle.log_warning(WarningEvent::new(
+            WarningType::NetworkError,
+            "Connection failed to 192.168.1.100",
+        ));
+        collector.process_pending();
+
+        // Export to temp file
+        let temp_dir = tempfile::tempdir().expect("should create temp dir");
+        let path = temp_dir.path().join("test_anonymize.json");
+
+        collector
+            .export_to_file(&path)
+            .expect("export should succeed");
+
+        // Read and verify no raw IP addresses
+        let content = std::fs::read_to_string(&path).expect("should read file");
+
+        assert!(
+            !content.contains("192.168.1.100"),
+            "Raw IP should be anonymized"
+        );
+        assert!(content.contains("<ip:"), "Should contain anonymized IP");
+    }
+
+    #[test]
+    fn export_to_file_anonymizes_domains() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        // Add event with domain in details
+        handle.log_action_with_details(
+            UserAction::NavigateNext,
+            Some("Fetched from api.example.com".to_string()),
+        );
+        collector.process_pending();
+
+        // Export to temp file
+        let temp_dir = tempfile::tempdir().expect("should create temp dir");
+        let path = temp_dir.path().join("test_domain.json");
+
+        collector
+            .export_to_file(&path)
+            .expect("export should succeed");
+
+        // Read and verify domain is anonymized
+        let content = std::fs::read_to_string(&path).expect("should read file");
+
+        assert!(
+            !content.contains("example.com"),
+            "Raw domain should be anonymized"
+        );
+        assert!(
+            content.contains("<domain:"),
+            "Should contain anonymized domain"
+        );
+    }
+
+    #[test]
+    fn export_to_file_returns_correct_path() {
+        let collector = DiagnosticsCollector::new(BufferCapacity::default());
+
+        let temp_dir = tempfile::tempdir().expect("should create temp dir");
+        let path = temp_dir.path().join("specific_name.json");
+
+        let result = collector
+            .export_to_file(&path)
+            .expect("export should succeed");
+
+        assert_eq!(result, path);
+    }
+
+    #[test]
+    fn export_to_file_with_empty_collector() {
+        let collector = DiagnosticsCollector::new(BufferCapacity::default());
+
+        let temp_dir = tempfile::tempdir().expect("should create temp dir");
+        let path = temp_dir.path().join("empty_export.json");
+
+        collector
+            .export_to_file(&path)
+            .expect("export should succeed");
+
+        let content = std::fs::read_to_string(&path).expect("should read file");
+        let parsed: serde_json::Value = serde_json::from_str(&content).expect("should parse");
+
+        let events = parsed["events"].as_array().expect("events should be array");
+        assert!(events.is_empty());
     }
 }

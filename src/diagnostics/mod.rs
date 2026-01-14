@@ -21,17 +21,19 @@ mod anonymizer;
 mod buffer;
 mod collector;
 mod events;
+mod export;
 mod report;
 mod resource_collector;
 mod sanitizer;
 
-pub use anonymizer::{IdentityAnonymizer, PathAnonymizer};
+pub use anonymizer::{AnonymizationPipeline, IdentityAnonymizer, PathAnonymizer};
 pub use buffer::{BufferCapacity, CircularBuffer};
 pub use collector::{DiagnosticsCollector, DiagnosticsHandle};
 pub use events::{
     AIModel, AppOperation, AppStateEvent, DiagnosticEvent, DiagnosticEventKind, EditorTool,
     ErrorEvent, MediaType, SizeCategory, UserAction, WarningEvent,
 };
+pub use export::ExportError;
 pub use report::{
     DiagnosticReport, ReportMetadata, ReportSummary, ResourceStats, SerializableEvent, SystemInfo,
 };
