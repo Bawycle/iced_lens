@@ -1,7 +1,7 @@
 # Story 3.6: Enrich Diagnostic Report Data
 
 **Epic:** 3 - UI Integration
-**Status:** Approved
+**Status:** Done
 **Priority:** High
 **Estimate:** 1-2 days
 **Depends On:** Story 2.1 (PathAnonymizer), Story 1.4 (Events)
@@ -350,6 +350,71 @@ The `PathAnonymizer` is already instantiated in the anonymization pipeline. For 
 
 ---
 
+## QA Results
+
+**Reviewed by:** Quinn (QA Agent)
+**Review Date:** 2026-01-15
+**Gate Decision:** PASS
+
+### Requirements Traceability
+
+| AC | Status | Validation | Test Coverage |
+|----|--------|------------|---------------|
+| AC 1 | PASS | MediaLoadingStarted, MediaLoaded, MediaFailed include extension, storage_type, path_hash | `app_state_event_media_loaded_serializes`, `app_state_event_media_loaded_omits_none_fields` (events.rs:1245-1280) |
+| AC 2 | PASS | StorageType enum with Local, Network, Unknown + serde snake_case | `storage_type_*` tests (events.rs:1071-1152) |
+| AC 3 | PASS | StorageType::detect() cross-platform heuristics | `storage_type_detects_home_as_local`, `storage_type_detects_users_as_local`, `storage_type_detects_unc_as_network`, `storage_type_defaults_to_unknown` (events.rs:1071-1119) |
+| AC 4 | PASS | PathAnonymizer reused via DiagnosticsHandle::media_metadata() | `media_metadata_generates_path_hash` (events.rs:1189-1201) |
+| AC 5 | PASS | SystemInfo updated with cpu_arch, cpu_brand, disk_type | `system_info_includes_cpu_arch`, `system_info_includes_cpu_brand`, `system_info_includes_disk_type` (report.rs:461-509) |
+| AC 6 | PASS | DiskType enum with Ssd, Hdd, Unknown + From<DiskKind> | `disk_type_from_sysinfo_*` (report.rs:403-445) |
+| AC 7 | PASS | disk_type detected for home directory disk | `system_info_includes_disk_type` (report.rs:482-494) |
+| AC 8 | PASS | All event logging calls updated in component.rs:647-660, 838-854, 920-933 | `test_media_loading_lifecycle_events` (collector.rs:1344-1398) |
+| AC 9 | PASS | All new fields Option or with #[serde(default)] | `app_state_event_media_loaded_omits_none_fields` (events.rs:1263-1280) |
+| AC 10 | PASS | JSON serialization snake_case + skip_serializing_if | `storage_type_serializes_snake_case`, `disk_type_serializes_snake_case` (events.rs:1122-1135, report.rs:420-427) |
+| AC 11 | PASS | Existing tests continue to pass | CI validation: 920 tests pass |
+| AC 12 | PASS | All required test cases implemented | See Required Test Cases below |
+
+### Required Test Cases Status
+
+| Test Case | Status | Location |
+|-----------|--------|----------|
+| storage_type_detects_home_as_local | PASS | events.rs:1071-1080 |
+| storage_type_detects_users_as_local | PASS | events.rs:1082-1089 |
+| storage_type_detects_unc_as_network | PASS | events.rs:1091-1099 |
+| storage_type_defaults_to_unknown | PASS | events.rs:1101-1119 |
+| storage_type_serializes_snake_case | PASS | events.rs:1121-1135 |
+| disk_type_from_sysinfo_ssd | PASS | report.rs:403-405 |
+| disk_type_from_sysinfo_hdd | PASS | report.rs:408-410 |
+| disk_type_from_sysinfo_unknown | PASS | report.rs:413-417 |
+| disk_type_serializes_snake_case | PASS | report.rs:420-427 |
+| media_metadata_extracts_extension | PASS | events.rs:1158-1173 |
+| media_metadata_handles_no_extension | PASS | events.rs:1175-1187 |
+| media_metadata_generates_path_hash | PASS | events.rs:1189-1201 |
+| system_info_includes_cpu_arch | PASS | report.rs:460-472 |
+| system_info_includes_cpu_brand | PASS | report.rs:474-479 |
+| system_info_includes_disk_type | PASS | report.rs:482-494 |
+
+### NFR Assessment
+
+| NFR | Assessment | Notes |
+|-----|------------|-------|
+| Security | PASS | No file paths exposed; path_hash uses blake3 anonymization |
+| Performance | PASS | StorageType::detect() is O(1) with no I/O; disk detection only at report generation |
+| Maintainability | PASS | Code well-documented, follows existing patterns, clear separation of concerns |
+| Reliability | PASS | Sensible defaults (Unknown), Option for non-critical fields, graceful fallbacks |
+
+### Code Quality Notes
+
+- **Architecture**: Clean integration via DiagnosticsHandle.media_metadata() helper method
+- **Patterns**: Consistent with existing codebase (serde attributes, test patterns, documentation)
+- **Integration Points**: All 3 call sites in component.rs properly updated with metadata enrichment
+- **Breaking Changes**: None - all new fields are optional or have defaults
+
+### Issues Found
+
+None.
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -357,3 +422,4 @@ The `PathAnonymizer` is already instantiated in the anonymization pipeline. For 
 | 2026-01-14 | 1.0 | Initial draft created by PM (John) | John |
 | 2026-01-14 | 1.1 | Added Dev Notes, Testing sections; Fixed Task 5 file path | John |
 | 2026-01-14 | 1.2 | Story APPROVED after PO validation | Sarah |
+| 2026-01-15 | 1.3 | QA Review completed - PASS | Quinn |
