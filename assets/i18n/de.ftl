@@ -576,6 +576,17 @@ diagnostics-toggle-label = Ressourcensammlung aktivieren
 diagnostics-export-file = In Datei exportieren
 diagnostics-export-clipboard = In Zwischenablage kopieren
 
+# Diagnose-Informationsbereich
+diagnostics-info-title = Über Diagnose
+diagnostics-info-description = Das Diagnosetool sammelt Laufzeitinformationen zur Fehlerbehebung. Erstellen Sie einen Bericht zum Teilen mit dem Support oder zur Analyse des Anwendungsverhaltens.
+diagnostics-data-collected-title = Gesammelte Daten:
+diagnostics-data-item-resources = Systemressourcen (CPU, RAM, Festplattennutzung)
+diagnostics-data-item-actions = Benutzeraktionen (Navigation, Bearbeitung, Befehle)
+diagnostics-data-item-states = Anwendungszustände (Bildschirm, Modus, Einstellungen)
+diagnostics-data-item-errors = Warnungen und Fehler
+diagnostics-privacy-notice = Alle Daten werden vor dem Export anonymisiert. Nichts wird automatisch gesendet.
+diagnostics-docs-link = Dokumentation
+
 # Diagnose-Benachrichtigungen
 notification-diagnostics-export-success = Diagnose erfolgreich exportiert
 notification-diagnostics-export-error = Export der Diagnose fehlgeschlagen

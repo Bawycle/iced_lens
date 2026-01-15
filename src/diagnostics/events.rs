@@ -1157,8 +1157,8 @@ mod tests {
 
     #[test]
     fn media_metadata_extracts_extension() {
-        use std::path::Path;
         use crate::diagnostics::PathAnonymizer;
+        use std::path::Path;
 
         let anonymizer = PathAnonymizer::with_seed(42);
 
@@ -1174,8 +1174,8 @@ mod tests {
 
     #[test]
     fn media_metadata_handles_no_extension() {
-        use std::path::Path;
         use crate::diagnostics::PathAnonymizer;
+        use std::path::Path;
 
         let anonymizer = PathAnonymizer::with_seed(42);
 
@@ -1188,8 +1188,8 @@ mod tests {
 
     #[test]
     fn media_metadata_generates_path_hash() {
-        use std::path::Path;
         use crate::diagnostics::PathAnonymizer;
+        use std::path::Path;
 
         let anonymizer = PathAnonymizer::with_seed(42);
 
@@ -1202,15 +1202,16 @@ mod tests {
 
     #[test]
     fn media_metadata_detects_storage_type() {
-        use std::path::Path;
         use crate::diagnostics::PathAnonymizer;
+        use std::path::Path;
 
         let anonymizer = PathAnonymizer::with_seed(42);
 
         let metadata = MediaMetadata::from_path(Path::new("/home/user/photo.jpg"), &anonymizer);
         assert_eq!(metadata.storage_type, StorageType::Local);
 
-        let metadata = MediaMetadata::from_path(Path::new("\\\\server\\share\\photo.jpg"), &anonymizer);
+        let metadata =
+            MediaMetadata::from_path(Path::new("\\\\server\\share\\photo.jpg"), &anonymizer);
         assert_eq!(metadata.storage_type, StorageType::Network);
 
         let metadata = MediaMetadata::from_path(Path::new("/tmp/photo.jpg"), &anonymizer);

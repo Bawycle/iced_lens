@@ -576,6 +576,17 @@ diagnostics-toggle-label = Abilita raccolta risorse
 diagnostics-export-file = Esporta su file
 diagnostics-export-clipboard = Copia negli appunti
 
+# Sezione informativa diagnostica
+diagnostics-info-title = Informazioni sulla Diagnostica
+diagnostics-info-description = Lo strumento di diagnostica raccoglie informazioni di runtime per aiutare a risolvere i problemi. Genera un report da condividere con il supporto o per analizzare il comportamento dell'applicazione.
+diagnostics-data-collected-title = Dati raccolti:
+diagnostics-data-item-resources = Risorse di sistema (CPU, RAM, utilizzo disco)
+diagnostics-data-item-actions = Azioni utente (navigazione, modifiche, comandi)
+diagnostics-data-item-states = Stati dell'applicazione (schermata, modalità, impostazioni)
+diagnostics-data-item-errors = Avvisi ed errori
+diagnostics-privacy-notice = Tutti i dati sono anonimizzati prima dell'esportazione. Nulla viene inviato automaticamente.
+diagnostics-docs-link = Documentazione
+
 # Notifiche diagnostica
 notification-diagnostics-export-success = Diagnostica esportata con successo
 notification-diagnostics-export-error = Esportazione diagnostica fallita

@@ -7,13 +7,20 @@
 use std::time::Duration;
 
 use crate::diagnostics::CollectionStatus;
+
+/// Documentation URL for diagnostics.
+const DOCS_URL: &str =
+    "https://codeberg.org/Bawycle/iced_lens/src/branch/master/docs/USER_GUIDE.md";
 use crate::i18n::fluent::I18n;
 use crate::ui::action_icons;
 use crate::ui::design_tokens::{palette, radius, sizing, spacing, typography};
+use crate::ui::icons;
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{button, container, scrollable, text, toggler, Column, Row, Space, Text},
-    Border, Color, Element, Length,
+    widget::{
+        button, container, rule, scrollable, text, toggler, Column, Container, Row, Space, Text,
+    },
+    Border, Color, Element, Length, Theme,
 };
 
 /// Contextual data needed to render the diagnostics screen.
@@ -104,6 +111,104 @@ fn build_status_indicator(color: Color) -> Element<'static, Message> {
         .style(move |_theme| container::Style {
             background: Some(color.into()),
             border: Border::default().rounded(radius::FULL),
+            ..Default::default()
+        })
+        .into()
+}
+
+/// Builds the info section with description, data collected list, privacy notice, and docs link.
+fn build_info_section<'a>(ctx: &ViewContext<'a>) -> Element<'a, Message> {
+    // Description (AC 1)
+    let description = Text::new(ctx.i18n.tr("diagnostics-info-description")).size(typography::BODY);
+
+    // Data collected header (AC 2)
+    let data_header =
+        Text::new(ctx.i18n.tr("diagnostics-data-collected-title")).size(typography::BODY_LG);
+
+    // Data collected list (AC 2)
+    let data_list = Column::new()
+        .spacing(spacing::XS)
+        .push(data_header)
+        .push(build_data_item(
+            &ctx.i18n.tr("diagnostics-data-item-resources"),
+        ))
+        .push(build_data_item(
+            &ctx.i18n.tr("diagnostics-data-item-actions"),
+        ))
+        .push(build_data_item(
+            &ctx.i18n.tr("diagnostics-data-item-states"),
+        ))
+        .push(build_data_item(
+            &ctx.i18n.tr("diagnostics-data-item-errors"),
+        ));
+
+    // Privacy notice (AC 3) - subtle gray styling
+    let privacy = Text::new(ctx.i18n.tr("diagnostics-privacy-notice"))
+        .size(typography::BODY)
+        .color(palette::GRAY_400);
+
+    // Documentation link (AC 4)
+    let docs_link = build_link_item(&ctx.i18n.tr("diagnostics-docs-link"), DOCS_URL);
+
+    let content = Column::new()
+        .spacing(spacing::SM)
+        .push(description)
+        .push(data_list)
+        .push(privacy)
+        .push(docs_link);
+
+    build_section(
+        icons::info(),
+        ctx.i18n.tr("diagnostics-info-title"),
+        content.into(),
+    )
+}
+
+/// Build a bullet point item for the data collected list.
+fn build_data_item<'a>(description: &str) -> Element<'a, Message> {
+    Text::new(format!("• {description}"))
+        .size(typography::BODY)
+        .into()
+}
+
+/// Build a link item with label and URL.
+fn build_link_item<'a>(label: &str, url: &'a str) -> Element<'a, Message> {
+    Row::new()
+        .spacing(spacing::SM)
+        .push(Text::new(format!("{label}:")).size(typography::BODY))
+        .push(Text::new(url).size(typography::BODY))
+        .into()
+}
+
+/// Build a section with icon, title, and content (same pattern as about.rs).
+fn build_section(
+    icon: iced::widget::Image<iced::widget::image::Handle>,
+    title: String,
+    content: Element<'_, Message>,
+) -> Element<'_, Message> {
+    let icon_sized = icons::sized(icon, sizing::ICON_MD);
+
+    let header = Row::new()
+        .spacing(spacing::SM)
+        .align_y(Vertical::Center)
+        .push(icon_sized)
+        .push(Text::new(title).size(typography::TITLE_SM));
+
+    let inner = Column::new()
+        .spacing(spacing::SM)
+        .push(header)
+        .push(rule::horizontal(1))
+        .push(content);
+
+    Container::new(inner)
+        .padding(spacing::MD)
+        .width(Length::Fill)
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.extended_palette().background.weak.color.into()),
+            border: Border {
+                radius: radius::MD.into(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .into()
@@ -235,6 +340,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
 
     let title = Text::new(ctx.i18n.tr("diagnostics-title")).size(typography::TITLE_LG);
 
+    let info_section = build_info_section(&ctx);
     let toggle_section = build_toggle_section(&ctx);
     let status_section = build_status_section(&ctx);
     let export_section = build_export_section(&ctx);
@@ -246,6 +352,7 @@ pub fn view(ctx: ViewContext<'_>) -> Element<'_, Message> {
         .padding(spacing::MD)
         .push(back_button)
         .push(title)
+        .push(info_section)
         .push(toggle_section)
         .push(status_section)
         .push(export_section);

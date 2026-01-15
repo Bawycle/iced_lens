@@ -577,6 +577,17 @@ diagnostics-toggle-label = Activer la collecte de ressources
 diagnostics-export-file = Exporter vers un fichier
 diagnostics-export-clipboard = Copier dans le presse-papiers
 
+# Section d'information des diagnostics
+diagnostics-info-title = À propos des Diagnostics
+diagnostics-info-description = L'outil de diagnostic collecte des informations d'exécution pour aider à résoudre les problèmes. Générez un rapport à partager avec le support ou pour analyser le comportement de l'application.
+diagnostics-data-collected-title = Données collectées :
+diagnostics-data-item-resources = Ressources système (CPU, RAM, utilisation disque)
+diagnostics-data-item-actions = Actions utilisateur (navigation, éditions, commandes)
+diagnostics-data-item-states = États de l'application (écran, mode, paramètres)
+diagnostics-data-item-errors = Avertissements et erreurs
+diagnostics-privacy-notice = Toutes les données sont anonymisées avant export. Rien n'est envoyé automatiquement.
+diagnostics-docs-link = Documentation
+
 # Notifications diagnostics
 notification-diagnostics-export-success = Diagnostics exportés avec succès
 notification-diagnostics-export-error = Échec de l'export des diagnostics
