@@ -71,6 +71,41 @@ pub enum AIModel {
     Upscale,
 }
 
+/// Type of filter change for diagnostic tracking.
+///
+/// This enum captures the specific type of filter modification that occurred,
+/// using String serialization to avoid coupling diagnostics to the filter module.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "change_type", rename_all = "snake_case")]
+pub enum FilterChangeType {
+    /// Media type filter changed (e.g., "all" → "imagesonly")
+    MediaType {
+        /// Previous filter value (e.g., "all", "imagesonly", "videosonly")
+        from: String,
+        /// New filter value
+        to: String,
+    },
+    /// Date range filter was enabled
+    DateRangeEnabled,
+    /// Date range filter was disabled
+    DateRangeDisabled,
+    /// Date filter field changed (e.g., "modified" or "created")
+    DateFieldChanged {
+        /// The field that was selected
+        field: String,
+    },
+    /// Date bound was set (start or end date)
+    DateBoundSet {
+        /// Which bound was set ("start" or "end")
+        target: String,
+    },
+    /// Date bound was cleared (start or end date)
+    DateBoundCleared {
+        /// Which bound was cleared ("start" or "end")
+        target: String,
+    },
+}
+
 /// Storage type for media files.
 ///
 /// Used to identify whether a media file is located on local storage,
@@ -557,6 +592,31 @@ pub enum AppStateEvent {
         model: AIModel,
         /// Sanitized reason for failure (generic, no paths)
         reason: String,
+    },
+
+    // -------------------------------------------------------------------------
+    // Navigation Filter Events
+    // -------------------------------------------------------------------------
+    /// Navigation filter has been changed.
+    FilterChanged {
+        /// Type of filter change that occurred
+        filter_type: FilterChangeType,
+        /// Whether filter was active before the change
+        previous_active: bool,
+        /// Whether filter is active after the change
+        new_active: bool,
+        /// Number of items matching current filter
+        filtered_count: usize,
+        /// Total number of items (before filtering)
+        total_count: usize,
+    },
+
+    /// All navigation filters have been cleared/reset.
+    FilterCleared {
+        /// Whether a media type filter was active before reset
+        had_media_type_filter: bool,
+        /// Whether a date range filter was active before reset
+        had_date_filter: bool,
     },
 }
 
@@ -1593,5 +1653,199 @@ mod tests {
         assert_eq!(event.error_type, ErrorType::DecodeError);
         assert_eq!(event.error_code.as_deref(), Some("DEC_001"));
         assert_eq!(event.message, "Invalid frame");
+    }
+
+    // =========================================================================
+    // FilterChangeType Tests
+    // =========================================================================
+
+    #[test]
+    fn filter_change_type_media_type_serializes() {
+        let change = FilterChangeType::MediaType {
+            from: "all".to_string(),
+            to: "imagesonly".to_string(),
+        };
+        let json = serde_json::to_string(&change).expect("serialization should succeed");
+
+        assert!(json.contains("\"change_type\":\"media_type\""));
+        assert!(json.contains("\"from\":\"all\""));
+        assert!(json.contains("\"to\":\"imagesonly\""));
+    }
+
+    #[test]
+    fn filter_change_type_date_range_enabled_serializes() {
+        let change = FilterChangeType::DateRangeEnabled;
+        let json = serde_json::to_string(&change).expect("serialization should succeed");
+
+        assert!(json.contains("\"change_type\":\"date_range_enabled\""));
+    }
+
+    #[test]
+    fn filter_change_type_date_range_disabled_serializes() {
+        let change = FilterChangeType::DateRangeDisabled;
+        let json = serde_json::to_string(&change).expect("serialization should succeed");
+
+        assert!(json.contains("\"change_type\":\"date_range_disabled\""));
+    }
+
+    #[test]
+    fn filter_change_type_date_field_changed_serializes() {
+        let change = FilterChangeType::DateFieldChanged {
+            field: "modified".to_string(),
+        };
+        let json = serde_json::to_string(&change).expect("serialization should succeed");
+
+        assert!(json.contains("\"change_type\":\"date_field_changed\""));
+        assert!(json.contains("\"field\":\"modified\""));
+    }
+
+    #[test]
+    fn filter_change_type_date_bound_set_serializes() {
+        let change = FilterChangeType::DateBoundSet {
+            target: "start".to_string(),
+        };
+        let json = serde_json::to_string(&change).expect("serialization should succeed");
+
+        assert!(json.contains("\"change_type\":\"date_bound_set\""));
+        assert!(json.contains("\"target\":\"start\""));
+    }
+
+    #[test]
+    fn filter_change_type_date_bound_cleared_serializes() {
+        let change = FilterChangeType::DateBoundCleared {
+            target: "end".to_string(),
+        };
+        let json = serde_json::to_string(&change).expect("serialization should succeed");
+
+        assert!(json.contains("\"change_type\":\"date_bound_cleared\""));
+        assert!(json.contains("\"target\":\"end\""));
+    }
+
+    #[test]
+    fn filter_change_type_deserializes() {
+        let json = r#"{"change_type":"media_type","from":"videosonly","to":"all"}"#;
+        let change: FilterChangeType =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match change {
+            FilterChangeType::MediaType { from, to } => {
+                assert_eq!(from, "videosonly");
+                assert_eq!(to, "all");
+            }
+            _ => panic!("expected MediaType variant"),
+        }
+    }
+
+    // =========================================================================
+    // FilterChanged AppStateEvent Tests
+    // =========================================================================
+
+    #[test]
+    fn filter_changed_event_serializes() {
+        let event = AppStateEvent::FilterChanged {
+            filter_type: FilterChangeType::MediaType {
+                from: "all".to_string(),
+                to: "imagesonly".to_string(),
+            },
+            previous_active: false,
+            new_active: true,
+            filtered_count: 42,
+            total_count: 100,
+        };
+        let json = serde_json::to_string(&event).expect("serialization should succeed");
+
+        assert!(json.contains("\"state\":\"filter_changed\""));
+        assert!(json.contains("\"change_type\":\"media_type\""));
+        assert!(json.contains("\"previous_active\":false"));
+        assert!(json.contains("\"new_active\":true"));
+        assert!(json.contains("\"filtered_count\":42"));
+        assert!(json.contains("\"total_count\":100"));
+    }
+
+    #[test]
+    fn filter_changed_with_date_range_serializes() {
+        let event = AppStateEvent::FilterChanged {
+            filter_type: FilterChangeType::DateRangeEnabled,
+            previous_active: false,
+            new_active: true,
+            filtered_count: 50,
+            total_count: 200,
+        };
+        let json = serde_json::to_string(&event).expect("serialization should succeed");
+
+        assert!(json.contains("\"state\":\"filter_changed\""));
+        assert!(json.contains("\"change_type\":\"date_range_enabled\""));
+    }
+
+    #[test]
+    fn filter_changed_event_deserializes() {
+        let json = r#"{"state":"filter_changed","filter_type":{"change_type":"date_bound_set","target":"start"},"previous_active":true,"new_active":true,"filtered_count":10,"total_count":50}"#;
+        let event: AppStateEvent =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match event {
+            AppStateEvent::FilterChanged {
+                filter_type,
+                previous_active,
+                new_active,
+                filtered_count,
+                total_count,
+            } => {
+                assert!(matches!(filter_type, FilterChangeType::DateBoundSet { .. }));
+                assert!(previous_active);
+                assert!(new_active);
+                assert_eq!(filtered_count, 10);
+                assert_eq!(total_count, 50);
+            }
+            _ => panic!("expected FilterChanged variant"),
+        }
+    }
+
+    // =========================================================================
+    // FilterCleared AppStateEvent Tests
+    // =========================================================================
+
+    #[test]
+    fn filter_cleared_event_serializes() {
+        let event = AppStateEvent::FilterCleared {
+            had_media_type_filter: true,
+            had_date_filter: false,
+        };
+        let json = serde_json::to_string(&event).expect("serialization should succeed");
+
+        assert!(json.contains("\"state\":\"filter_cleared\""));
+        assert!(json.contains("\"had_media_type_filter\":true"));
+        assert!(json.contains("\"had_date_filter\":false"));
+    }
+
+    #[test]
+    fn filter_cleared_with_both_filters_serializes() {
+        let event = AppStateEvent::FilterCleared {
+            had_media_type_filter: true,
+            had_date_filter: true,
+        };
+        let json = serde_json::to_string(&event).expect("serialization should succeed");
+
+        assert!(json.contains("\"had_media_type_filter\":true"));
+        assert!(json.contains("\"had_date_filter\":true"));
+    }
+
+    #[test]
+    fn filter_cleared_event_deserializes() {
+        let json =
+            r#"{"state":"filter_cleared","had_media_type_filter":false,"had_date_filter":true}"#;
+        let event: AppStateEvent =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match event {
+            AppStateEvent::FilterCleared {
+                had_media_type_filter,
+                had_date_filter,
+            } => {
+                assert!(!had_media_type_filter);
+                assert!(had_date_filter);
+            }
+            _ => panic!("expected FilterCleared variant"),
+        }
     }
 }

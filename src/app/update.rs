@@ -6,7 +6,9 @@
 
 use super::{notifications, persistence, Message, Screen};
 use crate::config;
-use crate::diagnostics::{AppStateEvent, DiagnosticsHandle, ErrorType, UserAction, WarningType};
+use crate::diagnostics::{
+    AppStateEvent, DiagnosticsHandle, ErrorType, FilterChangeType, UserAction, WarningType,
+};
 use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
 use crate::media::{
@@ -21,7 +23,7 @@ use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent, MetadataEdito
 use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
-use crate::ui::viewer::{component, filter_dropdown};
+use crate::ui::viewer::{component, filter_dropdown, video_controls};
 use crate::video_player::KeyboardSeekStep;
 // Re-export NavigationDirection from viewer component (single source of truth)
 pub use crate::ui::viewer::NavigationDirection;
@@ -154,6 +156,114 @@ impl UpdateContext<'_> {
     }
 }
 
+/// Logs the `MediaLoadingStarted` diagnostic event when a media load is initiated.
+///
+/// This should be called from the App layer when starting to load media,
+/// following the architectural principle R1: collect at handler level.
+pub(super) fn log_media_loading_started(path: &std::path::Path, diagnostics: &DiagnosticsHandle) {
+    use crate::diagnostics::MediaType;
+
+    // Detect media type from extension
+    let media_type = path.extension().map_or(MediaType::Unknown, |ext| {
+        let ext = ext.to_string_lossy().to_lowercase();
+        if ["mp4", "webm", "avi", "mkv", "mov", "m4v", "wmv", "flv"].contains(&ext.as_str()) {
+            MediaType::Video
+        } else {
+            MediaType::Image
+        }
+    });
+
+    // Get file size from filesystem
+    let file_size_bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+
+    // Get path metadata (extension, storage_type, path_hash)
+    let metadata = diagnostics.media_metadata(path);
+
+    diagnostics.log_state(AppStateEvent::MediaLoadingStarted {
+        media_type,
+        file_size_bytes,
+        dimensions: None, // Not known until load completes
+        extension: metadata.extension,
+        storage_type: metadata.storage_type,
+        path_hash: metadata.path_hash,
+    });
+}
+
+/// Logs the `MediaLoaded` diagnostic event when media is successfully loaded.
+///
+/// This should be called from the App layer when media loads successfully,
+/// following the architectural principle R1: collect at handler level.
+fn log_media_loaded(
+    media: &MediaData,
+    path: Option<&std::path::Path>,
+    diagnostics: &DiagnosticsHandle,
+) {
+    use crate::diagnostics::{Dimensions, MediaType};
+
+    let (media_type, dimensions) = match media {
+        MediaData::Image(img) => (
+            MediaType::Image,
+            Some(Dimensions::new(img.width, img.height)),
+        ),
+        MediaData::Video(video_data) => {
+            let dims = if video_data.width > 0 && video_data.height > 0 {
+                Some(Dimensions::new(video_data.width, video_data.height))
+            } else {
+                None
+            };
+            (MediaType::Video, dims)
+        }
+    };
+
+    let metadata = path.map_or_else(Default::default, |p| diagnostics.media_metadata(p));
+    let file_size_bytes = path
+        .and_then(|p| std::fs::metadata(p).ok())
+        .map_or(0, |m| m.len());
+
+    diagnostics.log_state(AppStateEvent::MediaLoaded {
+        media_type,
+        file_size_bytes,
+        dimensions,
+        extension: metadata.extension,
+        storage_type: metadata.storage_type,
+        path_hash: metadata.path_hash,
+    });
+}
+
+/// Logs the `MediaFailed` diagnostic event when media loading fails.
+///
+/// This should be called from the App layer when media loading fails,
+/// following the architectural principle R1: collect at handler level.
+fn log_media_failed(
+    error: &crate::error::Error,
+    path: Option<&std::path::Path>,
+    diagnostics: &DiagnosticsHandle,
+) {
+    use crate::diagnostics::MediaType;
+
+    // Detect media type from extension if path is available
+    let media_type = path
+        .and_then(|p| p.extension())
+        .map_or(MediaType::Unknown, |ext| {
+            let ext = ext.to_string_lossy().to_lowercase();
+            if ["mp4", "webm", "avi", "mkv", "mov", "m4v", "wmv", "flv"].contains(&ext.as_str()) {
+                MediaType::Video
+            } else {
+                MediaType::Image
+            }
+        });
+
+    let metadata = path.map_or_else(Default::default, |p| diagnostics.media_metadata(p));
+
+    diagnostics.log_state(AppStateEvent::MediaFailed {
+        media_type,
+        reason: format!("{error}"),
+        extension: metadata.extension,
+        storage_type: metadata.storage_type,
+        path_hash: metadata.path_hash,
+    });
+}
+
 /// Handles state updates after successful media load.
 fn handle_successful_media_load(ctx: &mut UpdateContext<'_>) {
     *ctx.metadata_editor_state = None;
@@ -172,6 +282,38 @@ fn handle_successful_media_load(ctx: &mut UpdateContext<'_>) {
     ctx.notifications.clear_load_errors();
 }
 
+/// Logs diagnostic events for viewer messages at handler level (R1 principle).
+///
+/// Returns `true` if the message is a successful media load.
+fn log_viewer_message_diagnostics(
+    message: &component::Message,
+    path: Option<&std::path::Path>,
+    seek_preview: Option<f64>,
+    diagnostics: &DiagnosticsHandle,
+) -> bool {
+    match message {
+        component::Message::MediaLoaded(Ok(media)) => {
+            log_media_loaded(media, path, diagnostics);
+            true
+        }
+        component::Message::MediaLoaded(Err(error)) => {
+            log_media_failed(error, path, diagnostics);
+            false
+        }
+        component::Message::VideoControls(video_controls::Message::TogglePlayback) => {
+            diagnostics.log_action(UserAction::TogglePlayback);
+            false
+        }
+        component::Message::VideoControls(video_controls::Message::SeekCommit) => {
+            if let Some(position_secs) = seek_preview {
+                diagnostics.log_action(UserAction::SeekVideo { position_secs });
+            }
+            false
+        }
+        _ => false,
+    }
+}
+
 /// Handles viewer component messages.
 pub fn handle_viewer_message(
     ctx: &mut UpdateContext<'_>,
@@ -181,7 +323,14 @@ pub fn handle_viewer_message(
         *ctx.window_id = Some(*window);
     }
 
-    let is_successful_load = matches!(&message, component::Message::MediaLoaded(Ok(_)));
+    // Log diagnostic events at handler level (R1: collect at handler level)
+    let is_successful_load = log_viewer_message_diagnostics(
+        &message,
+        ctx.viewer.current_media_path.as_deref(),
+        ctx.viewer.seek_preview_position(),
+        ctx.diagnostics,
+    );
+
     let (effect, task) = ctx
         .viewer
         .handle_message(message, ctx.i18n, ctx.diagnostics);
@@ -709,6 +858,9 @@ pub fn handle_editor_message(
                 image_editor::ImageSource::File(current_media_path) => {
                     // Set loading state via encapsulated method
                     ctx.viewer.start_loading();
+
+                    // Log MediaLoadingStarted at handler level (R1: collect at handler level)
+                    log_media_loading_started(&current_media_path, ctx.diagnostics);
 
                     // Reload the image in the viewer to show any saved changes
                     Task::perform(
@@ -1249,6 +1401,9 @@ where
         // Set loading state via encapsulated method
         ctx.viewer.start_loading();
 
+        // Log MediaLoadingStarted at handler level (R1: collect at handler level)
+        log_media_loading_started(&path, ctx.diagnostics);
+
         // Load the media with the provided callback
         Task::perform(async move { media::load_media(&path) }, on_loaded)
     } else {
@@ -1421,6 +1576,9 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
 
                 // Set loading state via encapsulated method
                 ctx.viewer.start_loading();
+
+                // Log MediaLoadingStarted at handler level (R1: collect at handler level)
+                log_media_loading_started(&next_path, ctx.diagnostics);
 
                 Task::perform(async move { media::load_media(&next_path) }, |result| {
                     Message::Viewer(component::Message::MediaLoaded(result))
@@ -1600,10 +1758,16 @@ fn handle_filter_changed(
     use crate::media::filter::{DateRangeFilter, MediaFilter};
     use filter_dropdown::DateTarget;
 
+    // === Capture state BEFORE change for diagnostics ===
+    let previous_active = ctx.media_navigator.filter().is_active();
+    let previous_media_type = ctx.media_navigator.filter().media_type;
+    let previous_date_active = ctx.media_navigator.filter().date_range.is_some();
+
     // Clone current filter to modify
     let mut filter = ctx.media_navigator.filter().clone();
 
-    match msg {
+    // Determine filter_type for logging (None for local-only messages and ResetFilters)
+    let filter_change_type: Option<FilterChangeType> = match msg {
         filter_dropdown::Message::ToggleDropdown
         | filter_dropdown::Message::CloseDropdown
         | filter_dropdown::Message::ConsumeClick
@@ -1612,25 +1776,36 @@ fn handle_filter_changed(
             unreachable!("Local messages should be handled in component")
         }
         filter_dropdown::Message::MediaTypeChanged(media_type) => {
+            let from = format!("{previous_media_type:?}").to_lowercase();
+            let to = format!("{media_type:?}").to_lowercase();
             filter.media_type = media_type;
+            Some(FilterChangeType::MediaType { from, to })
         }
         filter_dropdown::Message::ToggleDateFilter(enabled) => {
             if enabled {
                 // Enable date filter with default values (no bounds = filter by field only)
                 filter.date_range = Some(DateRangeFilter::default());
+                Some(FilterChangeType::DateRangeEnabled)
             } else {
                 filter.date_range = None;
+                Some(FilterChangeType::DateRangeDisabled)
             }
         }
         filter_dropdown::Message::DateFieldChanged(field) => {
+            let field_str = format!("{field:?}").to_lowercase();
             if let Some(ref mut date_range) = filter.date_range {
                 date_range.field = field;
             }
+            Some(FilterChangeType::DateFieldChanged { field: field_str })
         }
         filter_dropdown::Message::DateSubmit(target) => {
             // Get the date from the viewer's dropdown state
             let date_state = ctx.viewer.filter_dropdown_state().date_state(target);
             let date = date_state.to_system_time();
+            let target_str = match target {
+                DateTarget::Start => "start".to_string(),
+                DateTarget::End => "end".to_string(),
+            };
 
             if let Some(ref mut date_range) = filter.date_range {
                 match target {
@@ -1638,22 +1813,50 @@ fn handle_filter_changed(
                     DateTarget::End => date_range.end = date,
                 }
             }
+            Some(FilterChangeType::DateBoundSet { target: target_str })
         }
         filter_dropdown::Message::ClearDate(target) => {
+            let target_str = match target {
+                DateTarget::Start => "start".to_string(),
+                DateTarget::End => "end".to_string(),
+            };
+
             if let Some(ref mut date_range) = filter.date_range {
                 match target {
                     DateTarget::Start => date_range.start = None,
                     DateTarget::End => date_range.end = None,
                 }
             }
+            Some(FilterChangeType::DateBoundCleared { target: target_str })
         }
         filter_dropdown::Message::ResetFilters => {
+            // Handle separately as FilterCleared
+            let had_media_type_filter = previous_media_type.is_active();
+            let had_date_filter = previous_date_active;
             filter = MediaFilter::default();
+
+            // Emit FilterCleared event
+            ctx.diagnostics.log_state(AppStateEvent::FilterCleared {
+                had_media_type_filter,
+                had_date_filter,
+            });
+            None // Don't emit FilterChanged
         }
-    }
+    };
 
     // Update the navigator's filter
     ctx.media_navigator.set_filter(filter);
+
+    // === Emit FilterChanged diagnostic event ===
+    if let Some(filter_type) = filter_change_type {
+        ctx.diagnostics.log_state(AppStateEvent::FilterChanged {
+            filter_type,
+            previous_active,
+            new_active: ctx.media_navigator.filter().is_active(),
+            filtered_count: ctx.media_navigator.filtered_count(),
+            total_count: ctx.media_navigator.len(),
+        });
+    }
 
     // Persist if filter persistence is enabled
     let (cfg, _) = config::load();
@@ -1812,4 +2015,218 @@ fn trigger_prefetch(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         .collect();
 
     Task::batch(tasks)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diagnostics::{BufferCapacity, DiagnosticEventKind, DiagnosticsCollector};
+    use crate::media::{ImageData, VideoData};
+    use std::path::Path;
+
+    /// Creates test image data.
+    fn test_image_data() -> ImageData {
+        let pixels = vec![255_u8; 4 * 100 * 100];
+        ImageData::from_rgba(100, 100, pixels)
+    }
+
+    /// Creates test video data.
+    fn test_video_data() -> VideoData {
+        let pixels = vec![255_u8; 4];
+        let thumbnail = ImageData::from_rgba(1, 1, pixels);
+        VideoData {
+            thumbnail,
+            width: 1920,
+            height: 1080,
+            duration_secs: 60.0,
+            fps: 30.0,
+            has_audio: true,
+        }
+    }
+
+    #[test]
+    fn log_media_loaded_captures_image_dimensions() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let media = MediaData::Image(test_image_data());
+        log_media_loaded(&media, None, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state: AppStateEvent::MediaLoaded { dimensions, .. },
+        } = &events[0].kind
+        {
+            assert!(dimensions.is_some());
+            let dims = dimensions.as_ref().unwrap();
+            assert_eq!(dims.width, 100);
+            assert_eq!(dims.height, 100);
+        } else {
+            panic!("Expected MediaLoaded event");
+        }
+    }
+
+    #[test]
+    fn log_media_loaded_captures_video_dimensions() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let media = MediaData::Video(test_video_data());
+        log_media_loaded(&media, None, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state:
+                AppStateEvent::MediaLoaded {
+                    media_type,
+                    dimensions,
+                    ..
+                },
+        } = &events[0].kind
+        {
+            assert!(matches!(media_type, crate::diagnostics::MediaType::Video));
+            assert!(dimensions.is_some());
+            let dims = dimensions.as_ref().unwrap();
+            assert_eq!(dims.width, 1920);
+            assert_eq!(dims.height, 1080);
+        } else {
+            panic!("Expected MediaLoaded event");
+        }
+    }
+
+    #[test]
+    fn log_media_failed_captures_error_reason() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let error = crate::error::Error::Config("test config error".to_string());
+        log_media_failed(&error, None, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state: AppStateEvent::MediaFailed { reason, .. },
+        } = &events[0].kind
+        {
+            assert!(reason.contains("test config error"));
+        } else {
+            panic!("Expected MediaFailed event");
+        }
+    }
+
+    #[test]
+    fn log_media_loading_started_detects_video_extension() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let path = Path::new("/tmp/test_video.mp4");
+        log_media_loading_started(path, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state: AppStateEvent::MediaLoadingStarted { media_type, .. },
+        } = &events[0].kind
+        {
+            assert!(matches!(media_type, crate::diagnostics::MediaType::Video));
+        } else {
+            panic!("Expected MediaLoadingStarted event");
+        }
+    }
+
+    #[test]
+    fn log_media_loading_started_detects_image_extension() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let path = Path::new("/tmp/test_image.jpg");
+        log_media_loading_started(path, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state: AppStateEvent::MediaLoadingStarted { media_type, .. },
+        } = &events[0].kind
+        {
+            assert!(matches!(media_type, crate::diagnostics::MediaType::Image));
+        } else {
+            panic!("Expected MediaLoadingStarted event");
+        }
+    }
+
+    #[test]
+    fn toggle_playback_logged_from_handler() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let message = component::Message::VideoControls(video_controls::Message::TogglePlayback);
+        let result = log_viewer_message_diagnostics(&message, None, None, &handle);
+
+        assert!(!result); // TogglePlayback doesn't indicate successful load
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::UserAction {
+            action: UserAction::TogglePlayback,
+            ..
+        } = &events[0].kind
+        {
+            // Test passes - correct action logged
+        } else {
+            panic!("Expected TogglePlayback action");
+        }
+    }
+
+    #[test]
+    fn seek_video_logged_from_handler() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let message = component::Message::VideoControls(video_controls::Message::SeekCommit);
+        let seek_position = Some(42.5);
+        let result = log_viewer_message_diagnostics(&message, None, seek_position, &handle);
+
+        assert!(!result); // SeekCommit doesn't indicate successful load
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::UserAction {
+            action: UserAction::SeekVideo { position_secs },
+            ..
+        } = &events[0].kind
+        {
+            assert!((*position_secs - 42.5).abs() < f64::EPSILON);
+        } else {
+            panic!("Expected SeekVideo action");
+        }
+    }
+
+    #[test]
+    fn seek_video_not_logged_without_preview_position() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let message = component::Message::VideoControls(video_controls::Message::SeekCommit);
+        // No seek preview position set
+        let result = log_viewer_message_diagnostics(&message, None, None, &handle);
+
+        assert!(!result);
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 0); // No event logged when no preview position
+    }
 }

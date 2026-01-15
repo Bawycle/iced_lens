@@ -839,6 +839,10 @@ impl App {
                     self.media_navigator.set_current_media_path(path.clone());
                     self.viewer.current_media_path = Some(path.clone());
                     self.viewer.start_loading();
+
+                    // Log MediaLoadingStarted at handler level (R1: collect at handler level)
+                    update::log_media_loading_started(&path, &self.diagnostics.handle());
+
                     Task::perform(async move { media::load_media(&path) }, |result| {
                         Message::Viewer(component::Message::MediaLoaded(result))
                     })

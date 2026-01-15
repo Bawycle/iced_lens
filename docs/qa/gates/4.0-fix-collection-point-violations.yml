@@ -1,0 +1,96 @@
+# Quality Gate: Story 4.0 - Fix Collection Point Architectural Violations
+schema: 1
+story: "4.0"
+story_title: "Fix Collection Point Architectural Violations"
+gate: PASS
+status_reason: "All QA concerns addressed. 3 tests added for TogglePlayback/SeekVideo, Dev Agent Record updated. 930 tests pass."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15T20:00:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "TEST-001"
+    severity: low
+    finding: "Missing unit tests for TogglePlayback and SeekVideo handler-level logging"
+    suggested_action: "Add 2 tests to verify these actions are captured at handler level"
+    suggested_owner: dev
+    resolution: "FIXED - Added 3 tests: toggle_playback_logged_from_handler, seek_video_logged_from_handler, seek_video_not_logged_without_preview_position"
+  - id: "DOC-001"
+    severity: low
+    finding: "Dev Agent Record section not filled out (model, completion notes, file list)"
+    suggested_action: "Update story file with implementation details"
+    suggested_owner: dev
+    resolution: "FIXED - Updated with Claude Opus 4.5, completion notes, and file list"
+
+quality_score: 100  # All issues resolved
+
+evidence:
+  tests_reviewed: 8
+  tests_added: 8
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    ac_gaps: []  # All ACs met
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Path sanitization maintained via media_metadata()"
+  performance:
+    status: PASS
+    notes: "Non-blocking channel-based logging"
+  reliability:
+    status: PASS
+    notes: "930 tests pass, no regression"
+  maintainability:
+    status: PASS
+    notes: "Clean helper function extraction, good documentation"
+
+recommendations:
+  immediate: []  # All immediate actions completed
+  completed:
+    - action: "Add test for TogglePlayback handler-level logging"
+      refs: ["src/app/update.rs:2123"]
+      status: "DONE"
+    - action: "Add test for SeekVideo handler-level logging"
+      refs: ["src/app/update.rs:2147"]
+      status: "DONE"
+  future:
+    - action: "Consider extracting media type detection to shared helper"
+      refs: ["src/app/update.rs:165", "src/app/update.rs:243"]
+
+instrumentation_audit:
+  coverage_validated: true
+
+  user_actions_checked:
+    - action_name: "TogglePlayback"
+      handler: "log_viewer_message_diagnostics"
+      file: "src/app/update.rs:301-303"
+      test: "toggle_playback_logged_from_handler"
+    - action_name: "SeekVideo"
+      handler: "log_viewer_message_diagnostics"
+      file: "src/app/update.rs:305-309"
+      test: "seek_video_logged_from_handler, seek_video_not_logged_without_preview_position"
+
+  state_events_checked:
+    - event_name: "MediaLoadingStarted"
+      emission_point: "log_media_loading_started"
+      file: "src/app/update.rs:161-188"
+      test: "log_media_loading_started_detects_video_extension, log_media_loading_started_detects_image_extension"
+    - event_name: "MediaLoaded"
+      emission_point: "log_media_loaded"
+      file: "src/app/update.rs:194-229"
+      test: "log_media_loaded_captures_image_dimensions, log_media_loaded_captures_video_dimensions"
+    - event_name: "MediaFailed"
+      emission_point: "log_media_failed"
+      file: "src/app/update.rs:235-263"
+      test: "log_media_failed_captures_error_reason"
+
+  gaps_identified: []  # All gaps resolved - tests added for TogglePlayback and SeekVideo
+
+  placement_validated:
+    - checked: "No UI-level logging in component.rs (grep confirms)"
+    - checked: "Events emitted at handler level in update.rs"
+    - checked: "No duplicate events"
+    - checked: "video_player/state.rs logging acceptable (Domain layer)"

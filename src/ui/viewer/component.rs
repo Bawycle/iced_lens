@@ -486,6 +486,13 @@ impl State {
         matches!(self.media, Some(MediaData::Video(_)))
     }
 
+    /// Returns the current seek preview position if one is set.
+    ///
+    /// This is used by the App layer to log `SeekVideo` actions at handler level.
+    pub fn seek_preview_position(&self) -> Option<f64> {
+        self.seek_preview_position
+    }
+
     /// Returns true if a video is playing or will resume playing after seek/buffer.
     ///
     /// This determines if arrow keys should seek (true) vs navigate (false).
@@ -640,24 +647,6 @@ impl State {
         // Store for use in success/failure handlers
         self.loading_media_type = Some(media_type);
         self.loading_file_size = Some(file_size_bytes);
-
-        // Log MediaLoadingStarted event
-        // Note: dimensions are not yet known at load start, will be set on MediaLoaded
-        if let Some(ref handle) = self.diagnostics {
-            let metadata = self
-                .current_media_path
-                .as_ref()
-                .map(|p| handle.media_metadata(p))
-                .unwrap_or_default();
-            handle.log_state(crate::diagnostics::AppStateEvent::MediaLoadingStarted {
-                media_type,
-                file_size_bytes,
-                dimensions: None, // Not known until load completes
-                extension: metadata.extension,
-                storage_type: metadata.storage_type,
-                path_hash: metadata.path_hash,
-            });
-        }
     }
 
     /// Returns an exportable frame from the video canvas, if available.
@@ -830,50 +819,9 @@ impl State {
                             }
                         }
 
-                        // Log MediaLoaded event for diagnostics
-                        let (loaded_media_type, dimensions) = match &media {
-                            MediaData::Image(img) => (
-                                crate::diagnostics::MediaType::Image,
-                                Some(crate::diagnostics::Dimensions::new(img.width, img.height)),
-                            ),
-                            MediaData::Video(video_data) => {
-                                // Video dimensions available from video data
-                                let dims = if video_data.width > 0 && video_data.height > 0 {
-                                    Some(crate::diagnostics::Dimensions::new(
-                                        video_data.width,
-                                        video_data.height,
-                                    ))
-                                } else {
-                                    None
-                                };
-                                (crate::diagnostics::MediaType::Video, dims)
-                            }
-                        };
-                        if let Some(ref handle) = self.diagnostics {
-                            let metadata = self
-                                .current_media_path
-                                .as_ref()
-                                .map(|p| handle.media_metadata(p))
-                                .unwrap_or_default();
-                            // Use cached file size if available (from start_loading),
-                            // otherwise read from filesystem (for cache hits that bypass start_loading)
-                            let file_size_bytes = self.loading_file_size.take().or_else(|| {
-                                self.current_media_path
-                                    .as_ref()
-                                    .and_then(|p| std::fs::metadata(p).ok())
-                                    .map(|m| m.len())
-                            }).unwrap_or(0);
-                            handle.log_state(crate::diagnostics::AppStateEvent::MediaLoaded {
-                                media_type: loaded_media_type,
-                                file_size_bytes,
-                                dimensions,
-                                extension: metadata.extension,
-                                storage_type: metadata.storage_type,
-                                path_hash: metadata.path_hash,
-                            });
-                        }
-                        // Clear loading_media_type as it's no longer needed
+                        // Clear loading state fields (logging now handled at App layer)
                         self.loading_media_type = None;
+                        self.loading_file_size = None;
 
                         self.media = Some(media);
                         self.error = None;
@@ -922,35 +870,9 @@ impl State {
                         (effect, scroll_task)
                     }
                     Err(error) => {
-                        // Log MediaFailed event for diagnostics (sanitize error - no file paths)
-                        let failed_media_type = self
-                            .loading_media_type
-                            .take()
-                            .unwrap_or(crate::diagnostics::MediaType::Unknown);
-                        // Clear file size as it's no longer needed
+                        // Clear loading state fields (logging now handled at App layer)
+                        self.loading_media_type = None;
                         self.loading_file_size = None;
-
-                        let sanitized_reason = match &error {
-                            Error::Svg(e) => format!("SVG error: {e}"),
-                            Error::Video(e) => format!("Video error: {e}"),
-                            Error::Io(e) => format!("IO error: {e}"),
-                            Error::Config(e) => format!("Config error: {e}"),
-                        };
-
-                        if let Some(ref handle) = self.diagnostics {
-                            let metadata = self
-                                .current_media_path
-                                .as_ref()
-                                .map(|p| handle.media_metadata(p))
-                                .unwrap_or_default();
-                            handle.log_state(crate::diagnostics::AppStateEvent::MediaFailed {
-                                media_type: failed_media_type,
-                                reason: sanitized_reason,
-                                extension: metadata.extension,
-                                storage_type: metadata.storage_type,
-                                path_hash: metadata.path_hash,
-                            });
-                        }
 
                         // Get the failed filename for the notification
                         let failed_filename = self
@@ -1142,11 +1064,7 @@ impl State {
 
                 match video_msg {
                     VM::TogglePlayback => {
-                        // Log user action for diagnostics
-                        if let Some(ref handle) = self.diagnostics {
-                            handle.log_action(crate::diagnostics::UserAction::TogglePlayback);
-                        }
-
+                        // Logging now handled at App layer (R1: collect at handler level)
                         if let Some(player) = &mut self.video_player {
                             match player.state() {
                                 crate::video_player::PlaybackState::Playing { .. }
@@ -1189,16 +1107,10 @@ impl State {
                     }
                     VM::SeekCommit => {
                         // Perform actual seek to preview position
+                        // Logging now handled at App layer (R1: collect at handler level)
                         // Don't clear seek_preview_position here - it will be cleared
                         // when we receive a frame near the seek target
                         if let Some(target_secs) = self.seek_preview_position {
-                            // Log user action for diagnostics
-                            if let Some(ref handle) = self.diagnostics {
-                                handle.log_action(crate::diagnostics::UserAction::SeekVideo {
-                                    position_secs: target_secs,
-                                });
-                            }
-
                             if let Some(player) = &mut self.video_player {
                                 player.seek(target_secs);
                             }
