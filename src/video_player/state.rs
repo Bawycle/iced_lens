@@ -275,6 +275,11 @@ impl VideoPlayer {
     /// Sets whether the video should loop.
     pub fn set_loop(&mut self, enabled: bool) {
         self.loop_enabled = enabled;
+
+        // Log state event for diagnostics
+        if let Some(ref handle) = self.diagnostics {
+            handle.log_state(AppStateEvent::VideoLoopToggled { enabled });
+        }
     }
 
     /// Returns whether the player is in stepping mode.
@@ -745,6 +750,13 @@ impl VideoPlayer {
     fn set_playback_speed(&mut self, speed: super::PlaybackSpeed) {
         self.playback_speed = speed;
         self.speed_auto_muted = speed.should_auto_mute();
+
+        // Log state event for diagnostics
+        if let Some(ref handle) = self.diagnostics {
+            handle.log_state(AppStateEvent::VideoSpeedChanged {
+                speed: speed.value(),
+            });
+        }
 
         // Get current position as reference point for both decoders
         let reference_pts = self.state.position().unwrap_or(0.0);

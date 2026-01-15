@@ -2391,4 +2391,124 @@ mod tests {
             _ => panic!("expected RotateCounterClockwise variant"),
         }
     }
+
+    // =========================================================================
+    // Story 4.4: Missing State Events Serialization Tests
+    // =========================================================================
+
+    #[test]
+    fn video_loop_toggled_state_serializes() {
+        let state = AppStateEvent::VideoLoopToggled { enabled: true };
+        let json = serde_json::to_string(&state).expect("serialization should succeed");
+
+        assert!(json.contains("\"state\":\"video_loop_toggled\""));
+        assert!(json.contains("\"enabled\":true"));
+    }
+
+    #[test]
+    fn video_loop_toggled_state_deserializes() {
+        let json = r#"{"state":"video_loop_toggled","enabled":false}"#;
+        let state: AppStateEvent =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match state {
+            AppStateEvent::VideoLoopToggled { enabled } => {
+                assert!(!enabled);
+            }
+            _ => panic!("expected VideoLoopToggled variant"),
+        }
+    }
+
+    #[test]
+    fn video_speed_changed_state_serializes() {
+        let state = AppStateEvent::VideoSpeedChanged { speed: 2.0 };
+        let json = serde_json::to_string(&state).expect("serialization should succeed");
+
+        assert!(json.contains("\"state\":\"video_speed_changed\""));
+        assert!(json.contains("\"speed\":2.0"));
+    }
+
+    #[test]
+    fn video_speed_changed_state_deserializes() {
+        let json = r#"{"state":"video_speed_changed","speed":0.5}"#;
+        let state: AppStateEvent =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match state {
+            AppStateEvent::VideoSpeedChanged { speed } => {
+                assert_relative_eq!(speed, 0.5, epsilon = 0.01);
+            }
+            _ => panic!("expected VideoSpeedChanged variant"),
+        }
+    }
+
+    #[test]
+    fn editor_deblur_cancelled_state_serializes() {
+        let state = AppStateEvent::EditorDeblurCancelled;
+        let json = serde_json::to_string(&state).expect("serialization should succeed");
+
+        assert!(json.contains("\"state\":\"editor_deblur_cancelled\""));
+    }
+
+    #[test]
+    fn editor_deblur_cancelled_state_deserializes() {
+        let json = r#"{"state":"editor_deblur_cancelled"}"#;
+        let state: AppStateEvent =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        assert!(matches!(state, AppStateEvent::EditorDeblurCancelled));
+    }
+
+    #[test]
+    fn model_download_completed_state_serializes() {
+        let state = AppStateEvent::ModelDownloadCompleted {
+            model: AIModel::Deblur,
+        };
+        let json = serde_json::to_string(&state).expect("serialization should succeed");
+
+        assert!(json.contains("\"state\":\"model_download_completed\""));
+        assert!(json.contains("\"model\":\"deblur\""));
+    }
+
+    #[test]
+    fn model_download_completed_state_deserializes() {
+        let json = r#"{"state":"model_download_completed","model":"upscale"}"#;
+        let state: AppStateEvent =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match state {
+            AppStateEvent::ModelDownloadCompleted { model } => {
+                assert!(matches!(model, AIModel::Upscale));
+            }
+            _ => panic!("expected ModelDownloadCompleted variant"),
+        }
+    }
+
+    #[test]
+    fn model_download_failed_state_serializes() {
+        let state = AppStateEvent::ModelDownloadFailed {
+            model: AIModel::Deblur,
+            reason: "Network error".to_string(),
+        };
+        let json = serde_json::to_string(&state).expect("serialization should succeed");
+
+        assert!(json.contains("\"state\":\"model_download_failed\""));
+        assert!(json.contains("\"model\":\"deblur\""));
+        assert!(json.contains("\"reason\":\"Network error\""));
+    }
+
+    #[test]
+    fn model_download_failed_state_deserializes() {
+        let json = r#"{"state":"model_download_failed","model":"upscale","reason":"Timeout"}"#;
+        let state: AppStateEvent =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match state {
+            AppStateEvent::ModelDownloadFailed { model, reason } => {
+                assert!(matches!(model, AIModel::Upscale));
+                assert_eq!(reason, "Timeout");
+            }
+            _ => panic!("expected ModelDownloadFailed variant"),
+        }
+    }
 }

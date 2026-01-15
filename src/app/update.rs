@@ -7,8 +7,8 @@
 use super::{notifications, persistence, Message, Screen};
 use crate::config;
 use crate::diagnostics::{
-    AppStateEvent, DiagnosticsHandle, ErrorType, FilterChangeType, NavigationContext, UserAction,
-    WarningType,
+    AIModel, AppStateEvent, DiagnosticsHandle, ErrorType, FilterChangeType, NavigationContext,
+    UserAction, WarningType,
 };
 use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
@@ -811,6 +811,12 @@ pub fn handle_settings_message(
             use iced::futures::stream;
             use iced::futures::StreamExt;
 
+            // Log state event for diagnostics
+            ctx.diagnostics
+                .log_state(AppStateEvent::ModelDownloadStarted {
+                    model: AIModel::Deblur,
+                });
+
             // Start the download/validation process
             // Set status to downloading and start async task
             ctx.settings
@@ -925,6 +931,12 @@ pub fn handle_settings_message(
             use iced::futures::channel::{mpsc, oneshot};
             use iced::futures::stream;
             use iced::futures::StreamExt;
+
+            // Log state event for diagnostics
+            ctx.diagnostics
+                .log_state(AppStateEvent::ModelDownloadStarted {
+                    model: AIModel::Upscale,
+                });
 
             // Start the download/validation process
             ctx.settings.set_upscale_model_status(
@@ -1108,6 +1120,8 @@ pub fn handle_editor_message(
         ImageEditorEvent::DeblurCancelRequested => {
             // Cancel is handled by the editor state itself (sets cancel_requested flag)
             // The actual inference task will check this flag and stop
+            ctx.diagnostics
+                .log_state(AppStateEvent::EditorDeblurCancelled);
             Task::none()
         }
         ImageEditorEvent::UpscaleResizeRequested { width, height } => {

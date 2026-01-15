@@ -22,7 +22,7 @@ pub use message::{Flags, Message};
 pub use screen::Screen;
 
 use crate::diagnostics::{
-    AppOperation, AppStateEvent, DiagnosticsCollector, Dimensions, ErrorType, UserAction,
+    AIModel, AppOperation, AppStateEvent, DiagnosticsCollector, Dimensions, ErrorType, UserAction,
     WarningType,
 };
 use crate::media::metadata::MediaMetadata;
@@ -1070,6 +1070,13 @@ impl App {
 
         match result {
             Ok(()) => {
+                // Log state event for diagnostics
+                self.diagnostics
+                    .handle()
+                    .log_state(AppStateEvent::ModelDownloadCompleted {
+                        model: AIModel::Deblur,
+                    });
+
                 // Download succeeded - start validation
                 self.settings
                     .set_deblur_model_status(media::deblur::ModelStatus::Validating);
@@ -1101,6 +1108,14 @@ impl App {
                 )
             }
             Err(e) => {
+                // Log state event for diagnostics
+                self.diagnostics
+                    .handle()
+                    .log_state(AppStateEvent::ModelDownloadFailed {
+                        model: AIModel::Deblur,
+                        reason: e.clone(),
+                    });
+
                 // Download failed
                 self.settings
                     .set_deblur_model_status(media::deblur::ModelStatus::Error(e.clone()));
@@ -1183,6 +1198,13 @@ impl App {
 
         match result {
             Ok(()) => {
+                // Log state event for diagnostics
+                self.diagnostics
+                    .handle()
+                    .log_state(AppStateEvent::ModelDownloadCompleted {
+                        model: AIModel::Upscale,
+                    });
+
                 // Download succeeded - start validation
                 self.settings
                     .set_upscale_model_status(media::upscale::UpscaleModelStatus::Validating);
@@ -1213,6 +1235,14 @@ impl App {
                 )
             }
             Err(e) => {
+                // Log state event for diagnostics
+                self.diagnostics
+                    .handle()
+                    .log_state(AppStateEvent::ModelDownloadFailed {
+                        model: AIModel::Upscale,
+                        reason: e.clone(),
+                    });
+
                 // Download failed
                 self.settings
                     .set_upscale_model_status(media::upscale::UpscaleModelStatus::Error(e.clone()));
