@@ -534,6 +534,11 @@ impl App {
 
         // Handle diagnostics exports before creating context (need access to self.notifications)
         if let Message::Diagnostics(ref diagnostics_message) = message {
+            // Always drain pending events when handling diagnostics messages.
+            // This ensures the buffer is up-to-date even when Tick isn't firing
+            // (Tick only fires when fullscreen/loading/notifications are active).
+            self.diagnostics.process_pending();
+
             match diagnostics_message {
                 diagnostics_screen::Message::ToggleResourceCollection(enabled) => {
                     if *enabled {
