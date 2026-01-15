@@ -1,7 +1,7 @@
 # Story 3.5: Information and Help Content
 
 **Epic:** 3 - UI Integration
-**Status:** Approved
+**Status:** Ready for Review
 **Priority:** Medium
 **Estimate:** 1-2 hours
 **Depends On:** Story 3.1
@@ -30,56 +30,59 @@
 
 ## Tasks
 
-- [ ] **Task 1:** Add info section to diagnostics_screen (AC: 1, 5, 6)
-  - [ ] Create `build_info_section()` function following about.rs pattern
-  - [ ] Use `icons::info()` for section header
-  - [ ] 2-3 sentences explaining Diagnostics purpose
-  - [ ] Place below header, above status section
+- [x] **Task 1:** Add info section to diagnostics_screen (AC: 1, 5, 6)
+  - [x] Create `build_info_section()` function following about.rs pattern
+  - [x] Use `icons::info()` for section header
+  - [x] 2-3 sentences explaining Diagnostics purpose
+  - [x] Place below header, above status section
 
-- [ ] **Task 2:** Add data collection summary (AC: 2, 5, 6)
-  - [ ] Create `build_data_collected_section()` function
-  - [ ] Bullet list of what's collected:
+- [x] **Task 2:** Add data collection summary (AC: 2, 5, 6)
+  - [x] Create `build_data_collected_section()` function
+  - [x] Bullet list of what's collected:
     - System resources (CPU, RAM, disk)
     - User actions (navigation, edits)
     - Application states (screen, mode)
     - Warnings and errors
-  - [ ] Use `typography::BODY` for text
-  - [ ] Use `"• {item}"` format for bullets
+  - [x] Use `typography::BODY` for text
+  - [x] Use `"• {item}"` format for bullets
 
-- [ ] **Task 3:** Add privacy assurance (AC: 3, 5, 6)
-  - [ ] Add privacy notice within info section
-  - [ ] "All data is anonymized before export"
-  - [ ] "Data is never sent automatically"
-  - [ ] Use `palette::GRAY_400` for subtle secondary text styling
+- [x] **Task 3:** Add privacy assurance (AC: 3, 5, 6)
+  - [x] Add privacy notice within info section
+  - [x] "All data is anonymized before export"
+  - [x] "Data is never sent automatically"
+  - [x] Use `palette::GRAY_400` for subtle secondary text styling
 
-- [ ] **Task 4:** Add documentation reference (AC: 4, 5)
-  - [ ] Add link/reference to USER_GUIDE.md
-  - [ ] Display repository URL (docs/USER_GUIDE.md)
-  - [ ] Follow `build_link_item()` pattern from about.rs
+- [x] **Task 4:** Add documentation reference (AC: 4, 5)
+  - [x] Add link/reference to USER_GUIDE.md
+  - [x] Display repository URL (docs/USER_GUIDE.md)
+  - [x] Follow `build_link_item()` pattern from about.rs
 
-- [ ] **Task 5:** Add i18n keys (AC: 7)
-  - [ ] `diagnostics-info-title` - section title
-  - [ ] `diagnostics-info-description` - purpose description
-  - [ ] `diagnostics-data-collected-title` - data collected header
-  - [ ] `diagnostics-data-item-resources` - "System resources (CPU, RAM, disk)"
-  - [ ] `diagnostics-data-item-actions` - "User actions"
-  - [ ] `diagnostics-data-item-states` - "Application states"
-  - [ ] `diagnostics-data-item-errors` - "Warnings and errors"
-  - [ ] `diagnostics-privacy-notice` - privacy assurance text
-  - [ ] `diagnostics-docs-link` - documentation link label
+- [x] **Task 5:** Add i18n keys (AC: 7)
+  - [x] `diagnostics-info-title` - section title
+  - [x] `diagnostics-info-description` - purpose description
+  - [x] `diagnostics-data-collected-title` - data collected header
+  - [x] `diagnostics-data-item-resources` - "System resources (CPU, RAM, disk)"
+  - [x] `diagnostics-data-item-actions` - "User actions"
+  - [x] `diagnostics-data-item-states` - "Application states"
+  - [x] `diagnostics-data-item-errors` - "Warnings and errors"
+  - [x] `diagnostics-privacy-notice` - privacy assurance text
+  - [x] `diagnostics-docs-link` - documentation link label
 
-- [ ] **Task 6:** Update i18n translation files (AC: 7)
-  - [ ] English (`assets/i18n/en-US.ftl`)
-  - [ ] French (`assets/i18n/fr.ftl`)
+- [x] **Task 6:** Update i18n translation files (AC: 7)
+  - [x] English (`assets/i18n/en-US.ftl`)
+  - [x] French (`assets/i18n/fr.ftl`)
+  - [x] German (`assets/i18n/de.ftl`)
+  - [x] Spanish (`assets/i18n/es.ftl`)
+  - [x] Italian (`assets/i18n/it.ftl`)
 
-- [ ] **Task 7:** Run validation
-  - [ ] `cargo fmt --all`
-  - [ ] `cargo clippy --all --all-targets -- -D warnings`
-  - [ ] `cargo test`
+- [x] **Task 7:** Run validation
+  - [x] `cargo fmt --all`
+  - [x] `cargo clippy --all --all-targets -- -D warnings`
+  - [x] `cargo test`
 
-- [ ] **Task 8:** Commit changes
-  - [ ] Stage all changes
-  - [ ] Commit: `feat(ui): add diagnostics help content [Story 3.5]`
+- [x] **Task 8:** Commit changes
+  - [x] Stage all changes
+  - [x] Commit: `feat(ui): add diagnostics help content [Story 3.5]`
 
 ---
 
@@ -265,19 +268,30 @@ None required - this is static informational content.
 ## Dev Agent Record
 
 ### Agent Model Used
-<!-- Record which AI model completed this story -->
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Completion Notes
-<!-- Dev agent adds notes here during implementation -->
+- All 7 acceptance criteria satisfied
+- Implemented info section with description, data list, privacy notice, and docs link following about.rs pattern
+- Added i18n translations for all 5 languages (en-US, fr, de, es, it)
+- 922 tests pass, clippy clean
 
 ### Change Log
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-14 | Story created | PM |
 | 2026-01-14 | PO Validation: Added Source Tree, code examples following about.rs pattern, Task-AC mapping, i18n keys, fixed file paths, added QA Results section | Sarah (PO) |
+| 2026-01-15 | Implementation completed, all tasks done | James (Dev Agent) |
 
 ### File List
-<!-- Files created or modified -->
+| File | Action |
+|------|--------|
+| `src/ui/diagnostics_screen.rs` | Modified - Added info section functions |
+| `assets/i18n/en-US.ftl` | Modified - Added 10 diagnostics info keys |
+| `assets/i18n/fr.ftl` | Modified - Added 10 diagnostics info keys |
+| `assets/i18n/de.ftl` | Modified - Added 10 diagnostics info keys |
+| `assets/i18n/es.ftl` | Modified - Added 10 diagnostics info keys |
+| `assets/i18n/it.ftl` | Modified - Added 10 diagnostics info keys |
 
 ---
 
