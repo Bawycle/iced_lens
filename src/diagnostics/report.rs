@@ -55,6 +55,35 @@ impl ReportMetadata {
 }
 
 // =============================================================================
+// Disk Type
+// =============================================================================
+
+/// Type of storage disk.
+///
+/// Used to identify whether the system's primary disk is an SSD, HDD, or unknown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DiskType {
+    /// Solid State Drive (fast, no moving parts)
+    Ssd,
+    /// Hard Disk Drive (spinning platters)
+    Hdd,
+    /// Unknown or undetectable disk type (default)
+    #[default]
+    Unknown,
+}
+
+impl From<sysinfo::DiskKind> for DiskType {
+    fn from(kind: sysinfo::DiskKind) -> Self {
+        match kind {
+            sysinfo::DiskKind::SSD => Self::Ssd,
+            sysinfo::DiskKind::HDD => Self::Hdd,
+            sysinfo::DiskKind::Unknown(_) => Self::Unknown,
+        }
+    }
+}
+
+// =============================================================================
 // System Information
 // =============================================================================
 
@@ -65,10 +94,17 @@ pub struct SystemInfo {
     pub os: String,
     /// Operating system version
     pub os_version: String,
+    /// CPU architecture (e.g., "`x86_64`", "aarch64")
+    pub cpu_arch: String,
+    /// CPU brand name (e.g., "Intel Core i7-9700K", "Apple M1")
+    pub cpu_brand: String,
     /// Number of CPU cores
     pub cpu_cores: usize,
     /// Total RAM in megabytes
     pub ram_total_mb: u64,
+    /// Type of primary disk (SSD, HDD, or Unknown)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disk_type: Option<DiskType>,
 }
 
 impl SystemInfo {
@@ -77,12 +113,49 @@ impl SystemInfo {
     pub fn collect() -> Self {
         let sys = System::new_all();
 
+        // Get CPU brand from first CPU
+        let cpu_brand = sys
+            .cpus()
+            .first()
+            .map_or_else(|| "unknown".to_string(), |cpu| cpu.brand().to_string());
+
+        // Detect disk type for the disk containing the home directory
+        let disk_type = Self::detect_home_disk_type();
+
         Self {
             os: std::env::consts::OS.to_string(),
             os_version: System::os_version().unwrap_or_else(|| "unknown".to_string()),
+            cpu_arch: std::env::consts::ARCH.to_string(),
+            cpu_brand,
             cpu_cores: sys.cpus().len(),
             ram_total_mb: sys.total_memory() / (1024 * 1024),
+            disk_type,
         }
+    }
+
+    /// Detects the disk type for the disk containing the user's home directory.
+    fn detect_home_disk_type() -> Option<DiskType> {
+        use sysinfo::Disks;
+
+        let home_dir = dirs::home_dir()?;
+        let home_path = home_dir.to_string_lossy();
+
+        let disks = Disks::new_with_refreshed_list();
+
+        // Find the disk with the longest mount point prefix that matches the home directory
+        let mut best_match: Option<(&sysinfo::Disk, usize)> = None;
+
+        for disk in &disks {
+            let mount_point = disk.mount_point().to_string_lossy();
+            if home_path.starts_with(mount_point.as_ref()) {
+                let len = mount_point.len();
+                if best_match.is_none_or(|(_, best_len)| len > best_len) {
+                    best_match = Some((disk, len));
+                }
+            }
+        }
+
+        best_match.map(|(disk, _)| DiskType::from(disk.kind()))
     }
 }
 
@@ -323,6 +396,55 @@ mod tests {
     }
 
     // =========================================================================
+    // DiskType Tests
+    // =========================================================================
+
+    #[test]
+    fn disk_type_from_sysinfo_ssd() {
+        let disk_type: DiskType = sysinfo::DiskKind::SSD.into();
+        assert_eq!(disk_type, DiskType::Ssd);
+    }
+
+    #[test]
+    fn disk_type_from_sysinfo_hdd() {
+        let disk_type: DiskType = sysinfo::DiskKind::HDD.into();
+        assert_eq!(disk_type, DiskType::Hdd);
+    }
+
+    #[test]
+    fn disk_type_from_sysinfo_unknown() {
+        let disk_type: DiskType = sysinfo::DiskKind::Unknown(-1).into();
+        assert_eq!(disk_type, DiskType::Unknown);
+    }
+
+    #[test]
+    fn disk_type_serializes_snake_case() {
+        assert_eq!(serde_json::to_string(&DiskType::Ssd).unwrap(), "\"ssd\"");
+        assert_eq!(serde_json::to_string(&DiskType::Hdd).unwrap(), "\"hdd\"");
+        assert_eq!(
+            serde_json::to_string(&DiskType::Unknown).unwrap(),
+            "\"unknown\""
+        );
+    }
+
+    #[test]
+    fn disk_type_deserializes_from_json() {
+        let ssd: DiskType = serde_json::from_str("\"ssd\"").unwrap();
+        assert_eq!(ssd, DiskType::Ssd);
+
+        let hdd: DiskType = serde_json::from_str("\"hdd\"").unwrap();
+        assert_eq!(hdd, DiskType::Hdd);
+
+        let unknown: DiskType = serde_json::from_str("\"unknown\"").unwrap();
+        assert_eq!(unknown, DiskType::Unknown);
+    }
+
+    #[test]
+    fn disk_type_default_is_unknown() {
+        assert_eq!(DiskType::default(), DiskType::Unknown);
+    }
+
+    // =========================================================================
     // SystemInfo Tests
     // =========================================================================
 
@@ -336,6 +458,43 @@ mod tests {
     }
 
     #[test]
+    fn system_info_includes_cpu_arch() {
+        let info = SystemInfo::collect();
+
+        assert!(!info.cpu_arch.is_empty());
+        // Should be one of the common architectures
+        let valid_archs = ["x86_64", "aarch64", "x86", "arm", "riscv64"];
+        assert!(
+            valid_archs.iter().any(|&arch| info.cpu_arch.contains(arch)),
+            "cpu_arch '{}' should be a recognized architecture",
+            info.cpu_arch
+        );
+    }
+
+    #[test]
+    fn system_info_includes_cpu_brand() {
+        let info = SystemInfo::collect();
+
+        // cpu_brand should not be empty (even if it's "unknown")
+        assert!(!info.cpu_brand.is_empty());
+    }
+
+    #[test]
+    fn system_info_includes_disk_type() {
+        let info = SystemInfo::collect();
+
+        // disk_type might be None on some systems (e.g., VMs, unusual setups)
+        // If it is Some, it should be a valid DiskType
+        if let Some(disk_type) = info.disk_type {
+            // Just verify it's one of the valid variants
+            assert!(matches!(
+                disk_type,
+                DiskType::Ssd | DiskType::Hdd | DiskType::Unknown
+            ));
+        }
+    }
+
+    #[test]
     fn system_info_serializes_to_json() {
         let info = SystemInfo::collect();
 
@@ -343,8 +502,11 @@ mod tests {
 
         assert!(json.contains("\"os\""));
         assert!(json.contains("\"os_version\""));
+        assert!(json.contains("\"cpu_arch\""));
+        assert!(json.contains("\"cpu_brand\""));
         assert!(json.contains("\"cpu_cores\""));
         assert!(json.contains("\"ram_total_mb\""));
+        // disk_type is optional, so it might not be present
     }
 
     // =========================================================================

@@ -180,6 +180,35 @@ impl PathAnonymizer {
         // This provides ~4 billion unique values, sufficient for diagnostics
         hash.to_hex()[..8].to_string()
     }
+
+    /// Generates an 8-character hash of the full path for correlation.
+    ///
+    /// This hash can be used to correlate events about the same file
+    /// (e.g., `MediaLoadingStarted` and `MediaLoaded`) without revealing
+    /// the actual file path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    /// use iced_lens::diagnostics::PathAnonymizer;
+    ///
+    /// let anonymizer = PathAnonymizer::new();
+    /// let hash = anonymizer.hash_path(Path::new("/home/user/photo.jpg"));
+    ///
+    /// assert_eq!(hash.len(), 8);
+    /// assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    /// ```
+    #[must_use]
+    pub fn hash_path(&self, path: &Path) -> String {
+        let path_str = path.to_string_lossy();
+        let mut hasher = blake3::Hasher::new_keyed(&self.salt);
+        hasher.update(path_str.as_bytes());
+        let hash = hasher.finalize();
+
+        // Take first 8 hex characters (4 bytes = 32 bits)
+        hash.to_hex()[..8].to_string()
+    }
 }
 
 impl Default for PathAnonymizer {

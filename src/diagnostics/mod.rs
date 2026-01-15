@@ -51,11 +51,12 @@ pub use collector::{DiagnosticsCollector, DiagnosticsHandle};
 // CollectionStatus is defined at module level and exported directly
 pub use events::{
     AIModel, AppOperation, AppStateEvent, DiagnosticEvent, DiagnosticEventKind, EditorTool,
-    ErrorEvent, MediaType, SizeCategory, UserAction, WarningEvent,
+    ErrorEvent, MediaMetadata, MediaType, SizeCategory, StorageType, UserAction, WarningEvent,
 };
 pub use export::{ExportError, MAX_CLIPBOARD_SIZE_BYTES};
 pub use report::{
-    DiagnosticReport, ReportMetadata, ReportSummary, ResourceStats, SerializableEvent, SystemInfo,
+    DiagnosticReport, DiskType, ReportMetadata, ReportSummary, ResourceStats, SerializableEvent,
+    SystemInfo,
 };
 pub use resource_collector::{ResourceCollector, ResourceMetrics, SamplingInterval};
 pub use sanitizer::{sanitize_message, ErrorType, WarningType};

@@ -160,9 +160,18 @@ pub fn anonymize_event(
 /// Anonymizes string fields in `AppStateEvent` variants.
 fn anonymize_state_event(state: &AppStateEvent, pipeline: &AnonymizationPipeline) -> AppStateEvent {
     match state {
-        AppStateEvent::MediaFailed { media_type, reason } => AppStateEvent::MediaFailed {
+        AppStateEvent::MediaFailed {
+            media_type,
+            reason,
+            extension,
+            storage_type,
+            path_hash,
+        } => AppStateEvent::MediaFailed {
             media_type: *media_type,
             reason: pipeline.anonymize_string(reason),
+            extension: extension.clone(),
+            storage_type: *storage_type,
+            path_hash: path_hash.clone(),
         },
         AppStateEvent::VideoError { message } => AppStateEvent::VideoError {
             message: pipeline.anonymize_string(message),

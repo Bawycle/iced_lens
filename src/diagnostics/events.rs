@@ -4,6 +4,7 @@
 //! This module defines the various types of events that can be captured
 //! during application usage for diagnostic purposes.
 
+use std::path::Path;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -100,6 +101,148 @@ pub enum AIModel {
     Deblur,
     /// Real-ESRGAN upscale model
     Upscale,
+}
+
+/// Storage type for media files.
+///
+/// Used to identify whether a media file is located on local storage,
+/// network storage, or an unknown/ambiguous location.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageType {
+    /// Local storage (home directories, user folders)
+    Local,
+    /// Network storage (UNC paths, NFS/SMB mounts)
+    Network,
+    /// Unknown or ambiguous storage type (default)
+    #[default]
+    Unknown,
+}
+
+impl StorageType {
+    /// Detects the storage type from a file path using simple heuristics.
+    ///
+    /// Detection rules:
+    /// - **Network**: UNC paths (`\\server\share`)
+    /// - **Local**: Paths under `/home/`, `/Users/`, or `C:\Users\`
+    /// - **Unknown**: Default for ambiguous cases
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    /// use iced_lens::diagnostics::StorageType;
+    ///
+    /// // Local paths
+    /// assert_eq!(StorageType::detect(Path::new("/home/user/photo.jpg")), StorageType::Local);
+    ///
+    /// // Unknown paths (ambiguous)
+    /// assert_eq!(StorageType::detect(Path::new("/tmp/file.jpg")), StorageType::Unknown);
+    /// ```
+    #[must_use]
+    pub fn detect(path: &Path) -> Self {
+        let path_str = path.to_string_lossy();
+
+        // Network detection (high confidence): UNC paths
+        if path_str.starts_with("\\\\") {
+            return Self::Network;
+        }
+
+        // Local detection (high confidence): User directories
+        #[cfg(unix)]
+        {
+            if path_str.starts_with("/home/") || path_str.starts_with("/Users/") {
+                return Self::Local;
+            }
+        }
+
+        #[cfg(windows)]
+        {
+            // Check for C:\Users\, D:\Users\, etc.
+            if path_str.len() >= 3 {
+                let chars: Vec<char> = path_str.chars().take(10).collect();
+                if chars.len() >= 3
+                    && chars[1] == ':'
+                    && (chars[2] == '\\' || chars[2] == '/')
+                    && path_str.to_lowercase().contains("\\users\\")
+                {
+                    return Self::Local;
+                }
+            }
+        }
+
+        // Default to Unknown for ambiguous paths
+        Self::Unknown
+    }
+}
+
+// =============================================================================
+// Media Metadata
+// =============================================================================
+
+/// Metadata extracted from a media file path for diagnostic purposes.
+///
+/// This struct collects enriched metadata about media files including
+/// the file extension, storage type, and an anonymized path hash.
+#[derive(Debug, Clone, Default)]
+pub struct MediaMetadata {
+    /// File extension (e.g., "jpg", "mp4", "heic") - lowercase, without dot
+    pub extension: Option<String>,
+    /// Storage type (local, network, or unknown)
+    pub storage_type: StorageType,
+    /// 8-char blake3 hash of the path for correlation
+    pub path_hash: Option<String>,
+}
+
+impl MediaMetadata {
+    /// Creates media metadata from a file path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The file path to extract metadata from
+    /// * `anonymizer` - The path anonymizer for generating path hashes
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use std::path::Path;
+    /// use iced_lens::diagnostics::{MediaMetadata, PathAnonymizer};
+    ///
+    /// let anonymizer = PathAnonymizer::new();
+    /// let metadata = MediaMetadata::from_path(Path::new("/home/user/photo.jpg"), &anonymizer);
+    ///
+    /// assert_eq!(metadata.extension, Some("jpg".to_string()));
+    /// assert_eq!(metadata.storage_type, StorageType::Local);
+    /// assert!(metadata.path_hash.is_some());
+    /// ```
+    #[must_use]
+    pub fn from_path(path: &Path, anonymizer: &super::PathAnonymizer) -> Self {
+        // Extract extension (lowercase, no dot)
+        let extension = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(str::to_lowercase);
+
+        // Detect storage type
+        let storage_type = StorageType::detect(path);
+
+        // Generate path hash
+        let path_hash = Some(anonymizer.hash_path(path));
+
+        Self {
+            extension,
+            storage_type,
+            path_hash,
+        }
+    }
+
+    /// Creates an empty metadata struct with default values.
+    ///
+    /// Useful when path information is not available.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::default()
+    }
 }
 
 // =============================================================================
@@ -273,6 +416,15 @@ pub enum AppStateEvent {
         media_type: MediaType,
         /// Size category of the file
         size_category: SizeCategory,
+        /// File extension (e.g., "jpg", "mp4", "heic")
+        #[serde(skip_serializing_if = "Option::is_none")]
+        extension: Option<String>,
+        /// Storage type (local, network, or unknown)
+        #[serde(default)]
+        storage_type: StorageType,
+        /// 8-char blake3 hash of the path for correlation
+        #[serde(skip_serializing_if = "Option::is_none")]
+        path_hash: Option<String>,
     },
 
     /// Media has been successfully loaded.
@@ -281,6 +433,15 @@ pub enum AppStateEvent {
         media_type: MediaType,
         /// Size category of the file
         size_category: SizeCategory,
+        /// File extension (e.g., "jpg", "mp4", "heic")
+        #[serde(skip_serializing_if = "Option::is_none")]
+        extension: Option<String>,
+        /// Storage type (local, network, or unknown)
+        #[serde(default)]
+        storage_type: StorageType,
+        /// 8-char blake3 hash of the path for correlation
+        #[serde(skip_serializing_if = "Option::is_none")]
+        path_hash: Option<String>,
     },
 
     /// Media loading has failed.
@@ -289,6 +450,15 @@ pub enum AppStateEvent {
         media_type: MediaType,
         /// Sanitized reason for failure (no paths)
         reason: String,
+        /// File extension (e.g., "jpg", "mp4", "heic")
+        #[serde(skip_serializing_if = "Option::is_none")]
+        extension: Option<String>,
+        /// Storage type (local, network, or unknown)
+        #[serde(default)]
+        storage_type: StorageType,
+        /// 8-char blake3 hash of the path for correlation
+        #[serde(skip_serializing_if = "Option::is_none")]
+        path_hash: Option<String>,
     },
 
     // -------------------------------------------------------------------------
@@ -895,6 +1065,168 @@ mod tests {
     }
 
     // =========================================================================
+    // StorageType Tests
+    // =========================================================================
+
+    #[test]
+    fn storage_type_detects_home_as_local() {
+        use std::path::Path;
+
+        let path = Path::new("/home/user/photos/image.jpg");
+        assert_eq!(StorageType::detect(path), StorageType::Local);
+
+        let path = Path::new("/home/alice/Documents/file.png");
+        assert_eq!(StorageType::detect(path), StorageType::Local);
+    }
+
+    #[test]
+    fn storage_type_detects_users_as_local() {
+        use std::path::Path;
+
+        // macOS-style path
+        let path = Path::new("/Users/bob/Pictures/photo.jpg");
+        assert_eq!(StorageType::detect(path), StorageType::Local);
+    }
+
+    #[test]
+    fn storage_type_detects_unc_as_network() {
+        use std::path::Path;
+
+        let path = Path::new("\\\\server\\share\\folder\\file.jpg");
+        assert_eq!(StorageType::detect(path), StorageType::Network);
+
+        let path = Path::new("\\\\nas\\photos\\2024\\vacation.jpg");
+        assert_eq!(StorageType::detect(path), StorageType::Network);
+    }
+
+    #[test]
+    fn storage_type_defaults_to_unknown() {
+        use std::path::Path;
+
+        // Ambiguous paths should default to Unknown
+        let path = Path::new("/tmp/file.jpg");
+        assert_eq!(StorageType::detect(path), StorageType::Unknown);
+
+        let path = Path::new("/var/data/file.png");
+        assert_eq!(StorageType::detect(path), StorageType::Unknown);
+
+        let path = Path::new("/opt/media/video.mp4");
+        assert_eq!(StorageType::detect(path), StorageType::Unknown);
+
+        // Empty path
+        let path = Path::new("");
+        assert_eq!(StorageType::detect(path), StorageType::Unknown);
+    }
+
+    #[test]
+    fn storage_type_serializes_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&StorageType::Local).unwrap(),
+            "\"local\""
+        );
+        assert_eq!(
+            serde_json::to_string(&StorageType::Network).unwrap(),
+            "\"network\""
+        );
+        assert_eq!(
+            serde_json::to_string(&StorageType::Unknown).unwrap(),
+            "\"unknown\""
+        );
+    }
+
+    #[test]
+    fn storage_type_deserializes_from_json() {
+        let local: StorageType = serde_json::from_str("\"local\"").unwrap();
+        assert_eq!(local, StorageType::Local);
+
+        let network: StorageType = serde_json::from_str("\"network\"").unwrap();
+        assert_eq!(network, StorageType::Network);
+
+        let unknown: StorageType = serde_json::from_str("\"unknown\"").unwrap();
+        assert_eq!(unknown, StorageType::Unknown);
+    }
+
+    #[test]
+    fn storage_type_default_is_unknown() {
+        assert_eq!(StorageType::default(), StorageType::Unknown);
+    }
+
+    // =========================================================================
+    // MediaMetadata Tests
+    // =========================================================================
+
+    #[test]
+    fn media_metadata_extracts_extension() {
+        use std::path::Path;
+        use crate::diagnostics::PathAnonymizer;
+
+        let anonymizer = PathAnonymizer::with_seed(42);
+
+        let metadata = MediaMetadata::from_path(Path::new("/home/user/photo.jpg"), &anonymizer);
+        assert_eq!(metadata.extension, Some("jpg".to_string()));
+
+        let metadata = MediaMetadata::from_path(Path::new("/home/user/video.MP4"), &anonymizer);
+        assert_eq!(metadata.extension, Some("mp4".to_string())); // Lowercase
+
+        let metadata = MediaMetadata::from_path(Path::new("/home/user/image.HEIC"), &anonymizer);
+        assert_eq!(metadata.extension, Some("heic".to_string())); // Lowercase
+    }
+
+    #[test]
+    fn media_metadata_handles_no_extension() {
+        use std::path::Path;
+        use crate::diagnostics::PathAnonymizer;
+
+        let anonymizer = PathAnonymizer::with_seed(42);
+
+        let metadata = MediaMetadata::from_path(Path::new("/home/user/Makefile"), &anonymizer);
+        assert_eq!(metadata.extension, None);
+
+        let metadata = MediaMetadata::from_path(Path::new(""), &anonymizer);
+        assert_eq!(metadata.extension, None);
+    }
+
+    #[test]
+    fn media_metadata_generates_path_hash() {
+        use std::path::Path;
+        use crate::diagnostics::PathAnonymizer;
+
+        let anonymizer = PathAnonymizer::with_seed(42);
+
+        let metadata = MediaMetadata::from_path(Path::new("/home/user/photo.jpg"), &anonymizer);
+
+        let hash = metadata.path_hash.expect("should have path hash");
+        assert_eq!(hash.len(), 8);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn media_metadata_detects_storage_type() {
+        use std::path::Path;
+        use crate::diagnostics::PathAnonymizer;
+
+        let anonymizer = PathAnonymizer::with_seed(42);
+
+        let metadata = MediaMetadata::from_path(Path::new("/home/user/photo.jpg"), &anonymizer);
+        assert_eq!(metadata.storage_type, StorageType::Local);
+
+        let metadata = MediaMetadata::from_path(Path::new("\\\\server\\share\\photo.jpg"), &anonymizer);
+        assert_eq!(metadata.storage_type, StorageType::Network);
+
+        let metadata = MediaMetadata::from_path(Path::new("/tmp/photo.jpg"), &anonymizer);
+        assert_eq!(metadata.storage_type, StorageType::Unknown);
+    }
+
+    #[test]
+    fn media_metadata_empty_returns_defaults() {
+        let metadata = MediaMetadata::empty();
+
+        assert_eq!(metadata.extension, None);
+        assert_eq!(metadata.storage_type, StorageType::Unknown);
+        assert_eq!(metadata.path_hash, None);
+    }
+
+    // =========================================================================
     // AppStateEvent Tests
     // =========================================================================
 
@@ -914,12 +1246,37 @@ mod tests {
         let state = AppStateEvent::MediaLoaded {
             media_type: MediaType::Image,
             size_category: SizeCategory::Medium,
+            extension: Some("jpg".to_string()),
+            storage_type: StorageType::Local,
+            path_hash: Some("abc12345".to_string()),
         };
         let json = serde_json::to_string(&state).expect("serialization should succeed");
 
         assert!(json.contains("\"state\":\"media_loaded\""));
         assert!(json.contains("\"media_type\":\"image\""));
         assert!(json.contains("\"size_category\":\"medium\""));
+        assert!(json.contains("\"extension\":\"jpg\""));
+        assert!(json.contains("\"storage_type\":\"local\""));
+        assert!(json.contains("\"path_hash\":\"abc12345\""));
+    }
+
+    #[test]
+    fn app_state_event_media_loaded_omits_none_fields() {
+        let state = AppStateEvent::MediaLoaded {
+            media_type: MediaType::Image,
+            size_category: SizeCategory::Medium,
+            extension: None,
+            storage_type: StorageType::Unknown,
+            path_hash: None,
+        };
+        let json = serde_json::to_string(&state).expect("serialization should succeed");
+
+        assert!(json.contains("\"state\":\"media_loaded\""));
+        // None fields should be omitted
+        assert!(!json.contains("\"extension\""));
+        assert!(!json.contains("\"path_hash\""));
+        // storage_type with default (unknown) should still be serialized
+        assert!(json.contains("\"storage_type\":\"unknown\""));
     }
 
     #[test]

@@ -5,29 +5,43 @@
 //! various parts of the application and stores them in a circular buffer.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
 use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
 
-use super::anonymizer::AnonymizationPipeline;
+use super::anonymizer::{AnonymizationPipeline, PathAnonymizer};
 use super::export::{
     anonymize_event, default_export_directory, generate_default_filename, write_atomic, ExportError,
 };
 use super::resource_collector::{ResourceCollector, SamplingInterval};
+#[cfg(test)]
+use super::StorageType;
 use super::{
     sanitize_message, AppOperation, AppStateEvent, BufferCapacity, CircularBuffer, DiagnosticEvent,
-    DiagnosticEventKind, DiagnosticReport, ErrorEvent, ErrorType, ReportMetadata, ResourceMetrics,
-    SerializableEvent, SystemInfo, UserAction, WarningEvent, WarningType,
+    DiagnosticEventKind, DiagnosticReport, ErrorEvent, ErrorType, MediaMetadata, ReportMetadata,
+    ResourceMetrics, SerializableEvent, SystemInfo, UserAction, WarningEvent, WarningType,
 };
 
 /// Handle for sending diagnostic events to the collector.
 ///
 /// This handle is cheap to clone and can be shared across threads.
 /// Events are sent via a bounded channel to avoid blocking the UI thread.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DiagnosticsHandle {
     event_tx: Sender<DiagnosticEvent>,
+    /// Shared path anonymizer for generating consistent path hashes.
+    path_anonymizer: Arc<PathAnonymizer>,
+}
+
+impl std::fmt::Debug for DiagnosticsHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DiagnosticsHandle")
+            .field("event_tx", &self.event_tx)
+            .field("path_anonymizer", &"PathAnonymizer { ... }")
+            .finish()
+    }
 }
 
 impl DiagnosticsHandle {
@@ -142,6 +156,16 @@ impl DiagnosticsHandle {
         });
         self.event_tx.try_send(event)
     }
+
+    /// Creates media metadata from a file path.
+    ///
+    /// This uses the handle's shared path anonymizer to generate consistent
+    /// path hashes for correlating related events (e.g., `MediaLoadingStarted`
+    /// and `MediaLoaded` for the same file).
+    #[must_use]
+    pub fn media_metadata(&self, path: &Path) -> MediaMetadata {
+        MediaMetadata::from_path(path, &self.path_anonymizer)
+    }
 }
 
 /// Central collector for diagnostic events.
@@ -166,6 +190,8 @@ pub struct DiagnosticsCollector {
     resource_metrics_rx: Option<Receiver<ResourceMetrics>>,
     /// When resource collection was enabled (for duration tracking).
     resource_collection_started_at: Option<Instant>,
+    /// Shared path anonymizer for consistent hashing across handles.
+    path_anonymizer: Arc<PathAnonymizer>,
 }
 
 /// Default channel capacity for event buffering.
@@ -187,6 +213,7 @@ impl DiagnosticsCollector {
             resource_collector: None,
             resource_metrics_rx: None,
             resource_collection_started_at: None,
+            path_anonymizer: Arc::new(PathAnonymizer::new()),
         }
     }
 
@@ -198,6 +225,7 @@ impl DiagnosticsCollector {
     pub fn handle(&self) -> DiagnosticsHandle {
         DiagnosticsHandle {
             event_tx: self.event_tx.clone(),
+            path_anonymizer: Arc::clone(&self.path_anonymizer),
         }
     }
 
@@ -987,6 +1015,9 @@ mod tests {
         collector.log_state(AppStateEvent::MediaLoaded {
             media_type: crate::diagnostics::MediaType::Image,
             size_category: crate::diagnostics::SizeCategory::Small,
+            extension: None,
+            storage_type: crate::diagnostics::StorageType::Unknown,
+            path_hash: None,
         });
         collector.log_operation(AppOperation::DecodeFrame { duration_ms: 8 });
 
@@ -1317,10 +1348,16 @@ mod tests {
         handle.log_state(AppStateEvent::MediaLoadingStarted {
             media_type: MediaType::Image,
             size_category: SizeCategory::Medium,
+            extension: Some("jpg".to_string()),
+            storage_type: StorageType::Local,
+            path_hash: Some("abc12345".to_string()),
         });
         handle.log_state(AppStateEvent::MediaLoaded {
             media_type: MediaType::Image,
             size_category: SizeCategory::Medium,
+            extension: Some("jpg".to_string()),
+            storage_type: StorageType::Local,
+            path_hash: Some("abc12345".to_string()),
         });
 
         collector.process_pending();
@@ -1334,6 +1371,7 @@ mod tests {
                 AppStateEvent::MediaLoadingStarted {
                     media_type,
                     size_category,
+                    ..
                 } => {
                     assert!(matches!(media_type, MediaType::Image));
                     assert!(matches!(size_category, SizeCategory::Medium));
@@ -1348,6 +1386,7 @@ mod tests {
                 AppStateEvent::MediaLoaded {
                     media_type,
                     size_category,
+                    ..
                 } => {
                     assert!(matches!(media_type, MediaType::Image));
                     assert!(matches!(size_category, SizeCategory::Medium));
@@ -1562,6 +1601,9 @@ mod tests {
         collector.log_state(AppStateEvent::MediaLoaded {
             media_type: MediaType::Image,
             size_category: SizeCategory::Small,
+            extension: None,
+            storage_type: StorageType::Unknown,
+            path_hash: None,
         });
 
         // Export to temp file

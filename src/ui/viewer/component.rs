@@ -645,9 +645,17 @@ impl State {
 
         // Log MediaLoadingStarted event
         if let Some(ref handle) = self.diagnostics {
+            let metadata = self
+                .current_media_path
+                .as_ref()
+                .map(|p| handle.media_metadata(p))
+                .unwrap_or_default();
             handle.log_state(crate::diagnostics::AppStateEvent::MediaLoadingStarted {
                 media_type,
                 size_category,
+                extension: metadata.extension,
+                storage_type: metadata.storage_type,
+                path_hash: metadata.path_hash,
             });
         }
     }
@@ -828,12 +836,20 @@ impl State {
                             MediaData::Video(_) => crate::diagnostics::MediaType::Video,
                         };
                         if let Some(ref handle) = self.diagnostics {
+                            let metadata = self
+                                .current_media_path
+                                .as_ref()
+                                .map(|p| handle.media_metadata(p))
+                                .unwrap_or_default();
                             handle.log_state(crate::diagnostics::AppStateEvent::MediaLoaded {
                                 media_type: loaded_media_type,
                                 size_category: self
                                     .loading_size_category
                                     .take()
                                     .unwrap_or(crate::diagnostics::SizeCategory::Small),
+                                extension: metadata.extension,
+                                storage_type: metadata.storage_type,
+                                path_hash: metadata.path_hash,
                             });
                         }
                         // Clear loading_media_type as it's no longer needed
@@ -902,9 +918,17 @@ impl State {
                         };
 
                         if let Some(ref handle) = self.diagnostics {
+                            let metadata = self
+                                .current_media_path
+                                .as_ref()
+                                .map(|p| handle.media_metadata(p))
+                                .unwrap_or_default();
                             handle.log_state(crate::diagnostics::AppStateEvent::MediaFailed {
                                 media_type: failed_media_type,
                                 reason: sanitized_reason,
+                                extension: metadata.extension,
+                                storage_type: metadata.storage_type,
+                                path_hash: metadata.path_hash,
                             });
                         }
 

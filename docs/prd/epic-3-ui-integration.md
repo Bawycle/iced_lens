@@ -56,7 +56,7 @@
 **Acceptance Criteria:**
 1. "Export to File" button implemented with appropriate icon
 2. "Copy to Clipboard" button implemented with appropriate icon
-3. Buttons disabled when collection is disabled or buffer is empty
+3. Buttons disabled when buffer is empty (allows export of lightweight events even when resource collection is off)
 4. Clicking triggers respective export function
 5. Success feedback shown via toast notification ("Report exported" / "Copied to clipboard")
 6. Error feedback shown via toast notification with error description
@@ -77,5 +77,23 @@
 5. Content is concise and doesn't clutter the interface
 6. Text follows existing typography styles
 7. Content is translatable (uses i18n system)
+
+## Story 3.6: Enrich Diagnostic Report Data
+
+**As a** developer analyzing diagnostic reports,
+**I want** enriched metadata in media events and system information,
+**So that** I can better diagnose format-specific issues, network-related slowdowns, and hardware compatibility problems.
+
+**Acceptance Criteria:**
+1. Media events include: `extension`, `storage_type` (Local/Network/Unknown), `path_hash`
+2. `StorageType` enum with simple cross-platform detection heuristics
+3. `PathAnonymizer` reused for consistent path hashing
+4. `SystemInfo` enriched with: `cpu_arch`, `cpu_brand`, `disk_type`
+5. `DiskType` enum (Ssd/Hdd/Unknown) via `sysinfo::DiskKind`
+6. All new fields are optional or have defaults (no breaking changes)
+7. Unit tests cover new functionality
+8. JSON serialization follows existing patterns
+
+**Note:** This story addresses implementation gaps identified in Story 2.3 (SystemInfo) and Story 1.4 (media events). See `docs/prd/report-media-metadata-gap.md` for full analysis.
 
 ---
