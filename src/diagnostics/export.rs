@@ -454,7 +454,9 @@ mod tests {
             start,
             start,
             DiagnosticEventKind::UserAction {
-                action: UserAction::ZoomIn,
+                action: UserAction::ZoomIn {
+                    resulting_zoom_percent: 150,
+                },
                 details: None,
             },
         );

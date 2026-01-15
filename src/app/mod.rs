@@ -714,10 +714,8 @@ impl App {
                     let format = crate::media::frame_export::ExportFormat::from_path(&path);
 
                     // Log user action at handler level (R1 principle)
-                    let format_str = format.map_or_else(
-                        || "unknown".to_string(),
-                        |f| f.extension().to_string(),
-                    );
+                    let format_str =
+                        format.map_or_else(|| "unknown".to_string(), |f| f.extension().to_string());
                     self.diagnostics
                         .log_action(UserAction::ExportFile { format: format_str });
 

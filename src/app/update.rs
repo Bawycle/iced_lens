@@ -24,7 +24,7 @@ use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent, MetadataEdito
 use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
-use crate::ui::viewer::{component, filter_dropdown, video_controls};
+use crate::ui::viewer::{component, controls, filter_dropdown, video_controls};
 use crate::video_player::KeyboardSeekStep;
 // Re-export NavigationDirection from viewer component (single source of truth)
 pub use crate::ui::viewer::NavigationDirection;
@@ -360,6 +360,54 @@ fn log_video_audio_action(
     }
 }
 
+/// Logs view control actions at handler level (R1 principle).
+///
+/// This function logs actions AFTER they have been processed, so we can capture
+/// the resulting state (e.g., zoom percent after `ZoomIn`, rotation angle after `RotateClockwise`).
+fn log_view_control_action(
+    viewer: &component::State,
+    message: &controls::Message,
+    diagnostics: &DiagnosticsHandle,
+) {
+    // zoom_percent is bounded to 10-800%, safe to cast to u16
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let zoom_percent = viewer.zoom_state().zoom_percent as u16;
+
+    match message {
+        controls::Message::ZoomIn => {
+            diagnostics.log_action(UserAction::ZoomIn {
+                resulting_zoom_percent: zoom_percent,
+            });
+        }
+        controls::Message::ZoomOut => {
+            diagnostics.log_action(UserAction::ZoomOut {
+                resulting_zoom_percent: zoom_percent,
+            });
+        }
+        controls::Message::ResetZoom => {
+            diagnostics.log_action(UserAction::ResetZoom);
+        }
+        controls::Message::SetFitToWindow(is_fit) => {
+            diagnostics.log_action(UserAction::ToggleFitToWindow { is_fit: *is_fit });
+        }
+        controls::Message::ToggleFullscreen => {
+            diagnostics.log_action(UserAction::ToggleFullscreen);
+        }
+        controls::Message::RotateClockwise => {
+            diagnostics.log_action(UserAction::RotateClockwise {
+                resulting_angle: viewer.current_rotation().degrees(),
+            });
+        }
+        controls::Message::RotateCounterClockwise => {
+            diagnostics.log_action(UserAction::RotateCounterClockwise {
+                resulting_angle: viewer.current_rotation().degrees(),
+            });
+        }
+        // ZoomInputChanged and ZoomInputSubmitted are UI state changes, not user actions
+        _ => {}
+    }
+}
+
 /// Logs diagnostic events for editor messages at handler level (R1 principle).
 ///
 /// This function intercepts editor messages BEFORE they are processed by the editor state
@@ -464,6 +512,12 @@ pub fn handle_viewer_message(
         )
     );
 
+    // Capture view control message before processing (for logging AFTER)
+    let view_control_msg = match &message {
+        component::Message::Controls(msg) => Some(msg.clone()),
+        _ => None,
+    };
+
     let (effect, task) = ctx
         .viewer
         .handle_message(message, ctx.i18n, ctx.diagnostics);
@@ -474,6 +528,11 @@ pub fn handle_viewer_message(
             ctx.diagnostics
                 .log_action(UserAction::SetPlaybackSpeed { speed });
         }
+    }
+
+    // Log view control actions AFTER processing to capture resulting state
+    if let Some(ref msg) = view_control_msg {
+        log_view_control_action(ctx.viewer, msg, ctx.diagnostics);
     }
 
     if is_successful_load {
@@ -498,6 +557,7 @@ pub fn handle_viewer_message(
             }
         }
         component::Effect::ExitFullscreen => {
+            ctx.diagnostics.log_action(UserAction::ExitFullscreen);
             update_fullscreen_mode(ctx.fullscreen, ctx.window_id.as_ref(), false)
         }
         component::Effect::OpenSettings => {

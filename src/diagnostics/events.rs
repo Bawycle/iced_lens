@@ -374,16 +374,25 @@ pub enum UserAction {
     // View Actions
     // ==========================================================================
     /// Zoom in on the current media.
-    ZoomIn,
+    ZoomIn {
+        /// Resulting zoom level after zoom in (10-800%)
+        resulting_zoom_percent: u16,
+    },
 
     /// Zoom out on the current media.
-    ZoomOut,
+    ZoomOut {
+        /// Resulting zoom level after zoom out (10-800%)
+        resulting_zoom_percent: u16,
+    },
 
     /// Reset zoom to default (100%).
     ResetZoom,
 
     /// Toggle fit-to-window mode.
-    ToggleFitToWindow,
+    ToggleFitToWindow {
+        /// Whether fit-to-window is now enabled
+        is_fit: bool,
+    },
 
     /// Toggle fullscreen mode.
     ToggleFullscreen,
@@ -392,10 +401,16 @@ pub enum UserAction {
     ExitFullscreen,
 
     /// Rotate media clockwise (90°).
-    RotateClockwise,
+    RotateClockwise {
+        /// Resulting rotation angle (0-359 degrees)
+        resulting_angle: u16,
+    },
 
     /// Rotate media counter-clockwise (90°).
-    RotateCounterClockwise,
+    RotateCounterClockwise {
+        /// Resulting rotation angle (0-359 degrees)
+        resulting_angle: u16,
+    },
 
     // ==========================================================================
     // Screen Navigation
@@ -2242,6 +2257,138 @@ mod tests {
                 assert_eq!(format, "jpg");
             }
             _ => panic!("expected ExportFile variant"),
+        }
+    }
+
+    // =========================================================================
+    // Story 4.3c: View Controls Serialization Tests
+    // =========================================================================
+
+    #[test]
+    fn zoom_in_action_serializes() {
+        let action = UserAction::ZoomIn {
+            resulting_zoom_percent: 150,
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"zoom_in\""));
+        assert!(json.contains("\"resulting_zoom_percent\":150"));
+    }
+
+    #[test]
+    fn zoom_in_action_deserializes() {
+        let json = r#"{"action":"zoom_in","resulting_zoom_percent":200}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ZoomIn {
+                resulting_zoom_percent,
+            } => {
+                assert_eq!(resulting_zoom_percent, 200);
+            }
+            _ => panic!("expected ZoomIn variant"),
+        }
+    }
+
+    #[test]
+    fn zoom_out_action_serializes() {
+        let action = UserAction::ZoomOut {
+            resulting_zoom_percent: 75,
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"zoom_out\""));
+        assert!(json.contains("\"resulting_zoom_percent\":75"));
+    }
+
+    #[test]
+    fn zoom_out_action_deserializes() {
+        let json = r#"{"action":"zoom_out","resulting_zoom_percent":50}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ZoomOut {
+                resulting_zoom_percent,
+            } => {
+                assert_eq!(resulting_zoom_percent, 50);
+            }
+            _ => panic!("expected ZoomOut variant"),
+        }
+    }
+
+    #[test]
+    fn toggle_fit_to_window_action_serializes() {
+        let action = UserAction::ToggleFitToWindow { is_fit: true };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"toggle_fit_to_window\""));
+        assert!(json.contains("\"is_fit\":true"));
+    }
+
+    #[test]
+    fn toggle_fit_to_window_action_deserializes() {
+        let json = r#"{"action":"toggle_fit_to_window","is_fit":false}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ToggleFitToWindow { is_fit } => {
+                assert!(!is_fit);
+            }
+            _ => panic!("expected ToggleFitToWindow variant"),
+        }
+    }
+
+    #[test]
+    fn rotate_clockwise_action_serializes() {
+        let action = UserAction::RotateClockwise {
+            resulting_angle: 90,
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"rotate_clockwise\""));
+        assert!(json.contains("\"resulting_angle\":90"));
+    }
+
+    #[test]
+    fn rotate_clockwise_action_deserializes() {
+        let json = r#"{"action":"rotate_clockwise","resulting_angle":180}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::RotateClockwise { resulting_angle } => {
+                assert_eq!(resulting_angle, 180);
+            }
+            _ => panic!("expected RotateClockwise variant"),
+        }
+    }
+
+    #[test]
+    fn rotate_counterclockwise_action_serializes() {
+        let action = UserAction::RotateCounterClockwise {
+            resulting_angle: 270,
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        // Note: snake_case converts "CounterClockwise" to "counter_clockwise"
+        assert!(json.contains("\"action\":\"rotate_counter_clockwise\""));
+        assert!(json.contains("\"resulting_angle\":270"));
+    }
+
+    #[test]
+    fn rotate_counterclockwise_action_deserializes() {
+        let json = r#"{"action":"rotate_counter_clockwise","resulting_angle":0}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::RotateCounterClockwise { resulting_angle } => {
+                assert_eq!(resulting_angle, 0);
+            }
+            _ => panic!("expected RotateCounterClockwise variant"),
         }
     }
 }

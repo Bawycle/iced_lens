@@ -735,8 +735,16 @@ mod tests {
         let handle2 = handle1.clone();
 
         // Both handles should work
-        assert!(handle1.try_log_action(UserAction::ZoomIn).is_ok());
-        assert!(handle2.try_log_action(UserAction::ZoomOut).is_ok());
+        assert!(handle1
+            .try_log_action(UserAction::ZoomIn {
+                resulting_zoom_percent: 150
+            })
+            .is_ok());
+        assert!(handle2
+            .try_log_action(UserAction::ZoomOut {
+                resulting_zoom_percent: 100
+            })
+            .is_ok());
     }
 
     #[test]
@@ -1869,7 +1877,9 @@ mod tests {
             position_in_filtered: None,
             position_in_total: 0,
         });
-        collector.log_action(UserAction::ZoomIn);
+        collector.log_action(UserAction::ZoomIn {
+            resulting_zoom_percent: 150,
+        });
 
         // Build the report and verify it's well under the limit
         let json = collector.export_json().expect("should serialize");

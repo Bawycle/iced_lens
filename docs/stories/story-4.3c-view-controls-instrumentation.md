@@ -235,6 +235,81 @@ _To be filled by Dev Agent_
 
 ## QA Results
 
-_To be filled by QA Agent_
+### Review Date: 2026-01-15
+
+### Reviewed By: Quinn (Test Architect)
+
+### Code Quality Assessment
+
+Excellent implementation following the established patterns from Stories 4.3a and 4.3b. The three-function logging architecture (`log_viewer_message_diagnostics()`, `log_video_audio_action()`, `log_view_control_action()`) provides clean separation of concerns. All view control actions are properly instrumented at handler level with correct AFTER-processing logging to capture resulting state values.
+
+Key strengths:
+- Consistent pattern with previous diagnostics stories
+- Proper struct variants for context-rich events (zoom percent, rotation angle, fit state)
+- Unit variants maintained for stateless actions (ResetZoom, ToggleFullscreen, ExitFullscreen)
+- Clean clippy allow annotation with documented safety rationale for f32→u16 cast
+- ExitFullscreen correctly logged in Effect handler (triggered by Escape key, not Controls message)
+
+### Refactoring Performed
+
+None required. Implementation is clean and follows established patterns.
+
+### Compliance Check
+
+- Coding Standards: ✓ In-file tests, proper documentation, clippy clean
+- Project Structure: ✓ Modifications in correct files (events.rs, update.rs)
+- Testing Strategy: ✓ Serialization tests for all struct variants
+- All ACs Met: ✓ See traceability below
+
+### Requirements Traceability
+
+| AC | Requirement | Implementation | Test |
+|----|-------------|----------------|------|
+| 1 | ZoomIn with zoom level | `events.rs:377-380`, `update.rs:377-380` | zoom_in_action_serializes/deserializes |
+| 2 | ZoomOut with zoom level | `events.rs:382-386`, `update.rs:382-385` | zoom_out_action_serializes/deserializes |
+| 3 | ResetZoom | `events.rs:389`, `update.rs:387-388` | N/A (unit variant) |
+| 4 | ToggleFitToWindow with state | `events.rs:391-395`, `update.rs:390-391` | toggle_fit_to_window_action_serializes/deserializes |
+| 5 | RotateClockwise with angle | `events.rs:403-407`, `update.rs:396-399` | rotate_clockwise_action_serializes/deserializes |
+| 6 | RotateCounterClockwise with angle | `events.rs:409-413`, `update.rs:401-404` | rotate_counterclockwise_action_serializes/deserializes |
+| 7 | ToggleFullscreen | `events.rs:398`, `update.rs:393-394` | N/A (unit variant) |
+| 8 | ExitFullscreen | `events.rs:401`, `update.rs:559-560` | N/A (unit variant, Effect handler) |
+| 9 | Handler level collection | All in `update.rs` via `log_view_control_action()` + Effect handler | ✓ |
+| 10 | Integration tests | 10 serialization tests for struct variants | ✓ |
+
+### Improvements Checklist
+
+All items handled - no action required:
+
+- [x] UserAction variants modified with appropriate context fields
+- [x] `log_view_control_action()` function created following established pattern
+- [x] AFTER-processing logging for state capture
+- [x] ExitFullscreen logged in Effect handler (correct placement)
+- [x] 10 serialization tests added
+- [x] All 976 tests pass
+
+### Security Review
+
+No concerns. Events capture only:
+- Zoom percentage (10-800%)
+- Rotation angle (0-359°)
+- Fit-to-window boolean state
+
+No user data, paths, or sensitive information in logged events.
+
+### Performance Considerations
+
+No concerns. Non-blocking channel-based logging with minimal data capture. Consistent with existing diagnostics architecture.
+
+### Files Modified During Review
+
+None. No refactoring performed.
+
+### Gate Status
+
+Gate: PASS → docs/qa/gates/4.3c-view-controls-instrumentation.yml
+
+### Recommended Status
+
+✓ Ready for Done
 
 ---

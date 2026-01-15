@@ -1,0 +1,89 @@
+# Quality Gate: Story 4.3c - View Controls Instrumentation
+schema: 1
+story: "4.3c"
+story_title: "View Controls Instrumentation"
+gate: PASS
+status_reason: "All 10 acceptance criteria met. Clean implementation with three-function logging strategy, proper AFTER-processing capture, and 10 serialization tests."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15T23:30:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 976
+  tests_added: 10
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No sensitive data in events (zoom percent, rotation angle, fit state)"
+  performance:
+    status: PASS
+    notes: "Non-blocking channel-based logging, minimal data capture"
+  reliability:
+    status: PASS
+    notes: "976 tests pass, no regression"
+  maintainability:
+    status: PASS
+    notes: "Clean three-function architecture: log_viewer_message_diagnostics() + log_video_audio_action() + log_view_control_action()"
+
+recommendations:
+  immediate: []
+  future: []
+
+instrumentation_audit:
+  coverage_validated: true
+
+  user_actions_checked:
+    - action_name: "ZoomIn"
+      handler: "log_view_control_action"
+      file: "src/app/update.rs:377-380"
+      test: "zoom_in_action_serializes, zoom_in_action_deserializes"
+    - action_name: "ZoomOut"
+      handler: "log_view_control_action"
+      file: "src/app/update.rs:382-385"
+      test: "zoom_out_action_serializes, zoom_out_action_deserializes"
+    - action_name: "ResetZoom"
+      handler: "log_view_control_action"
+      file: "src/app/update.rs:387-388"
+      test: "N/A - unit variant"
+    - action_name: "ToggleFitToWindow"
+      handler: "log_view_control_action"
+      file: "src/app/update.rs:390-391"
+      test: "toggle_fit_to_window_action_serializes, toggle_fit_to_window_action_deserializes"
+    - action_name: "RotateClockwise"
+      handler: "log_view_control_action"
+      file: "src/app/update.rs:396-399"
+      test: "rotate_clockwise_action_serializes, rotate_clockwise_action_deserializes"
+    - action_name: "RotateCounterClockwise"
+      handler: "log_view_control_action"
+      file: "src/app/update.rs:401-404"
+      test: "rotate_counterclockwise_action_serializes, rotate_counterclockwise_action_deserializes"
+    - action_name: "ToggleFullscreen"
+      handler: "log_view_control_action"
+      file: "src/app/update.rs:393-394"
+      test: "N/A - unit variant"
+    - action_name: "ExitFullscreen"
+      handler: "Effect handler"
+      file: "src/app/update.rs:559-560"
+      test: "N/A - unit variant, Effect-triggered"
+
+  state_events_checked: []
+
+  gaps_identified: []
+
+  placement_validated:
+    - checked: "All logging via handler-level functions in update.rs"
+    - checked: "log_view_control_action() for context-dependent actions"
+    - checked: "View control actions logged AFTER processing to capture resulting state"
+    - checked: "ExitFullscreen logged in Effect handler (triggered by Escape key)"
+    - checked: "No UI-level logging"
+    - checked: "No duplicate events"
