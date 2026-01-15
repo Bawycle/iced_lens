@@ -1,7 +1,7 @@
 # Story 3.3: Collection Toggle Control
 
 **Epic:** 3 - UI Integration
-**Status:** Ready for Review
+**Status:** Done
 **Priority:** High
 **Estimate:** 3-4 hours
 **Depends On:** Story 3.1, Story 3.2
@@ -425,6 +425,39 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ## QA Results
 
-<!-- QA agent adds results here after review -->
+### Review Date: 2026-01-15
+### Reviewed By: Quinn (Test Architect)
+### Gate Decision: PASS
+
+#### Code Quality Assessment
+ResourceCollector properly integrated into DiagnosticsCollector. Enable/disable methods handle idempotency correctly. Toggle widget uses native Iced toggler with proper styling. Event flow from UI to App to collector is clean.
+
+#### AC Traceability
+
+| AC | Description | Status |
+|----|-------------|--------|
+| 1 | Toggle switch component | ✓ `iced::widget::toggler` |
+| 2 | Follows IcedLens style | ✓ `.size(20.0)` |
+| 3 | Starts/stops ResourceCollector | ✓ enable/disable methods |
+| 4 | UI reflects state change | ✓ CollectionStatus updates |
+| 5 | State persists during session | ✓ Stored in DiagnosticsCollector |
+| 6 | Clear toggle label | ✓ diagnostics-toggle-label key |
+| 7 | Keyboard accessible | ✓ Native toggler behavior |
+
+#### Test Coverage
+- `enable_resource_collection_starts_collector` - State transition
+- `enable_twice_is_idempotent` - Duplicate call safety
+- `get_status_reflects_collection_state` - Status accuracy
+- `process_pending_drains_resource_metrics` - Metrics flow
+- `disable_preserves_existing_events` - Buffer preservation
+- `toggle_resource_collection_emits_event` - Event emission
+- 895 total tests pass
+
+#### NFR Assessment
+- Security: N/A - Local state toggle
+- Performance: PASS - ResourceCollector runs in background thread
+- Reliability: PASS - Idempotent enable/disable, buffer preserved
+
+**Recommendation:** Ready for Done
 
 ---

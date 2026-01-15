@@ -1,7 +1,7 @@
 # Story 3.1: Diagnostics Screen Layout and Navigation
 
 **Epic:** 3 - UI Integration
-**Status:** Ready for Review
+**Status:** Done
 **Priority:** High
 **Estimate:** 3-4 hours
 **Depends On:** Epic 1, Epic 2
@@ -343,6 +343,35 @@ Claude Opus 4.5
 
 ## QA Results
 
-<!-- QA agent adds results here after review -->
+### Review Date: 2026-01-15
+### Reviewed By: Quinn (Test Architect)
+### Gate Decision: PASS
+
+#### Code Quality Assessment
+Implementation follows the established about.rs pattern correctly. Screen module properly integrated with App message handling, navbar, and subscriptions. All i18n keys added for 5 languages.
+
+#### AC Traceability
+
+| AC | Description | Status |
+|----|-------------|--------|
+| 1 | DiagnosticsScreen component created | ✓ `diagnostics_screen.rs` |
+| 2 | Added to hamburger menu | ✓ navbar.rs with OpenDiagnostics |
+| 3 | Menu uses cog icon | ✓ `icons::cog()` |
+| 4 | Navigation to/from works | ✓ Screen::Diagnostics + events |
+| 5 | Follows layout patterns | ✓ scrollable, Column, spacing |
+| 6 | Back navigation works | ✓ Event::BackToViewer |
+| 7 | Keyboard accessible | ✓ Native button focus |
+
+#### Test Coverage
+- `diagnostics_view_renders` - View renders without panic
+- `back_to_viewer_emits_event` - Event emission verified
+- 881 total tests pass
+
+#### NFR Assessment
+- Security: N/A - UI navigation only
+- Performance: N/A - Simple screen render
+- Maintainability: PASS - Clean pattern adherence
+
+**Recommendation:** Ready for Done
 
 ---

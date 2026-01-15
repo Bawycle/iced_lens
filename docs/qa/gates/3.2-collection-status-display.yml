@@ -1,0 +1,30 @@
+# QA Gate: Story 3.2 - Collection Status Display
+schema: 1
+story: "3.2"
+story_title: "Collection Status Display"
+gate: PASS
+status_reason: "All 7 ACs satisfied. Status display with real-time updates, proper design tokens."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15"
+
+top_issues: []
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security: { status: N/A, notes: "Display only" }
+  performance: { status: PASS, notes: "1s polling is reasonable" }
+  maintainability: { status: PASS, notes: "Clean separation of concerns" }
+
+files_reviewed:
+  - src/diagnostics/mod.rs
+  - src/diagnostics/collector.rs
+  - src/ui/diagnostics_screen.rs
+  - src/app/subscription.rs

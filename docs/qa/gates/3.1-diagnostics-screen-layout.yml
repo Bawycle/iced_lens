@@ -1,0 +1,32 @@
+# QA Gate: Story 3.1 - Diagnostics Screen Layout and Navigation
+schema: 1
+story: "3.1"
+story_title: "Diagnostics Screen Layout and Navigation"
+gate: PASS
+status_reason: "All 7 ACs satisfied. Screen follows about.rs pattern, properly integrated with App."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15"
+
+top_issues: []
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 2
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security: { status: N/A, notes: "UI navigation only" }
+  performance: { status: N/A, notes: "Simple screen render" }
+  maintainability: { status: PASS, notes: "Clean pattern adherence" }
+
+files_reviewed:
+  - src/ui/diagnostics_screen.rs
+  - src/ui/navbar.rs
+  - src/app/screen.rs
+  - src/app/message.rs
+  - src/app/update.rs
+  - src/app/view.rs

@@ -1,7 +1,7 @@
 # Story 3.2: Collection Status Display
 
 **Epic:** 3 - UI Integration
-**Status:** Ready for Review
+**Status:** Done
 **Priority:** High
 **Estimate:** 2-3 hours
 **Depends On:** Story 3.1
@@ -391,6 +391,37 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ## QA Results
 
-<!-- QA agent adds results here after review -->
+### Review Date: 2026-01-15
+### Reviewed By: Quinn (Test Architect)
+### Gate Decision: PASS
+
+#### Code Quality Assessment
+CollectionStatus enum properly designed with Disabled/Enabled/Error states. Status section UI uses correct design tokens for colors. Real-time subscription implemented with 1-second polling. Duration formatting helper well-tested.
+
+#### AC Traceability
+
+| AC | Description | Status |
+|----|-------------|--------|
+| 1 | Status indicator (Disabled/Enabled/Error) | ✓ CollectionStatus enum |
+| 2 | Visual colors from design tokens | ✓ SUCCESS_500/GRAY_400/ERROR_500 |
+| 3 | Clear status text | ✓ i18n keys for each state |
+| 4 | Collection duration display | ✓ format_duration() helper |
+| 5 | Buffer event count | ✓ diagnostics-buffer-count key |
+| 6 | Real-time updates (1s) | ✓ Subscription in App |
+| 7 | Accessible status text | ✓ Visible descriptive text |
+
+#### Test Coverage
+- `format_duration_under_one_hour` - "5m 32s" format
+- `format_duration_over_one_hour` - "2h 15m 45s" format
+- `format_duration_zero` - "0m 0s" format
+- `status_color_for_enabled/disabled/error` - Color mapping
+- 891 total tests pass
+
+#### NFR Assessment
+- Security: N/A - Display only
+- Performance: PASS - 1s polling is reasonable
+- Maintainability: PASS - Clean separation of concerns
+
+**Recommendation:** Ready for Done
 
 ---
