@@ -246,7 +246,9 @@ mod tests {
 
     use approx::assert_relative_eq;
 
-    use crate::diagnostics::{ErrorType, ResourceMetrics, UserAction, WarningType};
+    use crate::diagnostics::{
+        ErrorType, NavigationContext, ResourceMetrics, UserAction, WarningType,
+    };
 
     // =========================================================================
     // ExportError Tests
@@ -334,7 +336,12 @@ mod tests {
             start,
             start,
             DiagnosticEventKind::UserAction {
-                action: UserAction::NavigateNext,
+                action: UserAction::NavigateNext {
+                    context: NavigationContext::Viewer,
+                    filter_active: false,
+                    position_in_filtered: None,
+                    position_in_total: 0,
+                },
                 details: Some("Error from 192.168.1.1".to_string()),
             },
         );
@@ -343,7 +350,7 @@ mod tests {
 
         match &anonymized.kind {
             DiagnosticEventKind::UserAction { action, details } => {
-                assert!(matches!(action, UserAction::NavigateNext));
+                assert!(matches!(action, UserAction::NavigateNext { .. }));
                 let details = details.as_ref().expect("should have details");
                 assert!(details.contains("<ip:"));
                 assert!(!details.contains("192.168.1.1"));

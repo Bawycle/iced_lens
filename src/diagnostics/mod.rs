@@ -51,8 +51,8 @@ pub use collector::{DiagnosticsCollector, DiagnosticsHandle};
 // CollectionStatus is defined at module level and exported directly
 pub use events::{
     AIModel, AppOperation, AppStateEvent, DiagnosticEvent, DiagnosticEventKind, Dimensions,
-    EditorTool, ErrorEvent, FilterChangeType, MediaMetadata, MediaType, StorageType, UserAction,
-    WarningEvent,
+    EditorTool, ErrorEvent, FilterChangeType, MediaMetadata, MediaType, NavigationContext,
+    StorageType, UserAction, WarningEvent,
 };
 pub use export::{ExportError, MAX_CLIPBOARD_SIZE_BYTES};
 pub use report::{

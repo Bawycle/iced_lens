@@ -360,7 +360,7 @@ impl DiagnosticReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagnostics::{ResourceMetrics, UserAction};
+    use crate::diagnostics::{NavigationContext, ResourceMetrics, UserAction};
 
     // =========================================================================
     // ReportMetadata Tests
@@ -547,7 +547,12 @@ mod tests {
             event_time,
             start,
             DiagnosticEventKind::UserAction {
-                action: UserAction::NavigateNext,
+                action: UserAction::NavigateNext {
+                    context: NavigationContext::Viewer,
+                    filter_active: false,
+                    position_in_filtered: None,
+                    position_in_total: 0,
+                },
                 details: None,
             },
         );
@@ -606,7 +611,12 @@ mod tests {
             instant_start,
             instant_start,
             DiagnosticEventKind::UserAction {
-                action: UserAction::NavigateNext,
+                action: UserAction::NavigateNext {
+                    context: NavigationContext::Viewer,
+                    filter_active: false,
+                    position_in_filtered: None,
+                    position_in_total: 0,
+                },
                 details: None,
             },
         )];
@@ -658,7 +668,12 @@ mod tests {
                 start,
                 start,
                 DiagnosticEventKind::UserAction {
-                    action: UserAction::NavigateNext,
+                    action: UserAction::NavigateNext {
+                        context: NavigationContext::Viewer,
+                        filter_active: false,
+                        position_in_filtered: None,
+                        position_in_total: 0,
+                    },
                     details: None,
                 },
             ),
@@ -695,7 +710,12 @@ mod tests {
                 start,
                 start,
                 DiagnosticEventKind::UserAction {
-                    action: UserAction::NavigateNext,
+                    action: UserAction::NavigateNext {
+                        context: NavigationContext::Viewer,
+                        filter_active: false,
+                        position_in_filtered: None,
+                        position_in_total: 0,
+                    },
                     details: None,
                 },
             ),
@@ -834,7 +854,12 @@ mod tests {
             start,
             start,
             DiagnosticEventKind::UserAction {
-                action: UserAction::NavigateNext,
+                action: UserAction::NavigateNext {
+                    context: NavigationContext::Viewer,
+                    filter_active: false,
+                    position_in_filtered: None,
+                    position_in_total: 0,
+                },
                 details: None,
             },
         )];
@@ -858,7 +883,12 @@ mod tests {
                 instant_start,
                 instant_start,
                 DiagnosticEventKind::UserAction {
-                    action: UserAction::NavigateNext,
+                    action: UserAction::NavigateNext {
+                        context: NavigationContext::Viewer,
+                        filter_active: false,
+                        position_in_filtered: None,
+                        position_in_total: 0,
+                    },
                     details: None,
                 },
             ),

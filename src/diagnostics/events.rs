@@ -259,6 +259,23 @@ impl MediaMetadata {
 }
 
 // =============================================================================
+// Navigation Context
+// =============================================================================
+
+/// Context in which navigation occurred.
+///
+/// Distinguishes between navigation in Viewer mode (respects filters)
+/// and Editor mode (ignores filters, images only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NavigationContext {
+    /// Navigation in Viewer mode (respects active filters)
+    Viewer,
+    /// Navigation in Editor mode (ignores filters, images only)
+    Editor,
+}
+
+// =============================================================================
 // User Actions
 // =============================================================================
 
@@ -273,10 +290,30 @@ pub enum UserAction {
     // Navigation Actions
     // ==========================================================================
     /// Navigate to the next media file.
-    NavigateNext,
+    NavigateNext {
+        /// Context in which navigation occurred (Viewer or Editor)
+        context: NavigationContext,
+        /// Whether a filter is currently active
+        filter_active: bool,
+        /// Position in filtered list (None if no filter active)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        position_in_filtered: Option<usize>,
+        /// Position in total (unfiltered) list
+        position_in_total: usize,
+    },
 
     /// Navigate to the previous media file.
-    NavigatePrevious,
+    NavigatePrevious {
+        /// Context in which navigation occurred (Viewer or Editor)
+        context: NavigationContext,
+        /// Whether a filter is currently active
+        filter_active: bool,
+        /// Position in filtered list (None if no filter active)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        position_in_filtered: Option<usize>,
+        /// Position in total (unfiltered) list
+        position_in_total: usize,
+    },
 
     /// Load a media file (via file dialog, drag-drop, or CLI).
     LoadMedia {
@@ -966,7 +1003,12 @@ mod tests {
         let timestamp = Instant::now();
         let event = DiagnosticEvent::with_timestamp(
             DiagnosticEventKind::UserAction {
-                action: UserAction::NavigateNext,
+                action: UserAction::NavigateNext {
+                    context: NavigationContext::Viewer,
+                    filter_active: false,
+                    position_in_filtered: None,
+                    position_in_total: 0,
+                },
                 details: None,
             },
             timestamp,

@@ -547,7 +547,7 @@ mod tests {
     use approx::assert_relative_eq;
 
     use super::*;
-    use crate::diagnostics::{Dimensions, MediaType};
+    use crate::diagnostics::{Dimensions, MediaType, NavigationContext};
 
     #[test]
     fn collector_new_creates_empty_buffer() {
@@ -561,7 +561,12 @@ mod tests {
     fn collector_log_action_stores_event() {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
 
-        collector.log_action(UserAction::NavigateNext);
+        collector.log_action(UserAction::NavigateNext {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
 
         assert_eq!(collector.len(), 1);
     }
@@ -738,8 +743,18 @@ mod tests {
     fn collector_clear_removes_all_events() {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
 
-        collector.log_action(UserAction::NavigateNext);
-        collector.log_action(UserAction::NavigatePrevious);
+        collector.log_action(UserAction::NavigateNext {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
+        collector.log_action(UserAction::NavigatePrevious {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
 
         assert_eq!(collector.len(), 2);
 
@@ -752,9 +767,19 @@ mod tests {
     fn collector_iter_returns_events_in_order() {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
 
-        collector.log_action(UserAction::NavigateNext);
+        collector.log_action(UserAction::NavigateNext {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
         std::thread::sleep(Duration::from_millis(1)); // Ensure different timestamps
-        collector.log_action(UserAction::NavigatePrevious);
+        collector.log_action(UserAction::NavigatePrevious {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
 
         let events: Vec<_> = collector.iter().collect();
         assert_eq!(events.len(), 2);
@@ -786,11 +811,19 @@ mod tests {
 
     #[test]
     fn user_action_deserializes_from_json() {
-        let json = r#"{"action":"navigate_next"}"#;
+        let json = r#"{"action":"navigate_next","context":"viewer","filter_active":false,"position_in_total":0}"#;
         let action: UserAction =
             serde_json::from_str(json).expect("deserialization should succeed");
 
-        assert_eq!(action, UserAction::NavigateNext);
+        assert_eq!(
+            action,
+            UserAction::NavigateNext {
+                context: NavigationContext::Viewer,
+                filter_active: false,
+                position_in_filtered: None,
+                position_in_total: 0,
+            }
+        );
     }
 
     #[test]
@@ -999,7 +1032,12 @@ mod tests {
             500,
             1000,
         ));
-        handle.log_action(UserAction::NavigateNext);
+        handle.log_action(UserAction::NavigateNext {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
         handle.log_warning(WarningEvent::new(
             WarningType::UnsupportedFormat,
             "Test warning message",
@@ -1094,13 +1132,23 @@ mod tests {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
 
         // First event should have timestamp near 0
-        collector.log_action(UserAction::NavigateNext);
+        collector.log_action(UserAction::NavigateNext {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
 
         // Wait a bit
         std::thread::sleep(Duration::from_millis(50));
 
         // Second event should have timestamp around 50ms
-        collector.log_action(UserAction::NavigatePrevious);
+        collector.log_action(UserAction::NavigatePrevious {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
 
         let json = collector.export_json().expect("export should succeed");
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -1153,8 +1201,18 @@ mod tests {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
         let handle = collector.handle();
 
-        handle.log_action(UserAction::NavigateNext);
-        handle.log_action(UserAction::NavigatePrevious);
+        handle.log_action(UserAction::NavigateNext {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
+        handle.log_action(UserAction::NavigatePrevious {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
 
         collector.process_pending();
 
@@ -1164,7 +1222,15 @@ mod tests {
 
         match &events[0].kind {
             DiagnosticEventKind::UserAction { action, details } => {
-                assert!(matches!(action, UserAction::NavigateNext));
+                assert!(matches!(
+                    action,
+                    UserAction::NavigateNext {
+                        context: NavigationContext::Viewer,
+                        filter_active: false,
+                        position_in_filtered: None,
+                        position_in_total: 0,
+                    }
+                ));
                 assert!(details.is_none());
             }
             _ => panic!("expected UserAction event"),
@@ -1172,7 +1238,15 @@ mod tests {
 
         match &events[1].kind {
             DiagnosticEventKind::UserAction { action, details } => {
-                assert!(matches!(action, UserAction::NavigatePrevious));
+                assert!(matches!(
+                    action,
+                    UserAction::NavigatePrevious {
+                        context: NavigationContext::Viewer,
+                        filter_active: false,
+                        position_in_filtered: None,
+                        position_in_total: 0,
+                    }
+                ));
                 assert!(details.is_none());
             }
             _ => panic!("expected UserAction event"),
@@ -1609,7 +1683,12 @@ mod tests {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
 
         // Add some events
-        collector.log_action(UserAction::NavigateNext);
+        collector.log_action(UserAction::NavigateNext {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
         collector.log_state(AppStateEvent::MediaLoaded {
             media_type: MediaType::Image,
             file_size_bytes: 524_288,
@@ -1679,7 +1758,12 @@ mod tests {
 
         // Add event with domain in details
         handle.log_action_with_details(
-            UserAction::NavigateNext,
+            UserAction::NavigateNext {
+                context: NavigationContext::Viewer,
+                filter_active: false,
+                position_in_filtered: None,
+                position_in_total: 0,
+            },
             Some("Fetched from api.example.com".to_string()),
         );
         collector.process_pending();
@@ -1775,7 +1859,12 @@ mod tests {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
 
         // Add a few events
-        collector.log_action(UserAction::NavigateNext);
+        collector.log_action(UserAction::NavigateNext {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
         collector.log_action(UserAction::ZoomIn);
 
         // Build the report and verify it's well under the limit
@@ -1898,7 +1987,12 @@ mod tests {
     #[test]
     fn disable_preserves_existing_events() {
         let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
-        collector.log_action(UserAction::NavigateNext);
+        collector.log_action(UserAction::NavigateNext {
+            context: NavigationContext::Viewer,
+            filter_active: false,
+            position_in_filtered: None,
+            position_in_total: 0,
+        });
         collector.enable_resource_collection();
         std::thread::sleep(Duration::from_millis(200));
         collector.process_pending();

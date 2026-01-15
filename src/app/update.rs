@@ -7,7 +7,8 @@
 use super::{notifications, persistence, Message, Screen};
 use crate::config;
 use crate::diagnostics::{
-    AppStateEvent, DiagnosticsHandle, ErrorType, FilterChangeType, UserAction, WarningType,
+    AppStateEvent, DiagnosticsHandle, ErrorType, FilterChangeType, NavigationContext, UserAction,
+    WarningType,
 };
 use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
@@ -1065,6 +1066,14 @@ fn handle_save_as_dialog(
 
 /// Handles editor navigation to next image (skips videos).
 fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let info = ctx.media_navigator.navigation_info();
+    ctx.diagnostics.log_action(UserAction::NavigateNext {
+        context: NavigationContext::Editor,
+        filter_active: false, // Editor ignores filters
+        position_in_filtered: None,
+        position_in_total: info.current_index.unwrap_or(0),
+    });
+
     // Set load origin for auto-skip on failure
     ctx.viewer.set_navigation_origin(NavigationDirection::Next);
     handle_navigation(
@@ -1077,6 +1086,14 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
 /// Handles editor navigation to previous image (skips videos).
 fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let info = ctx.media_navigator.navigation_info();
+    ctx.diagnostics.log_action(UserAction::NavigatePrevious {
+        context: NavigationContext::Editor,
+        filter_active: false, // Editor ignores filters
+        position_in_filtered: None,
+        position_in_total: info.current_index.unwrap_or(0),
+    });
+
     // Set load origin for auto-skip on failure
     ctx.viewer
         .set_navigation_origin(NavigationDirection::Previous);
@@ -1426,7 +1443,17 @@ where
 
 /// Handles navigation to next media (images and videos).
 pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
-    ctx.diagnostics.log_action(UserAction::NavigateNext);
+    let info = ctx.media_navigator.navigation_info();
+    ctx.diagnostics.log_action(UserAction::NavigateNext {
+        context: NavigationContext::Viewer,
+        filter_active: info.filter_active,
+        position_in_filtered: if info.filter_active {
+            info.current_index
+        } else {
+            None
+        },
+        position_in_total: info.current_index.unwrap_or(0),
+    });
 
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
     // Set load origin for auto-skip on failure
@@ -1441,7 +1468,17 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
 /// Handles navigation to previous media (images and videos).
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
-    ctx.diagnostics.log_action(UserAction::NavigatePrevious);
+    let info = ctx.media_navigator.navigation_info();
+    ctx.diagnostics.log_action(UserAction::NavigatePrevious {
+        context: NavigationContext::Viewer,
+        filter_active: info.filter_active,
+        position_in_filtered: if info.filter_active {
+            info.current_index
+        } else {
+            None
+        },
+        position_in_total: info.current_index.unwrap_or(0),
+    });
 
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
     // Set load origin for auto-skip on failure
