@@ -311,7 +311,52 @@ fn log_viewer_message_diagnostics(
             }
             false
         }
+        component::Message::VideoControls(video_controls::Message::StepForward) => {
+            diagnostics.log_action(UserAction::StepForward);
+            false
+        }
+        component::Message::VideoControls(video_controls::Message::StepBackward) => {
+            diagnostics.log_action(UserAction::StepBackward);
+            false
+        }
         _ => false,
+    }
+}
+
+/// Logs video/audio control actions at handler level (R1 principle).
+///
+/// This function logs actions that require viewer state to capture resulting values
+/// (e.g., volume level after `SetVolume`, mute state after `ToggleMute`).
+/// Called BEFORE the message is processed, so for toggle actions we compute the resulting state.
+fn log_video_audio_action(
+    viewer: &component::State,
+    message: &video_controls::Message,
+    diagnostics: &DiagnosticsHandle,
+) {
+    match message {
+        video_controls::Message::SetVolume(volume) => {
+            diagnostics.log_action(UserAction::SetVolume {
+                volume: volume.value(),
+            });
+        }
+        video_controls::Message::ToggleMute => {
+            // Logging BEFORE processing, so resulting state is opposite of current
+            let is_muted = !viewer.video_muted();
+            diagnostics.log_action(UserAction::ToggleMute { is_muted });
+        }
+        video_controls::Message::ToggleLoop => {
+            // Logging BEFORE processing, so resulting state is opposite of current
+            let is_looping = !viewer.video_loop();
+            diagnostics.log_action(UserAction::ToggleLoop { is_looping });
+        }
+        video_controls::Message::CaptureFrame => {
+            // Get video position for timestamp
+            let timestamp_secs = viewer.video_position().unwrap_or(0.0);
+            diagnostics.log_action(UserAction::CaptureFrame { timestamp_secs });
+        }
+        // IncreasePlaybackSpeed and DecreasePlaybackSpeed are handled separately
+        // because we need the resulting speed value from the player
+        _ => {}
     }
 }
 
@@ -386,6 +431,8 @@ fn log_editor_action(
 }
 
 /// Handles viewer component messages.
+// Allow too_many_lines: Effect handling in one place improves readability over splitting.
+#[allow(clippy::too_many_lines)]
 pub fn handle_viewer_message(
     ctx: &mut UpdateContext<'_>,
     message: component::Message,
@@ -402,9 +449,32 @@ pub fn handle_viewer_message(
         ctx.diagnostics,
     );
 
+    // Log video/audio control actions (requires viewer state for context)
+    // Note: Some actions log BEFORE processing (toggles) so we can predict resulting state
+    if let component::Message::VideoControls(ref video_msg) = message {
+        log_video_audio_action(ctx.viewer, video_msg, ctx.diagnostics);
+    }
+
+    // Check if this is a speed change action (need to log AFTER processing)
+    let is_speed_change = matches!(
+        message,
+        component::Message::VideoControls(
+            video_controls::Message::IncreasePlaybackSpeed
+                | video_controls::Message::DecreasePlaybackSpeed
+        )
+    );
+
     let (effect, task) = ctx
         .viewer
         .handle_message(message, ctx.i18n, ctx.diagnostics);
+
+    // Log speed changes AFTER processing to capture resulting speed
+    if is_speed_change {
+        if let Some(speed) = ctx.viewer.video_playback_speed() {
+            ctx.diagnostics
+                .log_action(UserAction::SetPlaybackSpeed { speed });
+        }
+    }
 
     if is_successful_load {
         handle_successful_media_load(ctx);
@@ -1655,6 +1725,9 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
     else {
         return Task::none();
     };
+
+    // Log user action at handler level (R1 principle)
+    ctx.diagnostics.log_action(UserAction::DeleteMedia);
 
     // Get the next candidate before deletion (peek without changing position)
     let has_multiple = ctx.media_navigator.len() > 1;

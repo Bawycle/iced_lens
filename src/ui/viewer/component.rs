@@ -575,6 +575,24 @@ impl State {
         self.video_loop
     }
 
+    /// Returns the current video playback position in seconds (for diagnostics logging).
+    ///
+    /// Returns `None` if no video is loaded.
+    pub fn video_position(&self) -> Option<f64> {
+        self.video_player
+            .as_ref()
+            .and_then(|p| p.state().position())
+    }
+
+    /// Returns the current video playback speed (for diagnostics logging).
+    ///
+    /// Returns `None` if no video is loaded.
+    pub fn video_playback_speed(&self) -> Option<f64> {
+        self.video_player
+            .as_ref()
+            .map(crate::video_player::VideoPlayer::playback_speed)
+    }
+
     /// Sets the keyboard seek step.
     pub fn set_keyboard_seek_step(&mut self, step: KeyboardSeekStep) {
         self.keyboard_seek_step = step;

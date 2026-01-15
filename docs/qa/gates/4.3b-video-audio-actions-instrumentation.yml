@@ -1,0 +1,102 @@
+# Quality Gate: Story 4.3b - Video/Audio Actions Instrumentation
+schema: 1
+story: "4.3b"
+story_title: "Video/Audio Actions Instrumentation"
+gate: PASS
+status_reason: "All 12 acceptance criteria met. Clean implementation with two-function logging strategy, proper accessor methods, and 10 serialization tests."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15T22:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 968
+  tests_added: 10
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No sensitive data in events (volume, mute state, timestamp, format, speed)"
+  performance:
+    status: PASS
+    notes: "Non-blocking channel-based logging, minimal data capture"
+  reliability:
+    status: PASS
+    notes: "968 tests pass, no regression"
+  maintainability:
+    status: PASS
+    notes: "Clean two-function architecture: log_viewer_message_diagnostics() + log_video_audio_action()"
+
+recommendations:
+  immediate: []
+  future: []
+
+instrumentation_audit:
+  coverage_validated: true
+
+  user_actions_checked:
+    - action_name: "SetVolume"
+      handler: "log_video_audio_action"
+      file: "src/app/update.rs:337-341"
+      test: "N/A - existing variant"
+    - action_name: "ToggleMute"
+      handler: "log_video_audio_action"
+      file: "src/app/update.rs:342-345"
+      test: "toggle_mute_action_serializes, toggle_mute_action_deserializes"
+    - action_name: "DeleteMedia"
+      handler: "handle_delete_current_media"
+      file: "src/app/update.rs:1730"
+      test: "N/A - unit variant"
+    - action_name: "CaptureFrame"
+      handler: "log_video_audio_action"
+      file: "src/app/update.rs:352-355"
+      test: "capture_frame_action_serializes, capture_frame_action_deserializes"
+    - action_name: "ExportFile"
+      handler: "FrameCaptureDialogResult"
+      file: "src/app/mod.rs:721-722"
+      test: "export_file_action_serializes, export_file_action_deserializes"
+    - action_name: "StepForward"
+      handler: "log_viewer_message_diagnostics"
+      file: "src/app/update.rs:314-316"
+      test: "N/A - unit variant"
+    - action_name: "StepBackward"
+      handler: "log_viewer_message_diagnostics"
+      file: "src/app/update.rs:318-320"
+      test: "N/A - unit variant"
+    - action_name: "SetPlaybackSpeed"
+      handler: "handle_viewer_message (after processing)"
+      file: "src/app/update.rs:471-476"
+      test: "N/A - existing variant"
+    - action_name: "ToggleLoop"
+      handler: "log_video_audio_action"
+      file: "src/app/update.rs:347-350"
+      test: "toggle_loop_action_serializes, toggle_loop_action_deserializes"
+    - action_name: "TogglePlayback"
+      handler: "log_viewer_message_diagnostics"
+      file: "src/app/update.rs:304-306"
+      test: "N/A - Story 4.0"
+    - action_name: "SeekVideo"
+      handler: "log_viewer_message_diagnostics"
+      file: "src/app/update.rs:308-312"
+      test: "N/A - Story 4.0"
+
+  state_events_checked: []
+
+  gaps_identified: []
+
+  placement_validated:
+    - checked: "All logging via handler-level functions in update.rs and mod.rs"
+    - checked: "log_viewer_message_diagnostics() for simple actions"
+    - checked: "log_video_audio_action() for context-dependent actions"
+    - checked: "Speed changes logged AFTER processing to capture resulting value"
+    - checked: "Toggle actions logged BEFORE processing, predict resulting state"
+    - checked: "No UI-level logging"
+    - checked: "No duplicate events"

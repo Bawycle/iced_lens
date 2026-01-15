@@ -22,7 +22,8 @@ pub use message::{Flags, Message};
 pub use screen::Screen;
 
 use crate::diagnostics::{
-    AppOperation, AppStateEvent, DiagnosticsCollector, Dimensions, ErrorType, WarningType,
+    AppOperation, AppStateEvent, DiagnosticsCollector, Dimensions, ErrorType, UserAction,
+    WarningType,
 };
 use crate::media::metadata::MediaMetadata;
 use crate::media::{self, MaxSkipAttempts, MediaData, MediaNavigator};
@@ -711,6 +712,14 @@ impl App {
                 if let (Some(path), Some(frame)) = (path, frame) {
                     // Determine export format from file extension
                     let format = crate::media::frame_export::ExportFormat::from_path(&path);
+
+                    // Log user action at handler level (R1 principle)
+                    let format_str = format.map_or_else(
+                        || "unknown".to_string(),
+                        |f| f.extension().to_string(),
+                    );
+                    self.diagnostics
+                        .log_action(UserAction::ExportFile { format: format_str });
 
                     match frame.save_to_file(&path, format) {
                         Ok(()) => {

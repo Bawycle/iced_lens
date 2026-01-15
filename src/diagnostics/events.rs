@@ -350,7 +350,10 @@ pub enum UserAction {
     },
 
     /// Toggle loop mode.
-    ToggleLoop,
+    ToggleLoop {
+        /// Whether loop mode is now enabled
+        is_looping: bool,
+    },
 
     // ==========================================================================
     // Audio Actions
@@ -362,7 +365,10 @@ pub enum UserAction {
     },
 
     /// Toggle mute state.
-    ToggleMute,
+    ToggleMute {
+        /// Whether audio is now muted
+        is_muted: bool,
+    },
 
     // ==========================================================================
     // View Actions
@@ -413,10 +419,16 @@ pub enum UserAction {
     // Capture/Export Actions
     // ==========================================================================
     /// Capture current video frame.
-    CaptureFrame,
+    CaptureFrame {
+        /// Video timestamp when frame was captured (in seconds)
+        timestamp_secs: f64,
+    },
 
     /// Export/save file.
-    ExportFile,
+    ExportFile {
+        /// Export format (e.g., "png", "jpg", "webp")
+        format: String,
+    },
 
     // ==========================================================================
     // Editor Actions
@@ -2130,6 +2142,106 @@ mod tests {
                 assert!(!had_unsaved_changes);
             }
             _ => panic!("expected ReturnToViewer variant"),
+        }
+    }
+
+    // =========================================================================
+    // Video/Audio UserAction Tests (Story 4.3b)
+    // =========================================================================
+
+    #[test]
+    fn toggle_mute_action_serializes() {
+        let action = UserAction::ToggleMute { is_muted: true };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"toggle_mute\""));
+        assert!(json.contains("\"is_muted\":true"));
+    }
+
+    #[test]
+    fn toggle_mute_action_deserializes() {
+        let json = r#"{"action":"toggle_mute","is_muted":false}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ToggleMute { is_muted } => {
+                assert!(!is_muted);
+            }
+            _ => panic!("expected ToggleMute variant"),
+        }
+    }
+
+    #[test]
+    fn toggle_loop_action_serializes() {
+        let action = UserAction::ToggleLoop { is_looping: true };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"toggle_loop\""));
+        assert!(json.contains("\"is_looping\":true"));
+    }
+
+    #[test]
+    fn toggle_loop_action_deserializes() {
+        let json = r#"{"action":"toggle_loop","is_looping":false}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ToggleLoop { is_looping } => {
+                assert!(!is_looping);
+            }
+            _ => panic!("expected ToggleLoop variant"),
+        }
+    }
+
+    #[test]
+    fn capture_frame_action_serializes() {
+        let action = UserAction::CaptureFrame {
+            timestamp_secs: 42.5,
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"capture_frame\""));
+        assert!(json.contains("\"timestamp_secs\":42.5"));
+    }
+
+    #[test]
+    fn capture_frame_action_deserializes() {
+        let json = r#"{"action":"capture_frame","timestamp_secs":120.75}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::CaptureFrame { timestamp_secs } => {
+                assert_relative_eq!(timestamp_secs, 120.75, epsilon = 0.01);
+            }
+            _ => panic!("expected CaptureFrame variant"),
+        }
+    }
+
+    #[test]
+    fn export_file_action_serializes() {
+        let action = UserAction::ExportFile {
+            format: "png".to_string(),
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"export_file\""));
+        assert!(json.contains("\"format\":\"png\""));
+    }
+
+    #[test]
+    fn export_file_action_deserializes() {
+        let json = r#"{"action":"export_file","format":"jpg"}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ExportFile { format } => {
+                assert_eq!(format, "jpg");
+            }
+            _ => panic!("expected ExportFile variant"),
         }
     }
 }
