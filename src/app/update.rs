@@ -1241,7 +1241,7 @@ where
             Some(media::MediaType::Image)
         ) {
             if let Some(image_data) = ctx.prefetch_cache.get(&path) {
-                // Cache hit! Return the cached image immediately
+                // Cache hit - return immediately, file size will be read in MediaLoaded handler
                 return Task::done(on_loaded(Ok(MediaData::Image(image_data))));
             }
         }

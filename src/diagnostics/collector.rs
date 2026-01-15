@@ -547,7 +547,7 @@ mod tests {
     use approx::assert_relative_eq;
 
     use super::*;
-    use crate::diagnostics::{MediaType, SizeCategory};
+    use crate::diagnostics::{Dimensions, MediaType};
 
     #[test]
     fn collector_new_creates_empty_buffer() {
@@ -888,7 +888,8 @@ mod tests {
 
         handle.log_operation(AppOperation::AIDeblurProcess {
             duration_ms: 1500,
-            size_category: crate::diagnostics::SizeCategory::Medium,
+            file_size_bytes: 10_485_760,
+            dimensions: Some(Dimensions::new(2000, 1500)),
             success: true,
         });
 
@@ -1014,7 +1015,8 @@ mod tests {
         // Also add some events directly (sync path)
         collector.log_state(AppStateEvent::MediaLoaded {
             media_type: crate::diagnostics::MediaType::Image,
-            size_category: crate::diagnostics::SizeCategory::Small,
+            file_size_bytes: 524_288,
+            dimensions: Some(Dimensions::new(800, 600)),
             extension: None,
             storage_type: crate::diagnostics::StorageType::Unknown,
             path_hash: None,
@@ -1347,14 +1349,16 @@ mod tests {
 
         handle.log_state(AppStateEvent::MediaLoadingStarted {
             media_type: MediaType::Image,
-            size_category: SizeCategory::Medium,
+            file_size_bytes: 5_242_880,
+            dimensions: None, // Not known at start
             extension: Some("jpg".to_string()),
             storage_type: StorageType::Local,
             path_hash: Some("abc12345".to_string()),
         });
         handle.log_state(AppStateEvent::MediaLoaded {
             media_type: MediaType::Image,
-            size_category: SizeCategory::Medium,
+            file_size_bytes: 5_242_880,
+            dimensions: Some(Dimensions::new(1920, 1080)),
             extension: Some("jpg".to_string()),
             storage_type: StorageType::Local,
             path_hash: Some("abc12345".to_string()),
@@ -1370,11 +1374,11 @@ mod tests {
             DiagnosticEventKind::AppState { state } => match state {
                 AppStateEvent::MediaLoadingStarted {
                     media_type,
-                    size_category,
+                    file_size_bytes,
                     ..
                 } => {
                     assert!(matches!(media_type, MediaType::Image));
-                    assert!(matches!(size_category, SizeCategory::Medium));
+                    assert_eq!(*file_size_bytes, 5_242_880);
                 }
                 _ => panic!("expected MediaLoadingStarted"),
             },
@@ -1385,11 +1389,13 @@ mod tests {
             DiagnosticEventKind::AppState { state } => match state {
                 AppStateEvent::MediaLoaded {
                     media_type,
-                    size_category,
+                    file_size_bytes,
+                    dimensions,
                     ..
                 } => {
                     assert!(matches!(media_type, MediaType::Image));
-                    assert!(matches!(size_category, SizeCategory::Medium));
+                    assert_eq!(*file_size_bytes, 5_242_880);
+                    assert_eq!(*dimensions, Some(Dimensions::new(1920, 1080)));
                 }
                 _ => panic!("expected MediaLoaded"),
             },
@@ -1406,7 +1412,8 @@ mod tests {
 
         handle.log_operation(AppOperation::AIDeblurProcess {
             duration_ms: 1500,
-            size_category: SizeCategory::Medium,
+            file_size_bytes: 10_485_760,
+            dimensions: Some(Dimensions::new(2000, 1500)),
             success: true,
         });
 
@@ -1417,12 +1424,14 @@ mod tests {
             DiagnosticEventKind::Operation { operation } => match operation {
                 AppOperation::AIDeblurProcess {
                     duration_ms,
-                    size_category,
+                    file_size_bytes,
+                    dimensions,
                     success,
                 } => {
                     assert!(*duration_ms > 0, "Duration should be positive");
                     assert!(*duration_ms < 300_000, "Duration should be < 5 minutes");
-                    assert!(matches!(size_category, SizeCategory::Medium));
+                    assert_eq!(*file_size_bytes, 10_485_760);
+                    assert_eq!(*dimensions, Some(Dimensions::new(2000, 1500)));
                     assert!(*success);
                 }
                 _ => panic!("expected AIDeblurProcess"),
@@ -1439,7 +1448,8 @@ mod tests {
         handle.log_operation(AppOperation::AIUpscaleProcess {
             duration_ms: 2500,
             scale_factor: 2.0,
-            size_category: SizeCategory::Large,
+            file_size_bytes: 52_428_800,
+            dimensions: Some(Dimensions::new(4000, 3000)),
             success: true,
         });
 
@@ -1451,14 +1461,16 @@ mod tests {
                 AppOperation::AIUpscaleProcess {
                     duration_ms,
                     scale_factor,
-                    size_category,
+                    file_size_bytes,
+                    dimensions,
                     success,
                 } => {
                     assert!(*duration_ms > 0);
                     assert!(*duration_ms < 300_000);
                     assert!(*scale_factor > 0.0);
                     assert!(*scale_factor <= 4.0, "Real-ESRGAN max is 4x");
-                    assert!(matches!(size_category, SizeCategory::Large));
+                    assert_eq!(*file_size_bytes, 52_428_800);
+                    assert_eq!(*dimensions, Some(Dimensions::new(4000, 3000)));
                     assert!(*success);
                 }
                 _ => panic!("expected AIUpscaleProcess"),
@@ -1600,7 +1612,8 @@ mod tests {
         collector.log_action(UserAction::NavigateNext);
         collector.log_state(AppStateEvent::MediaLoaded {
             media_type: MediaType::Image,
-            size_category: SizeCategory::Small,
+            file_size_bytes: 524_288,
+            dimensions: Some(Dimensions::new(800, 600)),
             extension: None,
             storage_type: StorageType::Unknown,
             path_hash: None,

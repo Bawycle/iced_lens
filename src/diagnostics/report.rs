@@ -92,8 +92,12 @@ impl From<sysinfo::DiskKind> for DiskType {
 pub struct SystemInfo {
     /// Operating system name (e.g., "linux", "windows", "macos")
     pub os: String,
+    /// Operating system distribution name (e.g., "Linux Mint", "Windows 11", "macOS")
+    pub os_name: String,
     /// Operating system version
     pub os_version: String,
+    /// Kernel version (e.g., "6.14.0-37-generic")
+    pub kernel_version: String,
     /// CPU architecture (e.g., "`x86_64`", "aarch64")
     pub cpu_arch: String,
     /// CPU brand name (e.g., "Intel Core i7-9700K", "Apple M1")
@@ -124,7 +128,9 @@ impl SystemInfo {
 
         Self {
             os: std::env::consts::OS.to_string(),
+            os_name: System::name().unwrap_or_else(|| "unknown".to_string()),
             os_version: System::os_version().unwrap_or_else(|| "unknown".to_string()),
+            kernel_version: System::kernel_version().unwrap_or_else(|| "unknown".to_string()),
             cpu_arch: std::env::consts::ARCH.to_string(),
             cpu_brand,
             cpu_cores: sys.cpus().len(),
@@ -458,6 +464,22 @@ mod tests {
     }
 
     #[test]
+    fn system_info_collect_returns_os_name() {
+        let info = SystemInfo::collect();
+
+        // os_name should be non-empty (even if it's "unknown")
+        assert!(!info.os_name.is_empty());
+    }
+
+    #[test]
+    fn system_info_collect_returns_kernel_version() {
+        let info = SystemInfo::collect();
+
+        // kernel_version should be non-empty (even if it's "unknown")
+        assert!(!info.kernel_version.is_empty());
+    }
+
+    #[test]
     fn system_info_includes_cpu_arch() {
         let info = SystemInfo::collect();
 
@@ -501,7 +523,9 @@ mod tests {
         let json = serde_json::to_string(&info).expect("serialization should succeed");
 
         assert!(json.contains("\"os\""));
+        assert!(json.contains("\"os_name\""));
         assert!(json.contains("\"os_version\""));
+        assert!(json.contains("\"kernel_version\""));
         assert!(json.contains("\"cpu_arch\""));
         assert!(json.contains("\"cpu_brand\""));
         assert!(json.contains("\"cpu_cores\""));

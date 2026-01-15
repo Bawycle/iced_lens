@@ -207,8 +207,8 @@ pub struct State {
     spinner_rotation: f32, // Rotation angle for animated spinner (in radians)
     /// Media type being loaded (for diagnostics, set at load start).
     loading_media_type: Option<crate::diagnostics::MediaType>,
-    /// Size category of media being loaded (for diagnostics, set at load start).
-    loading_size_category: Option<crate::diagnostics::SizeCategory>,
+    /// File size in bytes of media being loaded (for diagnostics, set at load start).
+    loading_file_size: Option<u64>,
 
     /// Origin of the current media load request (for auto-skip behavior).
     pub load_origin: LoadOrigin,
@@ -288,7 +288,7 @@ impl Default for State {
             loading_started_at: None,
             spinner_rotation: 0.0,
             loading_media_type: None,
-            loading_size_category: None,
+            loading_file_size: None,
             load_origin: LoadOrigin::DirectOpen,
             max_skip_attempts: MaxSkipAttempts::default(),
             video_player: None,
@@ -631,19 +631,18 @@ impl State {
                 }
             });
 
-        let size_category = self
+        let file_size_bytes = self
             .current_media_path
             .as_ref()
             .and_then(|p| std::fs::metadata(p).ok())
-            .map_or(crate::diagnostics::SizeCategory::Small, |m| {
-                crate::diagnostics::SizeCategory::from_bytes(m.len())
-            });
+            .map_or(0, |m| m.len());
 
         // Store for use in success/failure handlers
         self.loading_media_type = Some(media_type);
-        self.loading_size_category = Some(size_category);
+        self.loading_file_size = Some(file_size_bytes);
 
         // Log MediaLoadingStarted event
+        // Note: dimensions are not yet known at load start, will be set on MediaLoaded
         if let Some(ref handle) = self.diagnostics {
             let metadata = self
                 .current_media_path
@@ -652,7 +651,8 @@ impl State {
                 .unwrap_or_default();
             handle.log_state(crate::diagnostics::AppStateEvent::MediaLoadingStarted {
                 media_type,
-                size_category,
+                file_size_bytes,
+                dimensions: None, // Not known until load completes
                 extension: metadata.extension,
                 storage_type: metadata.storage_type,
                 path_hash: metadata.path_hash,
@@ -831,9 +831,23 @@ impl State {
                         }
 
                         // Log MediaLoaded event for diagnostics
-                        let loaded_media_type = match &media {
-                            MediaData::Image(_) => crate::diagnostics::MediaType::Image,
-                            MediaData::Video(_) => crate::diagnostics::MediaType::Video,
+                        let (loaded_media_type, dimensions) = match &media {
+                            MediaData::Image(img) => (
+                                crate::diagnostics::MediaType::Image,
+                                Some(crate::diagnostics::Dimensions::new(img.width, img.height)),
+                            ),
+                            MediaData::Video(video_data) => {
+                                // Video dimensions available from video data
+                                let dims = if video_data.width > 0 && video_data.height > 0 {
+                                    Some(crate::diagnostics::Dimensions::new(
+                                        video_data.width,
+                                        video_data.height,
+                                    ))
+                                } else {
+                                    None
+                                };
+                                (crate::diagnostics::MediaType::Video, dims)
+                            }
                         };
                         if let Some(ref handle) = self.diagnostics {
                             let metadata = self
@@ -841,12 +855,18 @@ impl State {
                                 .as_ref()
                                 .map(|p| handle.media_metadata(p))
                                 .unwrap_or_default();
+                            // Use cached file size if available (from start_loading),
+                            // otherwise read from filesystem (for cache hits that bypass start_loading)
+                            let file_size_bytes = self.loading_file_size.take().or_else(|| {
+                                self.current_media_path
+                                    .as_ref()
+                                    .and_then(|p| std::fs::metadata(p).ok())
+                                    .map(|m| m.len())
+                            }).unwrap_or(0);
                             handle.log_state(crate::diagnostics::AppStateEvent::MediaLoaded {
                                 media_type: loaded_media_type,
-                                size_category: self
-                                    .loading_size_category
-                                    .take()
-                                    .unwrap_or(crate::diagnostics::SizeCategory::Small),
+                                file_size_bytes,
+                                dimensions,
                                 extension: metadata.extension,
                                 storage_type: metadata.storage_type,
                                 path_hash: metadata.path_hash,
@@ -907,8 +927,8 @@ impl State {
                             .loading_media_type
                             .take()
                             .unwrap_or(crate::diagnostics::MediaType::Unknown);
-                        // Clear size category as it's no longer needed
-                        self.loading_size_category = None;
+                        // Clear file size as it's no longer needed
+                        self.loading_file_size = None;
 
                         let sanitized_reason = match &error {
                             Error::Svg(e) => format!("SVG error: {e}"),

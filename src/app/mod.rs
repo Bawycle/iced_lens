@@ -22,7 +22,7 @@ pub use message::{Flags, Message};
 pub use screen::Screen;
 
 use crate::diagnostics::{
-    AppOperation, AppStateEvent, DiagnosticsCollector, ErrorType, SizeCategory, WarningType,
+    AppOperation, AppStateEvent, DiagnosticsCollector, Dimensions, ErrorType, WarningType,
 };
 use crate::media::metadata::MediaMetadata;
 use crate::media::{self, MaxSkipAttempts, MediaData, MediaNavigator};
@@ -871,19 +871,22 @@ impl App {
         let diagnostics_handle = self.diagnostics.handle();
 
         if let Some(editor) = self.image_editor.as_mut() {
-            // Calculate size category from image dimensions (RGBA = 4 bytes per pixel)
+            // Get image dimensions for diagnostics
             let (w, h) = (
                 editor.working_image().width(),
                 editor.working_image().height(),
             );
-            let size_category = SizeCategory::from_bytes(u64::from(w) * u64::from(h) * 4);
+            // Estimate memory size (RGBA = 4 bytes per pixel)
+            let file_size_bytes = u64::from(w) * u64::from(h) * 4;
+            let dimensions = Some(Dimensions::new(w, h));
 
             match result {
                 Ok(deblurred_image) => {
                     // Log operation with success
                     diagnostics_handle.log_operation(AppOperation::AIDeblurProcess {
                         duration_ms,
-                        size_category,
+                        file_size_bytes,
+                        dimensions,
                         success: true,
                     });
                     diagnostics_handle.log_state(AppStateEvent::EditorDeblurCompleted);
@@ -898,7 +901,8 @@ impl App {
                     // Log operation with failure
                     diagnostics_handle.log_operation(AppOperation::AIDeblurProcess {
                         duration_ms,
-                        size_category,
+                        file_size_bytes,
+                        dimensions,
                         success: false,
                     });
 
@@ -936,12 +940,14 @@ impl App {
         let diagnostics_handle = self.diagnostics.handle();
 
         if let Some(editor) = self.image_editor.as_mut() {
-            // Calculate size category from original image dimensions (RGBA = 4 bytes per pixel)
+            // Get original image dimensions for diagnostics
             let (w, h) = (
                 editor.working_image().width(),
                 editor.working_image().height(),
             );
-            let size_category = SizeCategory::from_bytes(u64::from(w) * u64::from(h) * 4);
+            // Estimate memory size (RGBA = 4 bytes per pixel)
+            let file_size_bytes = u64::from(w) * u64::from(h) * 4;
+            let dimensions = Some(Dimensions::new(w, h));
 
             match result {
                 Ok(upscaled_image) => {
@@ -949,7 +955,8 @@ impl App {
                     diagnostics_handle.log_operation(AppOperation::AIUpscaleProcess {
                         duration_ms,
                         scale_factor,
-                        size_category,
+                        file_size_bytes,
+                        dimensions,
                         success: true,
                     });
 
@@ -965,7 +972,8 @@ impl App {
                     diagnostics_handle.log_operation(AppOperation::AIUpscaleProcess {
                         duration_ms,
                         scale_factor,
-                        size_category,
+                        file_size_bytes,
+                        dimensions,
                         success: false,
                     });
 

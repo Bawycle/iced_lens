@@ -28,52 +28,20 @@ pub enum MediaType {
     Unknown,
 }
 
-/// Size category for privacy-preserving file size reporting.
-///
-/// Uses broad categories instead of exact sizes to protect user privacy
-/// while still providing useful diagnostic information.
+/// Media dimensions (width and height in pixels).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SizeCategory {
-    /// Less than 1 MB (thumbnails, small images)
-    Small,
-    /// 1 MB to 10 MB (standard photos)
-    Medium,
-    /// 10 MB to 100 MB (RAW images, short videos)
-    Large,
-    /// More than 100 MB (long videos, 4K content)
-    VeryLarge,
+pub struct Dimensions {
+    /// Width in pixels
+    pub width: u32,
+    /// Height in pixels
+    pub height: u32,
 }
 
-impl SizeCategory {
-    /// Size threshold constants in bytes
-    const ONE_MB: u64 = 1_048_576;
-    const TEN_MB: u64 = 10_485_760;
-    const HUNDRED_MB: u64 = 104_857_600;
-
-    /// Determines the size category from a byte count.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iced_lens::diagnostics::SizeCategory;
-    ///
-    /// assert_eq!(SizeCategory::from_bytes(500_000), SizeCategory::Small);
-    /// assert_eq!(SizeCategory::from_bytes(5_000_000), SizeCategory::Medium);
-    /// assert_eq!(SizeCategory::from_bytes(50_000_000), SizeCategory::Large);
-    /// assert_eq!(SizeCategory::from_bytes(500_000_000), SizeCategory::VeryLarge);
-    /// ```
+impl Dimensions {
+    /// Creates a new `Dimensions` struct.
     #[must_use]
-    pub fn from_bytes(bytes: u64) -> Self {
-        if bytes < Self::ONE_MB {
-            Self::Small
-        } else if bytes < Self::TEN_MB {
-            Self::Medium
-        } else if bytes < Self::HUNDRED_MB {
-            Self::Large
-        } else {
-            Self::VeryLarge
-        }
+    pub fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
     }
 }
 
@@ -143,9 +111,19 @@ impl StorageType {
     pub fn detect(path: &Path) -> Self {
         let path_str = path.to_string_lossy();
 
-        // Network detection (high confidence): UNC paths
+        // Network detection (high confidence): UNC paths (Windows-style, e.g., \\server\share)
+        // Note: This check runs on all platforms as some tools may use UNC paths cross-platform
         if path_str.starts_with("\\\\") {
             return Self::Network;
+        }
+
+        // Network detection (high confidence): GVFS mounts (Linux)
+        // Paths like /run/user/<uid>/gvfs/smb-share:server=... or /run/user/<uid>/gvfs/nfs:...
+        #[cfg(unix)]
+        {
+            if path_str.contains("/gvfs/smb-share:") || path_str.contains("/gvfs/nfs:") {
+                return Self::Network;
+            }
         }
 
         // Local detection (high confidence): User directories
@@ -414,8 +392,11 @@ pub enum AppStateEvent {
     MediaLoadingStarted {
         /// Type of media being loaded
         media_type: MediaType,
-        /// Size category of the file
-        size_category: SizeCategory,
+        /// Exact file size in bytes
+        file_size_bytes: u64,
+        /// Media dimensions (width × height) when available
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dimensions: Option<Dimensions>,
         /// File extension (e.g., "jpg", "mp4", "heic")
         #[serde(skip_serializing_if = "Option::is_none")]
         extension: Option<String>,
@@ -431,8 +412,11 @@ pub enum AppStateEvent {
     MediaLoaded {
         /// Type of media loaded
         media_type: MediaType,
-        /// Size category of the file
-        size_category: SizeCategory,
+        /// Exact file size in bytes
+        file_size_bytes: u64,
+        /// Media dimensions (width × height) when available
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dimensions: Option<Dimensions>,
         /// File extension (e.g., "jpg", "mp4", "heic")
         #[serde(skip_serializing_if = "Option::is_none")]
         extension: Option<String>,
@@ -601,8 +585,11 @@ pub enum AppOperation {
     ResizeImage {
         /// Duration in milliseconds
         duration_ms: u64,
-        /// Size category of the image
-        size_category: SizeCategory,
+        /// Exact file size in bytes
+        file_size_bytes: u64,
+        /// Image dimensions (width × height)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dimensions: Option<Dimensions>,
     },
 
     /// Filter application operation.
@@ -633,8 +620,11 @@ pub enum AppOperation {
     AIDeblurProcess {
         /// Duration in milliseconds
         duration_ms: u64,
-        /// Size category of the image
-        size_category: SizeCategory,
+        /// Exact file size in bytes
+        file_size_bytes: u64,
+        /// Image dimensions (width × height)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dimensions: Option<Dimensions>,
         /// Whether the operation succeeded
         success: bool,
     },
@@ -646,8 +636,11 @@ pub enum AppOperation {
         duration_ms: u64,
         /// Scale factor applied (e.g., 2.0 for 2x upscale)
         scale_factor: f32,
-        /// Size category of the original image
-        size_category: SizeCategory,
+        /// Exact file size in bytes
+        file_size_bytes: u64,
+        /// Image dimensions (width × height)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dimensions: Option<Dimensions>,
         /// Whether the operation succeeded
         success: bool,
     },
@@ -1011,57 +1004,32 @@ mod tests {
     }
 
     // =========================================================================
-    // SizeCategory Tests
+    // Dimensions Tests
     // =========================================================================
 
     #[test]
-    fn size_category_from_bytes_small() {
-        // 0 bytes - Small
-        assert_eq!(SizeCategory::from_bytes(0), SizeCategory::Small);
-        // Just under 1MB - Small
-        assert_eq!(SizeCategory::from_bytes(1_048_575), SizeCategory::Small);
+    fn dimensions_new_creates_struct() {
+        let dims = Dimensions::new(1920, 1080);
+        assert_eq!(dims.width, 1920);
+        assert_eq!(dims.height, 1080);
     }
 
     #[test]
-    fn size_category_from_bytes_medium() {
-        // Exactly 1MB - Medium
-        assert_eq!(SizeCategory::from_bytes(1_048_576), SizeCategory::Medium);
-        // Just under 10MB - Medium
-        assert_eq!(SizeCategory::from_bytes(10_485_759), SizeCategory::Medium);
+    fn dimensions_serializes_correctly() {
+        let dims = Dimensions::new(1920, 1080);
+        let json = serde_json::to_string(&dims).expect("serialization should succeed");
+
+        assert!(json.contains("\"width\":1920"));
+        assert!(json.contains("\"height\":1080"));
     }
 
     #[test]
-    fn size_category_from_bytes_large() {
-        // Exactly 10MB - Large
-        assert_eq!(SizeCategory::from_bytes(10_485_760), SizeCategory::Large);
-        // Just under 100MB - Large
-        assert_eq!(SizeCategory::from_bytes(104_857_599), SizeCategory::Large);
-    }
+    fn dimensions_deserializes_correctly() {
+        let json = r#"{"width":3840,"height":2160}"#;
+        let dims: Dimensions = serde_json::from_str(json).expect("deserialization should succeed");
 
-    #[test]
-    fn size_category_from_bytes_very_large() {
-        // Exactly 100MB - VeryLarge
-        assert_eq!(
-            SizeCategory::from_bytes(104_857_600),
-            SizeCategory::VeryLarge
-        );
-        // 1GB - VeryLarge
-        assert_eq!(
-            SizeCategory::from_bytes(1_073_741_824),
-            SizeCategory::VeryLarge
-        );
-    }
-
-    #[test]
-    fn size_category_serializes_correctly() {
-        assert_eq!(
-            serde_json::to_string(&SizeCategory::Small).unwrap(),
-            "\"small\""
-        );
-        assert_eq!(
-            serde_json::to_string(&SizeCategory::VeryLarge).unwrap(),
-            "\"very_large\""
-        );
+        assert_eq!(dims.width, 3840);
+        assert_eq!(dims.height, 2160);
     }
 
     // =========================================================================
@@ -1096,6 +1064,31 @@ mod tests {
         assert_eq!(StorageType::detect(path), StorageType::Network);
 
         let path = Path::new("\\\\nas\\photos\\2024\\vacation.jpg");
+        assert_eq!(StorageType::detect(path), StorageType::Network);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn storage_type_detects_gvfs_smb_as_network() {
+        use std::path::Path;
+
+        // GVFS SMB mount (Linux Mint, Ubuntu, etc.)
+        let path = Path::new("/run/user/1000/gvfs/smb-share:server=nas,share=photos/vacation.jpg");
+        assert_eq!(StorageType::detect(path), StorageType::Network);
+
+        // Nested subdirectory in SMB share
+        let path =
+            Path::new("/run/user/1000/gvfs/smb-share:server=fileserver,share=data/docs/file.pdf");
+        assert_eq!(StorageType::detect(path), StorageType::Network);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn storage_type_detects_gvfs_nfs_as_network() {
+        use std::path::Path;
+
+        // GVFS NFS mount
+        let path = Path::new("/run/user/1000/gvfs/nfs:host=server,path=/exports/photos/img.jpg");
         assert_eq!(StorageType::detect(path), StorageType::Network);
     }
 
@@ -1246,7 +1239,8 @@ mod tests {
     fn app_state_event_media_loaded_serializes() {
         let state = AppStateEvent::MediaLoaded {
             media_type: MediaType::Image,
-            size_category: SizeCategory::Medium,
+            file_size_bytes: 5_242_880, // 5 MB
+            dimensions: Some(Dimensions::new(1920, 1080)),
             extension: Some("jpg".to_string()),
             storage_type: StorageType::Local,
             path_hash: Some("abc12345".to_string()),
@@ -1255,7 +1249,10 @@ mod tests {
 
         assert!(json.contains("\"state\":\"media_loaded\""));
         assert!(json.contains("\"media_type\":\"image\""));
-        assert!(json.contains("\"size_category\":\"medium\""));
+        assert!(json.contains("\"file_size_bytes\":5242880"));
+        assert!(json.contains("\"dimensions\""));
+        assert!(json.contains("\"width\":1920"));
+        assert!(json.contains("\"height\":1080"));
         assert!(json.contains("\"extension\":\"jpg\""));
         assert!(json.contains("\"storage_type\":\"local\""));
         assert!(json.contains("\"path_hash\":\"abc12345\""));
@@ -1265,7 +1262,8 @@ mod tests {
     fn app_state_event_media_loaded_omits_none_fields() {
         let state = AppStateEvent::MediaLoaded {
             media_type: MediaType::Image,
-            size_category: SizeCategory::Medium,
+            file_size_bytes: 1_048_576,
+            dimensions: None,
             extension: None,
             storage_type: StorageType::Unknown,
             path_hash: None,
@@ -1276,6 +1274,7 @@ mod tests {
         // None fields should be omitted
         assert!(!json.contains("\"extension\""));
         assert!(!json.contains("\"path_hash\""));
+        assert!(!json.contains("\"dimensions\""));
         // storage_type with default (unknown) should still be serialized
         assert!(json.contains("\"storage_type\":\"unknown\""));
     }
@@ -1343,14 +1342,16 @@ mod tests {
     fn app_operation_ai_deblur_serializes() {
         let op = AppOperation::AIDeblurProcess {
             duration_ms: 1500,
-            size_category: SizeCategory::Large,
+            file_size_bytes: 52_428_800, // 50 MB
+            dimensions: Some(Dimensions::new(4000, 3000)),
             success: true,
         };
         let json = serde_json::to_string(&op).expect("serialization should succeed");
 
         assert!(json.contains("\"operation\":\"ai_deblur_process\""));
         assert!(json.contains("\"duration_ms\":1500"));
-        assert!(json.contains("\"size_category\":\"large\""));
+        assert!(json.contains("\"file_size_bytes\":52428800"));
+        assert!(json.contains("\"dimensions\""));
         assert!(json.contains("\"success\":true"));
     }
 
@@ -1359,13 +1360,15 @@ mod tests {
         let op = AppOperation::AIUpscaleProcess {
             duration_ms: 2500,
             scale_factor: 4.0,
-            size_category: SizeCategory::Medium,
+            file_size_bytes: 10_485_760, // 10 MB
+            dimensions: Some(Dimensions::new(2000, 1500)),
             success: false,
         };
         let json = serde_json::to_string(&op).expect("serialization should succeed");
 
         assert!(json.contains("\"operation\":\"ai_upscale_process\""));
         assert!(json.contains("\"scale_factor\":4.0"));
+        assert!(json.contains("\"file_size_bytes\":10485760"));
         assert!(json.contains("\"success\":false"));
     }
 
@@ -1437,7 +1440,7 @@ mod tests {
 
     #[test]
     fn diagnostic_event_kind_operation_deserializes() {
-        let json = r#"{"type":"operation","operation":"resize_image","duration_ms":200,"size_category":"small"}"#;
+        let json = r#"{"type":"operation","operation":"resize_image","duration_ms":200,"file_size_bytes":1048576,"dimensions":{"width":800,"height":600}}"#;
         let kind: DiagnosticEventKind =
             serde_json::from_str(json).expect("deserialization should succeed");
 
@@ -1445,10 +1448,12 @@ mod tests {
             DiagnosticEventKind::Operation { operation } => match operation {
                 AppOperation::ResizeImage {
                     duration_ms,
-                    size_category,
+                    file_size_bytes,
+                    dimensions,
                 } => {
                     assert_eq!(duration_ms, 200);
-                    assert_eq!(size_category, SizeCategory::Small);
+                    assert_eq!(file_size_bytes, 1_048_576);
+                    assert_eq!(dimensions, Some(Dimensions::new(800, 600)));
                 }
                 _ => panic!("expected ResizeImage operation"),
             },

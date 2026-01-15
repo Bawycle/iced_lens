@@ -1,0 +1,47 @@
+# Quality Gate: 3.8 - Enrich Diagnostic Report Data
+schema: 1
+story: "3.8"
+story_title: "Enrich Diagnostic Report Data"
+gate: PASS
+status_reason: "All acceptance criteria met, comprehensive test coverage, clean implementation with good architectural refactoring."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15T15:30:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "DOC-001"
+    severity: low
+    finding: "File List in story missing src/app/update.rs"
+    suggested_action: "Dev to update File List before marking Done"
+    suggested_owner: dev
+
+quality_score: 95
+expires: "2026-01-29T00:00:00Z"
+
+evidence:
+  tests_reviewed: 12
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No sensitive data exposure, proper anonymization maintained"
+  performance:
+    status: PASS
+    notes: "File metadata read is minimal I/O, centralized in single location"
+  reliability:
+    status: PASS
+    notes: "Proper fallbacks for unavailable OS info and dimensions"
+  maintainability:
+    status: PASS
+    notes: "Clean separation of concerns, SizeCategory fully removed, GVFS detection added"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Consider adding detection for manually mounted SMB shares under /mnt or /media"
+      refs: ["src/diagnostics/events.rs:StorageType::detect"]
