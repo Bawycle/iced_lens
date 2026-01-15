@@ -409,9 +409,6 @@ pub enum UserAction {
     /// Enter image editor.
     EnterEditor,
 
-    /// Return to viewer from another screen.
-    ReturnToViewer,
-
     // ==========================================================================
     // Capture/Export Actions
     // ==========================================================================
@@ -425,25 +422,61 @@ pub enum UserAction {
     // Editor Actions
     // ==========================================================================
     /// Apply crop operation.
-    ApplyCrop,
+    ApplyCrop {
+        /// Crop region X offset in pixels
+        x: u32,
+        /// Crop region Y offset in pixels
+        y: u32,
+        /// Crop region width in pixels
+        width: u32,
+        /// Crop region height in pixels
+        height: u32,
+    },
 
     /// Apply resize operation.
-    ApplyResize,
+    ApplyResize {
+        /// Scale percentage (100 = original size)
+        scale_percent: f32,
+        /// New width in pixels
+        new_width: u32,
+        /// New height in pixels
+        new_height: u32,
+    },
 
     /// Apply AI deblur.
     ApplyDeblur,
 
     /// Apply AI upscale.
-    ApplyUpscale,
+    ApplyUpscale {
+        /// Scale factor (e.g., 4 for 4x upscale)
+        scale_factor: u32,
+    },
 
     /// Undo last edit.
-    Undo,
+    Undo {
+        /// Type of operation that was undone
+        #[serde(skip_serializing_if = "Option::is_none")]
+        operation_type: Option<String>,
+    },
 
     /// Redo last undone edit.
-    Redo,
+    Redo {
+        /// Type of operation that was redone
+        #[serde(skip_serializing_if = "Option::is_none")]
+        operation_type: Option<String>,
+    },
 
     /// Save edited image.
-    SaveImage,
+    SaveImage {
+        /// Export format (e.g., "png", "jpg", "webp")
+        format: String,
+    },
+
+    /// Return to viewer from editor.
+    ReturnToViewer {
+        /// Whether there were unsaved changes when returning
+        had_unsaved_changes: bool,
+    },
 }
 
 // =============================================================================
@@ -1888,6 +1921,215 @@ mod tests {
                 assert!(had_date_filter);
             }
             _ => panic!("expected FilterCleared variant"),
+        }
+    }
+
+    // =========================================================================
+    // Editor UserAction Tests (Story 4.3a)
+    // =========================================================================
+
+    #[test]
+    fn apply_crop_action_serializes() {
+        let action = UserAction::ApplyCrop {
+            x: 10,
+            y: 20,
+            width: 800,
+            height: 600,
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"apply_crop\""));
+        assert!(json.contains("\"x\":10"));
+        assert!(json.contains("\"y\":20"));
+        assert!(json.contains("\"width\":800"));
+        assert!(json.contains("\"height\":600"));
+    }
+
+    #[test]
+    fn apply_crop_action_deserializes() {
+        let json = r#"{"action":"apply_crop","x":50,"y":100,"width":1920,"height":1080}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ApplyCrop {
+                x,
+                y,
+                width,
+                height,
+            } => {
+                assert_eq!(x, 50);
+                assert_eq!(y, 100);
+                assert_eq!(width, 1920);
+                assert_eq!(height, 1080);
+            }
+            _ => panic!("expected ApplyCrop variant"),
+        }
+    }
+
+    #[test]
+    fn apply_resize_action_serializes() {
+        let action = UserAction::ApplyResize {
+            scale_percent: 150.0,
+            new_width: 1920,
+            new_height: 1080,
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"apply_resize\""));
+        assert!(json.contains("\"scale_percent\":150.0"));
+        assert!(json.contains("\"new_width\":1920"));
+        assert!(json.contains("\"new_height\":1080"));
+    }
+
+    #[test]
+    fn apply_resize_action_deserializes() {
+        let json =
+            r#"{"action":"apply_resize","scale_percent":75.5,"new_width":800,"new_height":600}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ApplyResize {
+                scale_percent,
+                new_width,
+                new_height,
+            } => {
+                assert_relative_eq!(scale_percent, 75.5);
+                assert_eq!(new_width, 800);
+                assert_eq!(new_height, 600);
+            }
+            _ => panic!("expected ApplyResize variant"),
+        }
+    }
+
+    #[test]
+    fn apply_deblur_action_serializes() {
+        let action = UserAction::ApplyDeblur;
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"apply_deblur\""));
+    }
+
+    #[test]
+    fn apply_upscale_action_serializes() {
+        let action = UserAction::ApplyUpscale { scale_factor: 4 };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"apply_upscale\""));
+        assert!(json.contains("\"scale_factor\":4"));
+    }
+
+    #[test]
+    fn apply_upscale_action_deserializes() {
+        let json = r#"{"action":"apply_upscale","scale_factor":2}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ApplyUpscale { scale_factor } => {
+                assert_eq!(scale_factor, 2);
+            }
+            _ => panic!("expected ApplyUpscale variant"),
+        }
+    }
+
+    #[test]
+    fn save_image_action_serializes() {
+        let action = UserAction::SaveImage {
+            format: "png".to_string(),
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"save_image\""));
+        assert!(json.contains("\"format\":\"png\""));
+    }
+
+    #[test]
+    fn save_image_action_deserializes() {
+        let json = r#"{"action":"save_image","format":"webp"}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::SaveImage { format } => {
+                assert_eq!(format, "webp");
+            }
+            _ => panic!("expected SaveImage variant"),
+        }
+    }
+
+    #[test]
+    fn undo_action_with_operation_type_serializes() {
+        let action = UserAction::Undo {
+            operation_type: Some("crop".to_string()),
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"undo\""));
+        assert!(json.contains("\"operation_type\":\"crop\""));
+    }
+
+    #[test]
+    fn undo_action_without_operation_type_omits_field() {
+        let action = UserAction::Undo {
+            operation_type: None,
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"undo\""));
+        assert!(!json.contains("operation_type"));
+    }
+
+    #[test]
+    fn redo_action_with_operation_type_serializes() {
+        let action = UserAction::Redo {
+            operation_type: Some("resize".to_string()),
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"redo\""));
+        assert!(json.contains("\"operation_type\":\"resize\""));
+    }
+
+    #[test]
+    fn redo_action_deserializes() {
+        let json = r#"{"action":"redo","operation_type":"deblur"}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::Redo { operation_type } => {
+                assert_eq!(operation_type, Some("deblur".to_string()));
+            }
+            _ => panic!("expected Redo variant"),
+        }
+    }
+
+    #[test]
+    fn return_to_viewer_action_serializes() {
+        let action = UserAction::ReturnToViewer {
+            had_unsaved_changes: true,
+        };
+        let json = serde_json::to_string(&action).expect("serialization should succeed");
+
+        assert!(json.contains("\"action\":\"return_to_viewer\""));
+        assert!(json.contains("\"had_unsaved_changes\":true"));
+    }
+
+    #[test]
+    fn return_to_viewer_action_deserializes() {
+        let json = r#"{"action":"return_to_viewer","had_unsaved_changes":false}"#;
+        let action: UserAction =
+            serde_json::from_str(json).expect("deserialization should succeed");
+
+        match action {
+            UserAction::ReturnToViewer {
+                had_unsaved_changes,
+            } => {
+                assert!(!had_unsaved_changes);
+            }
+            _ => panic!("expected ReturnToViewer variant"),
         }
     }
 }

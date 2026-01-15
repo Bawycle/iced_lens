@@ -211,6 +211,53 @@ impl State {
     pub fn has_gps_data(&self) -> bool {
         self.has_gps_data
     }
+
+    /// Get the current crop state (for diagnostics logging).
+    pub fn crop(&self) -> &CropState {
+        &self.crop
+    }
+
+    /// Get the current resize state (for diagnostics logging).
+    pub fn resize(&self) -> &ResizeState {
+        &self.resize
+    }
+
+    /// Get the operation type that would be undone (for diagnostics logging).
+    ///
+    /// Returns `None` if there's nothing to undo.
+    pub fn undo_operation_type(&self) -> Option<String> {
+        if self.history_index == 0 {
+            return None;
+        }
+        self.transformation_history
+            .get(self.history_index - 1)
+            .map(transformation_type_name)
+    }
+
+    /// Get the operation type that would be redone (for diagnostics logging).
+    ///
+    /// Returns `None` if there's nothing to redo.
+    pub fn redo_operation_type(&self) -> Option<String> {
+        self.transformation_history
+            .get(self.history_index)
+            .map(transformation_type_name)
+    }
+}
+
+/// Maps a Transformation to its type name for diagnostics logging.
+fn transformation_type_name(t: &Transformation) -> String {
+    match t {
+        Transformation::RotateLeft => "rotate_left".to_string(),
+        Transformation::RotateRight => "rotate_right".to_string(),
+        Transformation::FlipHorizontal => "flip_horizontal".to_string(),
+        Transformation::FlipVertical => "flip_vertical".to_string(),
+        Transformation::Crop { .. } => "crop".to_string(),
+        Transformation::Resize { .. } => "resize".to_string(),
+        Transformation::UpscaleResize { .. } => "upscale_resize".to_string(),
+        Transformation::AdjustBrightness { .. } => "adjust_brightness".to_string(),
+        Transformation::AdjustContrast { .. } => "adjust_contrast".to_string(),
+        Transformation::Deblur { .. } => "deblur".to_string(),
+    }
 }
 
 #[cfg(test)]

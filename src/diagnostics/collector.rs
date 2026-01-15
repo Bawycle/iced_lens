@@ -1283,8 +1283,12 @@ mod tests {
 
         handle.log_action(UserAction::EnterEditor);
         handle.log_action(UserAction::ApplyDeblur);
-        handle.log_action(UserAction::SaveImage);
-        handle.log_action(UserAction::ReturnToViewer);
+        handle.log_action(UserAction::SaveImage {
+            format: "png".to_string(),
+        });
+        handle.log_action(UserAction::ReturnToViewer {
+            had_unsaved_changes: false,
+        });
 
         collector.process_pending();
 
@@ -1309,14 +1313,14 @@ mod tests {
         assert!(matches!(
             &events[2].kind,
             DiagnosticEventKind::UserAction {
-                action: UserAction::SaveImage,
+                action: UserAction::SaveImage { .. },
                 ..
             }
         ));
         assert!(matches!(
             &events[3].kind,
             DiagnosticEventKind::UserAction {
-                action: UserAction::ReturnToViewer,
+                action: UserAction::ReturnToViewer { .. },
                 ..
             }
         ));

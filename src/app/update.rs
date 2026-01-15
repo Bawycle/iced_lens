@@ -315,6 +315,76 @@ fn log_viewer_message_diagnostics(
     }
 }
 
+/// Logs diagnostic events for editor messages at handler level (R1 principle).
+///
+/// This function intercepts editor messages BEFORE they are processed by the editor state
+/// to capture user intent. We log here rather than in the editor state to maintain
+/// separation of concerns (diagnostics belong at the app/handler level).
+fn log_editor_action(
+    diagnostics: &DiagnosticsHandle,
+    editor: &image_editor::State,
+    message: &image_editor::Message,
+) {
+    use image_editor::{SidebarMessage, ToolbarMessage};
+
+    match message {
+        // Crop action - capture crop dimensions from current crop state
+        image_editor::Message::Sidebar(SidebarMessage::ApplyCrop) => {
+            let crop = editor.crop();
+            diagnostics.log_action(UserAction::ApplyCrop {
+                x: crop.x,
+                y: crop.y,
+                width: crop.width,
+                height: crop.height,
+            });
+        }
+
+        // Resize action - capture resize parameters
+        image_editor::Message::Sidebar(SidebarMessage::ApplyResize) => {
+            let resize = editor.resize();
+            diagnostics.log_action(UserAction::ApplyResize {
+                scale_percent: resize.scale.value(),
+                new_width: resize.width,
+                new_height: resize.height,
+            });
+        }
+
+        // Deblur action (intent to apply - state event EditorDeblurStarted tracks actual start)
+        image_editor::Message::Sidebar(SidebarMessage::ApplyDeblur) => {
+            diagnostics.log_action(UserAction::ApplyDeblur);
+        }
+
+        // Undo action - capture what operation is being undone
+        image_editor::Message::Sidebar(SidebarMessage::Undo) => {
+            let operation_type = editor.undo_operation_type();
+            diagnostics.log_action(UserAction::Undo { operation_type });
+        }
+
+        // Redo action - capture what operation is being redone
+        image_editor::Message::Sidebar(SidebarMessage::Redo) => {
+            let operation_type = editor.redo_operation_type();
+            diagnostics.log_action(UserAction::Redo { operation_type });
+        }
+
+        // Save or Save As action
+        image_editor::Message::Sidebar(SidebarMessage::Save | SidebarMessage::SaveAs) => {
+            let format = editor.export_format().extension().to_string();
+            diagnostics.log_action(UserAction::SaveImage { format });
+        }
+
+        // Return to viewer (Cancel/Back button)
+        image_editor::Message::Toolbar(ToolbarMessage::BackToViewer) => {
+            let had_unsaved_changes = editor.has_unsaved_changes();
+            diagnostics.log_action(UserAction::ReturnToViewer {
+                had_unsaved_changes,
+            });
+        }
+
+        // All other messages don't need user action logging
+        _ => {}
+    }
+}
+
 /// Handles viewer component messages.
 pub fn handle_viewer_message(
     ctx: &mut UpdateContext<'_>,
@@ -838,6 +908,9 @@ pub fn handle_editor_message(
         return Task::none();
     };
 
+    // Log editor user actions at handler level (R1: collect at handler level)
+    log_editor_action(ctx.diagnostics, editor_state, &message);
+
     match editor_state.update(message) {
         ImageEditorEvent::None => Task::none(),
         ImageEditorEvent::ExitEditor => {
@@ -989,6 +1062,12 @@ fn handle_upscale_resize_request(
             (target_pixels / original_pixels).sqrt() as f32
         };
         *ctx.upscale_scale_factor = Some(scale_factor);
+
+        // Log AI upscale action (R1: collect at handler level)
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        ctx.diagnostics.log_action(UserAction::ApplyUpscale {
+            scale_factor: scale_factor.round() as u32,
+        });
 
         // Run the AI upscale + Lanczos resize in a blocking task
         Task::perform(
