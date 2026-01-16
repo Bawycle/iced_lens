@@ -18,11 +18,10 @@ use iced::widget::scrollable::{AbsoluteOffset, RelativeOffset};
 use iced::widget::{operation, Id};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Identifier used for the viewer scrollable widget.
 pub const SCROLLABLE_ID: &str = "viewer-image-scrollable";
-const DOUBLE_CLICK_THRESHOLD: Duration = Duration::from_millis(350);
 
 /// Messages emitted by viewer-related widgets.
 #[derive(Debug, Clone)]
@@ -177,9 +176,10 @@ pub struct State {
     error: Option<ErrorState>,
     pub zoom: ZoomState,
     pub viewport: ViewportState,
-    pub drag: DragState,
-    cursor_position: Option<Point>,
-    last_click: Option<Instant>,
+
+    /// Drag/pan sub-component with cursor tracking and double-click detection.
+    drag: subcomponents::drag::State,
+
     pub current_media_path: Option<PathBuf>,
 
     /// Overlay visibility sub-component (fullscreen controls auto-hide).
@@ -249,9 +249,7 @@ impl Default for State {
             error: None,
             zoom: ZoomState::default(),
             viewport: ViewportState::default(),
-            drag: DragState::default(),
-            cursor_position: None,
-            last_click: None,
+            drag: subcomponents::drag::State::default(),
             current_media_path: None,
             overlay: subcomponents::overlay::State::default(),
             loading: subcomponents::loading::State::default(),
@@ -312,11 +310,21 @@ impl State {
     }
 
     pub fn drag_state(&self) -> &DragState {
-        &self.drag
+        &self.drag.inner
     }
 
     pub fn drag_state_mut(&mut self) -> &mut DragState {
-        &mut self.drag
+        &mut self.drag.inner
+    }
+
+    /// Get the cursor position within the viewer.
+    pub fn cursor_position(&self) -> Option<Point> {
+        self.drag.cursor_position()
+    }
+
+    /// Update the cursor position.
+    pub fn set_cursor_position(&mut self, position: Option<Point>) {
+        self.drag.cursor_position = position;
     }
 
     /// Closes the filter dropdown panel.
@@ -380,15 +388,6 @@ impl State {
             // but we handle it gracefully
             (Effect::None, Task::none())
         }
-    }
-
-    pub fn set_cursor_position(&mut self, position: Option<Point>) {
-        self.cursor_position = position;
-    }
-
-    /// Returns the current cursor position within the viewer.
-    pub fn cursor_position(&self) -> Option<Point> {
-        self.cursor_position
     }
 
     /// Returns true if the video overflow menu (advanced controls) is open.
@@ -922,7 +921,7 @@ impl State {
                     player.pause();
                 }
                 // Cancel any ongoing drag (user clicked on navigation overlay)
-                self.drag.stop();
+                self.drag.inner.stop();
                 // Reset overlay timer on navigation
                 self.overlay
                     .handle(subcomponents::overlay::Message::OverlayInteraction);
@@ -935,7 +934,7 @@ impl State {
                     player.pause();
                 }
                 // Cancel any ongoing drag (user clicked on navigation overlay)
-                self.drag.stop();
+                self.drag.inner.stop();
                 // Reset overlay timer on navigation
                 self.overlay
                     .handle(subcomponents::overlay::Message::OverlayInteraction);
@@ -1525,7 +1524,7 @@ impl State {
                 zoom_percent: self.zoom.zoom_percent,
                 manual_zoom_percent: self.zoom.zoom_percent,
                 fit_to_window: effective_fit_to_window,
-                is_dragging: self.drag.is_dragging,
+                is_dragging: self.drag.is_dragging(),
                 cursor_over_media: geometry_state.is_cursor_over_media(),
                 arrows_visible: if env.is_fullscreen {
                     // In fullscreen, arrows use same auto-hide logic as controls
@@ -1780,7 +1779,7 @@ impl State {
                     (effect, Task::none())
                 }
                 mouse::Event::ButtonPressed(button) => {
-                    let effect = if let Some(position) = self.cursor_position {
+                    let effect = if let Some(position) = self.cursor_position() {
                         self.handle_mouse_button_pressed(button, position)
                     } else {
                         Effect::None
@@ -1792,7 +1791,7 @@ impl State {
                     (Effect::None, Task::none())
                 }
                 mouse::Event::CursorMoved { position } => {
-                    self.cursor_position = Some(position);
+                    self.drag.cursor_position = Some(position);
 
                     // Delegate overlay visibility logic to sub-component
                     // (filters micro-movements, handles fullscreen entry delay, etc.)
@@ -1800,7 +1799,7 @@ impl State {
                         Point::new(position.x, position.y),
                     ));
 
-                    if self.drag.is_dragging {
+                    if self.drag.is_dragging() {
                         let task = self.handle_cursor_moved_during_drag(position);
                         (Effect::None, task)
                     } else {
@@ -1808,10 +1807,10 @@ impl State {
                     }
                 }
                 mouse::Event::CursorLeft => {
-                    self.cursor_position = None;
+                    self.drag.cursor_position = None;
                     self.overlay.cursor_left();
-                    if self.drag.is_dragging {
-                        self.drag.stop();
+                    if self.drag.is_dragging() {
+                        self.drag.inner.stop();
                     }
                     (Effect::None, Task::none())
                 }
@@ -2052,11 +2051,10 @@ impl State {
 
     fn handle_mouse_button_pressed(&mut self, button: mouse::Button, position: Point) -> Effect {
         if button == mouse::Button::Left {
-            let now = Instant::now();
-            let double_click = self
-                .last_click
-                .is_some_and(|instant| now.duration_since(instant) <= DOUBLE_CLICK_THRESHOLD);
-            self.last_click = Some(now);
+            // Delegate click handling (including double-click detection) to drag sub-component
+            let click_effect = self
+                .drag
+                .handle(subcomponents::drag::Message::Click(position));
 
             // Reset overlay timer on any left click, even on UI controls
             // This keeps controls visible when user is interacting
@@ -2064,14 +2062,14 @@ impl State {
                 .handle(subcomponents::overlay::Message::OverlayInteraction);
 
             if self.geometry_state().is_cursor_over_media() {
-                if double_click {
+                if matches!(click_effect, subcomponents::drag::Effect::DoubleClick) {
                     // Clear overlay timer when entering fullscreen (will hide controls initially)
                     self.overlay
                         .handle(subcomponents::overlay::Message::EnteredFullscreen);
                     return Effect::ToggleFullscreen;
                 }
 
-                self.drag.start(position, self.viewport.offset);
+                self.drag.inner.start(position, self.viewport.offset);
             }
         }
 
@@ -2080,7 +2078,7 @@ impl State {
 
     fn handle_mouse_button_released(&mut self, button: mouse::Button) {
         if button == mouse::Button::Left {
-            self.drag.stop();
+            self.drag.inner.stop();
         }
     }
 
@@ -2088,7 +2086,7 @@ impl State {
     /// the scaled image bounds and mirrors the change to the scrollable widget
     /// so keyboard/scroll interactions stay in sync.
     fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Task<Message> {
-        let Some(proposed_offset) = self.drag.calculate_offset(position) else {
+        let Some(proposed_offset) = self.drag.inner.calculate_offset(position) else {
             return Task::none();
         };
 
@@ -2220,7 +2218,7 @@ impl State {
             self.media.as_ref(),
             &self.viewport,
             self.zoom.zoom_percent,
-            self.cursor_position,
+            self.cursor_position(),
         )
     }
 }
@@ -2300,6 +2298,7 @@ fn format_media_indicator(i18n: &I18n, media: &MediaData) -> Option<HudLine> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     /// Creates a test diagnostics handle for use in tests.
     fn test_diagnostics() -> crate::diagnostics::DiagnosticsHandle {
