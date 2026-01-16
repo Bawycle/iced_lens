@@ -149,24 +149,10 @@ pub enum Effect {
     LoadingTimedOut,
 }
 
-#[derive(Debug, Clone)]
-pub struct ErrorState {
-    friendly_key: &'static str,
-    friendly_text: String,
-    details: String,
-    show_details: bool,
-}
-
-impl ErrorState {
-    fn refresh_translation(&mut self, i18n: &I18n) {
-        self.friendly_text = i18n.tr(self.friendly_key);
-    }
-
-    #[must_use]
-    pub fn details(&self) -> &str {
-        &self.details
-    }
-}
+/// Error state for displaying user-friendly errors with optional details.
+/// Currently not used (errors handled via notifications), but kept for potential future use.
+/// Uses the sub-component implementation for consistency.
+pub type ErrorState = subcomponents::error_state::State;
 
 /// Environment information required to render the viewer.
 #[allow(clippy::struct_field_names)] // Fields describe their content, not the struct
@@ -902,7 +888,7 @@ impl State {
             }
             Message::ToggleErrorDetails => {
                 if let Some(error) = &mut self.error {
-                    error.show_details = !error.show_details;
+                    error.handle(subcomponents::error_state::Message::ToggleDetails);
                 }
                 (Effect::None, Task::none())
             }
@@ -1458,9 +1444,9 @@ impl State {
         let geometry_state = self.geometry_state();
 
         let error = self.error.as_ref().map(|error| viewer::ErrorContext {
-            friendly_text: &error.friendly_text,
-            details: &error.details,
-            show_details: error.show_details,
+            friendly_text: error.friendly_text(),
+            details: error.details(),
+            show_details: error.show_details(),
         });
 
         let position_line = geometry_state
