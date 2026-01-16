@@ -18,3 +18,4 @@
 
 pub mod image_transform;
 pub mod media_lifecycle;
+pub mod video_playback;

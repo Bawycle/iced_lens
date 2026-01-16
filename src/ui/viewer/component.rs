@@ -18,7 +18,6 @@ use iced::widget::scrollable::{AbsoluteOffset, RelativeOffset};
 use iced::widget::{operation, Id};
 use iced::{event, keyboard, mouse, window, Element, Point, Rectangle, Task};
 use std::path::PathBuf;
-use std::time::Instant;
 
 /// Identifier used for the viewer scrollable widget.
 pub const SCROLLABLE_ID: &str = "viewer-image-scrollable";
@@ -190,40 +189,11 @@ pub struct State {
     /// Maximum number of consecutive corrupted files to skip during navigation.
     pub max_skip_attempts: MaxSkipAttempts,
 
-    // Video playback state
-    video_player: Option<VideoPlayer>,
+    /// Video playback cluster (player state, settings, seek management).
+    video_playback: clusters::video_playback::State,
+
+    /// Video shader widget (rendering, stays in component.rs as it's UI-specific).
     video_shader: VideoShader<Message>,
-    current_video_path: Option<PathBuf>,
-    playback_session_id: u64, // Incremented each time playback starts, ensures unique subscription ID
-
-    /// Fit-to-window setting for videos (separate from images).
-    /// Always defaults to true for videos and is NOT persisted.
-    video_fit_to_window: bool,
-
-    /// Preview position for seek slider in microseconds.
-    /// Set during slider drag, cleared on release.
-    seek_preview_position: Option<f64>,
-
-    /// Whether videos should auto-play when loaded.
-    video_autoplay: bool,
-
-    /// Video volume level (0.0 to 1.0).
-    video_volume: f32,
-
-    /// Whether video audio is muted.
-    video_muted: bool,
-
-    /// Whether video playback should loop.
-    video_loop: bool,
-
-    /// Whether the overflow menu (advanced video controls) is open.
-    overflow_menu_open: bool,
-
-    /// Last time a keyboard seek was triggered (for debouncing).
-    last_keyboard_seek: Option<Instant>,
-
-    /// Keyboard seek step (arrow keys during video playback).
-    keyboard_seek_step: KeyboardSeekStep,
 
     /// Filter dropdown UI state.
     filter_dropdown: filter_dropdown::FilterDropdownState,
@@ -233,9 +203,6 @@ pub struct State {
     diagnostics: Option<crate::diagnostics::DiagnosticsHandle>,
 }
 
-// Manual Default impl required: video_fit_to_window defaults to true (not false),
-// and video_volume/keyboard_seek_step use config constants instead of 0.0.
-#[allow(clippy::derivable_impls)]
 impl Default for State {
     fn default() -> Self {
         Self {
@@ -246,19 +213,8 @@ impl Default for State {
             overlay: subcomponents::overlay::State::default(),
             load_origin: LoadOrigin::DirectOpen,
             max_skip_attempts: MaxSkipAttempts::default(),
-            video_player: None,
+            video_playback: clusters::video_playback::State::default(),
             video_shader: VideoShader::new(),
-            current_video_path: None,
-            playback_session_id: 0,
-            video_fit_to_window: true, // Videos always fit-to-window by default
-            seek_preview_position: None,
-            video_autoplay: false, // Default to no autoplay
-            video_volume: crate::config::DEFAULT_VOLUME,
-            video_muted: false,
-            video_loop: false,
-            overflow_menu_open: false,
-            last_keyboard_seek: None,
-            keyboard_seek_step: KeyboardSeekStep::default(),
             filter_dropdown: filter_dropdown::FilterDropdownState::default(),
             diagnostics: None,
         }
@@ -352,7 +308,7 @@ impl State {
         self.image_transform.cached_rotated_image()
     }
 
-    /// Handle rotation effect from image_transform cluster and rebuild cache if needed.
+    /// Handle rotation effect from `image_transform` cluster and rebuild cache if needed.
     fn handle_rotation_changed(&mut self) {
         // Rebuild cache - cluster doesn't have access to media
         if let Some(MediaData::Image(ref image_data)) = self.media_lifecycle.media() {
@@ -386,7 +342,7 @@ impl State {
 
     /// Returns true if the video overflow menu (advanced controls) is open.
     pub fn is_overflow_menu_open(&self) -> bool {
-        self.overflow_menu_open
+        self.video_playback.is_overflow_menu_open()
     }
 
     /// Resets the viewport offset to zero, causing the media to recenter.
@@ -404,11 +360,11 @@ impl State {
     }
 
     /// Returns the effective fit-to-window setting.
-    /// For videos, uses the separate `video_fit_to_window` (not persisted).
+    /// For videos, uses the separate `video_playback.fit_to_window` (not persisted).
     /// For images, uses `zoom.fit_to_window` (persisted).
     pub fn fit_to_window(&self) -> bool {
         if self.is_video() {
-            self.video_fit_to_window
+            self.video_playback.fit_to_window()
         } else {
             self.image_transform.zoom.fit_to_window
         }
@@ -429,7 +385,7 @@ impl State {
     ///
     /// This is used by the App layer to log `SeekVideo` actions at handler level.
     pub fn seek_preview_position(&self) -> Option<f64> {
-        self.seek_preview_position
+        self.video_playback.seek_preview_position()
     }
 
     /// Returns true if a video is playing or will resume playing after seek/buffer.
@@ -438,9 +394,7 @@ impl State {
     /// Uses the state machine's `is_playing_or_will_resume()` to correctly handle
     /// the Seeking state during rapid key repeats.
     fn is_video_playing_or_will_resume(&self) -> bool {
-        self.video_player
-            .as_ref()
-            .is_some_and(|p| p.state().is_playing_or_will_resume())
+        self.video_playback.is_playing_or_will_resume()
     }
 
     /// Returns true if a video player exists and has an active session.
@@ -448,18 +402,13 @@ impl State {
     /// An active session means the player is not stopped or in error state.
     /// This is used to determine if Space should toggle playback vs initiate.
     fn has_active_video_session(&self) -> bool {
-        self.video_player.as_ref().is_some_and(|p| {
-            !matches!(
-                p.state(),
-                crate::video_player::PlaybackState::Stopped
-                    | crate::video_player::PlaybackState::Error { .. }
-            )
-        })
+        self.video_playback.has_active_session()
     }
 
     pub fn enable_fit_to_window(&mut self) {
         if self.is_video() {
-            self.video_fit_to_window = true;
+            self.video_playback
+                .handle(clusters::video_playback::Message::SetFitToWindow(true));
         } else {
             self.image_transform.zoom.enable_fit_to_window();
         }
@@ -467,7 +416,8 @@ impl State {
 
     pub fn disable_fit_to_window(&mut self) {
         if self.is_video() {
-            self.video_fit_to_window = false;
+            self.video_playback
+                .handle(clusters::video_playback::Message::SetFitToWindow(false));
         } else {
             self.image_transform.zoom.disable_fit_to_window();
         }
@@ -482,60 +432,58 @@ impl State {
 
     /// Sets whether videos should auto-play when loaded.
     pub fn set_video_autoplay(&mut self, enabled: bool) {
-        self.video_autoplay = enabled;
+        self.video_playback
+            .handle(clusters::video_playback::Message::SetAutoplay(enabled));
     }
 
     /// Sets the video volume level (0.0 to 1.0).
     pub fn set_video_volume(&mut self, volume: f32) {
-        self.video_volume = volume.clamp(crate::config::MIN_VOLUME, crate::config::MAX_VOLUME);
+        self.video_playback.set_volume_raw(volume);
     }
 
     /// Returns the current video volume level.
     pub fn video_volume(&self) -> f32 {
-        self.video_volume
+        self.video_playback.volume()
     }
 
     /// Sets whether video audio is muted.
     pub fn set_video_muted(&mut self, muted: bool) {
-        self.video_muted = muted;
+        self.video_playback.set_muted_raw(muted);
     }
 
     /// Returns whether video audio is muted.
     pub fn video_muted(&self) -> bool {
-        self.video_muted
+        self.video_playback.is_muted()
     }
 
     /// Sets whether video playback should loop.
     pub fn set_video_loop(&mut self, enabled: bool) {
-        self.video_loop = enabled;
+        self.video_playback.set_loop_raw(enabled);
     }
 
     /// Returns whether video playback loops.
     pub fn video_loop(&self) -> bool {
-        self.video_loop
+        self.video_playback.is_loop_enabled()
     }
 
     /// Returns the current video playback position in seconds (for diagnostics logging).
     ///
     /// Returns `None` if no video is loaded.
     pub fn video_position(&self) -> Option<f64> {
-        self.video_player
-            .as_ref()
-            .and_then(|p| p.state().position())
+        self.video_playback.position()
     }
 
     /// Returns the current video playback speed (for diagnostics logging).
     ///
     /// Returns `None` if no video is loaded.
     pub fn video_playback_speed(&self) -> Option<f64> {
-        self.video_player
-            .as_ref()
-            .map(crate::video_player::VideoPlayer::playback_speed)
+        self.video_playback.playback_speed()
     }
 
     /// Sets the keyboard seek step.
     pub fn set_keyboard_seek_step(&mut self, step: KeyboardSeekStep) {
-        self.keyboard_seek_step = step;
+        self.video_playback
+            .handle(clusters::video_playback::Message::SetKeyboardSeekStep(step));
     }
 
     /// Sets the maximum number of skip attempts for auto-skip.
@@ -619,7 +567,7 @@ impl State {
         self.media_lifecycle.is_loading()
     }
 
-    /// Handle loading timeout effect from media_lifecycle cluster.
+    /// Handle loading timeout effect from `media_lifecycle` cluster.
     fn handle_loading_timeout(&mut self) {
         self.media_lifecycle.handle(
             clusters::media_lifecycle::Message::StopLoading,
@@ -646,29 +594,28 @@ impl State {
         // This ensures the decoder stays alive and can receive pause/resume commands
         // The subscription only gets recreated when playback_session_id changes
         // (which happens when navigating to a different video or starting fresh)
-        let video_subscription = if let (Some(_player), Some(ref path)) =
-            (&self.video_player, &self.current_video_path)
-        {
-            // Create cache config from MB setting
-            let cache_config = crate::video_player::CacheConfig::new(
-                (frame_cache_mb as usize) * 1024 * 1024,
-                crate::video_player::frame_cache::DEFAULT_MAX_FRAMES,
-            );
+        let video_subscription =
+            if let (true, Some(path)) = (self.video_playback.has_player(), self.video_playback.current_path()) {
+                // Create cache config from MB setting
+                let cache_config = crate::video_player::CacheConfig::new(
+                    (frame_cache_mb as usize) * 1024 * 1024,
+                    crate::video_player::frame_cache::DEFAULT_MAX_FRAMES,
+                );
 
-            // Always create subscription when we have a video player and path
-            // The decoder will handle pause/resume via commands
-            crate::video_player::subscription::video_playback(
-                path.clone(),
-                self.playback_session_id,
-                lufs_cache,
-                normalization_enabled,
-                cache_config,
-                history_mb,
-            )
-            .map(Message::PlaybackEvent)
-        } else {
-            iced::Subscription::none()
-        };
+                // Always create subscription when we have a video player and path
+                // The decoder will handle pause/resume via commands
+                crate::video_player::subscription::video_playback(
+                    path.clone(),
+                    self.video_playback.session_id(),
+                    lufs_cache,
+                    normalization_enabled,
+                    cache_config,
+                    history_mb,
+                )
+                .map(Message::PlaybackEvent)
+            } else {
+                iced::Subscription::none()
+            };
 
         let spinner_subscription = if self.media_lifecycle.is_loading() {
             // Animate spinner at 60 FPS while loading
@@ -699,12 +646,9 @@ impl State {
                 // Clear all media state - used when no media is available
                 // (e.g., after deleting the last media in directory)
 
-                // Stop any video playback
-                if let Some(ref mut player) = self.video_player {
-                    player.stop();
-                }
-                self.video_player = None;
-                self.current_video_path = None;
+                // Stop any video playback via cluster
+                self.video_playback
+                    .handle(clusters::video_playback::Message::ResetForNewMedia);
                 self.video_shader.clear_frame();
 
                 // Delegate to media_lifecycle cluster (clears media, error, loading)
@@ -729,20 +673,14 @@ impl State {
 
                 // Clean up previous video state before loading new media
                 // This is important when navigating from one media to another
-                if self.video_player.is_some() {
-                    // Stop the current video player (sends Stop command to decoder)
-                    if let Some(ref mut player) = self.video_player {
-                        player.stop();
-                    }
-                    self.video_player = None;
-                    self.current_video_path = None;
+                if self.video_playback.has_player() {
+                    // Reset video playback state via cluster
+                    self.video_playback
+                        .handle(clusters::video_playback::Message::ResetForNewMedia);
                     self.video_shader.clear(); // Clear frame to release memory
-                    self.seek_preview_position = None;
-                    self.last_keyboard_seek = None;
-                    self.playback_session_id += 1; // Ensure old subscription is dropped
+                    // Increment session ID to ensure old subscription is dropped
+                    self.video_playback.increment_session_id();
                 }
-                // Reset video fit-to-window to default for new media
-                self.video_fit_to_window = true;
 
                 // Reset image transformation for new media
                 self.image_transform
@@ -765,18 +703,12 @@ impl State {
                         // Create VideoPlayer if this is a video (after media is stored)
                         if let Some(MediaData::Video(ref video_data)) = self.media_lifecycle.media()
                         {
-                            match VideoPlayer::new(video_data) {
-                                Ok(mut player) => {
-                                    // Pass diagnostics handle to the player for state event logging
-                                    if let Some(ref handle) = self.diagnostics {
-                                        player.set_diagnostics(handle.clone());
-                                    }
-                                    self.video_player = Some(player);
-                                    self.current_video_path = self.current_media_path.clone();
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to create video player: {e}");
-                                }
+                            if let Err(e) = self.video_playback.create_player(
+                                video_data,
+                                self.current_media_path.clone(),
+                                self.diagnostics.clone(),
+                            ) {
+                                eprintln!("Failed to create video player: {e}");
                             }
                         }
 
@@ -922,9 +854,8 @@ impl State {
             Message::RawEvent { event, .. } => self.handle_raw_event(event),
             Message::NavigateNext => {
                 // Stop video playback immediately to prevent rendering issues during navigation
-                if let Some(ref mut player) = self.video_player {
-                    player.pause();
-                }
+                self.video_playback
+                    .handle(clusters::video_playback::Message::Pause);
                 // Cancel any ongoing drag (user clicked on navigation overlay)
                 self.image_transform.drag.inner.stop();
                 // Reset overlay timer on navigation
@@ -935,9 +866,8 @@ impl State {
             }
             Message::NavigatePrevious => {
                 // Stop video playback immediately to prevent rendering issues during navigation
-                if let Some(ref mut player) = self.video_player {
-                    player.pause();
-                }
+                self.video_playback
+                    .handle(clusters::video_playback::Message::Pause);
                 // Cancel any ongoing drag (user clicked on navigation overlay)
                 self.image_transform.drag.inner.stop();
                 // Reset overlay timer on navigation
@@ -980,41 +910,30 @@ impl State {
                     .handle(subcomponents::overlay::Message::OverlayInteraction);
 
                 // Toggle playback if player already exists
-                if let Some(player) = &mut self.video_player {
-                    match player.state() {
-                        crate::video_player::PlaybackState::Playing { .. }
-                        | crate::video_player::PlaybackState::Buffering { .. } => {
-                            player.pause();
+                if self.video_playback.has_player() {
+                    self.video_playback
+                        .handle(clusters::video_playback::Message::TogglePlayback);
+                } else {
+                    // Check if current media is a video and get data for player creation
+                    let video_data = self.media().and_then(|m| {
+                        if let MediaData::Video(ref v) = m {
+                            Some(v.clone())
+                        } else {
+                            None
                         }
-                        _ => {
-                            // Resume playback - do NOT increment session ID
-                            // The existing subscription must stay active to receive commands
-                            // Clear seek preview so step operations use actual position
-                            self.seek_preview_position = None;
-                            player.play();
-                        }
-                    }
-                } else if let Some(MediaData::Video(ref video_data)) = self.media() {
-                    // Create video player and start playback
-                    match VideoPlayer::new(video_data) {
-                        Ok(mut player) => {
-                            // Pass diagnostics handle to the player for state event logging
-                            if let Some(ref handle) = self.diagnostics {
-                                player.set_diagnostics(handle.clone());
-                            }
-                            // Start playback
-                            player.play();
-                            self.video_player = Some(player);
-
-                            // Store video path for subscription
-                            self.current_video_path = self.current_media_path.clone();
-
-                            // Increment session ID to create a new unique subscription
-                            self.playback_session_id = self.playback_session_id.wrapping_add(1);
-                            // No need to sync shader scale - pane calculates display size at render time
-                        }
-                        Err(e) => {
+                    });
+                    if let Some(ref data) = video_data {
+                        // Create video player and start playback
+                        if let Err(e) = self.video_playback.create_player(
+                            data,
+                            self.current_media_path.clone(),
+                            self.diagnostics.clone(),
+                        ) {
                             eprintln!("Failed to create video player: {e}");
+                        } else {
+                            // Start playback
+                            self.video_playback
+                                .handle(clusters::video_playback::Message::Play);
                         }
                     }
                 }
@@ -1045,137 +964,79 @@ impl State {
                 match video_msg {
                     VM::TogglePlayback => {
                         // Logging now handled at App layer (R1: collect at handler level)
-                        if let Some(player) = &mut self.video_player {
-                            match player.state() {
-                                crate::video_player::PlaybackState::Playing { .. }
-                                | crate::video_player::PlaybackState::Buffering { .. } => {
-                                    player.pause();
+                        if self.video_playback.has_player() {
+                            self.video_playback
+                                .handle(clusters::video_playback::Message::TogglePlayback);
+                        } else {
+                            // Check if current media is a video
+                            let video_data = self.media().and_then(|m| {
+                                if let MediaData::Video(ref v) = m {
+                                    Some(v.clone())
+                                } else {
+                                    None
                                 }
-                                _ => {
-                                    // Resume playback - do NOT increment session ID
-                                    // The existing subscription must stay active to receive commands
-                                    // Clear seek preview so step operations use actual position
-                                    self.seek_preview_position = None;
-                                    player.play();
-                                }
-                            }
-                        } else if let Some(MediaData::Video(ref video_data)) = self.media() {
-                            // Create player if it doesn't exist yet and start playback
-                            match VideoPlayer::new(video_data) {
-                                Ok(mut player) => {
-                                    // Pass diagnostics handle to the player for state event logging
-                                    if let Some(ref handle) = self.diagnostics {
-                                        player.set_diagnostics(handle.clone());
-                                    }
-                                    player.play();
-                                    self.video_player = Some(player);
-                                    self.current_video_path = self.current_media_path.clone();
-                                    self.playback_session_id =
-                                        self.playback_session_id.wrapping_add(1);
-                                    // No need to sync shader scale - pane calculates display size at render time
-                                }
-                                Err(e) => {
+                            });
+                            if let Some(ref data) = video_data {
+                                // Create player if it doesn't exist yet and start playback
+                                if let Err(e) = self.video_playback.create_player(
+                                    data,
+                                    self.current_media_path.clone(),
+                                    self.diagnostics.clone(),
+                                ) {
                                     eprintln!("Failed to create video player: {e}");
+                                } else {
+                                    self.video_playback
+                                        .handle(clusters::video_playback::Message::Play);
                                 }
                             }
                         }
                     }
                     VM::SeekPreview(position) => {
-                        // Just update the preview position for visual feedback
-                        // Don't actually seek until release
-                        self.seek_preview_position = Some(position);
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::SeekPreview(position));
                     }
                     VM::SeekCommit => {
-                        // Perform actual seek to preview position
-                        // Logging now handled at App layer (R1: collect at handler level)
-                        // Don't clear seek_preview_position here - it will be cleared
-                        // when we receive a frame near the seek target
-                        if let Some(target_secs) = self.seek_preview_position {
-                            if let Some(player) = &mut self.video_player {
-                                player.seek(target_secs);
-                            }
-                        }
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::SeekCommit);
                     }
                     VM::SeekRelative(delta_secs) => {
-                        // Seek relative to current position
-                        // Used by keyboard shortcuts (e.g., arrow keys)
-                        //
-                        // Important: We use seek_preview_position as our "intended position"
-                        // because player.state().position() may return keyframe positions
-                        // which can differ from our target. This prevents "snap back" behavior.
-                        //
-                        // Time-based debounce: ignore events within 200ms of last seek
-                        const SEEK_DEBOUNCE_MS: u64 = 200;
-
-                        let now = Instant::now();
-                        let should_seek = match self.last_keyboard_seek {
-                            Some(last) => {
-                                now.duration_since(last).as_millis() >= u128::from(SEEK_DEBOUNCE_MS)
-                            }
-                            None => true,
-                        };
-
-                        if should_seek {
-                            if let Some(player) = &mut self.video_player {
-                                // Use seek_preview_position if set (from previous keyboard seek),
-                                // otherwise fall back to player's reported position
-                                let base_position = self
-                                    .seek_preview_position
-                                    .or_else(|| player.state().position());
-
-                                if let Some(current_pos) = base_position {
-                                    let duration = player.video_data().duration_secs;
-                                    let target_secs =
-                                        (current_pos + delta_secs).max(0.0).min(duration);
-
-                                    // Store our intended position for subsequent seeks
-                                    self.seek_preview_position = Some(target_secs);
-                                    player.seek(target_secs);
-                                    self.last_keyboard_seek = Some(now);
-                                }
-                            }
-                        }
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::SeekRelative(delta_secs));
                     }
                     VM::SetVolume(volume) => {
-                        // Volume type guarantees valid range, no clamp needed
-                        self.video_volume = volume.value();
-                        // Apply to audio output
-                        if let Some(player) = &self.video_player {
-                            player.set_volume(volume);
+                        let effect = self
+                            .video_playback
+                            .handle(clusters::video_playback::Message::SetVolume(volume));
+                        if matches!(effect, clusters::video_playback::Effect::PersistPreferences) {
+                            return (Effect::PersistPreferences, Task::none());
                         }
-                        return (Effect::PersistPreferences, Task::none());
                     }
                     VM::ToggleMute => {
-                        self.video_muted = !self.video_muted;
-                        // Apply to audio output
-                        if let Some(player) = &self.video_player {
-                            player.set_muted(self.video_muted);
+                        let effect = self
+                            .video_playback
+                            .handle(clusters::video_playback::Message::ToggleMute);
+                        if matches!(effect, clusters::video_playback::Effect::PersistPreferences) {
+                            return (Effect::PersistPreferences, Task::none());
                         }
-                        return (Effect::PersistPreferences, Task::none());
                     }
                     VM::ToggleLoop => {
-                        self.video_loop = !self.video_loop;
-                        if let Some(player) = &mut self.video_player {
-                            player.set_loop(self.video_loop);
+                        let effect = self
+                            .video_playback
+                            .handle(clusters::video_playback::Message::ToggleLoop);
+                        if matches!(effect, clusters::video_playback::Effect::PersistPreferences) {
+                            return (Effect::PersistPreferences, Task::none());
                         }
-                        return (Effect::PersistPreferences, Task::none());
                     }
                     VM::CaptureFrame => {
                         // Pause the video if playing
-                        if let Some(player) = &mut self.video_player {
-                            if player.state().is_playing_or_will_resume() {
-                                player.pause();
-                            }
-                        }
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::Pause);
 
                         // Capture current frame and open editor
-                        if let Some(video_path) = &self.current_video_path {
+                        if let Some(video_path) = self.video_playback.current_path() {
                             if let Some(frame) = self.exportable_frame() {
-                                let position_secs = self
-                                    .video_player
-                                    .as_ref()
-                                    .and_then(|p| p.state().position())
-                                    .unwrap_or(0.0);
+                                let position_secs =
+                                    self.video_playback.position().unwrap_or(0.0);
                                 return (
                                     Effect::CaptureFrame {
                                         frame,
@@ -1188,52 +1049,31 @@ impl State {
                         }
                     }
                     VM::StepForward => {
-                        // Step forward one frame (only when paused)
-                        // Uses StepFrame command to decode next frame sequentially
-                        if let Some(player) = &mut self.video_player {
-                            if player.state().is_paused() {
-                                // Clear seek_preview_position since we're using sequential decoding
-                                self.seek_preview_position = None;
-                                player.step_frame();
-                            }
-                        }
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::StepForward);
                     }
                     VM::StepBackward => {
-                        // Step backward one frame (only when paused)
-                        // Uses frame history buffer for backward navigation
-                        if let Some(player) = &mut self.video_player {
-                            if player.state().is_paused() {
-                                // Clear seek_preview_position
-                                self.seek_preview_position = None;
-                                player.step_backward();
-                            }
-                        }
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::StepBackward);
                     }
                     VM::ToggleOverflowMenu => {
-                        self.overflow_menu_open = !self.overflow_menu_open;
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::ToggleOverflowMenu);
                     }
                     VM::IncreasePlaybackSpeed => {
-                        if let Some(player) = &mut self.video_player {
-                            player.increase_playback_speed();
-                            // Apply effective mute: user mute OR speed auto-mute
-                            let effective_muted = self.video_muted || player.is_speed_auto_muted();
-                            player.set_muted(effective_muted);
-                        }
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::IncreaseSpeed);
                     }
                     VM::DecreasePlaybackSpeed => {
-                        if let Some(player) = &mut self.video_player {
-                            player.decrease_playback_speed();
-                            // Apply effective mute: user mute OR speed auto-mute
-                            let effective_muted = self.video_muted || player.is_speed_auto_muted();
-                            player.set_muted(effective_muted);
-                        }
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::DecreaseSpeed);
                     }
                 }
                 (Effect::None, Task::none())
             }
             Message::PlaybackEvent(event) => {
                 // Check for seeking timeout BEFORE processing event
-                if let Some(ref mut player) = self.video_player {
+                if let Some(player) = self.video_playback.player_mut() {
                     if matches!(
                         player.state(),
                         crate::video_player::PlaybackState::Seeking { .. }
@@ -1259,14 +1099,20 @@ impl State {
 
                 match event {
                     PlaybackMessage::Started(command_sender) => {
+                        // Get all settings BEFORE borrowing player_mut (avoids borrow conflict)
+                        let autoplay = self.video_playback.is_autoplay();
+                        let volume = self.video_playback.volume();
+                        let muted = self.video_playback.is_muted();
+                        let loop_enabled = self.video_playback.is_loop_enabled();
+
                         // Store the command sender in the player for pause/play/seek
-                        if let Some(ref mut player) = self.video_player {
+                        if let Some(player) = self.video_playback.player_mut() {
                             player.set_command_sender(command_sender);
 
                             // Apply current volume, mute, and loop state
-                            player.set_volume(Volume::new(self.video_volume));
-                            player.set_muted(self.video_muted);
-                            player.set_loop(self.video_loop);
+                            player.set_volume(Volume::new(volume));
+                            player.set_muted(muted);
+                            player.set_loop(loop_enabled);
 
                             // Load the first frame immediately so capture and step work
                             // without requiring play+pause first.
@@ -1277,7 +1123,7 @@ impl State {
                             }
 
                             // Auto-play if enabled
-                            if self.video_autoplay {
+                            if autoplay {
                                 player.play();
                             }
                         }
@@ -1296,31 +1142,25 @@ impl State {
                         // Update zoom display for fit-to-window mode
                         // This keeps the zoom textbox in sync, but doesn't affect the shader
                         // (pane calculates display size from zoom at render time)
-                        if self.video_fit_to_window {
+                        if self.video_playback.fit_to_window() {
                             if let Some(fit_zoom) = self.compute_fit_zoom_percent() {
                                 self.image_transform.zoom.update_zoom_display(fit_zoom);
                             }
                         }
 
                         // Update player position
-                        if let Some(ref mut player) = self.video_player {
+                        if let Some(player) = self.video_playback.player_mut() {
                             player.update_position(pts_secs);
                         }
 
                         // Clear seek preview if we received a frame near the seek target
                         // This ensures the slider stays at the new position after seek completes
-                        if let Some(preview_secs) = self.seek_preview_position {
-                            let diff = (pts_secs - preview_secs).abs();
-                            // Clear preview if frame is within 0.5 seconds of target
-                            if diff < 0.5 {
-                                self.seek_preview_position = None;
-                            }
-                        }
+                        self.video_playback.maybe_clear_seek_preview(pts_secs);
                     }
                     PlaybackMessage::Buffering => {
                         // Update player to buffering state, but not if we're seeking
                         // (Seeking state needs to be preserved to know whether to resume playing)
-                        if let Some(ref mut player) = self.video_player {
+                        if let Some(player) = self.video_playback.player_mut() {
                             if !matches!(
                                 player.state(),
                                 crate::video_player::PlaybackState::Seeking { .. }
@@ -1331,30 +1171,15 @@ impl State {
                         }
                     }
                     PlaybackMessage::EndOfStream => {
-                        // Handle end of stream
-                        if let Some(ref mut player) = self.video_player {
-                            // Mark that we've reached the end (for step forward button)
-                            player.set_at_end_of_stream();
-
-                            if self.video_loop {
-                                // Restart playback from beginning
-                                // Clear seek preview so step operations use actual position
-                                self.seek_preview_position = None;
-                                player.seek(0.0);
-                                player.play();
-                            } else {
-                                // Pause at end (don't stop, so user can seek back)
-                                let duration = player.video_data().duration_secs;
-                                player.pause_at(duration);
-                            }
-                        }
+                        // Handle end of stream via cluster
+                        self.video_playback.handle_end_of_stream();
                     }
                     PlaybackMessage::Error(msg) => {
                         // Parse error message into typed VideoError for i18n support
                         let video_error = VideoError::from_message(&msg);
 
                         // Store error in player state for display
-                        if let Some(ref mut player) = self.video_player {
+                        if let Some(player) = self.video_playback.player_mut() {
                             player.set_error(msg);
                         }
 
@@ -1369,14 +1194,14 @@ impl State {
                     }
                     PlaybackMessage::AudioPts(pts_secs) => {
                         // Update sync clock with audio PTS for A/V synchronization
-                        if let Some(ref player) = self.video_player {
+                        if let Some(player) = self.video_playback.player() {
                             player.update_audio_pts(pts_secs);
                         }
                     }
                     PlaybackMessage::HistoryExhausted => {
                         // Frame history buffer is exhausted - reset history position
                         // so the step backward button gets disabled
-                        if let Some(ref mut player) = self.video_player {
+                        if let Some(player) = self.video_playback.player_mut() {
                             player.reset_history_position();
                         }
                     }
@@ -1497,11 +1322,9 @@ impl State {
         let overlay_should_be_visible = self.overlay.should_show_controls(env.overlay_hide_delay);
 
         // For center video overlay (play/pause button), use auto-hide in both modes when playing
-        let is_currently_playing = self.video_player.is_some()
+        let is_currently_playing = self.video_playback.has_player()
             && matches!(
-                self.video_player
-                    .as_ref()
-                    .map(crate::video_player::VideoPlayer::state),
+                self.video_playback.player().map(VideoPlayer::state),
                 Some(
                     crate::video_player::PlaybackState::Playing { .. }
                         | crate::video_player::PlaybackState::Buffering { .. }
@@ -1576,8 +1399,8 @@ impl State {
                 is_loading_media: self.media_lifecycle.is_loading(),
                 spinner_rotation: self.media_lifecycle.spinner_rotation(),
                 video_error: self
-                    .video_player
-                    .as_ref()
+                    .video_playback
+                    .player()
                     .and_then(|p| p.state().error_message()),
                 metadata_editor_has_changes: env.metadata_editor_has_changes,
                 rotation: self.current_rotation(),
@@ -1604,7 +1427,7 @@ impl State {
                         can_step_forward,
                         playback_speed,
                         speed_auto_muted,
-                    ) = if let Some(player) = &self.video_player {
+                    ) = if let Some(player) = self.video_playback.player() {
                         let state = player.state();
                         let can_step_back = player.can_step_backward();
                         let can_step_fwd = player.can_step_forward();
@@ -1615,7 +1438,7 @@ impl State {
                             | crate::video_player::PlaybackState::Buffering { position_secs } => (
                                 true,
                                 *position_secs,
-                                self.video_loop,
+                                self.video_playback.is_loop_enabled(),
                                 false,
                                 false,
                                 speed,
@@ -1624,13 +1447,13 @@ impl State {
                             crate::video_player::PlaybackState::Paused { position_secs } => (
                                 false,
                                 *position_secs,
-                                self.video_loop,
+                                self.video_playback.is_loop_enabled(),
                                 can_step_back,
                                 can_step_fwd,
                                 speed,
                                 auto_muted,
                             ),
-                            _ => (false, 0.0, self.video_loop, false, false, 1.0, false),
+                            _ => (false, 0.0, self.video_playback.is_loop_enabled(), false, false, 1.0, false),
                         }
                     } else {
                         // No player yet - show initial state (paused at 0)
@@ -1641,11 +1464,11 @@ impl State {
                         is_playing,
                         position_secs,
                         duration_secs: video_data.duration_secs,
-                        volume: self.video_volume,
-                        muted: self.video_muted,
+                        volume: self.video_playback.volume(),
+                        muted: self.video_playback.is_muted(),
                         loop_enabled,
-                        seek_preview_position: self.seek_preview_position,
-                        overflow_menu_open: self.overflow_menu_open,
+                        seek_preview_position: self.video_playback.seek_preview_position(),
+                        overflow_menu_open: self.video_playback.is_overflow_menu_open(),
                         can_step_backward,
                         can_step_forward,
                         playback_speed,
@@ -1685,7 +1508,8 @@ impl State {
                     self.image_transform.zoom.apply_manual_zoom(value);
                     // Also disable video fit-to-window when manually setting zoom
                     if self.is_video() {
-                        self.video_fit_to_window = false;
+                        self.video_playback
+                            .handle(clusters::video_playback::Message::SetFitToWindow(false));
                     }
                     (Effect::PersistPreferences, Task::none())
                 } else {
@@ -1700,7 +1524,8 @@ impl State {
                     .apply_manual_zoom(crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT);
                 // Also disable video fit-to-window when resetting zoom
                 if self.is_video() {
-                    self.video_fit_to_window = false;
+                    self.video_playback
+                            .handle(clusters::video_playback::Message::SetFitToWindow(false));
                 }
                 (Effect::PersistPreferences, Task::none())
             }
@@ -1710,7 +1535,8 @@ impl State {
                 self.image_transform.zoom.apply_manual_zoom(new_zoom);
                 // Also disable video fit-to-window when zooming on a video
                 if self.is_video() {
-                    self.video_fit_to_window = false;
+                    self.video_playback
+                            .handle(clusters::video_playback::Message::SetFitToWindow(false));
                 }
                 (Effect::PersistPreferences, Task::none())
             }
@@ -1720,7 +1546,8 @@ impl State {
                 self.image_transform.zoom.apply_manual_zoom(new_zoom);
                 // Also disable video fit-to-window when zooming on a video
                 if self.is_video() {
-                    self.video_fit_to_window = false;
+                    self.video_playback
+                            .handle(clusters::video_playback::Message::SetFitToWindow(false));
                 }
                 (Effect::PersistPreferences, Task::none())
             }
@@ -1873,7 +1700,7 @@ impl State {
                     // ArrowRight: Seek forward if video is playing, otherwise navigate to next media
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
-                        let step = self.keyboard_seek_step.value();
+                        let step = self.video_playback.keyboard_seek_step().value();
                         self.dispatch_message(Message::VideoControls(
                             video_controls::Message::SeekRelative(step),
                         ))
@@ -1888,7 +1715,7 @@ impl State {
                     // ArrowLeft: Seek backward if video is playing, otherwise navigate to previous media
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
-                        let step = self.keyboard_seek_step.value();
+                        let step = self.video_playback.keyboard_seek_step().value();
                         self.dispatch_message(Message::VideoControls(
                             video_controls::Message::SeekRelative(-step),
                         ))
@@ -1902,7 +1729,7 @@ impl State {
                 } => {
                     // ArrowUp: Increase volume (only during video playback)
                     if self.has_active_video_session() {
-                        let new_volume = Volume::new(self.video_volume).increase();
+                        let new_volume = Volume::new(self.video_playback.volume()).increase();
                         self.dispatch_message(Message::VideoControls(
                             video_controls::Message::SetVolume(new_volume),
                         ))
@@ -1916,7 +1743,7 @@ impl State {
                 } => {
                     // ArrowDown: Decrease volume (only during video playback)
                     if self.has_active_video_session() {
-                        let new_volume = Volume::new(self.video_volume).decrease();
+                        let new_volume = Volume::new(self.video_playback.volume()).decrease();
                         self.dispatch_message(Message::VideoControls(
                             video_controls::Message::SetVolume(new_volume),
                         ))
@@ -1969,7 +1796,7 @@ impl State {
                 {
                     // Comma key: Step backward one frame (only when video is paused)
                     // Route through VideoControls handler for consistent behavior
-                    if self.video_player.is_some() {
+                    if self.video_playback.has_player() {
                         self.dispatch_message(Message::VideoControls(
                             video_controls::Message::StepBackward,
                         ))
@@ -1988,7 +1815,7 @@ impl State {
                 {
                     // Period key: Step forward one frame (only when video is paused)
                     // Route through VideoControls handler for consistent behavior
-                    if self.video_player.is_some() {
+                    if self.video_playback.has_player() {
                         self.dispatch_message(Message::VideoControls(
                             video_controls::Message::StepForward,
                         ))
@@ -2005,7 +1832,7 @@ impl State {
                     && !modifiers.alt() =>
                 {
                     // J key: Decrease playback speed (YouTube/VLC style)
-                    if self.video_player.is_some() {
+                    if self.video_playback.has_player() {
                         self.dispatch_message(Message::VideoControls(
                             video_controls::Message::DecreasePlaybackSpeed,
                         ))
@@ -2022,7 +1849,7 @@ impl State {
                     && !modifiers.alt() =>
                 {
                     // L key: Increase playback speed (YouTube/VLC style)
-                    if self.video_player.is_some() {
+                    if self.video_playback.has_player() {
                         self.dispatch_message(Message::VideoControls(
                             video_controls::Message::IncreasePlaybackSpeed,
                         ))
@@ -2178,7 +2005,8 @@ impl State {
 
         // Also disable video fit-to-window when zooming on a video
         if self.is_video() {
-            self.video_fit_to_window = false;
+            self.video_playback
+                .handle(clusters::video_playback::Message::SetFitToWindow(false));
         }
         // No need to sync shader scale - pane calculates display size from zoom at render time
 

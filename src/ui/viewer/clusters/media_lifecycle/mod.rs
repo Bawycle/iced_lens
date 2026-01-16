@@ -7,7 +7,7 @@
 //! - Error state (user-friendly errors with details)
 //!
 //! Note: Navigation logic (auto-skip, direction) remains in component.rs
-//! because it's tightly coupled with the external API and MediaNavigator.
+//! because it's tightly coupled with the external API and `MediaNavigator`.
 //!
 //! ## Composition
 //!
@@ -285,6 +285,7 @@ impl State {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
     use crate::media::ImageData;

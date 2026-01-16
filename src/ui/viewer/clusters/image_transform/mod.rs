@@ -240,6 +240,7 @@ impl State {
     }
 
     /// Convert drag effect to cluster effect.
+    #[allow(clippy::unused_self, clippy::needless_pass_by_value)]
     fn convert_drag_effect(&self, effect: drag::Effect) -> Effect {
         match effect {
             drag::Effect::None => Effect::None,
@@ -252,6 +253,7 @@ impl State {
     }
 
     /// Convert rotation effect to cluster effect.
+    #[allow(clippy::unused_self, clippy::needless_pass_by_value)]
     fn convert_rotation_effect(&self, effect: rotation::Effect) -> Effect {
         match effect {
             rotation::Effect::None => Effect::None,
