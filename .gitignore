@@ -50,3 +50,5 @@ tests/samples/
 # BMad
 .bmad-core/
 web-bundles/
+_bmad/
+_bmad-output/
