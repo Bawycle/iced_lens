@@ -7,6 +7,18 @@
 - [ ] **Missing loading indicator on startup** - When launching the app with a heavy media file (e.g., a multi-minute video), no loading indicator is shown. The user sees "No media loaded" with "Open file" button instead of a spinner, while the media is actually loading in the background. Regression introduced in `fix/seeking-and-disk-performance` merge.
 - [ ] **Launching with a folder path doesn't work** - Opening the app with a directory path as argument no longer loads the folder contents. Regression introduced in `fix/seeking-and-disk-performance` merge.
 
+## Technical Debt (P3)
+
+### Diagnostics - Missing Instrumentation
+> Ref: [Epic 4 Final Audit](docs/qa/assessments/epic4-final-audit.md)
+
+- [ ] `EditorUnsavedChanges` state event not logged
+- [ ] `DecodeFrame` operation not instrumented
+- [ ] `ResizeImage` operation not instrumented
+- [ ] `ApplyFilter` operation not instrumented
+- [ ] `ExportFrame` operation not instrumented
+- [ ] `LoadMetadata` operation not instrumented
+
 ## Changed
 
 

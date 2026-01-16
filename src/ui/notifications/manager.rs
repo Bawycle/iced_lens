@@ -4,7 +4,8 @@
 //! The `Manager` handles queuing, display timing, and dismissal of notifications.
 //! It limits the number of visible toasts and manages auto-dismiss timers.
 
-use super::notification::{Notification, NotificationId};
+use super::notification::{Notification, NotificationId, Severity};
+use crate::diagnostics::{DiagnosticsHandle, ErrorEvent, ErrorType, WarningEvent, WarningType};
 use std::collections::VecDeque;
 
 /// Maximum number of notifications visible at once.
@@ -26,6 +27,8 @@ pub struct Manager {
     visible: VecDeque<Notification>,
     /// Queued notifications waiting to be displayed.
     queue: VecDeque<Notification>,
+    /// Optional diagnostics handle for logging warnings/errors.
+    diagnostics: Option<DiagnosticsHandle>,
 }
 
 impl Manager {
@@ -35,12 +38,40 @@ impl Manager {
         Self::default()
     }
 
+    /// Sets the diagnostics handle for logging warnings and errors.
+    pub fn set_diagnostics(&mut self, handle: DiagnosticsHandle) {
+        self.diagnostics = Some(handle);
+    }
+
     /// Pushes a new notification to be displayed.
     ///
     /// If fewer than `MAX_VISIBLE` notifications are showing, it's displayed
     /// immediately. Otherwise, it's added to the queue and shown when space
     /// becomes available.
+    ///
+    /// Warnings and errors are automatically logged to the diagnostics system.
+    /// All notification sites should use `with_warning_type()` or `with_error_type()`
+    /// to set an explicit diagnostic type. If not set, `Other` is used as fallback.
     pub fn push(&mut self, notification: Notification) {
+        // Log warnings and errors to diagnostics
+        if let Some(handle) = &self.diagnostics {
+            match notification.severity() {
+                Severity::Warning => {
+                    // All notification sites should use .with_warning_type() explicitly
+                    let warning_type = notification.warning_type().unwrap_or(WarningType::Other);
+                    handle.log_warning(WarningEvent::new(warning_type, notification.message_key()));
+                }
+                Severity::Error => {
+                    // All notification sites should use .with_error_type() explicitly
+                    let error_type = notification.error_type().unwrap_or(ErrorType::Other);
+                    handle.log_error(ErrorEvent::new(error_type, notification.message_key()));
+                }
+                Severity::Success | Severity::Info => {
+                    // Success and Info notifications are not logged as diagnostic events
+                }
+            }
+        }
+
         if self.visible.len() < MAX_VISIBLE {
             self.visible.push_front(notification);
         } else {

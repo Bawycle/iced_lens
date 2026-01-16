@@ -149,6 +149,12 @@ define_icon!(
     "Checkmark icon: check/tick mark for success."
 );
 define_icon!(cross, dark, "cross.png", "Cross icon: X mark shape.");
+define_icon!(
+    activity,
+    dark,
+    "activity.png",
+    "Activity icon: heartbeat/pulse line (zigzag EKG-style)."
+);
 
 // =============================================================================
 // Zoom & View Icons
@@ -334,6 +340,23 @@ define_icon!(
 );
 
 // =============================================================================
+// Diagnostics Screen Icons
+// =============================================================================
+
+define_icon!(
+    arrow_down_bar,
+    dark,
+    "arrow_down_bar.png",
+    "Arrow down bar icon: arrow pointing down with horizontal line at bottom."
+);
+define_icon!(
+    clipboard,
+    dark,
+    "clipboard.png",
+    "Clipboard icon: clipboard shape with clip at top."
+);
+
+// =============================================================================
 // Light Icons (White variants for toolbars and dark theme UI)
 // =============================================================================
 
@@ -424,6 +447,12 @@ pub mod light {
         light,
         "hamburger.png",
         "Hamburger menu icon (white): for navbar."
+    );
+    define_icon!(
+        activity,
+        light,
+        "activity.png",
+        "Activity icon (white): heartbeat/pulse line for navbar."
     );
 
     // Video toolbar icons
@@ -533,6 +562,20 @@ pub mod light {
         light,
         "checkmark.png",
         "Checkmark icon (white): for notifications."
+    );
+
+    // Diagnostics screen icons
+    define_icon!(
+        arrow_down_bar,
+        light,
+        "arrow_down_bar.png",
+        "Arrow down bar icon (white): for diagnostics export."
+    );
+    define_icon!(
+        clipboard,
+        light,
+        "clipboard.png",
+        "Clipboard icon (white): for diagnostics export."
     );
 }
 
@@ -676,6 +719,7 @@ mod tests {
         let _ = warning();
         let _ = checkmark();
         let _ = cross();
+        let _ = activity();
     }
 
     #[test]
@@ -704,6 +748,7 @@ mod tests {
         let _ = light::triangle_plus();
         // Navbar
         let _ = light::hamburger();
+        let _ = light::activity();
         // Video toolbar
         let _ = light::play();
         let _ = light::pause();

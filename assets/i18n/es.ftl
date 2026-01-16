@@ -191,6 +191,7 @@ error-video-seek-timeout = La búsqueda de posición expiró. La posición objet
 menu-settings = Configuración
 menu-help = Ayuda
 menu-about = Acerca de
+menu-diagnostics = Diagnósticos
 navbar-edit-button = Editar
 
 # Help screen
@@ -561,3 +562,33 @@ notification-upscale-download-error = Error al descargar el modelo de escalado: 
 notification-upscale-validation-error = Error en la validación del modelo: { $error }
 notification-upscale-resize-success = Imagen redimensionada con escalado IA
 notification-upscale-resize-error = Error en el escalado IA: { $error }
+
+# Pantalla de diagnósticos
+diagnostics-title = Diagnósticos
+diagnostics-back-button = Volver al visor
+diagnostics-status-enabled = Recolección: Habilitada
+diagnostics-status-disabled = Recolección: Deshabilitada
+diagnostics-status-error = Recolección: Error
+diagnostics-events-running-for = Eventos: { $duration }
+diagnostics-resources-running-for = Recursos: { $duration }
+diagnostics-buffer-count = Buffer: { $count } eventos
+diagnostics-toggle-label = Habilitar recolección de recursos
+diagnostics-export-file = Exportar a archivo
+diagnostics-export-clipboard = Copiar al portapapeles
+
+# Sección de información de diagnóstico
+diagnostics-info-title = Acerca de Diagnósticos
+diagnostics-info-description = La herramienta de diagnóstico recopila información de ejecución para ayudar a solucionar problemas. Genere un informe para compartir con el soporte o analizar el comportamiento de la aplicación.
+diagnostics-data-collected-title = Datos recopilados:
+diagnostics-data-item-resources = Recursos del sistema (CPU, RAM, uso de disco)
+diagnostics-data-item-actions = Acciones del usuario (navegación, ediciones, comandos)
+diagnostics-data-item-states = Estados de la aplicación (pantalla, modo, configuración)
+diagnostics-data-item-errors = Advertencias y errores
+diagnostics-privacy-notice = Todos los datos se anonimizan antes de exportar. Nada se envía automáticamente.
+diagnostics-docs-link = Documentación
+
+# Notificaciones de diagnóstico
+notification-diagnostics-export-success = Diagnósticos exportados correctamente
+notification-diagnostics-export-error = Error al exportar diagnósticos
+notification-diagnostics-clipboard-success = Diagnósticos copiados al portapapeles
+notification-diagnostics-clipboard-error = Error al copiar diagnósticos al portapapeles

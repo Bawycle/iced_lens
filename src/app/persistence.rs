@@ -6,6 +6,7 @@
 
 use super::Message;
 use crate::config;
+use crate::diagnostics::WarningType;
 use crate::i18n::fluent::I18n;
 use crate::media::MediaNavigator;
 use crate::ui::notifications;
@@ -41,8 +42,10 @@ pub fn persist_preferences(ctx: &mut PreferencesContext<'_>) -> Task<Message> {
 
     let (mut cfg, load_warning) = config::load();
     if let Some(key) = load_warning {
-        ctx.notifications
-            .push(notifications::Notification::warning(&key));
+        ctx.notifications.push(
+            notifications::Notification::warning(&key)
+                .with_warning_type(WarningType::ConfigurationIssue),
+        );
     }
 
     // Use image_fit_to_window() to only persist the image setting, not video
@@ -81,9 +84,10 @@ pub fn persist_preferences(ctx: &mut PreferencesContext<'_>) -> Task<Message> {
     cfg.ai.upscale_model_url = Some(ctx.settings.upscale_model_url().to_string());
 
     if config::save(&cfg).is_err() {
-        ctx.notifications.push(notifications::Notification::warning(
-            "notification-config-save-error",
-        ));
+        ctx.notifications.push(
+            notifications::Notification::warning("notification-config-save-error")
+                .with_warning_type(WarningType::ConfigurationIssue),
+        );
     }
 
     Task::none()
@@ -101,15 +105,19 @@ pub fn apply_language_change(
 
     let (mut cfg, load_warning) = config::load();
     if let Some(key) = load_warning {
-        notifications.push(notifications::Notification::warning(&key));
+        notifications.push(
+            notifications::Notification::warning(&key)
+                .with_warning_type(WarningType::ConfigurationIssue),
+        );
     }
 
     cfg.general.language = Some(locale.to_string());
 
     if config::save(&cfg).is_err() {
-        notifications.push(notifications::Notification::warning(
-            "notification-config-save-error",
-        ));
+        notifications.push(
+            notifications::Notification::warning("notification-config-save-error")
+                .with_warning_type(WarningType::ConfigurationIssue),
+        );
     }
 
     viewer.refresh_error_translation(i18n);

@@ -421,6 +421,12 @@ pub mod navigation {
         icons::info()
     }
 
+    /// Open diagnostics screen.
+    #[must_use]
+    pub fn diagnostics() -> Image<Handle> {
+        icons::activity()
+    }
+
     /// Close / dismiss.
     #[must_use]
     pub fn close() -> Image<Handle> {
@@ -515,6 +521,38 @@ pub mod navigation {
         match background {
             BackgroundTheme::Dark => icons::overlay::loop_icon(),
             BackgroundTheme::Light | BackgroundTheme::Checkerboard => icons::loop_icon(),
+        }
+    }
+}
+
+// =============================================================================
+// Diagnostics Screen Actions
+// =============================================================================
+
+/// Icons for diagnostics screen actions.
+pub mod diagnostics {
+    use super::icons;
+    use iced::widget::image::{Handle, Image};
+
+    /// Export diagnostic report to file.
+    /// Returns dark icon for light theme, light icon for dark theme.
+    #[must_use]
+    pub fn export_file(is_dark_theme: bool) -> Image<Handle> {
+        if is_dark_theme {
+            icons::light::arrow_down_bar()
+        } else {
+            icons::arrow_down_bar()
+        }
+    }
+
+    /// Copy diagnostic report to clipboard.
+    /// Returns dark icon for light theme, light icon for dark theme.
+    #[must_use]
+    pub fn export_clipboard(is_dark_theme: bool) -> Image<Handle> {
+        if is_dark_theme {
+            icons::light::clipboard()
+        } else {
+            icons::clipboard()
         }
     }
 }
@@ -721,6 +759,7 @@ mod tests {
         let _ = navigation::settings();
         let _ = navigation::help();
         let _ = navigation::about();
+        let _ = navigation::diagnostics();
         let _ = navigation::close();
         // Test both theme variants
         let _ = navigation::collapse_left_panel(false);
@@ -803,5 +842,14 @@ mod tests {
         let _ = viewer::toolbar::expand();
         let _ = viewer::toolbar::fullscreen();
         let _ = viewer::toolbar::delete();
+    }
+
+    #[test]
+    fn diagnostics_icons_load() {
+        // Test both theme variants
+        let _ = diagnostics::export_file(false);
+        let _ = diagnostics::export_file(true);
+        let _ = diagnostics::export_clipboard(false);
+        let _ = diagnostics::export_clipboard(true);
     }
 }

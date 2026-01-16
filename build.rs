@@ -383,6 +383,7 @@ fn needs_light_variant(name: &str) -> bool {
             | "ellipsis_horizontal"
             // Navbar
             | "hamburger"
+            | "activity"
             // Viewer toolbar
             | "zoom_in"
             | "zoom_out"
@@ -400,5 +401,8 @@ fn needs_light_variant(name: &str) -> bool {
             // Notifications
             | "warning"
             | "checkmark"
+            // Diagnostics screen
+            | "arrow_down_bar"
+            | "clipboard"
     )
 }

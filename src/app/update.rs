@@ -6,6 +6,10 @@
 
 use super::{notifications, persistence, Message, Screen};
 use crate::config;
+use crate::diagnostics::{
+    AIModel, AppStateEvent, DiagnosticsHandle, ErrorType, FilterChangeType, NavigationContext,
+    UserAction, WarningType,
+};
 use crate::i18n::fluent::I18n;
 use crate::media::metadata::MediaMetadata;
 use crate::media::{
@@ -13,18 +17,20 @@ use crate::media::{
 };
 use crate::ui::about::{self, Event as AboutEvent};
 use crate::ui::design_tokens::sizing;
+use crate::ui::diagnostics_screen::{self, Event as DiagnosticsEvent};
 use crate::ui::help::{self, Event as HelpEvent};
 use crate::ui::image_editor::{self, Event as ImageEditorEvent, State as ImageEditorState};
 use crate::ui::metadata_panel::{self, Event as MetadataPanelEvent, MetadataEditorState};
 use crate::ui::navbar::{self, Event as NavbarEvent};
 use crate::ui::settings::{self, Event as SettingsEvent, State as SettingsState};
 use crate::ui::theming::ThemeMode;
-use crate::ui::viewer::{component, filter_dropdown};
+use crate::ui::viewer::{component, controls, filter_dropdown, video_controls};
 use crate::video_player::KeyboardSeekStep;
 // Re-export NavigationDirection from viewer component (single source of truth)
 pub use crate::ui::viewer::NavigationDirection;
 use iced::{window, Point, Size, Task};
 use std::path::PathBuf;
+use std::time::Instant;
 
 /// Navigation mode determines which media types to include.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,6 +128,14 @@ pub struct UpdateContext<'a> {
     pub notifications: &'a mut notifications::Manager,
     pub cancellation_token: &'a media::deblur::CancellationToken,
     pub prefetch_cache: &'a mut media::prefetch::ImagePrefetchCache,
+    /// Handle for logging diagnostic events.
+    pub diagnostics: &'a DiagnosticsHandle,
+    /// Timestamp when AI deblur operation started (for duration tracking).
+    pub deblur_started_at: &'a mut Option<Instant>,
+    /// Timestamp when AI upscale operation started (for duration tracking).
+    pub upscale_started_at: &'a mut Option<Instant>,
+    /// Scale factor for current upscale operation.
+    pub upscale_scale_factor: &'a mut Option<f32>,
 }
 
 impl UpdateContext<'_> {
@@ -143,7 +157,330 @@ impl UpdateContext<'_> {
     }
 }
 
+/// Logs the `MediaLoadingStarted` diagnostic event when a media load is initiated.
+///
+/// This should be called from the App layer when starting to load media,
+/// following the architectural principle R1: collect at handler level.
+pub(super) fn log_media_loading_started(path: &std::path::Path, diagnostics: &DiagnosticsHandle) {
+    use crate::diagnostics::MediaType;
+
+    // Detect media type from extension
+    let media_type = path.extension().map_or(MediaType::Unknown, |ext| {
+        let ext = ext.to_string_lossy().to_lowercase();
+        if ["mp4", "webm", "avi", "mkv", "mov", "m4v", "wmv", "flv"].contains(&ext.as_str()) {
+            MediaType::Video
+        } else {
+            MediaType::Image
+        }
+    });
+
+    // Get file size from filesystem
+    let file_size_bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+
+    // Get path metadata (extension, storage_type, path_hash)
+    let metadata = diagnostics.media_metadata(path);
+
+    diagnostics.log_state(AppStateEvent::MediaLoadingStarted {
+        media_type,
+        file_size_bytes,
+        dimensions: None, // Not known until load completes
+        extension: metadata.extension,
+        storage_type: metadata.storage_type,
+        path_hash: metadata.path_hash,
+    });
+}
+
+/// Logs the `MediaLoaded` diagnostic event when media is successfully loaded.
+///
+/// This should be called from the App layer when media loads successfully,
+/// following the architectural principle R1: collect at handler level.
+fn log_media_loaded(
+    media: &MediaData,
+    path: Option<&std::path::Path>,
+    diagnostics: &DiagnosticsHandle,
+) {
+    use crate::diagnostics::{Dimensions, MediaType};
+
+    let (media_type, dimensions) = match media {
+        MediaData::Image(img) => (
+            MediaType::Image,
+            Some(Dimensions::new(img.width, img.height)),
+        ),
+        MediaData::Video(video_data) => {
+            let dims = if video_data.width > 0 && video_data.height > 0 {
+                Some(Dimensions::new(video_data.width, video_data.height))
+            } else {
+                None
+            };
+            (MediaType::Video, dims)
+        }
+    };
+
+    let metadata = path.map_or_else(Default::default, |p| diagnostics.media_metadata(p));
+    let file_size_bytes = path
+        .and_then(|p| std::fs::metadata(p).ok())
+        .map_or(0, |m| m.len());
+
+    diagnostics.log_state(AppStateEvent::MediaLoaded {
+        media_type,
+        file_size_bytes,
+        dimensions,
+        extension: metadata.extension,
+        storage_type: metadata.storage_type,
+        path_hash: metadata.path_hash,
+    });
+}
+
+/// Logs the `MediaFailed` diagnostic event when media loading fails.
+///
+/// This should be called from the App layer when media loading fails,
+/// following the architectural principle R1: collect at handler level.
+fn log_media_failed(
+    error: &crate::error::Error,
+    path: Option<&std::path::Path>,
+    diagnostics: &DiagnosticsHandle,
+) {
+    use crate::diagnostics::MediaType;
+
+    // Detect media type from extension if path is available
+    let media_type = path
+        .and_then(|p| p.extension())
+        .map_or(MediaType::Unknown, |ext| {
+            let ext = ext.to_string_lossy().to_lowercase();
+            if ["mp4", "webm", "avi", "mkv", "mov", "m4v", "wmv", "flv"].contains(&ext.as_str()) {
+                MediaType::Video
+            } else {
+                MediaType::Image
+            }
+        });
+
+    let metadata = path.map_or_else(Default::default, |p| diagnostics.media_metadata(p));
+
+    diagnostics.log_state(AppStateEvent::MediaFailed {
+        media_type,
+        reason: format!("{error}"),
+        extension: metadata.extension,
+        storage_type: metadata.storage_type,
+        path_hash: metadata.path_hash,
+    });
+}
+
+/// Handles state updates after successful media load.
+fn handle_successful_media_load(ctx: &mut UpdateContext<'_>) {
+    *ctx.metadata_editor_state = None;
+    if let Some(path) = ctx.viewer.current_media_path.as_ref() {
+        *ctx.current_metadata = media::metadata::extract_metadata(path);
+        ctx.persisted.set_last_open_directory_from_file(path);
+        if let Some(key) = ctx.persisted.save() {
+            ctx.notifications.push(
+                notifications::Notification::warning(&key)
+                    .with_warning_type(WarningType::ConfigurationIssue),
+            );
+        }
+    } else {
+        *ctx.current_metadata = None;
+    }
+    ctx.notifications.clear_load_errors();
+}
+
+/// Logs diagnostic events for viewer messages at handler level (R1 principle).
+///
+/// Returns `true` if the message is a successful media load.
+fn log_viewer_message_diagnostics(
+    message: &component::Message,
+    path: Option<&std::path::Path>,
+    seek_preview: Option<f64>,
+    diagnostics: &DiagnosticsHandle,
+) -> bool {
+    match message {
+        component::Message::MediaLoaded(Ok(media)) => {
+            log_media_loaded(media, path, diagnostics);
+            true
+        }
+        component::Message::MediaLoaded(Err(error)) => {
+            log_media_failed(error, path, diagnostics);
+            false
+        }
+        component::Message::VideoControls(video_controls::Message::TogglePlayback) => {
+            diagnostics.log_action(UserAction::TogglePlayback);
+            false
+        }
+        component::Message::VideoControls(video_controls::Message::SeekCommit) => {
+            if let Some(position_secs) = seek_preview {
+                diagnostics.log_action(UserAction::SeekVideo { position_secs });
+            }
+            false
+        }
+        component::Message::VideoControls(video_controls::Message::StepForward) => {
+            diagnostics.log_action(UserAction::StepForward);
+            false
+        }
+        component::Message::VideoControls(video_controls::Message::StepBackward) => {
+            diagnostics.log_action(UserAction::StepBackward);
+            false
+        }
+        _ => false,
+    }
+}
+
+/// Logs video/audio control actions at handler level (R1 principle).
+///
+/// This function logs actions that require viewer state to capture resulting values
+/// (e.g., volume level after `SetVolume`, mute state after `ToggleMute`).
+/// Called BEFORE the message is processed, so for toggle actions we compute the resulting state.
+fn log_video_audio_action(
+    viewer: &component::State,
+    message: &video_controls::Message,
+    diagnostics: &DiagnosticsHandle,
+) {
+    match message {
+        video_controls::Message::SetVolume(volume) => {
+            diagnostics.log_action(UserAction::SetVolume {
+                volume: volume.value(),
+            });
+        }
+        video_controls::Message::ToggleMute => {
+            // Logging BEFORE processing, so resulting state is opposite of current
+            let is_muted = !viewer.video_muted();
+            diagnostics.log_action(UserAction::ToggleMute { is_muted });
+        }
+        video_controls::Message::ToggleLoop => {
+            // Logging BEFORE processing, so resulting state is opposite of current
+            let is_looping = !viewer.video_loop();
+            diagnostics.log_action(UserAction::ToggleLoop { is_looping });
+        }
+        video_controls::Message::CaptureFrame => {
+            // Get video position for timestamp
+            let timestamp_secs = viewer.video_position().unwrap_or(0.0);
+            diagnostics.log_action(UserAction::CaptureFrame { timestamp_secs });
+        }
+        // IncreasePlaybackSpeed and DecreasePlaybackSpeed are handled separately
+        // because we need the resulting speed value from the player
+        _ => {}
+    }
+}
+
+/// Logs view control actions at handler level (R1 principle).
+///
+/// This function logs actions AFTER they have been processed, so we can capture
+/// the resulting state (e.g., zoom percent after `ZoomIn`, rotation angle after `RotateClockwise`).
+fn log_view_control_action(
+    viewer: &component::State,
+    message: &controls::Message,
+    diagnostics: &DiagnosticsHandle,
+) {
+    // zoom_percent is bounded to 10-800%, safe to cast to u16
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let zoom_percent = viewer.zoom_state().zoom_percent as u16;
+
+    match message {
+        controls::Message::ZoomIn => {
+            diagnostics.log_action(UserAction::ZoomIn {
+                resulting_zoom_percent: zoom_percent,
+            });
+        }
+        controls::Message::ZoomOut => {
+            diagnostics.log_action(UserAction::ZoomOut {
+                resulting_zoom_percent: zoom_percent,
+            });
+        }
+        controls::Message::ResetZoom => {
+            diagnostics.log_action(UserAction::ResetZoom);
+        }
+        controls::Message::SetFitToWindow(is_fit) => {
+            diagnostics.log_action(UserAction::ToggleFitToWindow { is_fit: *is_fit });
+        }
+        controls::Message::ToggleFullscreen => {
+            diagnostics.log_action(UserAction::ToggleFullscreen);
+        }
+        controls::Message::RotateClockwise => {
+            diagnostics.log_action(UserAction::RotateClockwise {
+                resulting_angle: viewer.current_rotation().degrees(),
+            });
+        }
+        controls::Message::RotateCounterClockwise => {
+            diagnostics.log_action(UserAction::RotateCounterClockwise {
+                resulting_angle: viewer.current_rotation().degrees(),
+            });
+        }
+        // ZoomInputChanged and ZoomInputSubmitted are UI state changes, not user actions
+        _ => {}
+    }
+}
+
+/// Logs diagnostic events for editor messages at handler level (R1 principle).
+///
+/// This function intercepts editor messages BEFORE they are processed by the editor state
+/// to capture user intent. We log here rather than in the editor state to maintain
+/// separation of concerns (diagnostics belong at the app/handler level).
+fn log_editor_action(
+    diagnostics: &DiagnosticsHandle,
+    editor: &image_editor::State,
+    message: &image_editor::Message,
+) {
+    use image_editor::{SidebarMessage, ToolbarMessage};
+
+    match message {
+        // Crop action - capture crop dimensions from current crop state
+        image_editor::Message::Sidebar(SidebarMessage::ApplyCrop) => {
+            let crop = editor.crop();
+            diagnostics.log_action(UserAction::ApplyCrop {
+                x: crop.x,
+                y: crop.y,
+                width: crop.width,
+                height: crop.height,
+            });
+        }
+
+        // Resize action - capture resize parameters
+        image_editor::Message::Sidebar(SidebarMessage::ApplyResize) => {
+            let resize = editor.resize();
+            diagnostics.log_action(UserAction::ApplyResize {
+                scale_percent: resize.scale.value(),
+                new_width: resize.width,
+                new_height: resize.height,
+            });
+        }
+
+        // Deblur action (intent to apply - state event EditorDeblurStarted tracks actual start)
+        image_editor::Message::Sidebar(SidebarMessage::ApplyDeblur) => {
+            diagnostics.log_action(UserAction::ApplyDeblur);
+        }
+
+        // Undo action - capture what operation is being undone
+        image_editor::Message::Sidebar(SidebarMessage::Undo) => {
+            let operation_type = editor.undo_operation_type();
+            diagnostics.log_action(UserAction::Undo { operation_type });
+        }
+
+        // Redo action - capture what operation is being redone
+        image_editor::Message::Sidebar(SidebarMessage::Redo) => {
+            let operation_type = editor.redo_operation_type();
+            diagnostics.log_action(UserAction::Redo { operation_type });
+        }
+
+        // Save or Save As action
+        image_editor::Message::Sidebar(SidebarMessage::Save | SidebarMessage::SaveAs) => {
+            let format = editor.export_format().extension().to_string();
+            diagnostics.log_action(UserAction::SaveImage { format });
+        }
+
+        // Return to viewer (Cancel/Back button)
+        image_editor::Message::Toolbar(ToolbarMessage::BackToViewer) => {
+            let had_unsaved_changes = editor.has_unsaved_changes();
+            diagnostics.log_action(UserAction::ReturnToViewer {
+                had_unsaved_changes,
+            });
+        }
+
+        // All other messages don't need user action logging
+        _ => {}
+    }
+}
+
 /// Handles viewer component messages.
+// Allow too_many_lines: Effect handling in one place improves readability over splitting.
+#[allow(clippy::too_many_lines)]
 pub fn handle_viewer_message(
     ctx: &mut UpdateContext<'_>,
     message: component::Message,
@@ -152,36 +489,54 @@ pub fn handle_viewer_message(
         *ctx.window_id = Some(*window);
     }
 
-    // Check if this is a successful MediaLoaded message to extract metadata
-    let is_successful_load = matches!(&message, component::Message::MediaLoaded(Ok(_)));
+    // Log diagnostic events at handler level (R1: collect at handler level)
+    let is_successful_load = log_viewer_message_diagnostics(
+        &message,
+        ctx.viewer.current_media_path.as_deref(),
+        ctx.viewer.seek_preview_position(),
+        ctx.diagnostics,
+    );
 
-    let (effect, task) = ctx.viewer.handle_message(message, ctx.i18n);
+    // Log video/audio control actions (requires viewer state for context)
+    // Note: Some actions log BEFORE processing (toggles) so we can predict resulting state
+    if let component::Message::VideoControls(ref video_msg) = message {
+        log_video_audio_action(ctx.viewer, video_msg, ctx.diagnostics);
+    }
 
-    // Handle successful media load
-    if is_successful_load {
-        // Exit metadata edit mode (new media loaded = new context)
-        *ctx.metadata_editor_state = None;
+    // Check if this is a speed change action (need to log AFTER processing)
+    let is_speed_change = matches!(
+        message,
+        component::Message::VideoControls(
+            video_controls::Message::IncreasePlaybackSpeed
+                | video_controls::Message::DecreasePlaybackSpeed
+        )
+    );
 
-        // Use viewer.current_media_path as the source of truth for metadata extraction.
-        // This is the path of the media that was just loaded, which is guaranteed to be
-        // correct at this point. The navigator may not yet be synchronized (ConfirmNavigation
-        // effect is processed later).
-        if let Some(path) = ctx.viewer.current_media_path.as_ref() {
-            // Extract metadata
-            *ctx.current_metadata = media::metadata::extract_metadata(path);
+    // Capture view control message before processing (for logging AFTER)
+    let view_control_msg = match &message {
+        component::Message::Controls(msg) => Some(msg.clone()),
+        _ => None,
+    };
 
-            // Remember the directory for next time and persist
-            ctx.persisted.set_last_open_directory_from_file(path);
-            if let Some(key) = ctx.persisted.save() {
-                ctx.notifications
-                    .push(notifications::Notification::warning(&key));
-            }
-        } else {
-            *ctx.current_metadata = None;
+    let (effect, task) = ctx
+        .viewer
+        .handle_message(message, ctx.i18n, ctx.diagnostics);
+
+    // Log speed changes AFTER processing to capture resulting speed
+    if is_speed_change {
+        if let Some(speed) = ctx.viewer.video_playback_speed() {
+            ctx.diagnostics
+                .log_action(UserAction::SetPlaybackSpeed { speed });
         }
+    }
 
-        // Clear any stale load error notifications (UX: state consistency)
-        ctx.notifications.clear_load_errors();
+    // Log view control actions AFTER processing to capture resulting state
+    if let Some(ref msg) = view_control_msg {
+        log_view_control_action(ctx.viewer, msg, ctx.diagnostics);
+    }
+
+    if is_successful_load {
+        handle_successful_media_load(ctx);
     }
 
     let viewer_task = task.map(Message::Viewer);
@@ -202,6 +557,7 @@ pub fn handle_viewer_message(
             }
         }
         component::Effect::ExitFullscreen => {
+            ctx.diagnostics.log_action(UserAction::ExitFullscreen);
             update_fullscreen_mode(ctx.fullscreen, ctx.window_id.as_ref(), false)
         }
         component::Effect::OpenSettings => {
@@ -225,7 +581,8 @@ pub fn handle_viewer_message(
             handle_open_file_dialog(ctx.persisted.last_open_directory.clone())
         }
         component::Effect::ShowErrorNotification { key, args } => {
-            let mut notification = notifications::Notification::error(key);
+            let mut notification =
+                notifications::Notification::error(key).with_error_type(ErrorType::DecodeError);
             for (arg_key, arg_value) in args {
                 notification = notification.with_arg(arg_key, arg_value);
             }
@@ -241,6 +598,7 @@ pub fn handle_viewer_message(
             let files_text = format_skipped_files_message(ctx.i18n, &skipped_files);
             ctx.notifications.push(
                 notifications::Notification::warning("notification-skipped-corrupted-files")
+                    .with_warning_type(WarningType::UnsupportedFormat)
                     .with_arg("files", files_text)
                     .auto_dismiss(std::time::Duration::from_secs(8)),
             );
@@ -258,6 +616,7 @@ pub fn handle_viewer_message(
                 let files_text = format_skipped_files_message(ctx.i18n, &skipped_files);
                 ctx.notifications.push(
                     notifications::Notification::warning("notification-skipped-corrupted-files")
+                        .with_warning_type(WarningType::UnsupportedFormat)
                         .with_arg("files", files_text)
                         .auto_dismiss(std::time::Duration::from_secs(8)),
                 );
@@ -318,9 +677,12 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
             let image_data = match media_data {
                 MediaData::Image(img) => img,
                 MediaData::Video(_) => {
-                    ctx.notifications.push(notifications::Notification::warning(
-                        "notification-video-editing-unsupported",
-                    ));
+                    ctx.notifications.push(
+                        notifications::Notification::warning(
+                            "notification-video-editing-unsupported",
+                        )
+                        .with_warning_type(crate::diagnostics::WarningType::UnsupportedFormat),
+                    );
                     return Task::none();
                 }
             };
@@ -333,9 +695,10 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                 .scan_directory(&image_path, sort_order)
                 .is_err()
             {
-                ctx.notifications.push(notifications::Notification::warning(
-                    "notification-scan-dir-error",
-                ));
+                ctx.notifications.push(
+                    notifications::Notification::warning("notification-scan-dir-error")
+                        .with_warning_type(WarningType::Other),
+                );
             }
 
             match ImageEditorState::new(image_path, &image_data) {
@@ -343,14 +706,20 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
                     *ctx.image_editor = Some(state);
                     *ctx.screen = target;
 
+                    // Log editor opened event
+                    ctx.diagnostics.log_state(AppStateEvent::EditorOpened {
+                        tool: None, // No tool selected initially
+                    });
+
                     // Trigger deferred AI model validation on first editor access
                     let validation_task = trigger_deferred_ai_validation(ctx);
                     return validation_task;
                 }
                 Err(_) => {
-                    ctx.notifications.push(notifications::Notification::error(
-                        "notification-editor-create-error",
-                    ));
+                    ctx.notifications.push(
+                        notifications::Notification::error("notification-editor-create-error")
+                            .with_error_type(ErrorType::InternalError),
+                    );
                 }
             }
             return Task::none();
@@ -361,6 +730,16 @@ pub fn handle_screen_switch(ctx: &mut UpdateContext<'_>, target: Screen) -> Task
 
     // Handle Editor → Viewer transition
     if matches!(target, Screen::Viewer) && matches!(ctx.screen, Screen::ImageEditor) {
+        // Check if editor had unsaved changes before closing
+        let had_unsaved_changes = ctx
+            .image_editor
+            .as_ref()
+            .is_some_and(ImageEditorState::has_unsaved_changes);
+
+        ctx.diagnostics.log_state(AppStateEvent::EditorClosed {
+            had_unsaved_changes,
+        });
+
         *ctx.image_editor = None;
         *ctx.screen = target;
         return Task::none();
@@ -431,6 +810,12 @@ pub fn handle_settings_message(
             use iced::futures::channel::{mpsc, oneshot};
             use iced::futures::stream;
             use iced::futures::StreamExt;
+
+            // Log state event for diagnostics
+            ctx.diagnostics
+                .log_state(AppStateEvent::ModelDownloadStarted {
+                    model: AIModel::Deblur,
+                });
 
             // Start the download/validation process
             // Set status to downloading and start async task
@@ -532,8 +917,10 @@ pub fn handle_settings_message(
             // User disabled the feature - persist the state and delete the model
             ctx.persisted.enable_deblur = false;
             if let Some(key) = ctx.persisted.save() {
-                ctx.notifications
-                    .push(notifications::Notification::warning(&key));
+                ctx.notifications.push(
+                    notifications::Notification::warning(&key)
+                        .with_warning_type(WarningType::ConfigurationIssue),
+                );
             }
             // Delete the model file
             let _ = std::fs::remove_file(crate::media::deblur::get_model_path());
@@ -544,6 +931,12 @@ pub fn handle_settings_message(
             use iced::futures::channel::{mpsc, oneshot};
             use iced::futures::stream;
             use iced::futures::StreamExt;
+
+            // Log state event for diagnostics
+            ctx.diagnostics
+                .log_state(AppStateEvent::ModelDownloadStarted {
+                    model: AIModel::Upscale,
+                });
 
             // Start the download/validation process
             ctx.settings.set_upscale_model_status(
@@ -633,8 +1026,10 @@ pub fn handle_settings_message(
         SettingsEvent::DisableUpscale => {
             ctx.persisted.enable_upscale = false;
             if let Some(key) = ctx.persisted.save() {
-                ctx.notifications
-                    .push(notifications::Notification::warning(&key));
+                ctx.notifications.push(
+                    notifications::Notification::warning(&key)
+                        .with_warning_type(WarningType::ConfigurationIssue),
+                );
             }
             let _ = std::fs::remove_file(crate::media::upscale::get_model_path());
             Task::none()
@@ -655,11 +1050,20 @@ pub fn handle_editor_message(
         return Task::none();
     };
 
+    // Log editor user actions at handler level (R1: collect at handler level)
+    log_editor_action(ctx.diagnostics, editor_state, &message);
+
     match editor_state.update(message) {
         ImageEditorEvent::None => Task::none(),
         ImageEditorEvent::ExitEditor => {
             // Get the image source before dropping the editor
             let image_source = editor_state.image_source().clone();
+
+            // Log editor closed event before dropping editor state
+            let had_unsaved_changes = editor_state.has_unsaved_changes();
+            ctx.diagnostics.log_state(AppStateEvent::EditorClosed {
+                had_unsaved_changes,
+            });
 
             *ctx.image_editor = None;
             *ctx.screen = Screen::Viewer;
@@ -670,6 +1074,9 @@ pub fn handle_editor_message(
                 image_editor::ImageSource::File(current_media_path) => {
                     // Set loading state via encapsulated method
                     ctx.viewer.start_loading();
+
+                    // Log MediaLoadingStarted at handler level (R1: collect at handler level)
+                    log_media_loading_started(&current_media_path, ctx.diagnostics);
 
                     // Reload the image in the viewer to show any saved changes
                     Task::perform(
@@ -695,9 +1102,10 @@ pub fn handle_editor_message(
                         ));
                     }
                     Err(_err) => {
-                        ctx.notifications.push(notifications::Notification::error(
-                            "notification-save-error",
-                        ));
+                        ctx.notifications.push(
+                            notifications::Notification::error("notification-save-error")
+                                .with_error_type(crate::diagnostics::ErrorType::ExportError),
+                        );
                     }
                 }
             }
@@ -712,6 +1120,8 @@ pub fn handle_editor_message(
         ImageEditorEvent::DeblurCancelRequested => {
             // Cancel is handled by the editor state itself (sets cancel_requested flag)
             // The actual inference task will check this flag and stop
+            ctx.diagnostics
+                .log_state(AppStateEvent::EditorDeblurCancelled);
             Task::none()
         }
         ImageEditorEvent::UpscaleResizeRequested { width, height } => {
@@ -733,6 +1143,13 @@ fn handle_deblur_request(ctx: &mut UpdateContext<'_>) -> Task<Message> {
     let Some(editor_state) = ctx.image_editor.as_ref() else {
         return Task::none();
     };
+
+    // Store start time for duration tracking
+    *ctx.deblur_started_at = Some(Instant::now());
+
+    // Log state event for diagnostics
+    ctx.diagnostics
+        .log_state(AppStateEvent::EditorDeblurStarted);
 
     // Get the current working image from the editor
     let working_image = editor_state.working_image().clone();
@@ -777,6 +1194,24 @@ fn handle_upscale_resize_request(
     if use_ai_upscale {
         // Get the current working image from the editor
         let working_image = editor_state.working_image().clone();
+
+        // Store start time and calculate scale factor for duration tracking
+        *ctx.upscale_started_at = Some(Instant::now());
+        // Precision/truncation acceptable for ratio calculation (scale_factor is approximate)
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+        let scale_factor = {
+            let original_pixels =
+                f64::from(working_image.width()) * f64::from(working_image.height());
+            let target_pixels = f64::from(target_width) * f64::from(target_height);
+            (target_pixels / original_pixels).sqrt() as f32
+        };
+        *ctx.upscale_scale_factor = Some(scale_factor);
+
+        // Log AI upscale action (R1: collect at handler level)
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        ctx.diagnostics.log_action(UserAction::ApplyUpscale {
+            scale_factor: scale_factor.round() as u32,
+        });
 
         // Run the AI upscale + Lanczos resize in a blocking task
         Task::perform(
@@ -854,6 +1289,14 @@ fn handle_save_as_dialog(
 
 /// Handles editor navigation to next image (skips videos).
 fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let info = ctx.media_navigator.navigation_info();
+    ctx.diagnostics.log_action(UserAction::NavigateNext {
+        context: NavigationContext::Editor,
+        filter_active: false, // Editor ignores filters
+        position_in_filtered: None,
+        position_in_total: info.current_index.unwrap_or(0),
+    });
+
     // Set load origin for auto-skip on failure
     ctx.viewer.set_navigation_origin(NavigationDirection::Next);
     handle_navigation(
@@ -866,6 +1309,14 @@ fn handle_editor_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
 /// Handles editor navigation to previous image (skips videos).
 fn handle_editor_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let info = ctx.media_navigator.navigation_info();
+    ctx.diagnostics.log_action(UserAction::NavigatePrevious {
+        context: NavigationContext::Editor,
+        filter_active: false, // Editor ignores filters
+        position_in_filtered: None,
+        position_in_total: info.current_index.unwrap_or(0),
+    });
+
     // Set load origin for auto-skip on failure
     ctx.viewer
         .set_navigation_origin(NavigationDirection::Previous);
@@ -885,18 +1336,29 @@ pub fn handle_navbar_message(
     match navbar::update(message, ctx.menu_open) {
         NavbarEvent::None => Task::none(),
         NavbarEvent::OpenSettings => {
+            ctx.diagnostics.log_action(UserAction::OpenSettings);
             *ctx.screen = Screen::Settings;
             Task::none()
         }
         NavbarEvent::OpenHelp => {
+            ctx.diagnostics.log_action(UserAction::OpenHelp);
             *ctx.screen = Screen::Help;
             Task::none()
         }
         NavbarEvent::OpenAbout => {
+            ctx.diagnostics.log_action(UserAction::OpenAbout);
             *ctx.screen = Screen::About;
             Task::none()
         }
-        NavbarEvent::EnterEditor => handle_screen_switch(ctx, Screen::ImageEditor),
+        NavbarEvent::OpenDiagnostics => {
+            ctx.diagnostics.log_action(UserAction::OpenDiagnostics);
+            *ctx.screen = Screen::Diagnostics;
+            Task::none()
+        }
+        NavbarEvent::EnterEditor => {
+            ctx.diagnostics.log_action(UserAction::EnterEditor);
+            handle_screen_switch(ctx, Screen::ImageEditor)
+        }
         NavbarEvent::ToggleInfoPanel => {
             *ctx.info_panel_open = !*ctx.info_panel_open;
             Task::none()
@@ -909,9 +1371,11 @@ pub fn handle_navbar_message(
                 | filter_dropdown::Message::ConsumeClick
                 | filter_dropdown::Message::DateSegmentChanged { .. } => {
                     // These are local dropdown state messages - forward to viewer component
-                    let (effect, task) = ctx
-                        .viewer
-                        .handle_message(component::Message::FilterDropdown(filter_msg), ctx.i18n);
+                    let (effect, task) = ctx.viewer.handle_message(
+                        component::Message::FilterDropdown(filter_msg),
+                        ctx.i18n,
+                        ctx.diagnostics,
+                    );
                     // Handle any effects from the viewer
                     // Only FilterChanged and None are expected from FilterDropdown messages
                     let effect_task = match effect {
@@ -947,6 +1411,28 @@ pub fn handle_about_message(
         AboutEvent::None => Task::none(),
         AboutEvent::BackToViewer => {
             *ctx.screen = Screen::Viewer;
+            Task::none()
+        }
+    }
+}
+
+/// Handles diagnostics screen messages.
+pub fn handle_diagnostics_message(
+    ctx: &mut UpdateContext<'_>,
+    message: &diagnostics_screen::Message,
+) -> Task<Message> {
+    match diagnostics_screen::update(message) {
+        DiagnosticsEvent::None => Task::none(),
+        DiagnosticsEvent::BackToViewer => {
+            *ctx.screen = Screen::Viewer;
+            Task::none()
+        }
+        DiagnosticsEvent::ToggleResourceCollection(_) => {
+            // Toggle is handled directly in App::update() since it needs DiagnosticsCollector
+            Task::none()
+        }
+        DiagnosticsEvent::ExportToFile | DiagnosticsEvent::ExportToClipboard => {
+            // Export is handled directly in App::update() since it needs DiagnosticsCollector
             Task::none()
         }
     }
@@ -993,9 +1479,12 @@ pub fn handle_metadata_panel_message(
             if let Some(editor_state) = ctx.metadata_editor_state.as_mut() {
                 if !editor_state.validate_all() {
                     // Validation failed - show error notification
-                    ctx.notifications.push(notifications::Notification::error(
-                        "notification-metadata-validation-error",
-                    ));
+                    ctx.notifications.push(
+                        notifications::Notification::error(
+                            "notification-metadata-validation-error",
+                        )
+                        .with_error_type(ErrorType::Other),
+                    );
                     return Task::none();
                 }
 
@@ -1018,9 +1507,10 @@ pub fn handle_metadata_panel_message(
                     }
                     Err(_e) => {
                         // Show error notification
-                        ctx.notifications.push(notifications::Notification::error(
-                            "notification-metadata-save-error",
-                        ));
+                        ctx.notifications.push(
+                            notifications::Notification::error("notification-metadata-save-error")
+                                .with_error_type(ErrorType::IoError),
+                        );
                     }
                 }
             }
@@ -1030,9 +1520,12 @@ pub fn handle_metadata_panel_message(
             // Validate all fields before showing dialog
             if let Some(editor_state) = ctx.metadata_editor_state.as_mut() {
                 if !editor_state.validate_all() {
-                    ctx.notifications.push(notifications::Notification::error(
-                        "notification-metadata-validation-error",
-                    ));
+                    ctx.notifications.push(
+                        notifications::Notification::error(
+                            "notification-metadata-validation-error",
+                        )
+                        .with_error_type(ErrorType::Other),
+                    );
                     return Task::none();
                 }
             }
@@ -1140,13 +1633,16 @@ where
             Some(media::MediaType::Image)
         ) {
             if let Some(image_data) = ctx.prefetch_cache.get(&path) {
-                // Cache hit! Return the cached image immediately
+                // Cache hit - return immediately, file size will be read in MediaLoaded handler
                 return Task::done(on_loaded(Ok(MediaData::Image(image_data))));
             }
         }
 
         // Set loading state via encapsulated method
         ctx.viewer.start_loading();
+
+        // Log MediaLoadingStarted at handler level (R1: collect at handler level)
+        log_media_loading_started(&path, ctx.diagnostics);
 
         // Load the media with the provided callback
         Task::perform(async move { media::load_media(&path) }, on_loaded)
@@ -1170,6 +1666,18 @@ where
 
 /// Handles navigation to next media (images and videos).
 pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let info = ctx.media_navigator.navigation_info();
+    ctx.diagnostics.log_action(UserAction::NavigateNext {
+        context: NavigationContext::Viewer,
+        filter_active: info.filter_active,
+        position_in_filtered: if info.filter_active {
+            info.current_index
+        } else {
+            None
+        },
+        position_in_total: info.current_index.unwrap_or(0),
+    });
+
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
     // Set load origin for auto-skip on failure
     ctx.viewer.set_navigation_origin(NavigationDirection::Next);
@@ -1183,6 +1691,18 @@ pub fn handle_navigate_next(ctx: &mut UpdateContext<'_>) -> Task<Message> {
 
 /// Handles navigation to previous media (images and videos).
 pub fn handle_navigate_previous(ctx: &mut UpdateContext<'_>) -> Task<Message> {
+    let info = ctx.media_navigator.navigation_info();
+    ctx.diagnostics.log_action(UserAction::NavigatePrevious {
+        context: NavigationContext::Viewer,
+        filter_active: info.filter_active,
+        position_in_filtered: if info.filter_active {
+            info.current_index
+        } else {
+            None
+        },
+        position_in_total: info.current_index.unwrap_or(0),
+    });
+
     // Note: metadata edit mode is exited by MediaLoaded event handler (event-driven)
     // Set load origin for auto-skip on failure
     ctx.viewer
@@ -1280,6 +1800,9 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
         return Task::none();
     };
 
+    // Log user action at handler level (R1 principle)
+    ctx.diagnostics.log_action(UserAction::DeleteMedia);
+
     // Get the next candidate before deletion (peek without changing position)
     let has_multiple = ctx.media_navigator.len() > 1;
     let next_candidate = if has_multiple {
@@ -1317,6 +1840,9 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
                 // Set loading state via encapsulated method
                 ctx.viewer.start_loading();
 
+                // Log MediaLoadingStarted at handler level (R1: collect at handler level)
+                log_media_loading_started(&next_path, ctx.diagnostics);
+
                 Task::perform(async move { media::load_media(&next_path) }, |result| {
                     Message::Viewer(component::Message::MediaLoaded(result))
                 })
@@ -1329,9 +1855,10 @@ pub fn handle_delete_current_media(ctx: &mut UpdateContext<'_>) -> Task<Message>
             }
         }
         Err(_err) => {
-            ctx.notifications.push(notifications::Notification::error(
-                "notification-delete-error",
-            ));
+            ctx.notifications.push(
+                notifications::Notification::error("notification-delete-error")
+                    .with_error_type(ErrorType::IoError),
+            );
             Task::none()
         }
     }
@@ -1416,6 +1943,10 @@ pub fn handle_open_file_dialog_result(
         return Task::none();
     };
 
+    ctx.diagnostics.log_action(UserAction::LoadMedia {
+        source: Some("file_dialog".to_string()),
+    });
+
     // Load the media (last_open_directory is updated on successful load)
     load_media_from_path(ctx, path)
 }
@@ -1440,6 +1971,10 @@ pub fn handle_file_dropped(ctx: &mut UpdateContext<'_>, path: PathBuf) -> Task<M
         }
     }
     // If cursor position is unknown, accept the drop (better UX than silent rejection)
+
+    ctx.diagnostics.log_action(UserAction::LoadMedia {
+        source: Some("drag_drop".to_string()),
+    });
 
     // Check if it's a directory
     if path.is_dir() {
@@ -1486,10 +2021,16 @@ fn handle_filter_changed(
     use crate::media::filter::{DateRangeFilter, MediaFilter};
     use filter_dropdown::DateTarget;
 
+    // === Capture state BEFORE change for diagnostics ===
+    let previous_active = ctx.media_navigator.filter().is_active();
+    let previous_media_type = ctx.media_navigator.filter().media_type;
+    let previous_date_active = ctx.media_navigator.filter().date_range.is_some();
+
     // Clone current filter to modify
     let mut filter = ctx.media_navigator.filter().clone();
 
-    match msg {
+    // Determine filter_type for logging (None for local-only messages and ResetFilters)
+    let filter_change_type: Option<FilterChangeType> = match msg {
         filter_dropdown::Message::ToggleDropdown
         | filter_dropdown::Message::CloseDropdown
         | filter_dropdown::Message::ConsumeClick
@@ -1498,25 +2039,36 @@ fn handle_filter_changed(
             unreachable!("Local messages should be handled in component")
         }
         filter_dropdown::Message::MediaTypeChanged(media_type) => {
+            let from = format!("{previous_media_type:?}").to_lowercase();
+            let to = format!("{media_type:?}").to_lowercase();
             filter.media_type = media_type;
+            Some(FilterChangeType::MediaType { from, to })
         }
         filter_dropdown::Message::ToggleDateFilter(enabled) => {
             if enabled {
                 // Enable date filter with default values (no bounds = filter by field only)
                 filter.date_range = Some(DateRangeFilter::default());
+                Some(FilterChangeType::DateRangeEnabled)
             } else {
                 filter.date_range = None;
+                Some(FilterChangeType::DateRangeDisabled)
             }
         }
         filter_dropdown::Message::DateFieldChanged(field) => {
+            let field_str = format!("{field:?}").to_lowercase();
             if let Some(ref mut date_range) = filter.date_range {
                 date_range.field = field;
             }
+            Some(FilterChangeType::DateFieldChanged { field: field_str })
         }
         filter_dropdown::Message::DateSubmit(target) => {
             // Get the date from the viewer's dropdown state
             let date_state = ctx.viewer.filter_dropdown_state().date_state(target);
             let date = date_state.to_system_time();
+            let target_str = match target {
+                DateTarget::Start => "start".to_string(),
+                DateTarget::End => "end".to_string(),
+            };
 
             if let Some(ref mut date_range) = filter.date_range {
                 match target {
@@ -1524,22 +2076,50 @@ fn handle_filter_changed(
                     DateTarget::End => date_range.end = date,
                 }
             }
+            Some(FilterChangeType::DateBoundSet { target: target_str })
         }
         filter_dropdown::Message::ClearDate(target) => {
+            let target_str = match target {
+                DateTarget::Start => "start".to_string(),
+                DateTarget::End => "end".to_string(),
+            };
+
             if let Some(ref mut date_range) = filter.date_range {
                 match target {
                     DateTarget::Start => date_range.start = None,
                     DateTarget::End => date_range.end = None,
                 }
             }
+            Some(FilterChangeType::DateBoundCleared { target: target_str })
         }
         filter_dropdown::Message::ResetFilters => {
+            // Handle separately as FilterCleared
+            let had_media_type_filter = previous_media_type.is_active();
+            let had_date_filter = previous_date_active;
             filter = MediaFilter::default();
+
+            // Emit FilterCleared event
+            ctx.diagnostics.log_state(AppStateEvent::FilterCleared {
+                had_media_type_filter,
+                had_date_filter,
+            });
+            None // Don't emit FilterChanged
         }
-    }
+    };
 
     // Update the navigator's filter
     ctx.media_navigator.set_filter(filter);
+
+    // === Emit FilterChanged diagnostic event ===
+    if let Some(filter_type) = filter_change_type {
+        ctx.diagnostics.log_state(AppStateEvent::FilterChanged {
+            filter_type,
+            previous_active,
+            new_active: ctx.media_navigator.filter().is_active(),
+            filtered_count: ctx.media_navigator.filtered_count(),
+            total_count: ctx.media_navigator.len(),
+        });
+    }
 
     // Persist if filter persistence is enabled
     let (cfg, _) = config::load();
@@ -1698,4 +2278,218 @@ fn trigger_prefetch(ctx: &mut UpdateContext<'_>) -> Task<Message> {
         .collect();
 
     Task::batch(tasks)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diagnostics::{BufferCapacity, DiagnosticEventKind, DiagnosticsCollector};
+    use crate::media::{ImageData, VideoData};
+    use std::path::Path;
+
+    /// Creates test image data.
+    fn test_image_data() -> ImageData {
+        let pixels = vec![255_u8; 4 * 100 * 100];
+        ImageData::from_rgba(100, 100, pixels)
+    }
+
+    /// Creates test video data.
+    fn test_video_data() -> VideoData {
+        let pixels = vec![255_u8; 4];
+        let thumbnail = ImageData::from_rgba(1, 1, pixels);
+        VideoData {
+            thumbnail,
+            width: 1920,
+            height: 1080,
+            duration_secs: 60.0,
+            fps: 30.0,
+            has_audio: true,
+        }
+    }
+
+    #[test]
+    fn log_media_loaded_captures_image_dimensions() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let media = MediaData::Image(test_image_data());
+        log_media_loaded(&media, None, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state: AppStateEvent::MediaLoaded { dimensions, .. },
+        } = &events[0].kind
+        {
+            assert!(dimensions.is_some());
+            let dims = dimensions.as_ref().unwrap();
+            assert_eq!(dims.width, 100);
+            assert_eq!(dims.height, 100);
+        } else {
+            panic!("Expected MediaLoaded event");
+        }
+    }
+
+    #[test]
+    fn log_media_loaded_captures_video_dimensions() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let media = MediaData::Video(test_video_data());
+        log_media_loaded(&media, None, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state:
+                AppStateEvent::MediaLoaded {
+                    media_type,
+                    dimensions,
+                    ..
+                },
+        } = &events[0].kind
+        {
+            assert!(matches!(media_type, crate::diagnostics::MediaType::Video));
+            assert!(dimensions.is_some());
+            let dims = dimensions.as_ref().unwrap();
+            assert_eq!(dims.width, 1920);
+            assert_eq!(dims.height, 1080);
+        } else {
+            panic!("Expected MediaLoaded event");
+        }
+    }
+
+    #[test]
+    fn log_media_failed_captures_error_reason() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let error = crate::error::Error::Config("test config error".to_string());
+        log_media_failed(&error, None, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state: AppStateEvent::MediaFailed { reason, .. },
+        } = &events[0].kind
+        {
+            assert!(reason.contains("test config error"));
+        } else {
+            panic!("Expected MediaFailed event");
+        }
+    }
+
+    #[test]
+    fn log_media_loading_started_detects_video_extension() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let path = Path::new("/tmp/test_video.mp4");
+        log_media_loading_started(path, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state: AppStateEvent::MediaLoadingStarted { media_type, .. },
+        } = &events[0].kind
+        {
+            assert!(matches!(media_type, crate::diagnostics::MediaType::Video));
+        } else {
+            panic!("Expected MediaLoadingStarted event");
+        }
+    }
+
+    #[test]
+    fn log_media_loading_started_detects_image_extension() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let path = Path::new("/tmp/test_image.jpg");
+        log_media_loading_started(path, &handle);
+
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::AppState {
+            state: AppStateEvent::MediaLoadingStarted { media_type, .. },
+        } = &events[0].kind
+        {
+            assert!(matches!(media_type, crate::diagnostics::MediaType::Image));
+        } else {
+            panic!("Expected MediaLoadingStarted event");
+        }
+    }
+
+    #[test]
+    fn toggle_playback_logged_from_handler() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let message = component::Message::VideoControls(video_controls::Message::TogglePlayback);
+        let result = log_viewer_message_diagnostics(&message, None, None, &handle);
+
+        assert!(!result); // TogglePlayback doesn't indicate successful load
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::UserAction {
+            action: UserAction::TogglePlayback,
+            ..
+        } = &events[0].kind
+        {
+            // Test passes - correct action logged
+        } else {
+            panic!("Expected TogglePlayback action");
+        }
+    }
+
+    #[test]
+    fn seek_video_logged_from_handler() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let message = component::Message::VideoControls(video_controls::Message::SeekCommit);
+        let seek_position = Some(42.5);
+        let result = log_viewer_message_diagnostics(&message, None, seek_position, &handle);
+
+        assert!(!result); // SeekCommit doesn't indicate successful load
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 1);
+
+        if let DiagnosticEventKind::UserAction {
+            action: UserAction::SeekVideo { position_secs },
+            ..
+        } = &events[0].kind
+        {
+            assert!((*position_secs - 42.5).abs() < f64::EPSILON);
+        } else {
+            panic!("Expected SeekVideo action");
+        }
+    }
+
+    #[test]
+    fn seek_video_not_logged_without_preview_position() {
+        let mut collector = DiagnosticsCollector::new(BufferCapacity::default());
+        let handle = collector.handle();
+
+        let message = component::Message::VideoControls(video_controls::Message::SeekCommit);
+        // No seek preview position set
+        let result = log_viewer_message_diagnostics(&message, None, None, &handle);
+
+        assert!(!result);
+        collector.process_pending();
+        let events: Vec<_> = collector.iter().collect();
+        assert_eq!(events.len(), 0); // No event logged when no preview position
+    }
 }

@@ -205,6 +205,10 @@ pub struct State {
     pub is_loading_media: bool,
     pub loading_started_at: Option<Instant>,
     spinner_rotation: f32, // Rotation angle for animated spinner (in radians)
+    /// Media type being loaded (for diagnostics, set at load start).
+    loading_media_type: Option<crate::diagnostics::MediaType>,
+    /// File size in bytes of media being loaded (for diagnostics, set at load start).
+    loading_file_size: Option<u64>,
 
     /// Origin of the current media load request (for auto-skip behavior).
     pub load_origin: LoadOrigin,
@@ -255,6 +259,10 @@ pub struct State {
 
     /// Filter dropdown UI state.
     filter_dropdown: filter_dropdown::FilterDropdownState,
+
+    /// Diagnostics handle for logging events (set from external context).
+    /// Used for internal message dispatches (e.g., keyboard shortcuts).
+    diagnostics: Option<crate::diagnostics::DiagnosticsHandle>,
 }
 
 // Manual Default impl required: video_fit_to_window defaults to true (not false),
@@ -279,6 +287,8 @@ impl Default for State {
             is_loading_media: false,
             loading_started_at: None,
             spinner_rotation: 0.0,
+            loading_media_type: None,
+            loading_file_size: None,
             load_origin: LoadOrigin::DirectOpen,
             max_skip_attempts: MaxSkipAttempts::default(),
             video_player: None,
@@ -297,6 +307,7 @@ impl Default for State {
             current_rotation: RotationAngle::default(),
             rotated_image_cache: None,
             filter_dropdown: filter_dropdown::FilterDropdownState::default(),
+            diagnostics: None,
         }
     }
 }
@@ -410,6 +421,21 @@ impl State {
             .map(|(_, image)| image)
     }
 
+    /// Internal message dispatch using stored diagnostics handle.
+    ///
+    /// Used by keyboard handlers and other internal code paths that need to
+    /// dispatch messages without an external diagnostics reference.
+    /// Returns `(Effect::None, Task::none())` if no diagnostics handle is available.
+    fn dispatch_message(&mut self, message: Message) -> (Effect, Task<Message>) {
+        if let Some(ref diagnostics) = self.diagnostics.clone() {
+            self.handle_message(message, &I18n::default(), diagnostics)
+        } else {
+            // No diagnostics handle available - this shouldn't happen in normal operation
+            // but we handle it gracefully
+            (Effect::None, Task::none())
+        }
+    }
+
     pub fn set_cursor_position(&mut self, position: Option<Point>) {
         self.cursor_position = position;
     }
@@ -458,6 +484,13 @@ impl State {
     /// Returns true if the current media is a video.
     pub fn is_video(&self) -> bool {
         matches!(self.media, Some(MediaData::Video(_)))
+    }
+
+    /// Returns the current seek preview position if one is set.
+    ///
+    /// This is used by the App layer to log `SeekVideo` actions at handler level.
+    pub fn seek_preview_position(&self) -> Option<f64> {
+        self.seek_preview_position
     }
 
     /// Returns true if a video is playing or will resume playing after seek/buffer.
@@ -542,6 +575,24 @@ impl State {
         self.video_loop
     }
 
+    /// Returns the current video playback position in seconds (for diagnostics logging).
+    ///
+    /// Returns `None` if no video is loaded.
+    pub fn video_position(&self) -> Option<f64> {
+        self.video_player
+            .as_ref()
+            .and_then(|p| p.state().position())
+    }
+
+    /// Returns the current video playback speed (for diagnostics logging).
+    ///
+    /// Returns `None` if no video is loaded.
+    pub fn video_playback_speed(&self) -> Option<f64> {
+        self.video_player
+            .as_ref()
+            .map(crate::video_player::VideoPlayer::playback_speed)
+    }
+
     /// Sets the keyboard seek step.
     pub fn set_keyboard_seek_step(&mut self, step: KeyboardSeekStep) {
         self.keyboard_seek_step = step;
@@ -589,6 +640,31 @@ impl State {
         // Clear video shader immediately to prevent stale frame from being rendered
         // with wrong dimensions when navigating to a different media
         self.video_shader.clear();
+
+        // Determine media type and size for diagnostics
+        let media_type = self
+            .current_media_path
+            .as_ref()
+            .and_then(|p| p.extension())
+            .map_or(crate::diagnostics::MediaType::Unknown, |ext| {
+                let ext = ext.to_string_lossy().to_lowercase();
+                if ["mp4", "webm", "avi", "mkv", "mov", "m4v", "wmv", "flv"].contains(&ext.as_str())
+                {
+                    crate::diagnostics::MediaType::Video
+                } else {
+                    crate::diagnostics::MediaType::Image
+                }
+            });
+
+        let file_size_bytes = self
+            .current_media_path
+            .as_ref()
+            .and_then(|p| std::fs::metadata(p).ok())
+            .map_or(0, |m| m.len());
+
+        // Store for use in success/failure handlers
+        self.loading_media_type = Some(media_type);
+        self.loading_file_size = Some(file_size_bytes);
     }
 
     /// Returns an exportable frame from the video canvas, if available.
@@ -671,7 +747,14 @@ impl State {
     }
 
     #[allow(clippy::too_many_lines)] // Message handler with many variants, inherent complexity
-    pub fn handle_message(&mut self, message: Message, _i18n: &I18n) -> (Effect, Task<Message>) {
+    pub fn handle_message(
+        &mut self,
+        message: Message,
+        _i18n: &I18n,
+        diagnostics: &crate::diagnostics::DiagnosticsHandle,
+    ) -> (Effect, Task<Message>) {
+        // Store diagnostics handle for internal use (keyboard shortcuts, etc.)
+        self.diagnostics = Some(diagnostics.clone());
         match message {
             Message::StartLoadingMedia => {
                 // Set loading state via encapsulated method
@@ -740,7 +823,11 @@ impl State {
                         // Create VideoPlayer if this is a video
                         if let MediaData::Video(ref video_data) = media {
                             match VideoPlayer::new(video_data) {
-                                Ok(player) => {
+                                Ok(mut player) => {
+                                    // Pass diagnostics handle to the player for state event logging
+                                    if let Some(ref handle) = self.diagnostics {
+                                        player.set_diagnostics(handle.clone());
+                                    }
                                     self.video_player = Some(player);
                                     self.current_video_path = self.current_media_path.clone();
                                 }
@@ -749,6 +836,10 @@ impl State {
                                 }
                             }
                         }
+
+                        // Clear loading state fields (logging now handled at App layer)
+                        self.loading_media_type = None;
+                        self.loading_file_size = None;
 
                         self.media = Some(media);
                         self.error = None;
@@ -797,6 +888,10 @@ impl State {
                         (effect, scroll_task)
                     }
                     Err(error) => {
+                        // Clear loading state fields (logging now handled at App layer)
+                        self.loading_media_type = None;
+                        self.loading_file_size = None;
+
                         // Get the failed filename for the notification
                         let failed_filename = self
                             .current_media_path
@@ -948,6 +1043,10 @@ impl State {
                     // Create video player and start playback
                     match VideoPlayer::new(video_data) {
                         Ok(mut player) => {
+                            // Pass diagnostics handle to the player for state event logging
+                            if let Some(ref handle) = self.diagnostics {
+                                player.set_diagnostics(handle.clone());
+                            }
                             // Start playback
                             player.play();
                             self.video_player = Some(player);
@@ -983,6 +1082,7 @@ impl State {
 
                 match video_msg {
                     VM::TogglePlayback => {
+                        // Logging now handled at App layer (R1: collect at handler level)
                         if let Some(player) = &mut self.video_player {
                             match player.state() {
                                 crate::video_player::PlaybackState::Playing { .. }
@@ -1001,6 +1101,10 @@ impl State {
                             // Create player if it doesn't exist yet and start playback
                             match VideoPlayer::new(video_data) {
                                 Ok(mut player) => {
+                                    // Pass diagnostics handle to the player for state event logging
+                                    if let Some(ref handle) = self.diagnostics {
+                                        player.set_diagnostics(handle.clone());
+                                    }
                                     player.play();
                                     self.video_player = Some(player);
                                     self.current_video_path = self.current_media_path.clone();
@@ -1021,6 +1125,7 @@ impl State {
                     }
                     VM::SeekCommit => {
                         // Perform actual seek to preview position
+                        // Logging now handled at App layer (R1: collect at handler level)
                         // Don't clear seek_preview_position here - it will be cleared
                         // when we receive a frame near the seek target
                         if let Some(target_secs) = self.seek_preview_position {
@@ -1804,13 +1909,12 @@ impl State {
                 } => {
                     // Space: Toggle play/pause (video only)
                     if self.has_active_video_session() {
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::TogglePlayback),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::TogglePlayback,
+                        ))
                     } else if matches!(self.media, Some(MediaData::Video(_))) {
                         // Video loaded but not playing yet - initiate playback
-                        self.handle_message(Message::InitiatePlayback, &I18n::default())
+                        self.dispatch_message(Message::InitiatePlayback)
                     } else {
                         (Effect::None, Task::none())
                     }
@@ -1823,12 +1927,11 @@ impl State {
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
                         let step = self.keyboard_seek_step.value();
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::SeekRelative(step)),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::SeekRelative(step),
+                        ))
                     } else {
-                        self.handle_message(Message::NavigateNext, &I18n::default())
+                        self.dispatch_message(Message::NavigateNext)
                     }
                 }
                 keyboard::Event::KeyPressed {
@@ -1839,12 +1942,11 @@ impl State {
                     // Uses is_playing_or_will_resume() to handle rapid key repeats during seek
                     if self.is_video_playing_or_will_resume() {
                         let step = self.keyboard_seek_step.value();
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::SeekRelative(-step)),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::SeekRelative(-step),
+                        ))
                     } else {
-                        self.handle_message(Message::NavigatePrevious, &I18n::default())
+                        self.dispatch_message(Message::NavigatePrevious)
                     }
                 }
                 keyboard::Event::KeyPressed {
@@ -1854,10 +1956,9 @@ impl State {
                     // ArrowUp: Increase volume (only during video playback)
                     if self.has_active_video_session() {
                         let new_volume = Volume::new(self.video_volume).increase();
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::SetVolume(new_volume)),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::SetVolume(new_volume),
+                        ))
                     } else {
                         (Effect::None, Task::none())
                     }
@@ -1869,10 +1970,9 @@ impl State {
                     // ArrowDown: Decrease volume (only during video playback)
                     if self.has_active_video_session() {
                         let new_volume = Volume::new(self.video_volume).decrease();
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::SetVolume(new_volume)),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::SetVolume(new_volume),
+                        ))
                     } else {
                         (Effect::None, Task::none())
                     }
@@ -1887,10 +1987,9 @@ impl State {
                 {
                     // M key: Toggle mute (only during video playback)
                     if self.has_active_video_session() {
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::ToggleMute),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::ToggleMute,
+                        ))
                     } else {
                         (Effect::None, Task::none())
                     }
@@ -1924,10 +2023,9 @@ impl State {
                     // Comma key: Step backward one frame (only when video is paused)
                     // Route through VideoControls handler for consistent behavior
                     if self.video_player.is_some() {
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::StepBackward),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::StepBackward,
+                        ))
                     } else {
                         (Effect::None, Task::none())
                     }
@@ -1944,10 +2042,9 @@ impl State {
                     // Period key: Step forward one frame (only when video is paused)
                     // Route through VideoControls handler for consistent behavior
                     if self.video_player.is_some() {
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::StepForward),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::StepForward,
+                        ))
                     } else {
                         (Effect::None, Task::none())
                     }
@@ -1962,10 +2059,9 @@ impl State {
                 {
                     // J key: Decrease playback speed (YouTube/VLC style)
                     if self.video_player.is_some() {
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::DecreasePlaybackSpeed),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::DecreasePlaybackSpeed,
+                        ))
                     } else {
                         (Effect::None, Task::none())
                     }
@@ -1980,10 +2076,9 @@ impl State {
                 {
                     // L key: Increase playback speed (YouTube/VLC style)
                     if self.video_player.is_some() {
-                        self.handle_message(
-                            Message::VideoControls(video_controls::Message::IncreasePlaybackSpeed),
-                            &I18n::default(),
-                        )
+                        self.dispatch_message(Message::VideoControls(
+                            video_controls::Message::IncreasePlaybackSpeed,
+                        ))
                     } else {
                         (Effect::None, Task::none())
                     }
@@ -2010,9 +2105,9 @@ impl State {
                     // R key: Rotate clockwise
                     // Shift+R: Rotate counter-clockwise
                     if modifiers.shift() {
-                        self.handle_message(Message::RotateCounterClockwise, &I18n::default())
+                        self.dispatch_message(Message::RotateCounterClockwise)
                     } else {
-                        self.handle_message(Message::RotateClockwise, &I18n::default())
+                        self.dispatch_message(Message::RotateClockwise)
                     }
                 }
                 keyboard::Event::ModifiersChanged(modifiers) => {
@@ -2278,6 +2373,12 @@ fn format_media_indicator(i18n: &I18n, media: &MediaData) -> Option<HudLine> {
 mod tests {
     use super::*;
 
+    /// Creates a test diagnostics handle for use in tests.
+    fn test_diagnostics() -> crate::diagnostics::DiagnosticsHandle {
+        use crate::diagnostics::{BufferCapacity, DiagnosticsCollector};
+        DiagnosticsCollector::new(BufferCapacity::default()).handle()
+    }
+
     #[test]
     fn scroll_indicator_formats_hud_lines() {
         let i18n = I18n::default();
@@ -2406,6 +2507,7 @@ mod tests {
         let (_effect, _task) = state.handle_message(
             Message::MediaLoaded(Ok(MediaData::Image(image_data))),
             &i18n,
+            &test_diagnostics(),
         );
 
         assert!(
@@ -2613,7 +2715,8 @@ mod tests {
         state.last_overlay_interaction = None;
 
         // Keyboard navigation should still work
-        let (effect, _) = state.handle_message(Message::NavigateNext, &I18n::default());
+        let (effect, _) =
+            state.handle_message(Message::NavigateNext, &I18n::default(), &test_diagnostics());
 
         assert_eq!(
             effect,
@@ -2632,7 +2735,11 @@ mod tests {
         assert!(state.last_overlay_interaction.is_none());
 
         // Send a playback message
-        let (effect, _) = state.handle_message(Message::InitiatePlayback, &I18n::default());
+        let (effect, _) = state.handle_message(
+            Message::InitiatePlayback,
+            &I18n::default(),
+            &test_diagnostics(),
+        );
 
         // Effect should be None, and timer should now be set
         assert_eq!(effect, Effect::None);
@@ -2645,7 +2752,11 @@ mod tests {
         sleep(Duration::from_millis(50));
 
         // Send another playback message
-        let (effect, _) = state.handle_message(Message::InitiatePlayback, &I18n::default());
+        let (effect, _) = state.handle_message(
+            Message::InitiatePlayback,
+            &I18n::default(),
+            &test_diagnostics(),
+        );
         assert_eq!(effect, Effect::None);
 
         // Timer should be updated to a newer timestamp

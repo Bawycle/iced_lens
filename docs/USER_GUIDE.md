@@ -12,10 +12,11 @@ Complete documentation for IcedLens features, configuration, and usage.
 6. [AI Deblur](#ai-deblur)
 7. [AI Upscaling](#ai-upscaling)
 8. [Metadata Editing](#metadata-editing)
-9. [Configuration](#configuration)
-10. [Internationalization](#internationalization)
-11. [Download & Installation](#download--installation)
-12. [FAQ](#faq)
+9. [Diagnostics](#diagnostics)
+10. [Configuration](#configuration)
+11. [Internationalization](#internationalization)
+12. [Download & Installation](#download--installation)
+13. [FAQ](#faq)
 
 ---
 
@@ -290,6 +291,48 @@ Enhance image enlargements using the Real-ESRGAN neural network for sharper resu
 - Video metadata viewing only (editing not supported)
 - Files with corrupted EXIF data are handled gracefully
 - Smart date picker supports multiple input formats
+
+---
+
+## Diagnostics
+
+The Diagnostics screen helps troubleshoot issues by collecting anonymized application data that can be shared with developers.
+
+### Accessing Diagnostics
+
+1. Open Settings menu (gear icon in toolbar)
+2. Select "Diagnostics"
+
+### What Data is Collected
+
+| Category | Examples | Privacy |
+|----------|----------|---------|
+| **User Actions** | Navigation, zoom, playback controls | No file paths |
+| **App State** | Media loaded/failed, editor opened | File paths hashed |
+| **Operations** | AI processing duration, seek timing | Performance metrics only |
+| **System Info** | OS, CPU cores, RAM, disk space | Generic system info |
+
+### Privacy Protection
+
+- **No file paths**: All paths are hashed using blake3 (8-character hash)
+- **No file content**: Only metadata like dimensions and file size
+- **No personal data**: No usernames, network identities, or sensitive info
+- **Local only**: Data stays on your device until you export it
+
+### Using Diagnostics
+
+1. **Enable collection**: Toggle "Collection" on to start capturing events
+2. **Reproduce the issue**: Perform the actions that cause the problem
+3. **Export report**: Click "Export to File" or "Copy to Clipboard"
+4. **Share with developers**: Attach the JSON report to your bug report
+
+### Export Format
+
+Reports are exported as JSON with:
+- Session metadata (app version, OS, timestamp)
+- System resources snapshot
+- Captured events with timestamps
+- Summary statistics
 
 ---
 

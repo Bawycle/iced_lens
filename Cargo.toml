@@ -13,62 +13,67 @@ readme = "README.md"
 rust-version = "1.92.0"
 
 [dependencies]
-dirs = "6.0.0"
+dirs = "6.0"
 exif = { package = "kamadak-exif", version = "0.6" }
 ffmpeg-next = "8.0"
-fluent-bundle = "0.16.0"
-iced = { version = "0.14.0", features = ["tokio", "svg", "image", "advanced", "canvas", "wgpu"] }
-iced_aw = { version = "0.13.0", default-features = false, features = ["date_picker"] }
+fluent-bundle = "0.16"
+getrandom = "0.3"
+iced = { version = "0.14", features = ["tokio", "svg", "image", "advanced", "canvas", "wgpu"] }
+iced_aw = { version = "0.13", default-features = false, features = ["date_picker"] }
 image_rs = { package = "image", version = "0.25", features = ["jpeg", "png", "gif", "tiff", "webp", "bmp", "ico"] }
-pico-args = "0.5.0"
-resvg = "0.45.1"
+pico-args = "0.5"
+resvg = "0.45"
 rfd = "0.16"
-rust-embed = "8.9.0"
-serde = { version = "1.0.228", features = ["derive"] }
-sys-locale = "0.3.2"
-tiny-skia = "0.11.4"
+rust-embed = "8.9"
+serde = { version = "1.0", features = ["derive"] }
+sys-locale = "0.3"
+tiny-skia = "0.11"
 toml = "0.9.10"
-unic-langid = "0.9.6"
-iced_core = "0.14.0"
-iced_widget = "0.14.0"
+unic-langid = "0.9"
+iced_core = "0.14"
+iced_widget = "0.14"
 tokio = { version = "1.48", features = ["macros", "rt-multi-thread", "sync"] }
-dark-light = "2.0.0"
+arboard = "3.6"
+dark-light = "2.0"
 bytemuck = { version = "1.16", features = ["derive"] }
 ciborium = "0.2"
 wgpu = "27.0"
-cpal = "0.17.0"
-lexical-sort = "0.3.1"
+cpal = "0.17"
+lexical-sort = "0.3"
 little_exif = "0.6"
 img-parts = "0.4"
 lru = "0.16"
 png = "0.18"
-webp-animation = "0.9.0"
+webp-animation = "0.9"
 xmp-writer = "0.3"
 quick-xml = "0.38"
-chrono = "0.4.42"
-
-# AI/ML dependencies
+chrono = "0.4"
+crossbeam-channel = "0.5"
+sysinfo = "0.37"
 ort = { version = "2.0.0-rc.10", features = ["ndarray"] }
 ndarray = "0.17"
 blake3 = "1.5"
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+regex = "1.12"
+serde_json = "1.0"
+uuid = { version = "1.19", features = ["v4"] }
 
 [features]
 default = []
 
 [build-dependencies]
 winresource = "0.1"
-resvg = "0.45.1"
-tiny-skia = "0.11.4"
+resvg = "0.45"
+tiny-skia = "0.11"
 image_rs = { package = "image", version = "0.25", default-features = false, features = ["png", "ico"] }
 ico = "0.4"
 icns = "0.3"
 
 [dev-dependencies]
 approx = "0.5"
-criterion = { version = "0.8.1", features = ["html_reports"] }
-tempfile = "3.24.0"
+criterion = { version = "0.8", features = ["html_reports"] }
+tempfile = "3.24"
 tokio = { version = "1.48", features = ["macros", "rt", "sync", "time"] }
 
 [lints.clippy]

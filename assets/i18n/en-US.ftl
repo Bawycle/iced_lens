@@ -191,6 +191,7 @@ error-video-seek-timeout = Seeking timed out. The target position may be beyond 
 menu-settings = Settings
 menu-help = Help
 menu-about = About
+menu-diagnostics = Diagnostics
 navbar-edit-button = Edit
 
 # Help screen
@@ -562,3 +563,33 @@ notification-upscale-download-error = Failed to download upscale model: { $error
 notification-upscale-validation-error = Model validation failed: { $error }
 notification-upscale-resize-success = Image resized with AI upscaling
 notification-upscale-resize-error = AI upscaling failed: { $error }
+
+# Diagnostics screen
+diagnostics-title = Diagnostics
+diagnostics-back-button = Back to Viewer
+diagnostics-status-enabled = Collection: Enabled
+diagnostics-status-disabled = Collection: Disabled
+diagnostics-status-error = Collection: Error
+diagnostics-events-running-for = Events: { $duration }
+diagnostics-resources-running-for = Resources: { $duration }
+diagnostics-buffer-count = Buffer: { $count } events
+diagnostics-toggle-label = Enable Resource Collection
+diagnostics-export-file = Export to File
+diagnostics-export-clipboard = Copy to Clipboard
+
+# Diagnostics info section
+diagnostics-info-title = About Diagnostics
+diagnostics-info-description = The Diagnostics tool collects runtime information to help troubleshoot issues. Generate a report to share with support or analyze application behavior.
+diagnostics-data-collected-title = Data collected:
+diagnostics-data-item-resources = System resources (CPU, RAM, disk usage)
+diagnostics-data-item-actions = User actions (navigation, edits, commands)
+diagnostics-data-item-states = Application states (screen, mode, settings)
+diagnostics-data-item-errors = Warnings and errors
+diagnostics-privacy-notice = All data is anonymized before export. Nothing is sent automatically.
+diagnostics-docs-link = Documentation
+
+# Diagnostics notifications
+notification-diagnostics-export-success = Diagnostics exported successfully
+notification-diagnostics-export-error = Failed to export diagnostics
+notification-diagnostics-clipboard-success = Diagnostics copied to clipboard
+notification-diagnostics-clipboard-error = Failed to copy diagnostics to clipboard

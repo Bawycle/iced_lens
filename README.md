@@ -53,6 +53,9 @@ Enable in Settings → AI / Machine Learning. Models download from Hugging Face 
 ### Metadata
 View and edit EXIF (camera, exposure, GPS) and Dublin Core/XMP (title, creator, copyright) metadata.
 
+### Diagnostics
+Built-in diagnostics screen (Settings → Diagnostics) for troubleshooting. Collects anonymized events locally — all file paths are hashed, no data leaves your device unless you export and share it.
+
 ## Documentation
 
 - **[User Guide](docs/USER_GUIDE.md)** — Keyboard shortcuts, configuration, CLI options

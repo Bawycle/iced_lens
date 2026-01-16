@@ -21,8 +21,13 @@ mod view;
 pub use message::{Flags, Message};
 pub use screen::Screen;
 
+use crate::diagnostics::{
+    AIModel, AppOperation, AppStateEvent, DiagnosticsCollector, Dimensions, ErrorType, UserAction,
+    WarningType,
+};
 use crate::media::metadata::MediaMetadata;
 use crate::media::{self, MaxSkipAttempts, MediaData, MediaNavigator};
+use crate::ui::diagnostics_screen;
 use crate::ui::help;
 use crate::ui::image_editor::{self, State as ImageEditorState};
 use crate::ui::metadata_panel::MetadataEditorState;
@@ -35,6 +40,7 @@ use crate::video_player::{create_lufs_cache, SharedLufsCache};
 use i18n::fluent::I18n;
 use iced::{window, Element, Subscription, Task, Theme};
 use std::fmt;
+use std::time::Instant;
 
 /// Root Iced application state that bridges UI components, localization, and
 /// persisted preferences.
@@ -84,6 +90,14 @@ pub struct App {
     cancellation_token: std::sync::Arc<std::sync::atomic::AtomicBool>,
     /// Cache for prefetched images to speed up navigation.
     prefetch_cache: media::prefetch::ImagePrefetchCache,
+    /// Diagnostics collector for capturing application events.
+    diagnostics: DiagnosticsCollector,
+    /// Timestamp when AI deblur operation started (for duration tracking).
+    deblur_started_at: Option<Instant>,
+    /// Timestamp when AI upscale operation started (for duration tracking).
+    upscale_started_at: Option<Instant>,
+    /// Scale factor for current upscale operation (stored at start for completion handler).
+    upscale_scale_factor: Option<f32>,
 }
 
 impl fmt::Debug for App {
@@ -179,6 +193,10 @@ impl Default for App {
             shutting_down: false,
             cancellation_token: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             prefetch_cache: media::prefetch::ImagePrefetchCache::with_defaults(),
+            diagnostics: DiagnosticsCollector::default(),
+            deblur_started_at: None,
+            upscale_started_at: None,
+            upscale_scale_factor: None,
         }
     }
 }
@@ -198,6 +216,9 @@ impl App {
             i18n,
             ..Self::default()
         };
+
+        // Initialize diagnostics handle in notification manager for automatic warning/error capture
+        app.notifications.set_diagnostics(app.diagnostics.handle());
 
         app.theme_mode = config.general.theme_mode;
 
@@ -334,12 +355,16 @@ impl App {
 
         // Show warnings for config/state loading issues
         if let Some(key) = config_warning {
-            app.notifications
-                .push(notifications::Notification::warning(&key));
+            app.notifications.push(
+                notifications::Notification::warning(&key)
+                    .with_warning_type(WarningType::ConfigurationIssue),
+            );
         }
         if let Some(key) = state_warning {
-            app.notifications
-                .push(notifications::Notification::warning(&key));
+            app.notifications.push(
+                notifications::Notification::warning(&key)
+                    .with_warning_type(WarningType::ConfigurationIssue),
+            );
         }
 
         let task = if let Some(path_str) = flags.file_path {
@@ -488,7 +513,10 @@ impl App {
                 editor.subscription().map(Message::ImageEditor)
             });
 
-        Subscription::batch([event_sub, tick_sub, video_sub, editor_sub])
+        // Diagnostics screen refresh subscription
+        let diagnostics_sub = subscription::create_diagnostics_subscription(self.screen);
+
+        Subscription::batch([event_sub, tick_sub, video_sub, editor_sub, diagnostics_sub])
     }
 
     // Allow too_many_lines: match dispatcher inherent to Elm architecture.
@@ -504,6 +532,67 @@ impl App {
         {
             self.window_size = Some(*size);
         }
+
+        // Handle diagnostics exports before creating context (need access to self.notifications)
+        if let Message::Diagnostics(ref diagnostics_message) = message {
+            // Always drain pending events when handling diagnostics messages.
+            // This ensures the buffer is up-to-date even when Tick isn't firing
+            // (Tick only fires when fullscreen/loading/notifications are active).
+            self.diagnostics.process_pending();
+
+            match diagnostics_message {
+                diagnostics_screen::Message::ToggleResourceCollection(enabled) => {
+                    if *enabled {
+                        self.diagnostics.enable_resource_collection();
+                    } else {
+                        self.diagnostics.disable_resource_collection();
+                    }
+                }
+                diagnostics_screen::Message::ExportToFile => {
+                    match self.diagnostics.export_with_dialog() {
+                        Ok(_path) => {
+                            self.notifications
+                                .push(notifications::Notification::success(
+                                    "notification-diagnostics-export-success",
+                                ));
+                        }
+                        Err(crate::diagnostics::ExportError::Cancelled) => {
+                            // User cancelled, no notification needed
+                        }
+                        Err(_) => {
+                            self.notifications.push(
+                                notifications::Notification::error(
+                                    "notification-diagnostics-export-error",
+                                )
+                                .with_error_type(ErrorType::ExportError),
+                            );
+                        }
+                    }
+                }
+                diagnostics_screen::Message::ExportToClipboard => {
+                    match self.diagnostics.export_to_clipboard() {
+                        Ok(()) => {
+                            self.notifications
+                                .push(notifications::Notification::success(
+                                    "notification-diagnostics-clipboard-success",
+                                ));
+                        }
+                        Err(_) => {
+                            self.notifications.push(
+                                notifications::Notification::error(
+                                    "notification-diagnostics-clipboard-error",
+                                )
+                                .with_error_type(ErrorType::ExportError),
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Get diagnostics handle before creating context (to avoid borrow issues)
+        let diagnostics_handle = self.diagnostics.handle();
 
         let mut ctx = update::UpdateContext {
             i18n: &mut self.i18n,
@@ -527,6 +616,10 @@ impl App {
             notifications: &mut self.notifications,
             cancellation_token: &self.cancellation_token,
             prefetch_cache: &mut self.prefetch_cache,
+            diagnostics: &diagnostics_handle,
+            deblur_started_at: &mut self.deblur_started_at,
+            upscale_started_at: &mut self.upscale_started_at,
+            upscale_scale_factor: &mut self.upscale_scale_factor,
         };
 
         match message {
@@ -545,6 +638,10 @@ impl App {
             }
             Message::Help(help_message) => update::handle_help_message(&mut ctx, help_message),
             Message::About(about_message) => update::handle_about_message(&mut ctx, &about_message),
+            Message::Diagnostics(diagnostics_message) => {
+                // Toggle and export handled before ctx creation to avoid borrow conflicts
+                update::handle_diagnostics_message(&mut ctx, &diagnostics_message)
+            }
             Message::MetadataPanel(panel_message) => {
                 update::handle_metadata_panel_message(&mut ctx, panel_message)
             }
@@ -559,13 +656,17 @@ impl App {
 
                 // Also check for loading timeout
                 if self.viewer.check_loading_timeout() {
-                    self.notifications.push(notifications::Notification::error(
-                        "notification-load-error-timeout",
-                    ));
+                    self.notifications.push(
+                        notifications::Notification::error("notification-load-error-timeout")
+                            .with_error_type(ErrorType::IoError),
+                    );
                 }
 
                 // Tick notification manager to handle auto-dismiss
                 self.notifications.tick();
+
+                // Process pending diagnostic events from channel to buffer
+                self.diagnostics.process_pending();
 
                 Task::none()
             }
@@ -583,8 +684,10 @@ impl App {
                                 // Remember the save directory for next time
                                 self.persisted.set_last_save_directory_from_file(&path);
                                 if let Some(key) = self.persisted.save() {
-                                    self.notifications
-                                        .push(notifications::Notification::warning(&key));
+                                    self.notifications.push(
+                                        notifications::Notification::warning(&key)
+                                            .with_warning_type(WarningType::ConfigurationIssue),
+                                    );
                                 }
 
                                 // Rescan directory if saved in the same folder as current media
@@ -594,9 +697,10 @@ impl App {
                                 );
                             }
                             Err(_err) => {
-                                self.notifications.push(notifications::Notification::error(
-                                    "notification-save-error",
-                                ));
+                                self.notifications.push(
+                                    notifications::Notification::error("notification-save-error")
+                                        .with_error_type(ErrorType::ExportError),
+                                );
                             }
                         }
                     }
@@ -609,6 +713,12 @@ impl App {
                     // Determine export format from file extension
                     let format = crate::media::frame_export::ExportFormat::from_path(&path);
 
+                    // Log user action at handler level (R1 principle)
+                    let format_str =
+                        format.map_or_else(|| "unknown".to_string(), |f| f.extension().to_string());
+                    self.diagnostics
+                        .log_action(UserAction::ExportFile { format: format_str });
+
                     match frame.save_to_file(&path, format) {
                         Ok(()) => {
                             self.notifications
@@ -619,14 +729,19 @@ impl App {
                             // Remember the save directory for next time
                             self.persisted.set_last_save_directory_from_file(&path);
                             if let Some(key) = self.persisted.save() {
-                                self.notifications
-                                    .push(notifications::Notification::warning(&key));
+                                self.notifications.push(
+                                    notifications::Notification::warning(&key)
+                                        .with_warning_type(WarningType::ConfigurationIssue),
+                                );
                             }
                         }
                         Err(_err) => {
-                            self.notifications.push(notifications::Notification::error(
-                                "notification-frame-capture-error",
-                            ));
+                            self.notifications.push(
+                                notifications::Notification::error(
+                                    "notification-frame-capture-error",
+                                )
+                                .with_error_type(ErrorType::ExportError),
+                            );
                         }
                     }
                 }
@@ -643,9 +758,10 @@ impl App {
                         self.screen = Screen::ImageEditor;
                     }
                     Err(_) => {
-                        self.notifications.push(notifications::Notification::error(
-                            "notification-editor-frame-error",
-                        ));
+                        self.notifications.push(
+                            notifications::Notification::error("notification-editor-frame-error")
+                                .with_error_type(ErrorType::InternalError),
+                        );
                     }
                 }
                 Task::none()
@@ -707,10 +823,10 @@ impl App {
             }
             Message::DirectoryScanCompleted { result, load_path } => {
                 let Ok(media_list) = result else {
-                    self.notifications
-                        .push(notifications::Notification::warning(
-                            "notification-scan-dir-error",
-                        ));
+                    self.notifications.push(
+                        notifications::Notification::warning("notification-scan-dir-error")
+                            .with_warning_type(WarningType::Other),
+                    );
                     return Task::none();
                 };
 
@@ -730,6 +846,10 @@ impl App {
                     self.media_navigator.set_current_media_path(path.clone());
                     self.viewer.current_media_path = Some(path.clone());
                     self.viewer.start_loading();
+
+                    // Log MediaLoadingStarted at handler level (R1: collect at handler level)
+                    update::log_media_loading_started(&path, &self.diagnostics.handle());
+
                     Task::perform(async move { media::load_media(&path) }, |result| {
                         Message::Viewer(component::Message::MediaLoaded(result))
                     })
@@ -751,9 +871,37 @@ impl App {
             return Task::none();
         }
 
+        // Calculate duration from start time
+        // Truncation is safe: millis won't exceed u64::MAX for practical durations
+        #[allow(clippy::cast_possible_truncation)]
+        let duration_ms = self
+            .deblur_started_at
+            .take()
+            .map_or(0, |start| start.elapsed().as_millis() as u64);
+
+        let diagnostics_handle = self.diagnostics.handle();
+
         if let Some(editor) = self.image_editor.as_mut() {
+            // Get image dimensions for diagnostics
+            let (w, h) = (
+                editor.working_image().width(),
+                editor.working_image().height(),
+            );
+            // Estimate memory size (RGBA = 4 bytes per pixel)
+            let file_size_bytes = u64::from(w) * u64::from(h) * 4;
+            let dimensions = Some(Dimensions::new(w, h));
+
             match result {
                 Ok(deblurred_image) => {
+                    // Log operation with success
+                    diagnostics_handle.log_operation(AppOperation::AIDeblurProcess {
+                        duration_ms,
+                        file_size_bytes,
+                        dimensions,
+                        success: true,
+                    });
+                    diagnostics_handle.log_state(AppStateEvent::EditorDeblurCompleted);
+
                     editor.apply_deblur_result(*deblurred_image);
                     self.notifications
                         .push(notifications::Notification::success(
@@ -761,9 +909,18 @@ impl App {
                         ));
                 }
                 Err(e) => {
+                    // Log operation with failure
+                    diagnostics_handle.log_operation(AppOperation::AIDeblurProcess {
+                        duration_ms,
+                        file_size_bytes,
+                        dimensions,
+                        success: false,
+                    });
+
                     editor.deblur_failed();
                     self.notifications.push(
                         notifications::Notification::error("notification-deblur-apply-error")
+                            .with_error_type(crate::diagnostics::ErrorType::AIModelError)
                             .with_arg("error", e),
                     );
                 }
@@ -782,9 +939,38 @@ impl App {
             return Task::none();
         }
 
+        // Calculate duration from start time
+        // Truncation is safe: millis won't exceed u64::MAX for practical durations
+        #[allow(clippy::cast_possible_truncation)]
+        let duration_ms = self
+            .upscale_started_at
+            .take()
+            .map_or(0, |start| start.elapsed().as_millis() as u64);
+
+        let scale_factor = self.upscale_scale_factor.take().unwrap_or(1.0);
+        let diagnostics_handle = self.diagnostics.handle();
+
         if let Some(editor) = self.image_editor.as_mut() {
+            // Get original image dimensions for diagnostics
+            let (w, h) = (
+                editor.working_image().width(),
+                editor.working_image().height(),
+            );
+            // Estimate memory size (RGBA = 4 bytes per pixel)
+            let file_size_bytes = u64::from(w) * u64::from(h) * 4;
+            let dimensions = Some(Dimensions::new(w, h));
+
             match result {
                 Ok(upscaled_image) => {
+                    // Log operation with success
+                    diagnostics_handle.log_operation(AppOperation::AIUpscaleProcess {
+                        duration_ms,
+                        scale_factor,
+                        file_size_bytes,
+                        dimensions,
+                        success: true,
+                    });
+
                     // apply_upscale_resize_result clears the processing state
                     editor.apply_upscale_resize_result(*upscaled_image);
                     self.notifications
@@ -793,10 +979,20 @@ impl App {
                         ));
                 }
                 Err(e) => {
+                    // Log operation with failure
+                    diagnostics_handle.log_operation(AppOperation::AIUpscaleProcess {
+                        duration_ms,
+                        scale_factor,
+                        file_size_bytes,
+                        dimensions,
+                        success: false,
+                    });
+
                     // Clear processing state on error
                     editor.clear_upscale_processing();
                     self.notifications.push(
                         notifications::Notification::error("notification-upscale-resize-error")
+                            .with_error_type(crate::diagnostics::ErrorType::AIModelError)
                             .with_arg("error", e),
                     );
                 }
@@ -813,15 +1009,17 @@ impl App {
         // Use media_navigator as single source of truth for current path
         if let Some(source_path) = self.media_navigator.current_media_path() {
             if let Err(_e) = std::fs::copy(source_path, path) {
-                self.notifications.push(notifications::Notification::error(
-                    "notification-metadata-save-error",
-                ));
+                self.notifications.push(
+                    notifications::Notification::error("notification-metadata-save-error")
+                        .with_error_type(ErrorType::IoError),
+                );
                 return Task::none();
             }
         } else {
-            self.notifications.push(notifications::Notification::error(
-                "notification-metadata-save-error",
-            ));
+            self.notifications.push(
+                notifications::Notification::error("notification-metadata-save-error")
+                    .with_error_type(ErrorType::IoError),
+            );
             return Task::none();
         }
 
@@ -832,8 +1030,10 @@ impl App {
                     // Remember the save directory
                     self.persisted.set_last_save_directory_from_file(path);
                     if let Some(key) = self.persisted.save() {
-                        self.notifications
-                            .push(notifications::Notification::warning(&key));
+                        self.notifications.push(
+                            notifications::Notification::warning(&key)
+                                .with_warning_type(WarningType::ConfigurationIssue),
+                        );
                     }
 
                     // Refresh metadata display
@@ -851,9 +1051,10 @@ impl App {
                 Err(_e) => {
                     // Clean up: remove the copied file if write failed
                     let _ = std::fs::remove_file(path);
-                    self.notifications.push(notifications::Notification::error(
-                        "notification-metadata-save-error",
-                    ));
+                    self.notifications.push(
+                        notifications::Notification::error("notification-metadata-save-error")
+                            .with_error_type(ErrorType::IoError),
+                    );
                 }
             }
         }
@@ -869,6 +1070,13 @@ impl App {
 
         match result {
             Ok(()) => {
+                // Log state event for diagnostics
+                self.diagnostics
+                    .handle()
+                    .log_state(AppStateEvent::ModelDownloadCompleted {
+                        model: AIModel::Deblur,
+                    });
+
                 // Download succeeded - start validation
                 self.settings
                     .set_deblur_model_status(media::deblur::ModelStatus::Validating);
@@ -900,11 +1108,20 @@ impl App {
                 )
             }
             Err(e) => {
+                // Log state event for diagnostics
+                self.diagnostics
+                    .handle()
+                    .log_state(AppStateEvent::ModelDownloadFailed {
+                        model: AIModel::Deblur,
+                        reason: e.clone(),
+                    });
+
                 // Download failed
                 self.settings
                     .set_deblur_model_status(media::deblur::ModelStatus::Error(e.clone()));
                 self.notifications.push(
                     notifications::Notification::error("notification-deblur-download-error")
+                        .with_error_type(ErrorType::AIModelError)
                         .with_arg("error", e),
                 );
                 Task::none()
@@ -935,8 +1152,10 @@ impl App {
                 self.settings.set_enable_deblur(true);
                 self.persisted.enable_deblur = true;
                 if let Some(key) = self.persisted.save() {
-                    self.notifications
-                        .push(notifications::Notification::warning(&key));
+                    self.notifications.push(
+                        notifications::Notification::warning(&key)
+                            .with_warning_type(WarningType::ConfigurationIssue),
+                    );
                 }
                 // Only show success notification for user-initiated activation, not startup
                 if !is_startup {
@@ -953,13 +1172,16 @@ impl App {
                 self.settings.set_enable_deblur(false);
                 self.persisted.enable_deblur = false;
                 if let Some(key) = self.persisted.save() {
-                    self.notifications
-                        .push(notifications::Notification::warning(&key));
+                    self.notifications.push(
+                        notifications::Notification::warning(&key)
+                            .with_warning_type(WarningType::ConfigurationIssue),
+                    );
                 }
                 // Delete the invalid model file
                 let _ = std::fs::remove_file(media::deblur::get_model_path());
                 self.notifications.push(
                     notifications::Notification::error("notification-deblur-validation-error")
+                        .with_error_type(ErrorType::AIModelError)
                         .with_arg("error", e),
                 );
             }
@@ -976,6 +1198,13 @@ impl App {
 
         match result {
             Ok(()) => {
+                // Log state event for diagnostics
+                self.diagnostics
+                    .handle()
+                    .log_state(AppStateEvent::ModelDownloadCompleted {
+                        model: AIModel::Upscale,
+                    });
+
                 // Download succeeded - start validation
                 self.settings
                     .set_upscale_model_status(media::upscale::UpscaleModelStatus::Validating);
@@ -1006,11 +1235,20 @@ impl App {
                 )
             }
             Err(e) => {
+                // Log state event for diagnostics
+                self.diagnostics
+                    .handle()
+                    .log_state(AppStateEvent::ModelDownloadFailed {
+                        model: AIModel::Upscale,
+                        reason: e.clone(),
+                    });
+
                 // Download failed
                 self.settings
                     .set_upscale_model_status(media::upscale::UpscaleModelStatus::Error(e.clone()));
                 self.notifications.push(
                     notifications::Notification::error("notification-upscale-download-error")
+                        .with_error_type(ErrorType::AIModelError)
                         .with_arg("error", e),
                 );
                 Task::none()
@@ -1037,8 +1275,10 @@ impl App {
                 self.settings.set_enable_upscale(true);
                 self.persisted.enable_upscale = true;
                 if let Some(key) = self.persisted.save() {
-                    self.notifications
-                        .push(notifications::Notification::warning(&key));
+                    self.notifications.push(
+                        notifications::Notification::warning(&key)
+                            .with_warning_type(WarningType::ConfigurationIssue),
+                    );
                 }
                 // Only show success notification for user-initiated activation, not startup
                 if !is_startup {
@@ -1055,13 +1295,16 @@ impl App {
                 self.settings.set_enable_upscale(false);
                 self.persisted.enable_upscale = false;
                 if let Some(key) = self.persisted.save() {
-                    self.notifications
-                        .push(notifications::Notification::warning(&key));
+                    self.notifications.push(
+                        notifications::Notification::warning(&key)
+                            .with_warning_type(WarningType::ConfigurationIssue),
+                    );
                 }
                 // Delete the invalid model file
                 let _ = std::fs::remove_file(media::upscale::get_model_path());
                 self.notifications.push(
                     notifications::Notification::error("notification-upscale-validation-error")
+                        .with_error_type(ErrorType::AIModelError)
                         .with_arg("error", e),
                 );
             }
@@ -1104,6 +1347,7 @@ impl App {
                         notifications::Notification::warning(
                             "notification-skipped-corrupted-files",
                         )
+                        .with_warning_type(WarningType::UnsupportedFormat)
                         .with_arg("files", files_text)
                         .auto_dismiss(std::time::Duration::from_secs(8)),
                     );
@@ -1116,9 +1360,10 @@ impl App {
                     self.image_editor = Some(new_editor_state);
                 }
                 Err(_) => {
-                    self.notifications.push(notifications::Notification::error(
-                        "notification-editor-create-error",
-                    ));
+                    self.notifications.push(
+                        notifications::Notification::error("notification-editor-create-error")
+                            .with_error_type(ErrorType::InternalError),
+                    );
                 }
             }
             Task::none()
@@ -1183,6 +1428,7 @@ impl App {
                                 notifications::Notification::warning(
                                     "notification-skipped-corrupted-files",
                                 )
+                                .with_warning_type(WarningType::UnsupportedFormat)
                                 .with_arg("files", files_text)
                                 .auto_dismiss(std::time::Duration::from_secs(8)),
                             );
@@ -1196,6 +1442,7 @@ impl App {
                             notifications::Notification::warning(
                                 "notification-skipped-corrupted-files",
                             )
+                            .with_warning_type(WarningType::UnsupportedFormat)
                             .with_arg("files", files_text)
                             .auto_dismiss(std::time::Duration::from_secs(8)),
                         );
@@ -1207,9 +1454,10 @@ impl App {
                     // come from navigation. Kept as defensive fallback.
                     #[cfg(debug_assertions)]
                     eprintln!("[WARN] Unexpected DirectOpen in image editor error handler");
-                    self.notifications.push(notifications::Notification::error(
-                        "notification-load-error",
-                    ));
+                    self.notifications.push(
+                        notifications::Notification::error("notification-load-error")
+                            .with_error_type(ErrorType::DecodeError),
+                    );
                     Task::none()
                 }
             }
@@ -1246,6 +1494,9 @@ impl App {
             filter: self.media_navigator.filter(),
             total_count: self.media_navigator.navigation_info().total_count,
             filtered_count: self.media_navigator.navigation_info().filtered_count,
+            diagnostics_status: self.diagnostics.get_status(),
+            diagnostics_event_count: self.diagnostics.len(),
+            diagnostics_collection_duration: self.diagnostics.get_collection_duration(),
         })
     }
 }
@@ -1268,6 +1519,12 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::{Mutex, OnceLock};
     use tempfile::tempdir;
+
+    /// Creates a test diagnostics handle for use in tests.
+    fn test_diagnostics() -> crate::diagnostics::DiagnosticsHandle {
+        use crate::diagnostics::{BufferCapacity, DiagnosticsCollector};
+        DiagnosticsCollector::new(BufferCapacity::default()).handle()
+    }
 
     fn config_env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -1550,6 +1807,7 @@ mod tests {
         let _ = app.viewer.handle_message(
             component::Message::MediaLoaded(Ok(build_media(2000, 1000))),
             &app.i18n,
+            &test_diagnostics(),
         );
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
             Point::new(0.0, 0.0),
@@ -1603,6 +1861,7 @@ mod tests {
         let _ = app.viewer.handle_message(
             component::Message::MediaLoaded(Ok(build_media(800, 600))),
             &app.i18n,
+            &test_diagnostics(),
         );
         app.viewer.viewport_state_mut().bounds = Some(Rectangle::new(
             Point::new(10.0, 10.0),
@@ -1634,6 +1893,7 @@ mod tests {
         let _ = app.viewer.handle_message(
             component::Message::MediaLoaded(Ok(build_media(800, 600))),
             &app.i18n,
+            &test_diagnostics(),
         );
 
         // Configure zoom after loading to set up test state

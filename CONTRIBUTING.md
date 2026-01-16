@@ -561,6 +561,13 @@ iced_lens/
 │   │   ├── sync.rs             # A/V synchronization (audio-master)
 │   │   ├── frame_cache.rs      # Decoded frame caching
 │   │   └── time_units.rs       # Time conversion utilities
+│   ├── diagnostics/            # Diagnostics collection and export
+│   │   ├── mod.rs              # Module exports and DiagnosticsCollector
+│   │   ├── events.rs           # Event types (UserAction, AppStateEvent, AppOperation)
+│   │   ├── buffer.rs           # Circular buffer for event storage
+│   │   ├── anonymizer.rs       # Path hashing and data anonymization
+│   │   ├── export.rs           # JSON export to file and clipboard
+│   │   └── resource_collector.rs # System metrics collection
 │   ├── ui/                     # UI components
 │   │   ├── viewer/             # Image/video viewer component
 │   │   │   ├── component.rs    # Main viewer widget

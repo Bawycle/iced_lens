@@ -191,6 +191,7 @@ error-video-seek-timeout = Die Suche ist abgelaufen. Die Zielposition liegt mög
 menu-settings = Einstellungen
 menu-help = Hilfe
 menu-about = Über
+menu-diagnostics = Diagnose
 navbar-edit-button = Bearbeiten
 
 # Help screen
@@ -561,3 +562,33 @@ notification-upscale-download-error = Herunterladen des Hochskalierungs-Modells 
 notification-upscale-validation-error = Modellvalidierung fehlgeschlagen: { $error }
 notification-upscale-resize-success = Bild mit KI-Hochskalierung vergrößert
 notification-upscale-resize-error = KI-Hochskalierung fehlgeschlagen: { $error }
+
+# Diagnose-Bildschirm
+diagnostics-title = Diagnose
+diagnostics-back-button = Zurück zum Viewer
+diagnostics-status-enabled = Sammlung: Aktiviert
+diagnostics-status-disabled = Sammlung: Deaktiviert
+diagnostics-status-error = Sammlung: Fehler
+diagnostics-events-running-for = Ereignisse: { $duration }
+diagnostics-resources-running-for = Ressourcen: { $duration }
+diagnostics-buffer-count = Puffer: { $count } Ereignisse
+diagnostics-toggle-label = Ressourcensammlung aktivieren
+diagnostics-export-file = In Datei exportieren
+diagnostics-export-clipboard = In Zwischenablage kopieren
+
+# Diagnose-Informationsbereich
+diagnostics-info-title = Über Diagnose
+diagnostics-info-description = Das Diagnosetool sammelt Laufzeitinformationen zur Fehlerbehebung. Erstellen Sie einen Bericht zum Teilen mit dem Support oder zur Analyse des Anwendungsverhaltens.
+diagnostics-data-collected-title = Gesammelte Daten:
+diagnostics-data-item-resources = Systemressourcen (CPU, RAM, Festplattennutzung)
+diagnostics-data-item-actions = Benutzeraktionen (Navigation, Bearbeitung, Befehle)
+diagnostics-data-item-states = Anwendungszustände (Bildschirm, Modus, Einstellungen)
+diagnostics-data-item-errors = Warnungen und Fehler
+diagnostics-privacy-notice = Alle Daten werden vor dem Export anonymisiert. Nichts wird automatisch gesendet.
+diagnostics-docs-link = Dokumentation
+
+# Diagnose-Benachrichtigungen
+notification-diagnostics-export-success = Diagnose erfolgreich exportiert
+notification-diagnostics-export-error = Export der Diagnose fehlgeschlagen
+notification-diagnostics-clipboard-success = Diagnose in Zwischenablage kopiert
+notification-diagnostics-clipboard-error = Kopieren der Diagnose in Zwischenablage fehlgeschlagen

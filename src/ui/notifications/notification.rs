@@ -4,6 +4,7 @@
 //! This module defines the `Notification` struct and `Severity` enum
 //! used throughout the notification system.
 
+use crate::diagnostics::{ErrorType, WarningType};
 use crate::ui::design_tokens::palette;
 use iced::Color;
 use std::time::{Duration, Instant};
@@ -80,6 +81,10 @@ pub struct Notification {
     created_at: Instant,
     /// Custom auto-dismiss duration (overrides severity default).
     custom_dismiss_duration: Option<Duration>,
+    /// Diagnostic warning type for structured logging (only meaningful for Warning severity).
+    warning_type: Option<WarningType>,
+    /// Diagnostic error type for structured logging (only meaningful for Error severity).
+    error_type: Option<ErrorType>,
 }
 
 impl Notification {
@@ -95,6 +100,8 @@ impl Notification {
             message_args: Vec::new(),
             created_at: Instant::now(),
             custom_dismiss_duration: None,
+            warning_type: None,
+            error_type: None,
         }
     }
 
@@ -136,6 +143,26 @@ impl Notification {
         self
     }
 
+    /// Sets the diagnostic warning type for structured logging.
+    ///
+    /// This is used by the notification manager to log warnings to the diagnostics
+    /// system with a proper category instead of inferring it from the message key.
+    #[must_use]
+    pub fn with_warning_type(mut self, warning_type: WarningType) -> Self {
+        self.warning_type = Some(warning_type);
+        self
+    }
+
+    /// Sets the diagnostic error type for structured logging.
+    ///
+    /// This is used by the notification manager to log errors to the diagnostics
+    /// system with a proper category instead of inferring it from the message key.
+    #[must_use]
+    pub fn with_error_type(mut self, error_type: ErrorType) -> Self {
+        self.error_type = Some(error_type);
+        self
+    }
+
     /// Returns the notification's unique ID.
     #[must_use]
     pub fn id(&self) -> NotificationId {
@@ -158,6 +185,18 @@ impl Notification {
     #[must_use]
     pub fn message_args(&self) -> &[(String, String)] {
         &self.message_args
+    }
+
+    /// Returns the diagnostic warning type if set.
+    #[must_use]
+    pub fn warning_type(&self) -> Option<WarningType> {
+        self.warning_type
+    }
+
+    /// Returns the diagnostic error type if set.
+    #[must_use]
+    pub fn error_type(&self) -> Option<ErrorType> {
+        self.error_type
     }
 
     /// Returns when this notification was created.
