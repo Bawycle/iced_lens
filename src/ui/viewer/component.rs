@@ -172,20 +172,18 @@ pub struct ViewEnv<'a> {
 /// Complete viewer component state.
 #[allow(clippy::struct_excessive_bools)] // Complex UI state requires multiple boolean flags
 pub struct State {
-    media: Option<MediaData>,
-    error: Option<ErrorState>,
     pub viewport: ViewportState,
 
     /// Image transformation cluster (zoom, drag/pan, rotation).
     image_transform: clusters::image_transform::State,
 
+    /// Media lifecycle cluster (loading, media holder, errors).
+    media_lifecycle: clusters::media_lifecycle::State,
+
     pub current_media_path: Option<PathBuf>,
 
     /// Overlay visibility sub-component (fullscreen controls auto-hide).
     overlay: subcomponents::overlay::State,
-
-    /// Loading state sub-component (spinner, timeout detection).
-    loading: subcomponents::loading::State,
 
     /// Origin of the current media load request (for auto-skip behavior).
     pub load_origin: LoadOrigin,
@@ -241,13 +239,11 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
-            media: None,
-            error: None,
             viewport: ViewportState::default(),
             image_transform: clusters::image_transform::State::default(),
+            media_lifecycle: clusters::media_lifecycle::State::default(),
             current_media_path: None,
             overlay: subcomponents::overlay::State::default(),
-            loading: subcomponents::loading::State::default(),
             load_origin: LoadOrigin::DirectOpen,
             max_skip_attempts: MaxSkipAttempts::default(),
             video_player: None,
@@ -276,15 +272,25 @@ impl State {
     }
 
     pub fn has_media(&self) -> bool {
-        self.media.is_some()
+        self.media_lifecycle.has_media()
     }
 
     pub fn media(&self) -> Option<&MediaData> {
-        self.media.as_ref()
+        self.media_lifecycle.media()
     }
 
     pub fn error(&self) -> Option<&ErrorState> {
-        self.error.as_ref()
+        self.media_lifecycle.error()
+    }
+
+    /// Check if currently loading media.
+    pub fn is_loading(&self) -> bool {
+        self.media_lifecycle.is_loading()
+    }
+
+    /// Get the spinner rotation angle.
+    pub fn spinner_rotation(&self) -> f32 {
+        self.media_lifecycle.spinner_rotation()
     }
 
     pub fn zoom_state(&self) -> &ZoomState {
@@ -338,7 +344,7 @@ impl State {
 
     /// Returns true if the current media is an image (not a video).
     fn is_current_media_image(&self) -> bool {
-        matches!(self.media, Some(MediaData::Image(_)))
+        self.media_lifecycle.is_image()
     }
 
     /// Returns the cached rotated image if available.
@@ -349,7 +355,7 @@ impl State {
     /// Handle rotation effect from image_transform cluster and rebuild cache if needed.
     fn handle_rotation_changed(&mut self) {
         // Rebuild cache - cluster doesn't have access to media
-        if let Some(MediaData::Image(ref image_data)) = self.media {
+        if let Some(MediaData::Image(ref image_data)) = self.media_lifecycle.media() {
             if self.image_transform.is_rotated() {
                 let rotated = image_data.rotated(self.image_transform.rotation_angle().degrees());
                 self.image_transform.set_rotation_cache(rotated);
@@ -416,7 +422,7 @@ impl State {
 
     /// Returns true if the current media is a video.
     pub fn is_video(&self) -> bool {
-        matches!(self.media, Some(MediaData::Video(_)))
+        self.media_lifecycle.is_video()
     }
 
     /// Returns the current seek preview position if one is set.
@@ -468,9 +474,10 @@ impl State {
     }
 
     pub fn refresh_error_translation(&mut self, i18n: &I18n) {
-        if let Some(error) = &mut self.error {
-            error.refresh_translation(i18n);
-        }
+        self.media_lifecycle.handle(
+            clusters::media_lifecycle::Message::RefreshTranslations,
+            i18n,
+        );
     }
 
     /// Sets whether videos should auto-play when loaded.
@@ -567,8 +574,6 @@ impl State {
     /// This encapsulates the loading state management that was previously scattered
     /// across multiple app handlers.
     pub fn start_loading(&mut self) {
-        // Cross-cutting concerns that stay in orchestrator
-        self.error = None;
         // Clear video shader immediately to prevent stale frame from being rendered
         // with wrong dimensions when navigating to a different media
         self.video_shader.clear();
@@ -594,12 +599,14 @@ impl State {
             .and_then(|p| std::fs::metadata(p).ok())
             .map(|m| m.len());
 
-        // Delegate to loading sub-component
-        self.loading
-            .handle(subcomponents::loading::Message::StartLoading {
+        // Delegate to media_lifecycle cluster (clears error + starts loading)
+        self.media_lifecycle.handle(
+            clusters::media_lifecycle::Message::StartLoading {
                 media_type,
                 file_size: file_size_bytes,
-            });
+            },
+            &I18n::default(),
+        );
     }
 
     /// Returns an exportable frame from the video canvas, if available.
@@ -609,13 +616,15 @@ impl State {
 
     /// Returns true if media is currently being loaded.
     pub fn is_loading_media(&self) -> bool {
-        self.loading.is_loading()
+        self.media_lifecycle.is_loading()
     }
 
-    /// Handle loading timeout effect from sub-component.
+    /// Handle loading timeout effect from media_lifecycle cluster.
     fn handle_loading_timeout(&mut self) {
-        self.loading
-            .handle(subcomponents::loading::Message::StopLoading);
+        self.media_lifecycle.handle(
+            clusters::media_lifecycle::Message::StopLoading,
+            &I18n::default(),
+        );
         self.current_media_path = None;
     }
 
@@ -661,7 +670,7 @@ impl State {
             iced::Subscription::none()
         };
 
-        let spinner_subscription = if self.loading.is_loading() {
+        let spinner_subscription = if self.media_lifecycle.is_loading() {
             // Animate spinner at 60 FPS while loading
             iced::time::every(std::time::Duration::from_millis(16)).map(|_| Message::SpinnerTick)
         } else {
@@ -698,14 +707,12 @@ impl State {
                 self.current_video_path = None;
                 self.video_shader.clear_frame();
 
-                // Clear media and error state
-                self.media = None;
-                self.error = None;
+                // Delegate to media_lifecycle cluster (clears media, error, loading)
+                self.media_lifecycle.handle(
+                    clusters::media_lifecycle::Message::ClearMedia,
+                    &I18n::default(),
+                );
                 self.current_media_path = None;
-
-                // Reset loading state
-                self.loading
-                    .handle(subcomponents::loading::Message::StopLoading);
 
                 // Reset image transformation state (zoom, drag, rotation)
                 self.image_transform = clusters::image_transform::State::default();
@@ -714,9 +721,11 @@ impl State {
                 (Effect::None, Task::none())
             }
             Message::MediaLoaded(result) => {
-                // Clear loading state
-                self.loading
-                    .handle(subcomponents::loading::Message::StopLoading);
+                // Clear loading state via cluster
+                self.media_lifecycle.handle(
+                    clusters::media_lifecycle::Message::StopLoading,
+                    &I18n::default(),
+                );
 
                 // Clean up previous video state before loading new media
                 // This is important when navigating from one media to another
@@ -741,8 +750,21 @@ impl State {
 
                 match result {
                     Ok(media) => {
-                        // Create VideoPlayer if this is a video
-                        if let MediaData::Video(ref video_data) = media {
+                        // Store the path before passing media to cluster
+                        let path = self.current_media_path.clone().unwrap_or_default();
+
+                        // Set media via cluster (also clears any error)
+                        self.media_lifecycle.handle(
+                            clusters::media_lifecycle::Message::MediaLoaded {
+                                data: media,
+                                path: path.clone(),
+                            },
+                            &I18n::default(),
+                        );
+
+                        // Create VideoPlayer if this is a video (after media is stored)
+                        if let Some(MediaData::Video(ref video_data)) = self.media_lifecycle.media()
+                        {
                             match VideoPlayer::new(video_data) {
                                 Ok(mut player) => {
                                     // Pass diagnostics handle to the player for state event logging
@@ -757,11 +779,6 @@ impl State {
                                 }
                             }
                         }
-
-                        // loading_media_type/file_size cleared by StopLoading message
-
-                        self.media = Some(media);
-                        self.error = None;
 
                         // Extract skipped files from navigation origin (if any)
                         let skipped_files =
@@ -873,9 +890,10 @@ impl State {
                 }
             }
             Message::ToggleErrorDetails => {
-                if let Some(error) = &mut self.error {
-                    error.handle(subcomponents::error_state::Message::ToggleDetails);
-                }
+                self.media_lifecycle.handle(
+                    clusters::media_lifecycle::Message::ToggleErrorDetails,
+                    &I18n::default(),
+                );
                 (Effect::None, Task::none())
             }
             Message::Controls(control) => {
@@ -976,7 +994,7 @@ impl State {
                             player.play();
                         }
                     }
-                } else if let Some(MediaData::Video(ref video_data)) = self.media {
+                } else if let Some(MediaData::Video(ref video_data)) = self.media() {
                     // Create video player and start playback
                     match VideoPlayer::new(video_data) {
                         Ok(mut player) => {
@@ -1004,13 +1022,14 @@ impl State {
                 (Effect::None, Task::none())
             }
             Message::SpinnerTick => {
-                // Delegate to loading sub-component
-                let effect = self
-                    .loading
-                    .handle(subcomponents::loading::Message::SpinnerTick);
+                // Delegate to media_lifecycle cluster
+                let effect = self.media_lifecycle.handle(
+                    clusters::media_lifecycle::Message::SpinnerTick,
+                    &I18n::default(),
+                );
 
                 // Handle timeout effect
-                if matches!(effect, subcomponents::loading::Effect::LoadingTimedOut) {
+                if matches!(effect, clusters::media_lifecycle::Effect::LoadingTimedOut) {
                     self.handle_loading_timeout();
                     return (Effect::LoadingTimedOut, Task::none());
                 }
@@ -1040,7 +1059,7 @@ impl State {
                                     player.play();
                                 }
                             }
-                        } else if let Some(MediaData::Video(ref video_data)) = self.media {
+                        } else if let Some(MediaData::Video(ref video_data)) = self.media() {
                             // Create player if it doesn't exist yet and start playback
                             match VideoPlayer::new(video_data) {
                                 Ok(mut player) => {
@@ -1433,7 +1452,7 @@ impl State {
     pub fn view<'a>(&'a self, env: ViewEnv<'a>) -> Element<'a, Message> {
         let geometry_state = self.geometry_state();
 
-        let error = self.error.as_ref().map(|error| viewer::ErrorContext {
+        let error = self.error().map(|error| viewer::ErrorContext {
             friendly_text: error.friendly_text(),
             details: error.details(),
             show_details: error.show_details(),
@@ -1463,8 +1482,7 @@ impl State {
         };
 
         let media_type_line = self
-            .media
-            .as_ref()
+            .media()
             .and_then(|m| format_media_indicator(env.i18n, m));
 
         let hud_lines = position_line
@@ -1499,7 +1517,7 @@ impl State {
         };
 
         let effective_fit_to_window = self.fit_to_window();
-        let image = self.media.as_ref().map(|image_data| viewer::ImageContext {
+        let image = self.media().map(|image_data| viewer::ImageContext {
             i18n: env.i18n,
             controls_context: controls::ViewContext {
                 i18n: env.i18n,
@@ -1555,8 +1573,8 @@ impl State {
                 // Use is_playing_or_will_resume() to include Seeking state
                 // This prevents the play button from flashing during seek operations
                 is_video_playing: self.is_video_playing_or_will_resume(),
-                is_loading_media: self.loading.is_loading(),
-                spinner_rotation: self.loading.spinner_rotation(),
+                is_loading_media: self.media_lifecycle.is_loading(),
+                spinner_rotation: self.media_lifecycle.spinner_rotation(),
                 video_error: self
                     .video_player
                     .as_ref()
@@ -1574,7 +1592,7 @@ impl State {
             },
             is_fullscreen: env.is_fullscreen,
             is_video: self.is_video(),
-            video_playback_state: self.media.as_ref().and_then(|media| {
+            video_playback_state: self.media().and_then(|media| {
                 // Build PlaybackState for video controls
                 // Show controls for any video, not just when VideoPlayer exists
                 if let MediaData::Video(ref video_data) = media {
@@ -1644,8 +1662,8 @@ impl State {
             i18n: env.i18n,
             error,
             image,
-            is_loading: self.loading.is_loading(),
-            spinner_rotation: self.loading.spinner_rotation(),
+            is_loading: self.media_lifecycle.is_loading(),
+            spinner_rotation: self.media_lifecycle.spinner_rotation(),
         })
     }
 
@@ -1841,7 +1859,7 @@ impl State {
                         self.dispatch_message(Message::VideoControls(
                             video_controls::Message::TogglePlayback,
                         ))
-                    } else if matches!(self.media, Some(MediaData::Video(_))) {
+                    } else if matches!(self.media(), Some(MediaData::Video(_))) {
                         // Video loaded but not playing yet - initiate playback
                         self.dispatch_message(Message::InitiatePlayback)
                     } else {
@@ -2189,7 +2207,7 @@ impl State {
     /// the viewport. Returns `None` until viewport bounds are known.
     #[allow(clippy::cast_precision_loss)] // u32 to f32 for image dimensions is acceptable
     pub fn compute_fit_zoom_percent(&self) -> Option<f32> {
-        let media = self.media.as_ref()?;
+        let media = self.media()?;
         let viewport = self.viewport.bounds?;
 
         if media.width() == 0 || media.height() == 0 {
@@ -2219,7 +2237,7 @@ impl State {
     /// and layout helpers.
     fn geometry_state(&self) -> geometry::ViewerState<'_> {
         geometry::ViewerState::new(
-            self.media.as_ref(),
+            self.media(),
             &self.viewport,
             self.image_transform.zoom.zoom_percent,
             self.cursor_position(),
@@ -2400,7 +2418,7 @@ mod tests {
             !state.is_loading_media(),
             "loading flag should be cleared after successful load"
         );
-        assert!(state.error.is_none(), "no error should be set");
+        assert!(state.error().is_none(), "no error should be set");
     }
 
     #[test]
