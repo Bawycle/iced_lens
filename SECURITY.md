@@ -15,7 +15,8 @@ As IcedLens is currently in pre-1.0 development, security updates are provided f
 IcedLens is a local-first image viewer and editor:
 - **Local processing**: Images and videos are processed entirely on your machine
 - **Minimal network activity**: The only network connections are optional AI features, which download ONNX models from Hugging Face on first use: NAFNet for deblurring (~92 MB) and Real-ESRGAN for upscaling (~64 MB). Each model's integrity is verified with a BLAKE3 checksum.
-- **No telemetry**: No usage data, analytics, or tracking
+- **No telemetry**: No usage data, analytics, or tracking sent to any server
+- **Privacy-safe diagnostics**: The optional diagnostics feature (Settings → Diagnostics) collects anonymized events locally for troubleshooting. All file paths are hashed with blake3 (8-character hash). Data stays on your device unless you explicitly export and share it.
 
 Security vulnerabilities may arise from:
 - Malformed image files triggering bugs in image decoding libraries

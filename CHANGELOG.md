@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Diagnostics system:** new screen (Settings menu → Diagnostics) to collect and export anonymized diagnostic data for troubleshooting.
+  - Captures user actions, application state changes, and operation performance metrics
+  - Privacy-first: all file paths are hashed (blake3), no sensitive data collected
+  - Export to JSON file or clipboard for sharing with developers
+  - Toggle collection on/off with status display
+  - Help section explains what data is collected
 - **Image prefetching:** adjacent images are preloaded in the background for faster navigation. Uses an LRU cache (32 MB default) to store 2 images ahead and 2 behind current position.
 - **Metadata preservation options:** checkboxes in the editor sidebar to control metadata when saving.
   - Add software tag and modification date (default: on)

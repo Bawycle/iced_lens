@@ -5,6 +5,18 @@
 ## Bugs to Fix
 
 
+## Technical Debt (P3)
+
+### Diagnostics - Missing Instrumentation
+> Ref: [Epic 4 Final Audit](docs/qa/assessments/epic4-final-audit.md)
+
+- [ ] `EditorUnsavedChanges` state event not logged
+- [ ] `DecodeFrame` operation not instrumented
+- [ ] `ResizeImage` operation not instrumented
+- [ ] `ApplyFilter` operation not instrumented
+- [ ] `ExportFrame` operation not instrumented
+- [ ] `LoadMetadata` operation not instrumented
+
 ## Changed
 
 
