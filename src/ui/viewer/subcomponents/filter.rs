@@ -4,10 +4,10 @@
 use crate::ui::viewer::filter_dropdown::{DateSegment, DateTarget, FilterDropdownState};
 use std::time::SystemTime;
 
-/// Wrapper state encapsulating FilterDropdownState.
+/// Wrapper state encapsulating `FilterDropdownState`.
 #[derive(Debug, Clone, Default)]
 pub struct State {
-    /// Inner state from existing filter_dropdown module.
+    /// Inner state from existing `filter_dropdown` module.
     inner: FilterDropdownState,
 }
 
@@ -43,7 +43,7 @@ pub enum Effect {
 }
 
 impl State {
-    /// Access inner FilterDropdownState (read-only).
+    /// Access inner `FilterDropdownState` (read-only).
     #[must_use]
     pub fn inner(&self) -> &FilterDropdownState {
         &self.inner
@@ -61,6 +61,9 @@ impl State {
     }
 
     /// Handle a filter message.
+    ///
+    /// Note: Takes `Message` by value following Iced's `update(message: Message)` pattern.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn handle(&mut self, msg: Message) -> Effect {
         match msg {
             Message::Toggle => {

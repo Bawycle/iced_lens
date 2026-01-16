@@ -8,6 +8,7 @@ use crate::video_player::{PlaybackState, VideoPlayer, Volume};
 use iced::widget::image::Handle as ImageHandle;
 
 /// Video playback sub-component state.
+#[derive(Default)]
 pub struct State {
     /// The underlying video player (if video is loaded).
     player: Option<VideoPlayer>,
@@ -34,16 +35,6 @@ impl Clone for State {
         Self {
             player: None,
             current_frame: self.current_frame.clone(),
-            playback_active: false,
-        }
-    }
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            player: None,
-            current_frame: None,
             playback_active: false,
         }
     }
@@ -115,7 +106,10 @@ pub enum Effect {
 
 impl State {
     /// Handle a video playback message.
+    ///
+    /// Note: Takes `Message` by value following Iced's `update(message: Message)` pattern.
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::needless_pass_by_value)]
     pub fn handle(&mut self, msg: Message) -> Effect {
         match msg {
             Message::Initialize(video_data) => {
@@ -550,6 +544,6 @@ mod tests {
 
         assert!(state.playback_state().is_some());
         assert_eq!(state.duration(), Some(120.0));
-        assert_eq!(state.playback_speed(), 1.0);
+        assert!((state.playback_speed() - 1.0).abs() < f64::EPSILON);
     }
 }

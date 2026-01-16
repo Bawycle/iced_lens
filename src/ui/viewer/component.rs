@@ -7,7 +7,8 @@ use crate::media::navigator::NavigationInfo;
 use crate::media::{MaxSkipAttempts, MediaData};
 use crate::ui::state::{DragState, RotationAngle, ViewportState, ZoomState, ZoomStep};
 use crate::ui::viewer::{
-    self, controls, filter_dropdown, pane, state as geometry, video_controls, HudIconKind, HudLine,
+    self, controls, filter_dropdown, pane, state as geometry, subcomponents, video_controls,
+    HudIconKind, HudLine,
 };
 use crate::ui::widgets::VideoShader;
 use crate::video_player::{
@@ -250,12 +251,8 @@ pub struct State {
     /// Keyboard seek step (arrow keys during video playback).
     keyboard_seek_step: KeyboardSeekStep,
 
-    /// Current temporary rotation angle (resets on navigation).
-    current_rotation: RotationAngle,
-
-    /// Cached rotated image to avoid recomputing on every render.
-    /// Contains (`rotation_angle`, `rotated_image_data`).
-    rotated_image_cache: Option<(RotationAngle, crate::media::ImageData)>,
+    /// Rotation sub-component (temporary rotation that resets on navigation).
+    rotation: subcomponents::rotation::State,
 
     /// Filter dropdown UI state.
     filter_dropdown: filter_dropdown::FilterDropdownState,
@@ -304,8 +301,7 @@ impl Default for State {
             overflow_menu_open: false,
             last_keyboard_seek: None,
             keyboard_seek_step: KeyboardSeekStep::default(),
-            current_rotation: RotationAngle::default(),
-            rotated_image_cache: None,
+            rotation: subcomponents::rotation::State::default(),
             filter_dropdown: filter_dropdown::FilterDropdownState::default(),
             diagnostics: None,
         }
@@ -366,7 +362,7 @@ impl State {
 
     /// Returns the current temporary rotation angle.
     pub fn current_rotation(&self) -> RotationAngle {
-        self.current_rotation
+        self.rotation.angle()
     }
 
     /// Returns true if the current media is an image (not a video).
@@ -374,51 +370,32 @@ impl State {
         matches!(self.media, Some(MediaData::Image(_)))
     }
 
-    /// Updates the rotation and rebuilds the cache.
-    fn apply_rotation(&mut self, new_rotation: RotationAngle) {
-        self.current_rotation = new_rotation;
-        self.rebuild_rotation_cache();
-    }
-
-    /// Rebuilds the cached rotated image based on current rotation.
-    fn rebuild_rotation_cache(&mut self) {
-        // Only cache for images, and only when rotation is non-zero
-        if let Some(MediaData::Image(ref image_data)) = self.media {
-            if self.current_rotation.is_rotated() {
-                let rotated = image_data.rotated(self.current_rotation.degrees());
-                self.rotated_image_cache = Some((self.current_rotation, rotated));
-            } else {
-                self.rotated_image_cache = None;
-            }
-        } else {
-            self.rotated_image_cache = None;
-        }
-    }
-
-    /// Rotates the current media 90° clockwise (images only).
-    pub fn rotate_clockwise(&mut self) {
-        // Rotation only applies to images, not videos
-        if !self.is_current_media_image() {
-            return;
-        }
-        self.apply_rotation(self.current_rotation.rotate_clockwise());
-    }
-
-    /// Rotates the current media 90° counter-clockwise (images only).
-    pub fn rotate_counterclockwise(&mut self) {
-        // Rotation only applies to images, not videos
-        if !self.is_current_media_image() {
-            return;
-        }
-        self.apply_rotation(self.current_rotation.rotate_counterclockwise());
-    }
-
     /// Returns the cached rotated image if available.
     pub fn rotated_image_cache(&self) -> Option<&crate::media::ImageData> {
-        self.rotated_image_cache
-            .as_ref()
-            .filter(|(angle, _)| *angle == self.current_rotation)
-            .map(|(_, image)| image)
+        self.rotation.cached_image()
+    }
+
+    /// Handle rotation effect and rebuild cache if needed.
+    #[allow(clippy::needless_pass_by_value)] // Effect enum is small and passed by value
+    fn handle_rotation_effect(&mut self, effect: subcomponents::rotation::Effect) {
+        match effect {
+            subcomponents::rotation::Effect::None => {}
+            subcomponents::rotation::Effect::RotationChanged => {
+                // Rebuild cache - rotation sub-component doesn't have access to media
+                if let Some(MediaData::Image(ref image_data)) = self.media {
+                    if self.rotation.is_rotated() {
+                        let rotated = image_data.rotated(self.rotation.angle().degrees());
+                        self.rotation.set_cache(rotated);
+                    } else {
+                        self.rotation.clear_cache();
+                    }
+                } else {
+                    self.rotation.clear_cache();
+                }
+                // Refresh fit zoom for rotated dimensions
+                self.refresh_fit_zoom();
+            }
+        }
     }
 
     /// Internal message dispatch using stored diagnostics handle.
@@ -787,8 +764,7 @@ impl State {
                 self.viewport = ViewportState::default();
 
                 // Reset temporary rotation and cache
-                self.current_rotation = RotationAngle::default();
-                self.rotated_image_cache = None;
+                self.rotation.handle(subcomponents::rotation::Message::Reset);
 
                 (Effect::None, Task::none())
             }
@@ -815,8 +791,7 @@ impl State {
                 self.video_fit_to_window = true;
 
                 // Reset temporary rotation and cache for new media
-                self.current_rotation = RotationAngle::default();
-                self.rotated_image_cache = None;
+                self.rotation.handle(subcomponents::rotation::Message::Reset);
 
                 match result {
                     Ok(media) => {
@@ -1013,11 +988,23 @@ impl State {
             Message::EnterEditor => (Effect::EnterEditor, Task::none()),
             Message::OpenFileRequested => (Effect::OpenFileDialog, Task::none()),
             Message::RotateClockwise => {
-                self.rotate_clockwise();
+                // Rotation only applies to images, not videos
+                if self.is_current_media_image() {
+                    let effect = self
+                        .rotation
+                        .handle(subcomponents::rotation::Message::RotateClockwise);
+                    self.handle_rotation_effect(effect);
+                }
                 (Effect::None, Task::none())
             }
             Message::RotateCounterClockwise => {
-                self.rotate_counterclockwise();
+                // Rotation only applies to images, not videos
+                if self.is_current_media_image() {
+                    let effect = self
+                        .rotation
+                        .handle(subcomponents::rotation::Message::RotateCounterClockwise);
+                    self.handle_rotation_effect(effect);
+                }
                 (Effect::None, Task::none())
             }
             Message::InitiatePlayback => {
@@ -1509,8 +1496,8 @@ impl State {
             None
         };
 
-        let rotation_line = if self.current_rotation.is_rotated() {
-            Some(format_rotation_indicator(self.current_rotation))
+        let rotation_line = if self.current_rotation().is_rotated() {
+            Some(format_rotation_indicator(self.current_rotation()))
         } else {
             None
         };
@@ -1621,7 +1608,7 @@ impl State {
                     .as_ref()
                     .and_then(|p| p.state().error_message()),
                 metadata_editor_has_changes: env.metadata_editor_has_changes,
-                rotation: self.current_rotation,
+                rotation: self.current_rotation(),
                 rotated_image_cache: self.rotated_image_cache(),
             },
             controls_visible: if env.is_fullscreen {
@@ -1791,11 +1778,23 @@ impl State {
             }
             DeleteCurrentImage => (Effect::None, Task::none()),
             RotateClockwise => {
-                self.rotate_clockwise();
+                // Rotation only applies to images, not videos
+                if self.is_current_media_image() {
+                    let effect = self
+                        .rotation
+                        .handle(subcomponents::rotation::Message::RotateClockwise);
+                    self.handle_rotation_effect(effect);
+                }
                 (Effect::None, Task::none())
             }
             RotateCounterClockwise => {
-                self.rotate_counterclockwise();
+                // Rotation only applies to images, not videos
+                if self.is_current_media_image() {
+                    let effect = self
+                        .rotation
+                        .handle(subcomponents::rotation::Message::RotateCounterClockwise);
+                    self.handle_rotation_effect(effect);
+                }
                 (Effect::None, Task::none())
             }
         }
@@ -2168,7 +2167,7 @@ impl State {
         // Use rotation-aware size for correct clamping when image is rotated
         if let (Some(viewport), Some(size)) = (
             self.viewport.bounds,
-            geometry_state.scaled_media_size_rotated(self.current_rotation),
+            geometry_state.scaled_media_size_rotated(self.current_rotation()),
         ) {
             let max_offset_x = (size.width - viewport.width).max(0.0);
             let max_offset_y = (size.height - viewport.height).max(0.0);

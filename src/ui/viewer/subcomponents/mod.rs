@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Nested TEA sub-components for the viewer.
 //!
-//! Each sub-component has its own State, Message, Effect, and handle() method.
+//! Each sub-component has its own `State`, `Message`, `Effect`, and `handle()` method.
 //! The main component.rs orchestrates these sub-components.
 //!
 //! ## Architecture

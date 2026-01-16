@@ -49,6 +49,9 @@ pub enum Effect {
 
 impl State {
     /// Handle a loading state message.
+    ///
+    /// Note: Takes `Message` by value following Iced's `update(message: Message)` pattern.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn handle(&mut self, msg: Message) -> Effect {
         match msg {
             Message::StartLoading {
@@ -148,7 +151,7 @@ mod tests {
 
         assert!(!state.is_loading());
         assert!(state.started_at().is_none());
-        assert_eq!(state.spinner_rotation(), 0.0);
+        assert!(state.spinner_rotation().abs() < f32::EPSILON);
     }
 
     #[test]

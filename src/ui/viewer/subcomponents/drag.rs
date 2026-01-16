@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 const DOUBLE_CLICK_THRESHOLD: Duration = Duration::from_millis(350);
 
 /// Drag sub-component state.
-/// Encapsulates DragState and adds cursor tracking and double-click detection.
+/// Encapsulates `DragState` and adds cursor tracking and double-click detection.
 #[derive(Debug, Clone, Default)]
 pub struct State {
     /// The underlying drag state (existing type).
@@ -52,6 +52,11 @@ pub enum Effect {
 
 impl State {
     /// Handle a drag message.
+    ///
+    /// Note: Takes `Message` by value following Iced's `update(message: Message)` pattern.
+    /// Clippy's `needless_pass_by_value` is suppressed because this is the standard
+    /// TEA/Iced pattern where messages are moved into the handler.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn handle(&mut self, msg: Message) -> Effect {
         match msg {
             Message::StartDrag {
@@ -82,8 +87,7 @@ impl State {
 
                 let is_double_click = self
                     .last_click
-                    .map(|t| now.duration_since(t) < DOUBLE_CLICK_THRESHOLD)
-                    .unwrap_or(false);
+                    .is_some_and(|t| now.duration_since(t) < DOUBLE_CLICK_THRESHOLD);
 
                 self.last_click = Some(now);
 

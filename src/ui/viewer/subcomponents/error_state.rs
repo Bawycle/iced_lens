@@ -38,6 +38,9 @@ impl State {
     }
 
     /// Handle an error state message.
+    ///
+    /// Note: Takes `Message` by value following Iced's `update(message: Message)` pattern.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn handle(&mut self, msg: Message) {
         match msg {
             Message::ToggleDetails => self.show_details = !self.show_details,

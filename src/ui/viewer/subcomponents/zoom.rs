@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Zoom sub-component encapsulating ZoomState and its handlers.
+//! Zoom sub-component encapsulating `ZoomState` and its handlers.
 
 use crate::ui::state::ZoomState;
 
 /// Zoom sub-component state.
-/// Encapsulates the existing ZoomState and adds handler logic.
-#[derive(Debug, Clone)]
+/// Encapsulates the existing `ZoomState` and adds handler logic.
+#[derive(Debug, Clone, Default)]
 pub struct State {
     /// The underlying zoom state (existing type).
     pub inner: ZoomState,
@@ -41,14 +41,6 @@ pub enum Effect {
     FitToWindowChanged(bool),
     /// Preferences should be persisted.
     PersistPreferences,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            inner: ZoomState::default(),
-        }
-    }
 }
 
 impl State {

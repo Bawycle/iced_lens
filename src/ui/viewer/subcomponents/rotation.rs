@@ -35,6 +35,9 @@ pub enum Effect {
 
 impl State {
     /// Handle a rotation message.
+    ///
+    /// Note: Takes `Message` by value following Iced's `update(message: Message)` pattern.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn handle(&mut self, msg: Message) -> Effect {
         match msg {
             Message::RotateClockwise => {

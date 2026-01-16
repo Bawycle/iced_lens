@@ -54,6 +54,9 @@ pub enum Effect {
 
 impl State {
     /// Handle an overlay message.
+    ///
+    /// Note: Takes `Message` by value following Iced's `update(message: Message)` pattern.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn handle(&mut self, msg: Message) -> Effect {
         match msg {
             Message::MouseMoved(pos) => {
@@ -65,14 +68,11 @@ impl State {
                 }
 
                 // Filter micro-movements (sensor noise)
-                let is_significant = self
-                    .last_mouse_position
-                    .map(|last| {
-                        let dx = pos.x - last.x;
-                        let dy = pos.y - last.y;
-                        (dx * dx + dy * dy).sqrt() > MOUSE_MOVEMENT_THRESHOLD
-                    })
-                    .unwrap_or(true);
+                let is_significant = self.last_mouse_position.is_none_or(|last| {
+                    let dx = pos.x - last.x;
+                    let dy = pos.y - last.y;
+                    (dx * dx + dy * dy).sqrt() > MOUSE_MOVEMENT_THRESHOLD
+                });
 
                 self.last_mouse_position = Some(pos);
 
@@ -162,7 +162,7 @@ mod tests {
         assert!(state.arrows_visible);
 
         // Simulate time passing
-        state.last_mouse_move = Some(Instant::now() - Duration::from_secs(5));
+        state.last_mouse_move = Instant::now().checked_sub(Duration::from_secs(5));
         state.last_overlay_interaction = None;
 
         let effect = state.handle(Message::CheckTimeout);
@@ -172,9 +172,11 @@ mod tests {
 
     #[test]
     fn timeout_does_nothing_outside_fullscreen() {
-        let mut state = State::default();
-        state.arrows_visible = true;
-        state.last_mouse_move = Some(Instant::now() - Duration::from_secs(10));
+        let mut state = State {
+            arrows_visible: true,
+            last_mouse_move: Instant::now().checked_sub(Duration::from_secs(10)),
+            ..Default::default()
+        };
 
         let effect = state.handle(Message::CheckTimeout);
         assert!(state.arrows_visible);
