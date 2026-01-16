@@ -23,8 +23,6 @@ use std::time::{Duration, Instant};
 /// Identifier used for the viewer scrollable widget.
 pub const SCROLLABLE_ID: &str = "viewer-image-scrollable";
 const DOUBLE_CLICK_THRESHOLD: Duration = Duration::from_millis(350);
-const MOUSE_MOVEMENT_THRESHOLD: f32 = 10.0; // Minimum pixels to consider real movement (filter sensor noise)
-const FULLSCREEN_ENTRY_IGNORE_DELAY: Duration = Duration::from_millis(500); // Ignore mouse movements for 500ms after entering fullscreen
 
 /// Messages emitted by viewer-related widgets.
 #[derive(Debug, Clone)]
@@ -197,11 +195,9 @@ pub struct State {
     cursor_position: Option<Point>,
     last_click: Option<Instant>,
     pub current_media_path: Option<PathBuf>,
-    arrows_visible: bool,
-    last_mouse_move: Option<Instant>,
-    last_overlay_interaction: Option<Instant>,
-    last_mouse_position: Option<Point>, // Track last position to filter micro-movements
-    fullscreen_entered_at: Option<Instant>, // Track when fullscreen was entered to ignore initial movements
+
+    /// Overlay visibility sub-component (fullscreen controls auto-hide).
+    overlay: subcomponents::overlay::State,
 
     /// Loading state sub-component (spinner, timeout detection).
     loading: subcomponents::loading::State,
@@ -271,11 +267,7 @@ impl Default for State {
             cursor_position: None,
             last_click: None,
             current_media_path: None,
-            arrows_visible: false,
-            last_mouse_move: None,
-            last_overlay_interaction: None,
-            last_mouse_position: None,
-            fullscreen_entered_at: None,
+            overlay: subcomponents::overlay::State::default(),
             loading: subcomponents::loading::State::default(),
             load_origin: LoadOrigin::DirectOpen,
             max_skip_attempts: MaxSkipAttempts::default(),
@@ -946,7 +938,8 @@ impl State {
                 // Cancel any ongoing drag (user clicked on navigation overlay)
                 self.drag.stop();
                 // Reset overlay timer on navigation
-                self.last_overlay_interaction = Some(Instant::now());
+                self.overlay
+                    .handle(subcomponents::overlay::Message::OverlayInteraction);
                 // Emit effect to let App handle navigation with MediaNavigator
                 (Effect::NavigateNext, Task::none())
             }
@@ -958,7 +951,8 @@ impl State {
                 // Cancel any ongoing drag (user clicked on navigation overlay)
                 self.drag.stop();
                 // Reset overlay timer on navigation
-                self.last_overlay_interaction = Some(Instant::now());
+                self.overlay
+                    .handle(subcomponents::overlay::Message::OverlayInteraction);
                 // Emit effect to let App handle navigation with MediaNavigator
                 (Effect::NavigatePrevious, Task::none())
             }
@@ -988,7 +982,8 @@ impl State {
             }
             Message::InitiatePlayback => {
                 // Reset overlay timer on interaction
-                self.last_overlay_interaction = Some(Instant::now());
+                self.overlay
+                    .handle(subcomponents::overlay::Message::OverlayInteraction);
 
                 // Toggle playback if player already exists
                 if let Some(player) = &mut self.video_player {
@@ -1049,7 +1044,8 @@ impl State {
                 use super::video_controls::Message as VM;
 
                 // Reset overlay timer on video control interaction
-                self.last_overlay_interaction = Some(Instant::now());
+                self.overlay
+                    .handle(subcomponents::overlay::Message::OverlayInteraction);
 
                 match video_msg {
                     VM::TogglePlayback => {
@@ -1500,12 +1496,7 @@ impl State {
 
         // In fullscreen, overlay auto-hides after delay
         // In windowed mode, controls stay visible but center overlay (pause button) can hide
-        let overlay_should_be_visible = if env.is_fullscreen {
-            self.last_overlay_interaction
-                .is_some_and(|t| t.elapsed() < env.overlay_hide_delay)
-        } else {
-            true
-        };
+        let overlay_should_be_visible = self.overlay.should_show_controls(env.overlay_hide_delay);
 
         // For center video overlay (play/pause button), use auto-hide in both modes when playing
         let is_currently_playing = self.video_player.is_some()
@@ -1521,8 +1512,7 @@ impl State {
 
         let center_overlay_visible = if is_currently_playing {
             // When playing, center overlay (pause button) auto-hides after delay
-            self.last_overlay_interaction
-                .is_some_and(|t| t.elapsed() < env.overlay_hide_delay)
+            overlay_should_be_visible
         } else {
             // When paused/stopped, play button always visible
             true
@@ -1553,12 +1543,12 @@ impl State {
                 cursor_over_media: geometry_state.is_cursor_over_media(),
                 arrows_visible: if env.is_fullscreen {
                     // In fullscreen, arrows use same auto-hide logic as controls
-                    self.arrows_visible
+                    self.overlay.arrows_visible
                         && env.navigation.total_count > 0
                         && overlay_should_be_visible
                 } else {
                     // In windowed mode, arrows visible on hover (current behavior)
-                    self.arrows_visible && env.navigation.total_count > 0
+                    self.overlay.arrows_visible && env.navigation.total_count > 0
                 },
                 overlay_visible: center_overlay_visible,
                 has_next: env.navigation.has_next,
@@ -1755,9 +1745,8 @@ impl State {
             }
             ToggleFullscreen => {
                 // Clear overlay timer and position when entering fullscreen to hide controls
-                self.last_overlay_interaction = None;
-                self.last_mouse_position = None;
-                self.fullscreen_entered_at = Some(Instant::now());
+                self.overlay
+                    .handle(subcomponents::overlay::Message::EnteredFullscreen);
                 (Effect::ToggleFullscreen, Task::none())
             }
             DeleteCurrentImage => (Effect::None, Task::none()),
@@ -1819,40 +1808,11 @@ impl State {
                 mouse::Event::CursorMoved { position } => {
                     self.cursor_position = Some(position);
 
-                    // Calculate distance from last recorded position to filter sensor noise
-                    let (_distance, is_real_movement) =
-                        self.last_mouse_position
-                            .map_or((f32::MAX, true), |last_pos| {
-                                // First movement is always real
-                                let dx = position.x - last_pos.x;
-                                let dy = position.y - last_pos.y;
-                                let dist = (dx * dx + dy * dy).sqrt();
-                                (dist, dist >= MOUSE_MOVEMENT_THRESHOLD)
-                            });
-
-                    // Only process if real movement (not sensor noise)
-                    if is_real_movement {
-                        self.last_mouse_move = Some(Instant::now());
-                        self.last_mouse_position = Some(position);
-                        // Show arrows when cursor is anywhere in the viewer
-                        self.arrows_visible = true;
-
-                        // Ignore mouse movements shortly after entering fullscreen to avoid
-                        // triggering controls from window resize events
-                        let ignore_due_to_fullscreen_entry =
-                            self.fullscreen_entered_at.is_some_and(|entered| {
-                                entered.elapsed() < FULLSCREEN_ENTRY_IGNORE_DELAY
-                            });
-
-                        if ignore_due_to_fullscreen_entry {
-                            // Ignoring movement within 500ms of fullscreen entry
-                        } else {
-                            // Record interaction time for overlay auto-hide (fullscreen)
-                            // Reset timer on EVERY real mouse movement to keep controls visible
-                            // This follows the standard video player pattern (YouTube, VLC, etc.)
-                            self.last_overlay_interaction = Some(Instant::now());
-                        }
-                    }
+                    // Delegate overlay visibility logic to sub-component
+                    // (filters micro-movements, handles fullscreen entry delay, etc.)
+                    self.overlay.handle(subcomponents::overlay::Message::MouseMoved(
+                        Point::new(position.x, position.y),
+                    ));
 
                     if self.drag.is_dragging {
                         let task = self.handle_cursor_moved_during_drag(position);
@@ -1863,7 +1823,7 @@ impl State {
                 }
                 mouse::Event::CursorLeft => {
                     self.cursor_position = None;
-                    self.arrows_visible = false;
+                    self.overlay.cursor_left();
                     if self.drag.is_dragging {
                         self.drag.stop();
                     }
@@ -1877,9 +1837,8 @@ impl State {
                     ..
                 } => {
                     // Clear overlay timer and position when entering fullscreen to hide controls
-                    self.last_overlay_interaction = None;
-                    self.last_mouse_position = None;
-                    self.fullscreen_entered_at = Some(Instant::now());
+                    self.overlay
+                        .handle(subcomponents::overlay::Message::EnteredFullscreen);
                     (Effect::ToggleFullscreen, Task::none())
                 }
                 keyboard::Event::KeyPressed {
@@ -2115,14 +2074,14 @@ impl State {
 
             // Reset overlay timer on any left click, even on UI controls
             // This keeps controls visible when user is interacting
-            self.last_overlay_interaction = Some(now);
+            self.overlay
+                .handle(subcomponents::overlay::Message::OverlayInteraction);
 
             if self.geometry_state().is_cursor_over_media() {
                 if double_click {
                     // Clear overlay timer when entering fullscreen (will hide controls initially)
-                    self.last_overlay_interaction = None;
-                    self.last_mouse_position = None;
-                    self.fullscreen_entered_at = Some(Instant::now());
+                    self.overlay
+                        .handle(subcomponents::overlay::Message::EnteredFullscreen);
                     return Effect::ToggleFullscreen;
                 }
 
@@ -2468,120 +2427,25 @@ mod tests {
         assert!(indicator.is_none());
     }
 
-    #[test]
-    fn overlay_timer_resets_on_real_mouse_movement() {
-        use std::thread::sleep;
-
-        let mut state = State::new();
-
-        // Simulate entering fullscreen - timer should be None initially
-        state.fullscreen_entered_at = Some(Instant::now());
-        assert!(state.last_overlay_interaction.is_none());
-
-        // Wait for fullscreen entry delay to pass
-        sleep(Duration::from_millis(501));
-
-        // First real mouse movement (distance > threshold)
-        let event1 = event::Event::Mouse(mouse::Event::CursorMoved {
-            position: Point::new(100.0, 100.0),
-        });
-        let (_effect, _task) = state.handle_raw_event(event1);
-
-        // Timer should now be set
-        let first_timer = state.last_overlay_interaction;
-        assert!(
-            first_timer.is_some(),
-            "Timer should be set after first movement"
-        );
-
-        // Small delay
-        sleep(Duration::from_millis(100));
-
-        // Second real mouse movement (distance > threshold from last position)
-        let event2 = event::Event::Mouse(mouse::Event::CursorMoved {
-            position: Point::new(115.0, 115.0),
-        });
-        let (_effect, _task) = state.handle_raw_event(event2);
-
-        // Timer should be RESET (updated to a new value)
-        let second_timer = state.last_overlay_interaction;
-        assert!(second_timer.is_some(), "Timer should still be set");
-        assert!(
-            second_timer.unwrap() > first_timer.unwrap(),
-            "Timer should be reset (newer timestamp) after second movement"
-        );
-    }
+    // NOTE: Detailed overlay visibility tests have been moved to the overlay sub-component
+    // (src/ui/viewer/subcomponents/overlay.rs). The tests below verify integration behavior.
 
     #[test]
-    fn overlay_ignores_micro_movements() {
+    fn overlay_fullscreen_toggle_via_controls() {
         let mut state = State::new();
-        state.fullscreen_entered_at = Some(Instant::now());
-
-        // Wait for fullscreen entry delay
-        std::thread::sleep(Duration::from_millis(501));
-
-        // First movement - establishes baseline
-        let event1 = event::Event::Mouse(mouse::Event::CursorMoved {
-            position: Point::new(100.0, 100.0),
-        });
-        let (_effect, _task) = state.handle_raw_event(event1);
-        assert!(state.last_overlay_interaction.is_some());
-
-        let timer_before = state.last_overlay_interaction;
-
-        // Small movement (< threshold) - should be ignored
-        std::thread::sleep(Duration::from_millis(10));
-        let event2 = event::Event::Mouse(mouse::Event::CursorMoved {
-            position: Point::new(101.0, 101.0), // ~1.4 pixels distance
-        });
-        let (_effect, _task) = state.handle_raw_event(event2);
-
-        // Timer should NOT change (micro-movement filtered)
-        assert_eq!(
-            state.last_overlay_interaction, timer_before,
-            "Timer should not reset for micro-movements"
-        );
-    }
-
-    #[test]
-    fn overlay_ignores_movements_during_fullscreen_entry() {
-        let mut state = State::new();
-
-        // Simulate entering fullscreen
-        state.fullscreen_entered_at = Some(Instant::now());
-
-        // Immediate mouse movement (within 500ms window)
-        let event = event::Event::Mouse(mouse::Event::CursorMoved {
-            position: Point::new(200.0, 200.0),
-        });
-        let (_effect, _task) = state.handle_raw_event(event);
-
-        // Timer should NOT be set (movement ignored during entry period)
-        assert!(
-            state.last_overlay_interaction.is_none(),
-            "Should ignore mouse movements during fullscreen entry delay"
-        );
-    }
-
-    #[test]
-    fn overlay_clears_on_fullscreen_toggle() {
-        let mut state = State::new();
-
-        // Set up some state
-        state.last_overlay_interaction = Some(Instant::now());
-        state.last_mouse_position = Some(Point::new(50.0, 50.0));
+        assert!(!state.overlay.is_fullscreen());
 
         // Toggle fullscreen (via button)
         let (effect, _) = state.handle_controls(controls::Message::ToggleFullscreen);
 
         assert_eq!(effect, Effect::ToggleFullscreen);
-        assert!(state.last_overlay_interaction.is_none());
-        assert!(state.last_mouse_position.is_none());
-        assert!(state.fullscreen_entered_at.is_some());
+        assert!(state.overlay.is_fullscreen());
+        // EnteredFullscreen clears the interaction timer initially
+        assert!(!state.overlay.should_show_controls(Duration::from_secs(3)));
     }
 
     #[test]
-    fn arrows_always_visible_in_windowed_mode() {
+    fn arrows_visible_after_mouse_movement() {
         let mut state = State::new();
 
         // Simulate mouse movement to show arrows
@@ -2592,61 +2456,20 @@ mod tests {
 
         // In windowed mode, arrows should be visible
         assert!(
-            state.arrows_visible,
+            state.overlay.arrows_visible,
             "Arrows should be visible after mouse movement"
         );
-    }
-
-    #[test]
-    fn arrows_auto_hide_in_fullscreen_after_delay() {
-        use std::thread::sleep;
-
-        let mut state = State::new();
-
-        // Enter fullscreen
-        state.fullscreen_entered_at = Some(Instant::now());
-
-        // Wait for fullscreen entry delay
-        sleep(Duration::from_millis(501));
-
-        // Move mouse to show arrows and controls
-        let event = event::Event::Mouse(mouse::Event::CursorMoved {
-            position: Point::new(100.0, 100.0),
-        });
-        let (_effect, _task) = state.handle_raw_event(event);
-
-        assert!(
-            state.arrows_visible,
-            "Arrows should be visible after movement"
-        );
-        assert!(
-            state.last_overlay_interaction.is_some(),
-            "Timer should be set"
-        );
-
-        // Check that arrows would be hidden after delay (using default 3s)
-        let timer = state.last_overlay_interaction.unwrap();
-        let default_delay = crate::ui::state::OverlayTimeout::default().as_duration();
-
-        // Simulate 2 seconds elapsed (arrows still visible)
-        sleep(Duration::from_millis(2000));
-        let should_show_at_2s = timer.elapsed() < default_delay;
-        assert!(should_show_at_2s, "Arrows should still be visible at 2s");
-
-        // Simulate 3+ seconds elapsed (arrows should hide)
-        sleep(Duration::from_millis(1100));
-        let should_hide_at_3s = timer.elapsed() >= default_delay;
-        assert!(should_hide_at_3s, "Arrows should be hidden after 3s");
     }
 
     #[test]
     fn keyboard_navigation_always_works() {
         let mut state = State::new();
 
-        // In fullscreen with arrows hidden (no timer set)
-        state.fullscreen_entered_at = Some(Instant::now());
-        state.arrows_visible = false;
-        state.last_overlay_interaction = None;
+        // Enter fullscreen with arrows hidden
+        state
+            .overlay
+            .handle(subcomponents::overlay::Message::EnteredFullscreen);
+        state.overlay.cursor_left(); // Hide arrows
 
         // Keyboard navigation should still work
         let (effect, _) =
@@ -2660,13 +2483,14 @@ mod tests {
     }
 
     #[test]
-    fn play_button_interaction_resets_overlay_timer() {
-        use std::thread::sleep;
-
+    fn play_button_interaction_records_overlay_interaction() {
         let mut state = State::new();
 
-        // Timer is initially None
-        assert!(state.last_overlay_interaction.is_none());
+        // Initially no controls visible in fullscreen
+        state
+            .overlay
+            .handle(subcomponents::overlay::Message::EnteredFullscreen);
+        assert!(!state.overlay.should_show_controls(Duration::from_secs(3)));
 
         // Send a playback message
         let (effect, _) = state.handle_message(
@@ -2675,28 +2499,11 @@ mod tests {
             &test_diagnostics(),
         );
 
-        // Effect should be None, and timer should now be set
+        // Effect should be None, and controls should now be visible
         assert_eq!(effect, Effect::None);
         assert!(
-            state.last_overlay_interaction.is_some(),
-            "Timer should be set after initiating playback"
-        );
-
-        let timer_before = state.last_overlay_interaction;
-        sleep(Duration::from_millis(50));
-
-        // Send another playback message
-        let (effect, _) = state.handle_message(
-            Message::InitiatePlayback,
-            &I18n::default(),
-            &test_diagnostics(),
-        );
-        assert_eq!(effect, Effect::None);
-
-        // Timer should be updated to a newer timestamp
-        assert!(
-            state.last_overlay_interaction > timer_before,
-            "Timer should be reset to a newer time"
+            state.overlay.should_show_controls(Duration::from_secs(3)),
+            "Controls should be visible after initiating playback"
         );
     }
 }

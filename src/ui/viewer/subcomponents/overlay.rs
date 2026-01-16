@@ -77,7 +77,12 @@ impl State {
                 self.last_mouse_position = Some(pos);
 
                 if is_significant {
-                    self.last_mouse_move = Some(Instant::now());
+                    let now = Instant::now();
+                    self.last_mouse_move = Some(now);
+                    // Record interaction for overlay auto-hide (fullscreen)
+                    // Reset timer on EVERY real mouse movement to keep controls visible
+                    // This follows the standard video player pattern (YouTube, VLC, etc.)
+                    self.last_overlay_interaction = Some(now);
                     if !self.arrows_visible {
                         self.arrows_visible = true;
                         return Effect::VisibilityChanged(true);
@@ -91,6 +96,8 @@ impl State {
             }
             Message::EnteredFullscreen => {
                 self.fullscreen_entered_at = Some(Instant::now());
+                self.last_overlay_interaction = None;
+                self.last_mouse_position = None;
                 self.arrows_visible = true;
                 self.last_mouse_move = Some(Instant::now());
                 Effect::VisibilityChanged(true)
@@ -126,6 +133,24 @@ impl State {
     #[must_use]
     pub fn is_fullscreen(&self) -> bool {
         self.fullscreen_entered_at.is_some()
+    }
+
+    /// Check if overlay controls should be visible based on configurable delay.
+    ///
+    /// In windowed mode, always returns true.
+    /// In fullscreen, returns true only if user had recent interaction within the delay.
+    #[must_use]
+    pub fn should_show_controls(&self, hide_delay: Duration) -> bool {
+        if self.fullscreen_entered_at.is_none() {
+            return true; // Always visible in windowed mode
+        }
+        self.last_overlay_interaction
+            .is_some_and(|t| t.elapsed() < hide_delay)
+    }
+
+    /// Hide arrows (called when cursor leaves the viewer area).
+    pub fn cursor_left(&mut self) {
+        self.arrows_visible = false;
     }
 }
 
@@ -181,5 +206,54 @@ mod tests {
         let effect = state.handle(Message::CheckTimeout);
         assert!(state.arrows_visible);
         assert!(matches!(effect, Effect::None));
+    }
+
+    #[test]
+    fn should_show_controls_always_true_in_windowed() {
+        let state = State::default();
+        // Even with no interaction, controls visible in windowed mode
+        assert!(state.should_show_controls(Duration::from_secs(3)));
+    }
+
+    #[test]
+    fn should_show_controls_respects_delay_in_fullscreen() {
+        let mut state = State::default();
+        state.handle(Message::EnteredFullscreen);
+
+        // Right after entering, no overlay_interaction recorded (cleared by EnteredFullscreen)
+        assert!(!state.should_show_controls(Duration::from_secs(3)));
+
+        // Record interaction
+        state.handle(Message::OverlayInteraction);
+        assert!(state.should_show_controls(Duration::from_secs(3)));
+
+        // Simulate time passing beyond delay
+        state.last_overlay_interaction = Instant::now().checked_sub(Duration::from_secs(5));
+        assert!(!state.should_show_controls(Duration::from_secs(3)));
+    }
+
+    #[test]
+    fn cursor_left_hides_arrows() {
+        let mut state = State {
+            arrows_visible: true,
+            ..Default::default()
+        };
+        state.cursor_left();
+        assert!(!state.arrows_visible);
+    }
+
+    #[test]
+    fn mouse_moved_records_overlay_interaction() {
+        let mut state = State::default();
+        state.handle(Message::EnteredFullscreen);
+        // EnteredFullscreen clears last_overlay_interaction
+        assert!(state.last_overlay_interaction.is_none());
+
+        // Wait briefly to pass fullscreen entry delay (simulated by direct field access)
+        state.fullscreen_entered_at = Instant::now().checked_sub(Duration::from_secs(1));
+
+        // Move mouse significantly
+        state.handle(Message::MouseMoved(Point::new(100.0, 100.0)));
+        assert!(state.last_overlay_interaction.is_some());
     }
 }
