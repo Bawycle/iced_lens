@@ -4,7 +4,6 @@
 
 ## Bugs to Fix
 
-- [ ] **Missing loading indicator on startup** - When launching the app with a heavy media file (e.g., a multi-minute video), no loading indicator is shown. The user sees "No media loaded" with "Open file" button instead of a spinner, while the media is actually loading in the background. Regression introduced in `fix/seeking-and-disk-performance` merge.
 - [ ] **Launching with a folder path doesn't work** - Opening the app with a directory path as argument no longer loads the folder contents. Regression introduced in `fix/seeking-and-disk-performance` merge.
 - [ ] **Software tag and modification date not written** - When saving or "Save As" in the image editor with "Add software tag and modification date" checkbox enabled, these metadata fields are not added to the saved image.
 

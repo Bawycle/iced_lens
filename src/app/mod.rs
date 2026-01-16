@@ -370,6 +370,9 @@ impl App {
         let task = if let Some(path_str) = flags.file_path {
             let path = std::path::PathBuf::from(&path_str);
 
+            // Show loading indicator immediately (before async scan completes)
+            app.viewer.start_loading();
+
             // Use async scanning for startup to avoid blocking the UI
             if path.is_dir() {
                 // Directory path: async scan for media files
