@@ -13,6 +13,10 @@ use std::io::{BufReader, Read};
 use std::panic;
 use std::path::Path;
 
+/// Size of JPEG APP1 header: FF E1 (2) + length (2) + "Exif\0\0" (6) = 10 bytes.
+/// Used when stripping APP1 header to get raw EXIF/TIFF bytes for PNG eXIf chunk.
+const APP1_HEADER_SIZE: usize = 10;
+
 /// Editable metadata fields for EXIF and XMP writing.
 ///
 /// All fields are strings to simplify UI binding. Validation and conversion
@@ -156,15 +160,16 @@ pub fn write_exif<P: AsRef<Path>>(path: P, metadata: &EditableMetadata) -> Resul
     let path = path.as_ref();
 
     // Load existing EXIF or create empty metadata
-    let (mut exif_metadata, can_write_exif) = load_existing_exif(path, metadata);
+    let exif_result = load_existing_exif(path, metadata);
+    let mut exif_metadata = exif_result.metadata;
 
     // Apply all EXIF tags from editable metadata
     apply_exif_tags(&mut exif_metadata, metadata);
 
     // Write EXIF to file if we have data to write and format supports it
-    // Note: can_write_exif is false for problematic WebP files (VP8L without VP8X)
-    if can_write_exif && metadata.has_any_exif_data() {
-        write_exif_to_file(path, &exif_metadata)?;
+    // Note: can_write is false for problematic WebP files (VP8L without VP8X)
+    if exif_result.can_write && metadata.has_any_exif_data() {
+        write_exif_to_file(path, &exif_metadata, exif_result.had_existing_exif)?;
     }
 
     // Write XMP metadata (JPEG, PNG, WebP, TIFF supported)
@@ -173,17 +178,32 @@ pub fn write_exif<P: AsRef<Path>>(path: P, metadata: &EditableMetadata) -> Resul
     Ok(())
 }
 
+/// Result of loading existing EXIF metadata from a file.
+struct ExifLoadResult {
+    /// The EXIF metadata (existing or newly created empty)
+    metadata: Metadata,
+    /// Whether we can write EXIF to this file format
+    can_write: bool,
+    /// Whether the file had existing EXIF data
+    had_existing_exif: bool,
+}
+
 /// Loads existing EXIF metadata from file, or creates empty metadata if none exists.
 ///
-/// Returns `(metadata, can_write)` where:
-/// - `metadata` is the existing EXIF data or empty metadata
-/// - `can_write` is true if the format supports EXIF writing (false only for problematic formats)
+/// Returns `ExifLoadResult` containing:
+/// - `metadata`: the existing EXIF data or empty metadata
+/// - `can_write`: true if the format supports EXIF writing (false only for problematic formats)
+/// - `had_existing_exif`: true if the file had EXIF data before
 ///
 /// Skips EXIF handling for WebP files without VP8X chunk, as `little_exif` panics on these.
-fn load_existing_exif(path: &Path, _metadata: &EditableMetadata) -> (Metadata, bool) {
+fn load_existing_exif(path: &Path, _metadata: &EditableMetadata) -> ExifLoadResult {
     // Skip EXIF for problematic WebP files (VP8L without VP8X)
     if is_webp_without_vp8x(path) {
-        return (Metadata::new(), false);
+        return ExifLoadResult {
+            metadata: Metadata::new(),
+            can_write: false,
+            had_existing_exif: false,
+        };
     }
 
     let path_buf = path.to_path_buf();
@@ -192,15 +212,27 @@ fn load_existing_exif(path: &Path, _metadata: &EditableMetadata) -> (Metadata, b
     }));
 
     match read_result {
-        Ok(Ok(m)) => (m, true),
+        Ok(Ok(m)) => ExifLoadResult {
+            metadata: m,
+            can_write: true,
+            had_existing_exif: true,
+        },
         Ok(Err(_e)) => {
             // No existing EXIF (e.g., file just created by image_rs), but format supports it.
             // We can still write new EXIF data.
-            (Metadata::new(), true)
+            ExifLoadResult {
+                metadata: Metadata::new(),
+                can_write: true,
+                had_existing_exif: false,
+            }
         }
         Err(_panic) => {
             // little_exif panicked unexpectedly - format likely unsupported
-            (Metadata::new(), false)
+            ExifLoadResult {
+                metadata: Metadata::new(),
+                can_write: false,
+                had_existing_exif: false,
+            }
         }
     }
 }
@@ -209,7 +241,11 @@ fn load_existing_exif(path: &Path, _metadata: &EditableMetadata) -> (Metadata, b
 ///
 /// WebP files with VP8L (lossless) but no VP8X cause `little_exif` to panic.
 /// This function reads the file header to detect such files.
-fn is_webp_without_vp8x(path: &Path) -> bool {
+///
+/// Public because it's also used by `metadata_operations.rs` to check before
+/// attempting to create EXIF on images without existing metadata.
+#[must_use]
+pub fn is_webp_without_vp8x(path: &Path) -> bool {
     // Only check WebP files
     let is_webp = path
         .extension()
@@ -352,7 +388,21 @@ fn apply_lens_tags(exif_metadata: &mut Metadata, metadata: &EditableMetadata) {
 ///
 /// `little_exif` can panic on some WebP files (VP8L without VP8X chunk).
 /// This function catches such panics and continues gracefully.
-fn write_exif_to_file(path: &Path, exif_metadata: &Metadata) -> Result<()> {
+///
+/// For PNG files without existing EXIF, uses img-parts to insert EXIF bytes
+/// since `little_exif::write_to_file()` silently fails in this case.
+fn write_exif_to_file(path: &Path, exif_metadata: &Metadata, had_existing_exif: bool) -> Result<()> {
+    // Check if this is a PNG without existing EXIF - needs special handling
+    let is_png = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("png"));
+
+    if is_png && !had_existing_exif {
+        return write_exif_to_png_via_imgparts(exif_metadata, path);
+    }
+
+    // Use little_exif for other formats (JPEG, WebP with VP8X, PNG with existing EXIF)
     let path_clone = path.to_path_buf();
     let write_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         exif_metadata.write_to_file(&path_clone)
@@ -370,6 +420,51 @@ fn write_exif_to_file(path: &Path, exif_metadata: &Metadata) -> Result<()> {
             Ok(())
         }
     }
+}
+
+/// Writes EXIF metadata to a PNG file using img-parts.
+///
+/// This is needed because `little_exif::write_to_file()` silently fails for PNG
+/// files that don't already have an EXIF chunk.
+fn write_exif_to_png_via_imgparts(exif_metadata: &Metadata, dest: &Path) -> Result<()> {
+    use img_parts::png::Png;
+    use img_parts::Bytes;
+    use img_parts::ImageEXIF;
+    use little_exif::filetype::FileExtension;
+    use std::fs;
+
+    // Encode EXIF using JPEG format, then strip the APP1 header.
+    // JPEG APP1 format: FF E1 [length:2] "Exif\0\0" [TIFF data...]
+    // PNG eXIf chunk expects only the TIFF data (starting with "II" or "MM")
+    let full_app1 = exif_metadata
+        .as_u8_vec(FileExtension::JPEG)
+        .map_err(|e| Error::Io(format!("Failed to encode EXIF: {e:?}")))?;
+
+    // Strip APP1 header: FF E1 (2) + length (2) + "Exif\0\0" (6) = 10 bytes
+    if full_app1.len() <= APP1_HEADER_SIZE {
+        return Err(Error::Io("EXIF data too short".into()));
+    }
+    let exif_bytes: Vec<u8> = full_app1[APP1_HEADER_SIZE..].to_vec();
+
+    // Read destination PNG
+    let dest_bytes =
+        fs::read(dest).map_err(|e| Error::Io(format!("Failed to read PNG file: {e}")))?;
+    let mut dest_png = Png::from_bytes(Bytes::from(dest_bytes))
+        .map_err(|e| Error::Io(format!("Failed to parse PNG: {e}")))?;
+
+    // Insert EXIF bytes
+    dest_png.set_exif(Some(exif_bytes.into()));
+
+    // Write back
+    let mut output = Vec::new();
+    dest_png
+        .encoder()
+        .write_to(&mut output)
+        .map_err(|e| Error::Io(format!("Failed to encode PNG: {e}")))?;
+
+    fs::write(dest, output).map_err(|e| Error::Io(format!("Failed to write PNG: {e}")))?;
+
+    Ok(())
 }
 
 /// Writes XMP metadata based on file format.

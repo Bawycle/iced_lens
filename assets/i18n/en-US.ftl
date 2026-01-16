@@ -384,6 +384,7 @@ about-link-issues = Report Issues
 # Notifications
 notification-save-success = Image saved successfully
 notification-save-error = Failed to save image
+editor-metadata-write-failed = Could not add software tag to this image format
 notification-frame-capture-success = Frame captured successfully
 notification-frame-capture-error = Failed to capture frame
 notification-delete-success = File deleted successfully

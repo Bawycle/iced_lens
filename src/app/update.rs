@@ -1096,10 +1096,17 @@ pub fn handle_editor_message(
             // Save the edited image
             if let Some(editor) = ctx.image_editor.as_mut() {
                 match editor.save_image(&path) {
-                    Ok(()) => {
+                    Ok(result) => {
                         ctx.notifications.push(notifications::Notification::success(
                             "notification-save-success",
                         ));
+                        // Show warning if metadata preservation failed
+                        if let Some(warning_key) = result.metadata_warning {
+                            ctx.notifications.push(
+                                notifications::Notification::warning(warning_key)
+                                    .with_warning_type(crate::diagnostics::WarningType::MetadataIssue),
+                            );
+                        }
                     }
                     Err(_err) => {
                         ctx.notifications.push(

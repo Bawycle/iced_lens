@@ -678,11 +678,18 @@ impl App {
                     // User selected a path, save the image there
                     if let Some(editor) = self.image_editor.as_mut() {
                         match editor.save_image(&path) {
-                            Ok(()) => {
+                            Ok(result) => {
                                 self.notifications
                                     .push(notifications::Notification::success(
                                         "notification-save-success",
                                     ));
+                                // Show warning if metadata preservation failed
+                                if let Some(warning_key) = result.metadata_warning {
+                                    self.notifications.push(
+                                        notifications::Notification::warning(warning_key)
+                                            .with_warning_type(WarningType::MetadataIssue),
+                                    );
+                                }
 
                                 // Remember the save directory for next time
                                 self.persisted.set_last_save_directory_from_file(&path);

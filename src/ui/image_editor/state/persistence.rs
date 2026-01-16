@@ -14,6 +14,13 @@ use crate::media::metadata_operations::{preserve_metadata_from_bytes, Preservati
 use crate::ui::image_editor::{ImageSource, State};
 use std::fs;
 
+/// Result of a save operation, indicating success with optional warnings.
+#[derive(Debug, Default)]
+pub struct SaveResult {
+    /// If metadata preservation failed, contains the i18n key for the warning message.
+    pub metadata_warning: Option<&'static str>,
+}
+
 impl State {
     /// Save the edited image to a file, preserving the original format and metadata.
     ///
@@ -25,12 +32,17 @@ impl State {
     ///    - Resets orientation tag if image was rotated
     ///    - Adds software tag and modification date if requested
     ///
+    /// # Returns
+    ///
+    /// Returns `Ok(SaveResult)` on success. The `SaveResult` may contain a
+    /// `metadata_warning` if metadata preservation failed (the image is still
+    /// saved successfully in this case).
+    ///
     /// # Errors
     ///
     /// Returns an error if the image format is unsupported or the file
-    /// cannot be written. Metadata preservation errors are logged but don't
-    /// fail the save operation.
-    pub fn save_image(&mut self, path: &std::path::Path) -> Result<()> {
+    /// cannot be written.
+    pub fn save_image(&mut self, path: &std::path::Path) -> Result<SaveResult> {
         use image_rs::ImageFormat;
 
         // Detect format from file extension (case-insensitive)
@@ -71,6 +83,8 @@ impl State {
             .map_err(|err| Error::Io(format!("Failed to save image: {err}")))?;
 
         // Preserve metadata if editing a file (not captured frame)
+        let mut result = SaveResult::default();
+
         if let Some((source_bytes, source_ext)) = source_data {
             // Update orientation_changed flag from transformation history
             self.metadata_options
@@ -86,6 +100,8 @@ impl State {
             if let Err(e) = preserve_metadata_from_bytes(&source_bytes, &source_ext, path, &config)
             {
                 eprintln!("[WARN] Failed to preserve metadata: {e}. Image saved without metadata.");
+                // Set warning so caller can notify user
+                result.metadata_warning = Some("editor-metadata-write-failed");
             }
         }
 
@@ -93,7 +109,7 @@ impl State {
         self.transformation_history.clear();
         self.history_index = 0;
 
-        Ok(())
+        Ok(result)
     }
 
     /// Discard all changes and reset to original image state.

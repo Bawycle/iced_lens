@@ -34,9 +34,14 @@
 
 use crate::error::{Error, Result};
 use crate::media::metadata::{extract_image_metadata, ImageMetadata};
+use crate::media::metadata_writer::is_webp_without_vp8x;
 use img_parts::{Bytes, ImageEXIF, ImageICC};
 use std::fs;
 use std::path::Path;
+
+/// Size of JPEG APP1 header: FF E1 (2) + length (2) + "Exif\0\0" (6) = 10 bytes.
+/// Used when stripping APP1 header to get raw EXIF/TIFF bytes for PNG eXIf chunk.
+const APP1_HEADER_SIZE: usize = 10;
 
 /// Configuration for metadata preservation during image save.
 #[derive(Debug, Clone, Default)]
@@ -260,16 +265,32 @@ fn apply_metadata_transformations(dest: &Path, config: &PreservationConfig) -> R
         return Ok(());
     }
 
+    // Check file extension
+    let is_png = dest
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("png"));
+
     // Read existing EXIF from destination (now it should have EXIF data)
     let dest_path = dest.to_path_buf();
     let read_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         Metadata::new_from_path(&dest_path)
     }));
 
-    let Ok(Ok(mut exif_metadata)) = read_result else {
-        // No EXIF to modify - this can happen if source had no EXIF
-        // We can't add software tag without existing EXIF structure
-        return Ok(());
+    let has_existing_exif = matches!(read_result, Ok(Ok(_)));
+
+    let mut exif_metadata = if let Ok(Ok(m)) = read_result {
+        m
+    } else {
+        // No existing EXIF - check if we can create one
+        if is_webp_without_vp8x(dest) {
+            // WebP VP8L without VP8X - cannot write EXIF safely
+            return Err(Error::Io(
+                "Cannot add metadata to this WebP format".into(),
+            ));
+        }
+        // Create new EXIF structure
+        Metadata::new()
     };
 
     // Apply transformations
@@ -290,7 +311,13 @@ fn apply_metadata_transformations(dest: &Path, config: &PreservationConfig) -> R
         exif_metadata.set_tag(ExifTag::ModifyDate(date_modified));
     }
 
-    // Write back to file
+    // For PNG without existing EXIF, little_exif::write_to_file() silently fails.
+    // Use img-parts to insert EXIF bytes directly.
+    if is_png && !has_existing_exif {
+        return write_exif_to_png_via_imgparts(&exif_metadata, dest);
+    }
+
+    // Write back to file using little_exif (works for JPEG, WebP, PNG with existing EXIF)
     let write_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         exif_metadata.write_to_file(&dest_path)
     }));
@@ -299,10 +326,59 @@ fn apply_metadata_transformations(dest: &Path, config: &PreservationConfig) -> R
         Ok(Ok(())) => Ok(()),
         Ok(Err(e)) => Err(Error::Io(format!("Failed to write EXIF: {e:?}"))),
         Err(_) => {
-            // little_exif panicked - continue without error
-            Ok(())
+            // little_exif panicked - return error so caller can warn user
+            Err(Error::Io(
+                "Failed to write metadata (unsupported format)".into(),
+            ))
         }
     }
+}
+
+/// Writes EXIF metadata to a PNG file using img-parts.
+///
+/// This is needed because `little_exif::write_to_file()` silently fails for PNG
+/// files that don't already have an EXIF chunk.
+fn write_exif_to_png_via_imgparts(
+    exif_metadata: &little_exif::metadata::Metadata,
+    dest: &Path,
+) -> Result<()> {
+    use img_parts::png::Png;
+    use little_exif::filetype::FileExtension;
+
+    // Encode EXIF using JPEG format, then strip the APP1 header.
+    // JPEG APP1 format: FF E1 [length:2] "Exif\0\0" [TIFF data...]
+    // PNG eXIf chunk expects only the TIFF data (starting with "II" or "MM")
+    let full_app1 = exif_metadata
+        .as_u8_vec(FileExtension::JPEG)
+        .map_err(|e| Error::Io(format!("Failed to encode EXIF: {e:?}")))?;
+
+    // Strip APP1 header: FF E1 (2) + length (2) + "Exif\0\0" (6) = 10 bytes
+    // Looking at the bytes: [255, 225, 0, 96, 69, 120, 105, 102, 0, 0, 73, 73...]
+    // FF E1 = marker, 00 60 = length, "Exif\0\0", then "II" (TIFF)
+    if full_app1.len() <= APP1_HEADER_SIZE {
+        return Err(Error::Io("EXIF data too short".into()));
+    }
+    let exif_bytes: Vec<u8> = full_app1[APP1_HEADER_SIZE..].to_vec();
+
+    // Read destination PNG
+    let dest_bytes =
+        fs::read(dest).map_err(|e| Error::Io(format!("Failed to read PNG file: {e}")))?;
+    let mut dest_png = Png::from_bytes(dest_bytes.into())
+        .map_err(|e| Error::Io(format!("Failed to parse PNG: {e}")))?;
+
+    // Insert EXIF bytes
+    dest_png.set_exif(Some(exif_bytes.into()));
+
+    // Write back
+    let mut output = Vec::new();
+    dest_png
+        .encoder()
+        .write_to(&mut output)
+        .map_err(|e| Error::Io(format!("Failed to encode PNG: {e}")))?;
+
+    fs::write(dest, output).map_err(|e| Error::Io(format!("Failed to write PNG: {e}")))?;
+
+    Ok(())
 }
 
 /// Strips GPS-related tags from EXIF metadata.

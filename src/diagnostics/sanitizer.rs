@@ -28,6 +28,8 @@ pub enum WarningType {
     NetworkError,
     /// A configuration issue was detected.
     ConfigurationIssue,
+    /// Metadata could not be written to the saved file.
+    MetadataIssue,
     /// Other warning type not covered by specific categories.
     Other,
 }

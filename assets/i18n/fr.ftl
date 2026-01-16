@@ -384,6 +384,7 @@ about-link-issues = Signaler un problème
 # Notifications
 notification-save-success = Image enregistrée avec succès
 notification-save-error = Échec de l'enregistrement de l'image
+editor-metadata-write-failed = Impossible d'ajouter le tag logiciel à ce format d'image
 notification-frame-capture-success = Image capturée avec succès
 notification-frame-capture-error = Échec de la capture d'image
 notification-delete-success = Fichier supprimé avec succès

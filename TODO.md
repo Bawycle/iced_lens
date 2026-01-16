@@ -4,7 +4,7 @@
 
 ## Bugs to Fix
 
-- [ ] **Software tag and modification date not written** - When saving or "Save As" in the image editor with "Add software tag and modification date" checkbox enabled, these metadata fields are not added to the saved image.
+(None currently tracked)
 
 ## Technical Debt (P3)
 

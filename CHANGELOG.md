@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edited images now preserve original metadata (EXIF, XMP, ICC) when saved. Previously, all metadata was lost.
 - EXIF orientation is now automatically reset after rotation/flip transformations.
 - Image editor now correctly saves files with uppercase extensions (`.JPG`, `.PNG`).
+- Software tag and modification date are now written to images without existing EXIF metadata (JPEG, PNG). Previously, metadata was silently not written. For WebP VP8L images (which don't support EXIF), a warning notification is shown.
 
 ## [0.6.0] - 2025-01-02
 

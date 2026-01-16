@@ -384,6 +384,7 @@ about-link-issues = Reportar problemas
 # Notifications
 notification-save-success = Imagen guardada exitosamente
 notification-save-error = Error al guardar la imagen
+editor-metadata-write-failed = No se pudo agregar la etiqueta de software a este formato de imagen
 notification-frame-capture-success = Fotograma capturado exitosamente
 notification-frame-capture-error = Error al capturar fotograma
 notification-delete-success = Archivo eliminado exitosamente
