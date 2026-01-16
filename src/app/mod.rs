@@ -833,16 +833,18 @@ impl App {
                     return Task::none();
                 };
 
+                // For directory scans without explicit load_path, get the first file before moving the list
+                let first_file = if load_path.is_none() {
+                    media_list.first().map(std::path::Path::to_path_buf)
+                } else {
+                    None
+                };
+
                 // Update navigator with scanned media list
                 self.media_navigator.set_media_list(media_list);
 
-                // Determine which path to load
-                let path_to_load = load_path.or_else(|| {
-                    // For directory scans, load the first file
-                    self.media_navigator
-                        .current_media_path()
-                        .map(std::path::Path::to_path_buf)
-                });
+                // Determine which path to load: explicit path, or first file from directory scan
+                let path_to_load = load_path.or(first_file);
 
                 // Load the determined path
                 if let Some(path) = path_to_load {

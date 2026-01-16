@@ -4,7 +4,6 @@
 
 ## Bugs to Fix
 
-- [ ] **Launching with a folder path doesn't work** - Opening the app with a directory path as argument no longer loads the folder contents. Regression introduced in `fix/seeking-and-disk-performance` merge.
 - [ ] **Software tag and modification date not written** - When saving or "Save As" in the image editor with "Add software tag and modification date" checkbox enabled, these metadata fields are not added to the saved image.
 
 ## Technical Debt (P3)
