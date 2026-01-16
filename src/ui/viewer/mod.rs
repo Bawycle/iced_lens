@@ -8,6 +8,7 @@ pub mod filter_dropdown;
 pub mod pane;
 pub mod shared_styles;
 pub mod state;
+pub mod subcomponents;
 pub mod video_controls;
 
 use self::component::Message;
