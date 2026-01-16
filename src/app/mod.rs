@@ -660,14 +660,7 @@ impl App {
             Message::Tick(_instant) => {
                 // Periodic tick for overlay auto-hide - just trigger a view refresh
                 // The view() function will check elapsed time and hide controls if needed
-
-                // Also check for loading timeout
-                if self.viewer.check_loading_timeout() {
-                    self.notifications.push(
-                        notifications::Notification::error("notification-load-error-timeout")
-                            .with_error_type(ErrorType::IoError),
-                    );
-                }
+                // Note: Loading timeout is now handled via SpinnerTick -> Effect::LoadingTimedOut
 
                 // Tick notification manager to handle auto-dismiss
                 self.notifications.tick();

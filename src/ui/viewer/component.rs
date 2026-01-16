@@ -25,7 +25,6 @@ pub const SCROLLABLE_ID: &str = "viewer-image-scrollable";
 const DOUBLE_CLICK_THRESHOLD: Duration = Duration::from_millis(350);
 const MOUSE_MOVEMENT_THRESHOLD: f32 = 10.0; // Minimum pixels to consider real movement (filter sensor noise)
 const FULLSCREEN_ENTRY_IGNORE_DELAY: Duration = Duration::from_millis(500); // Ignore mouse movements for 500ms after entering fullscreen
-const LOADING_TIMEOUT: Duration = Duration::from_secs(10); // Timeout for media loading
 
 /// Messages emitted by viewer-related widgets.
 #[derive(Debug, Clone)]
@@ -148,6 +147,8 @@ pub enum Effect {
     },
     /// Filter changed via dropdown. App should update navigator's filter.
     FilterChanged(filter_dropdown::Message),
+    /// Loading timed out. App should show timeout notification.
+    LoadingTimedOut,
 }
 
 #[derive(Debug, Clone)]
@@ -202,14 +203,8 @@ pub struct State {
     last_mouse_position: Option<Point>, // Track last position to filter micro-movements
     fullscreen_entered_at: Option<Instant>, // Track when fullscreen was entered to ignore initial movements
 
-    // Loading state
-    pub is_loading_media: bool,
-    pub loading_started_at: Option<Instant>,
-    spinner_rotation: f32, // Rotation angle for animated spinner (in radians)
-    /// Media type being loaded (for diagnostics, set at load start).
-    loading_media_type: Option<crate::diagnostics::MediaType>,
-    /// File size in bytes of media being loaded (for diagnostics, set at load start).
-    loading_file_size: Option<u64>,
+    /// Loading state sub-component (spinner, timeout detection).
+    loading: subcomponents::loading::State,
 
     /// Origin of the current media load request (for auto-skip behavior).
     pub load_origin: LoadOrigin,
@@ -281,11 +276,7 @@ impl Default for State {
             last_overlay_interaction: None,
             last_mouse_position: None,
             fullscreen_entered_at: None,
-            is_loading_media: false,
-            loading_started_at: None,
-            spinner_rotation: 0.0,
-            loading_media_type: None,
-            loading_file_size: None,
+            loading: subcomponents::loading::State::default(),
             load_origin: LoadOrigin::DirectOpen,
             max_skip_attempts: MaxSkipAttempts::default(),
             video_player: None,
@@ -611,8 +602,7 @@ impl State {
     /// This encapsulates the loading state management that was previously scattered
     /// across multiple app handlers.
     pub fn start_loading(&mut self) {
-        self.is_loading_media = true;
-        self.loading_started_at = Some(std::time::Instant::now());
+        // Cross-cutting concerns that stay in orchestrator
         self.error = None;
         // Clear video shader immediately to prevent stale frame from being rendered
         // with wrong dimensions when navigating to a different media
@@ -623,7 +613,7 @@ impl State {
             .current_media_path
             .as_ref()
             .and_then(|p| p.extension())
-            .map_or(crate::diagnostics::MediaType::Unknown, |ext| {
+            .map(|ext| {
                 let ext = ext.to_string_lossy().to_lowercase();
                 if ["mp4", "webm", "avi", "mkv", "mov", "m4v", "wmv", "flv"].contains(&ext.as_str())
                 {
@@ -637,11 +627,14 @@ impl State {
             .current_media_path
             .as_ref()
             .and_then(|p| std::fs::metadata(p).ok())
-            .map_or(0, |m| m.len());
+            .map(|m| m.len());
 
-        // Store for use in success/failure handlers
-        self.loading_media_type = Some(media_type);
-        self.loading_file_size = Some(file_size_bytes);
+        // Delegate to loading sub-component
+        self.loading
+            .handle(subcomponents::loading::Message::StartLoading {
+                media_type,
+                file_size: file_size_bytes,
+            });
     }
 
     /// Returns an exportable frame from the video canvas, if available.
@@ -651,24 +644,14 @@ impl State {
 
     /// Returns true if media is currently being loaded.
     pub fn is_loading_media(&self) -> bool {
-        self.is_loading_media
+        self.loading.is_loading()
     }
 
-    /// Checks if loading has timed out.
-    /// Returns `true` if a timeout occurred (caller should show notification).
-    pub fn check_loading_timeout(&mut self) -> bool {
-        if self.is_loading_media {
-            if let Some(started_at) = self.loading_started_at {
-                if started_at.elapsed() > LOADING_TIMEOUT {
-                    // Loading timed out - clear loading state
-                    self.is_loading_media = false;
-                    self.loading_started_at = None;
-                    self.current_media_path = None;
-                    return true;
-                }
-            }
-        }
-        false
+    /// Handle loading timeout effect from sub-component.
+    fn handle_loading_timeout(&mut self) {
+        self.loading
+            .handle(subcomponents::loading::Message::StopLoading);
+        self.current_media_path = None;
     }
 
     /// Returns the subscriptions for video playback and spinner animation.
@@ -713,7 +696,7 @@ impl State {
             iced::Subscription::none()
         };
 
-        let spinner_subscription = if self.is_loading_media {
+        let spinner_subscription = if self.loading.is_loading() {
             // Animate spinner at 60 FPS while loading
             iced::time::every(std::time::Duration::from_millis(16)).map(|_| Message::SpinnerTick)
         } else {
@@ -756,8 +739,8 @@ impl State {
                 self.current_media_path = None;
 
                 // Reset loading state
-                self.is_loading_media = false;
-                self.loading_started_at = None;
+                self.loading
+                    .handle(subcomponents::loading::Message::StopLoading);
 
                 // Reset zoom to defaults
                 self.zoom = ZoomState::default();
@@ -770,8 +753,8 @@ impl State {
             }
             Message::MediaLoaded(result) => {
                 // Clear loading state
-                self.is_loading_media = false;
-                self.loading_started_at = None;
+                self.loading
+                    .handle(subcomponents::loading::Message::StopLoading);
 
                 // Clean up previous video state before loading new media
                 // This is important when navigating from one media to another
@@ -812,9 +795,7 @@ impl State {
                             }
                         }
 
-                        // Clear loading state fields (logging now handled at App layer)
-                        self.loading_media_type = None;
-                        self.loading_file_size = None;
+                        // loading_media_type/file_size cleared by StopLoading message
 
                         self.media = Some(media);
                         self.error = None;
@@ -863,9 +844,7 @@ impl State {
                         (effect, scroll_task)
                     }
                     Err(error) => {
-                        // Clear loading state fields (logging now handled at App layer)
-                        self.loading_media_type = None;
-                        self.loading_file_size = None;
+                        // loading_media_type/file_size cleared by StopLoading message
 
                         // Get the failed filename for the notification
                         let failed_filename = self
@@ -1054,11 +1033,16 @@ impl State {
                 (Effect::None, Task::none())
             }
             Message::SpinnerTick => {
-                // Update spinner rotation (180° per second = π radians per second)
-                // At 60 FPS, that's π/60 radians per frame ≈ 0.0524 radians
-                const ROTATION_SPEED: f32 = std::f32::consts::PI / 60.0;
-                self.spinner_rotation =
-                    (self.spinner_rotation + ROTATION_SPEED) % (2.0 * std::f32::consts::PI);
+                // Delegate to loading sub-component
+                let effect = self
+                    .loading
+                    .handle(subcomponents::loading::Message::SpinnerTick);
+
+                // Handle timeout effect
+                if matches!(effect, subcomponents::loading::Effect::LoadingTimedOut) {
+                    self.handle_loading_timeout();
+                    return (Effect::LoadingTimedOut, Task::none());
+                }
                 (Effect::None, Task::none())
             }
             Message::VideoControls(video_msg) => {
@@ -1601,8 +1585,8 @@ impl State {
                 // Use is_playing_or_will_resume() to include Seeking state
                 // This prevents the play button from flashing during seek operations
                 is_video_playing: self.is_video_playing_or_will_resume(),
-                is_loading_media: self.is_loading_media,
-                spinner_rotation: self.spinner_rotation,
+                is_loading_media: self.loading.is_loading(),
+                spinner_rotation: self.loading.spinner_rotation(),
                 video_error: self
                     .video_player
                     .as_ref()
@@ -1690,8 +1674,8 @@ impl State {
             i18n: env.i18n,
             error,
             image,
-            is_loading: self.is_loading_media,
-            spinner_rotation: self.spinner_rotation,
+            is_loading: self.loading.is_loading(),
+            spinner_rotation: self.loading.spinner_rotation(),
         })
     }
 
@@ -2443,61 +2427,16 @@ mod tests {
     }
 
     #[test]
-    fn loading_state_timeout_returns_true_and_clears_state() {
-        let mut state = State::new();
-
-        // Simulate starting to load media
-        state.is_loading_media = true;
-        state.loading_started_at = Some(
-            Instant::now()
-                .checked_sub(LOADING_TIMEOUT + Duration::from_secs(1))
-                .expect("instant subtraction"),
-        );
-
-        // Check timeout should return true (caller pushes notification)
-        let timed_out = state.check_loading_timeout();
-
-        assert!(timed_out, "should return true when timeout occurred");
-        assert!(!state.is_loading_media, "loading flag should be cleared");
-        assert!(
-            state.loading_started_at.is_none(),
-            "loading timestamp should be cleared"
-        );
-    }
-
-    #[test]
-    fn loading_state_timeout_returns_false_before_timeout() {
-        let mut state = State::new();
-
-        // Simulate starting to load media (but not timed out yet)
-        state.is_loading_media = true;
-        state.loading_started_at = Some(
-            Instant::now()
-                .checked_sub(Duration::from_secs(5))
-                .expect("instant subtraction"),
-        );
-
-        // Check timeout should NOT trigger yet
-        let timed_out = state.check_loading_timeout();
-
-        assert!(!timed_out, "should return false when timeout not reached");
-        assert!(state.is_loading_media, "loading flag should still be set");
-        assert!(
-            state.loading_started_at.is_some(),
-            "loading timestamp should still be set"
-        );
-    }
-
-    #[test]
     fn loading_state_resets_on_successful_load() {
         use crate::media::ImageData;
 
         let i18n = I18n::default();
         let mut state = State::new();
 
-        // Simulate loading state
-        state.is_loading_media = true;
-        state.loading_started_at = Some(Instant::now());
+        // Simulate loading state via start_loading()
+        state.current_media_path = Some(std::path::PathBuf::from("/test/image.jpg"));
+        state.start_loading();
+        assert!(state.is_loading_media(), "loading should be active");
 
         // Simulate successful load (MediaLoaded with Ok result)
         let pixels = vec![255_u8; 100 * 100 * 4];
@@ -2510,12 +2449,8 @@ mod tests {
         );
 
         assert!(
-            !state.is_loading_media,
+            !state.is_loading_media(),
             "loading flag should be cleared after successful load"
-        );
-        assert!(
-            state.loading_started_at.is_none(),
-            "loading timestamp should be cleared"
         );
         assert!(state.error.is_none(), "no error should be set");
     }
