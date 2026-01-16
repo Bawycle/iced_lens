@@ -1016,7 +1016,7 @@ mod tests {
         use crate::test_utils::assert_abs_diff_eq;
         let app = App::default();
 
-        let zoom = &app.viewer.zoom;
+        let zoom = app.viewer.zoom_state();
         assert!(zoom.fit_to_window);
         assert_abs_diff_eq!(zoom.zoom_percent, DEFAULT_ZOOM_PERCENT);
         assert_eq!(zoom.zoom_input, format_number(DEFAULT_ZOOM_PERCENT));

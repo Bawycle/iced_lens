@@ -7,8 +7,8 @@ use crate::media::navigator::NavigationInfo;
 use crate::media::{MaxSkipAttempts, MediaData};
 use crate::ui::state::{DragState, RotationAngle, ViewportState, ZoomState, ZoomStep};
 use crate::ui::viewer::{
-    self, controls, filter_dropdown, pane, state as geometry, subcomponents, video_controls,
-    HudIconKind, HudLine,
+    self, clusters, controls, filter_dropdown, pane, state as geometry, subcomponents,
+    video_controls, HudIconKind, HudLine,
 };
 use crate::ui::widgets::VideoShader;
 use crate::video_player::{
@@ -174,11 +174,10 @@ pub struct ViewEnv<'a> {
 pub struct State {
     media: Option<MediaData>,
     error: Option<ErrorState>,
-    pub zoom: ZoomState,
     pub viewport: ViewportState,
 
-    /// Drag/pan sub-component with cursor tracking and double-click detection.
-    drag: subcomponents::drag::State,
+    /// Image transformation cluster (zoom, drag/pan, rotation).
+    image_transform: clusters::image_transform::State,
 
     pub current_media_path: Option<PathBuf>,
 
@@ -228,9 +227,6 @@ pub struct State {
     /// Keyboard seek step (arrow keys during video playback).
     keyboard_seek_step: KeyboardSeekStep,
 
-    /// Rotation sub-component (temporary rotation that resets on navigation).
-    rotation: subcomponents::rotation::State,
-
     /// Filter dropdown UI state.
     filter_dropdown: filter_dropdown::FilterDropdownState,
 
@@ -247,9 +243,8 @@ impl Default for State {
         Self {
             media: None,
             error: None,
-            zoom: ZoomState::default(),
             viewport: ViewportState::default(),
-            drag: subcomponents::drag::State::default(),
+            image_transform: clusters::image_transform::State::default(),
             current_media_path: None,
             overlay: subcomponents::overlay::State::default(),
             loading: subcomponents::loading::State::default(),
@@ -268,7 +263,6 @@ impl Default for State {
             overflow_menu_open: false,
             last_keyboard_seek: None,
             keyboard_seek_step: KeyboardSeekStep::default(),
-            rotation: subcomponents::rotation::State::default(),
             filter_dropdown: filter_dropdown::FilterDropdownState::default(),
             diagnostics: None,
         }
@@ -294,11 +288,11 @@ impl State {
     }
 
     pub fn zoom_state(&self) -> &ZoomState {
-        &self.zoom
+        &self.image_transform.zoom
     }
 
     pub fn zoom_state_mut(&mut self) -> &mut ZoomState {
-        &mut self.zoom
+        &mut self.image_transform.zoom
     }
 
     pub fn viewport_state(&self) -> &ViewportState {
@@ -310,21 +304,21 @@ impl State {
     }
 
     pub fn drag_state(&self) -> &DragState {
-        &self.drag.inner
+        &self.image_transform.drag.inner
     }
 
     pub fn drag_state_mut(&mut self) -> &mut DragState {
-        &mut self.drag.inner
+        &mut self.image_transform.drag.inner
     }
 
     /// Get the cursor position within the viewer.
     pub fn cursor_position(&self) -> Option<Point> {
-        self.drag.cursor_position()
+        self.image_transform.cursor_position()
     }
 
     /// Update the cursor position.
     pub fn set_cursor_position(&mut self, position: Option<Point>) {
-        self.drag.cursor_position = position;
+        self.image_transform.drag.cursor_position = position;
     }
 
     /// Closes the filter dropdown panel.
@@ -339,7 +333,7 @@ impl State {
 
     /// Returns the current temporary rotation angle.
     pub fn current_rotation(&self) -> RotationAngle {
-        self.rotation.angle()
+        self.image_transform.rotation_angle()
     }
 
     /// Returns true if the current media is an image (not a video).
@@ -349,30 +343,24 @@ impl State {
 
     /// Returns the cached rotated image if available.
     pub fn rotated_image_cache(&self) -> Option<&crate::media::ImageData> {
-        self.rotation.cached_image()
+        self.image_transform.cached_rotated_image()
     }
 
-    /// Handle rotation effect and rebuild cache if needed.
-    #[allow(clippy::needless_pass_by_value)] // Effect enum is small and passed by value
-    fn handle_rotation_effect(&mut self, effect: subcomponents::rotation::Effect) {
-        match effect {
-            subcomponents::rotation::Effect::None => {}
-            subcomponents::rotation::Effect::RotationChanged => {
-                // Rebuild cache - rotation sub-component doesn't have access to media
-                if let Some(MediaData::Image(ref image_data)) = self.media {
-                    if self.rotation.is_rotated() {
-                        let rotated = image_data.rotated(self.rotation.angle().degrees());
-                        self.rotation.set_cache(rotated);
-                    } else {
-                        self.rotation.clear_cache();
-                    }
-                } else {
-                    self.rotation.clear_cache();
-                }
-                // Refresh fit zoom for rotated dimensions
-                self.refresh_fit_zoom();
+    /// Handle rotation effect from image_transform cluster and rebuild cache if needed.
+    fn handle_rotation_changed(&mut self) {
+        // Rebuild cache - cluster doesn't have access to media
+        if let Some(MediaData::Image(ref image_data)) = self.media {
+            if self.image_transform.is_rotated() {
+                let rotated = image_data.rotated(self.image_transform.rotation_angle().degrees());
+                self.image_transform.set_rotation_cache(rotated);
+            } else {
+                self.image_transform.clear_rotation_cache();
             }
+        } else {
+            self.image_transform.clear_rotation_cache();
         }
+        // Refresh fit zoom for rotated dimensions
+        self.refresh_fit_zoom();
     }
 
     /// Internal message dispatch using stored diagnostics handle.
@@ -402,11 +390,11 @@ impl State {
     }
 
     pub fn zoom_step_percent(&self) -> f32 {
-        self.zoom.zoom_step.value()
+        self.image_transform.zoom.zoom_step.value()
     }
 
     pub fn set_zoom_step_percent(&mut self, value: f32) {
-        self.zoom.zoom_step = ZoomStep::new(value);
+        self.image_transform.zoom.zoom_step = ZoomStep::new(value);
     }
 
     /// Returns the effective fit-to-window setting.
@@ -416,14 +404,14 @@ impl State {
         if self.is_video() {
             self.video_fit_to_window
         } else {
-            self.zoom.fit_to_window
+            self.image_transform.zoom.fit_to_window
         }
     }
 
     /// Returns the image fit-to-window setting (persisted).
     /// Use this when saving preferences - only saves image setting.
     pub fn image_fit_to_window(&self) -> bool {
-        self.zoom.fit_to_window
+        self.image_transform.zoom.fit_to_window
     }
 
     /// Returns true if the current media is a video.
@@ -467,7 +455,7 @@ impl State {
         if self.is_video() {
             self.video_fit_to_window = true;
         } else {
-            self.zoom.enable_fit_to_window();
+            self.image_transform.zoom.enable_fit_to_window();
         }
     }
 
@@ -475,7 +463,7 @@ impl State {
         if self.is_video() {
             self.video_fit_to_window = false;
         } else {
-            self.zoom.disable_fit_to_window();
+            self.image_transform.zoom.disable_fit_to_window();
         }
     }
 
@@ -719,12 +707,9 @@ impl State {
                 self.loading
                     .handle(subcomponents::loading::Message::StopLoading);
 
-                // Reset zoom to defaults
-                self.zoom = ZoomState::default();
+                // Reset image transformation state (zoom, drag, rotation)
+                self.image_transform = clusters::image_transform::State::default();
                 self.viewport = ViewportState::default();
-
-                // Reset temporary rotation and cache
-                self.rotation.handle(subcomponents::rotation::Message::Reset);
 
                 (Effect::None, Task::none())
             }
@@ -750,8 +735,9 @@ impl State {
                 // Reset video fit-to-window to default for new media
                 self.video_fit_to_window = true;
 
-                // Reset temporary rotation and cache for new media
-                self.rotation.handle(subcomponents::rotation::Message::Reset);
+                // Reset image transformation for new media
+                self.image_transform
+                    .handle(clusters::image_transform::Message::ResetForNewMedia);
 
                 match result {
                     Ok(media) => {
@@ -807,7 +793,8 @@ impl State {
 
                         // Reset zoom to 100% for images when fit-to-window is disabled
                         if !self.is_video() && !self.image_fit_to_window() {
-                            self.zoom
+                            self.image_transform
+                                .zoom
                                 .apply_manual_zoom(crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT);
                         }
 
@@ -921,7 +908,7 @@ impl State {
                     player.pause();
                 }
                 // Cancel any ongoing drag (user clicked on navigation overlay)
-                self.drag.inner.stop();
+                self.image_transform.drag.inner.stop();
                 // Reset overlay timer on navigation
                 self.overlay
                     .handle(subcomponents::overlay::Message::OverlayInteraction);
@@ -934,7 +921,7 @@ impl State {
                     player.pause();
                 }
                 // Cancel any ongoing drag (user clicked on navigation overlay)
-                self.drag.inner.stop();
+                self.image_transform.drag.inner.stop();
                 // Reset overlay timer on navigation
                 self.overlay
                     .handle(subcomponents::overlay::Message::OverlayInteraction);
@@ -949,9 +936,11 @@ impl State {
                 // Rotation only applies to images, not videos
                 if self.is_current_media_image() {
                     let effect = self
-                        .rotation
-                        .handle(subcomponents::rotation::Message::RotateClockwise);
-                    self.handle_rotation_effect(effect);
+                        .image_transform
+                        .handle(clusters::image_transform::Message::RotateClockwise);
+                    if matches!(effect, clusters::image_transform::Effect::RotationChanged) {
+                        self.handle_rotation_changed();
+                    }
                 }
                 (Effect::None, Task::none())
             }
@@ -959,9 +948,11 @@ impl State {
                 // Rotation only applies to images, not videos
                 if self.is_current_media_image() {
                     let effect = self
-                        .rotation
-                        .handle(subcomponents::rotation::Message::RotateCounterClockwise);
-                    self.handle_rotation_effect(effect);
+                        .image_transform
+                        .handle(clusters::image_transform::Message::RotateCounterClockwise);
+                    if matches!(effect, clusters::image_transform::Effect::RotationChanged) {
+                        self.handle_rotation_changed();
+                    }
                 }
                 (Effect::None, Task::none())
             }
@@ -1288,7 +1279,7 @@ impl State {
                         // (pane calculates display size from zoom at render time)
                         if self.video_fit_to_window {
                             if let Some(fit_zoom) = self.compute_fit_zoom_percent() {
-                                self.zoom.update_zoom_display(fit_zoom);
+                                self.image_transform.zoom.update_zoom_display(fit_zoom);
                             }
                         }
 
@@ -1452,11 +1443,15 @@ impl State {
             .scroll_position_percentage()
             .map(|(px, py)| format_position_indicator(env.i18n, px, py));
 
-        let zoom_line = if (self.zoom.zoom_percent - crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT)
+        let zoom_line = if (self.image_transform.zoom.zoom_percent
+            - crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT)
             .abs()
             > f32::EPSILON
         {
-            Some(format_zoom_indicator(env.i18n, self.zoom.zoom_percent))
+            Some(format_zoom_indicator(
+                env.i18n,
+                self.image_transform.zoom.zoom_percent,
+            ))
         } else {
             None
         };
@@ -1511,7 +1506,7 @@ impl State {
                 metadata_editor_has_changes: env.metadata_editor_has_changes,
                 is_video: self.is_video(),
             },
-            zoom: &self.zoom,
+            zoom: &self.image_transform.zoom,
             effective_fit_to_window,
             pane_context: pane::ViewContext {
                 background_theme: env.background_theme,
@@ -1521,10 +1516,10 @@ impl State {
             },
             pane_model: pane::ViewModel {
                 media: image_data,
-                zoom_percent: self.zoom.zoom_percent,
-                manual_zoom_percent: self.zoom.zoom_percent,
+                zoom_percent: self.image_transform.zoom.zoom_percent,
+                manual_zoom_percent: self.image_transform.zoom.zoom_percent,
                 fit_to_window: effective_fit_to_window,
-                is_dragging: self.drag.is_dragging(),
+                is_dragging: self.image_transform.is_dragging(),
                 cursor_over_media: geometry_state.is_cursor_over_media(),
                 arrows_visible: if env.is_fullscreen {
                     // In fullscreen, arrows use same auto-hide logic as controls
@@ -1660,29 +1655,30 @@ impl State {
 
         match message {
             ZoomInputChanged(value) => {
-                self.zoom.zoom_input = value;
-                self.zoom.zoom_input_dirty = true;
-                self.zoom.zoom_input_error_key = None;
+                self.image_transform.zoom.zoom_input = value;
+                self.image_transform.zoom.zoom_input_dirty = true;
+                self.image_transform.zoom.zoom_input_error_key = None;
                 (Effect::None, Task::none())
             }
             ZoomInputSubmitted => {
-                self.zoom.zoom_input_dirty = false;
+                self.image_transform.zoom.zoom_input_dirty = false;
 
-                if let Some(value) = parse_number(&self.zoom.zoom_input) {
-                    self.zoom.apply_manual_zoom(value);
+                if let Some(value) = parse_number(&self.image_transform.zoom.zoom_input) {
+                    self.image_transform.zoom.apply_manual_zoom(value);
                     // Also disable video fit-to-window when manually setting zoom
                     if self.is_video() {
                         self.video_fit_to_window = false;
                     }
                     (Effect::PersistPreferences, Task::none())
                 } else {
-                    self.zoom.zoom_input_error_key =
+                    self.image_transform.zoom.zoom_input_error_key =
                         Some(crate::ui::state::zoom::ZOOM_INPUT_INVALID_KEY);
                     (Effect::None, Task::none())
                 }
             }
             ResetZoom => {
-                self.zoom
+                self.image_transform
+                    .zoom
                     .apply_manual_zoom(crate::ui::state::zoom::DEFAULT_ZOOM_PERCENT);
                 // Also disable video fit-to-window when resetting zoom
                 if self.is_video() {
@@ -1691,8 +1687,9 @@ impl State {
                 (Effect::PersistPreferences, Task::none())
             }
             ZoomIn => {
-                self.zoom
-                    .apply_manual_zoom(self.zoom.zoom_percent + self.zoom.zoom_step.value());
+                let new_zoom = self.image_transform.zoom.zoom_percent
+                    + self.image_transform.zoom.zoom_step.value();
+                self.image_transform.zoom.apply_manual_zoom(new_zoom);
                 // Also disable video fit-to-window when zooming on a video
                 if self.is_video() {
                     self.video_fit_to_window = false;
@@ -1700,8 +1697,9 @@ impl State {
                 (Effect::PersistPreferences, Task::none())
             }
             ZoomOut => {
-                self.zoom
-                    .apply_manual_zoom(self.zoom.zoom_percent - self.zoom.zoom_step.value());
+                let new_zoom = self.image_transform.zoom.zoom_percent
+                    - self.image_transform.zoom.zoom_step.value();
+                self.image_transform.zoom.apply_manual_zoom(new_zoom);
                 // Also disable video fit-to-window when zooming on a video
                 if self.is_video() {
                     self.video_fit_to_window = false;
@@ -1739,9 +1737,11 @@ impl State {
                 // Rotation only applies to images, not videos
                 if self.is_current_media_image() {
                     let effect = self
-                        .rotation
-                        .handle(subcomponents::rotation::Message::RotateClockwise);
-                    self.handle_rotation_effect(effect);
+                        .image_transform
+                        .handle(clusters::image_transform::Message::RotateClockwise);
+                    if matches!(effect, clusters::image_transform::Effect::RotationChanged) {
+                        self.handle_rotation_changed();
+                    }
                 }
                 (Effect::None, Task::none())
             }
@@ -1749,9 +1749,11 @@ impl State {
                 // Rotation only applies to images, not videos
                 if self.is_current_media_image() {
                     let effect = self
-                        .rotation
-                        .handle(subcomponents::rotation::Message::RotateCounterClockwise);
-                    self.handle_rotation_effect(effect);
+                        .image_transform
+                        .handle(clusters::image_transform::Message::RotateCounterClockwise);
+                    if matches!(effect, clusters::image_transform::Effect::RotationChanged) {
+                        self.handle_rotation_changed();
+                    }
                 }
                 (Effect::None, Task::none())
             }
@@ -1791,7 +1793,7 @@ impl State {
                     (Effect::None, Task::none())
                 }
                 mouse::Event::CursorMoved { position } => {
-                    self.drag.cursor_position = Some(position);
+                    self.image_transform.drag.cursor_position = Some(position);
 
                     // Delegate overlay visibility logic to sub-component
                     // (filters micro-movements, handles fullscreen entry delay, etc.)
@@ -1799,7 +1801,7 @@ impl State {
                         Point::new(position.x, position.y),
                     ));
 
-                    if self.drag.is_dragging() {
+                    if self.image_transform.is_dragging() {
                         let task = self.handle_cursor_moved_during_drag(position);
                         (Effect::None, task)
                     } else {
@@ -1807,10 +1809,10 @@ impl State {
                     }
                 }
                 mouse::Event::CursorLeft => {
-                    self.drag.cursor_position = None;
+                    self.image_transform.drag.cursor_position = None;
                     self.overlay.cursor_left();
-                    if self.drag.is_dragging() {
-                        self.drag.inner.stop();
+                    if self.image_transform.is_dragging() {
+                        self.image_transform.drag.inner.stop();
                     }
                     (Effect::None, Task::none())
                 }
@@ -2051,10 +2053,10 @@ impl State {
 
     fn handle_mouse_button_pressed(&mut self, button: mouse::Button, position: Point) -> Effect {
         if button == mouse::Button::Left {
-            // Delegate click handling (including double-click detection) to drag sub-component
+            // Delegate click handling (including double-click detection) to image_transform cluster
             let click_effect = self
-                .drag
-                .handle(subcomponents::drag::Message::Click(position));
+                .image_transform
+                .handle(clusters::image_transform::Message::Click(position));
 
             // Reset overlay timer on any left click, even on UI controls
             // This keeps controls visible when user is interacting
@@ -2062,14 +2064,14 @@ impl State {
                 .handle(subcomponents::overlay::Message::OverlayInteraction);
 
             if self.geometry_state().is_cursor_over_media() {
-                if matches!(click_effect, subcomponents::drag::Effect::DoubleClick) {
+                if matches!(click_effect, clusters::image_transform::Effect::DoubleClick) {
                     // Clear overlay timer when entering fullscreen (will hide controls initially)
                     self.overlay
                         .handle(subcomponents::overlay::Message::EnteredFullscreen);
                     return Effect::ToggleFullscreen;
                 }
 
-                self.drag.inner.start(position, self.viewport.offset);
+                self.image_transform.drag.inner.start(position, self.viewport.offset);
             }
         }
 
@@ -2078,7 +2080,7 @@ impl State {
 
     fn handle_mouse_button_released(&mut self, button: mouse::Button) {
         if button == mouse::Button::Left {
-            self.drag.inner.stop();
+            self.image_transform.drag.inner.stop();
         }
     }
 
@@ -2086,7 +2088,8 @@ impl State {
     /// the scaled image bounds and mirrors the change to the scrollable widget
     /// so keyboard/scroll interactions stay in sync.
     fn handle_cursor_moved_during_drag(&mut self, position: Point) -> Task<Message> {
-        let Some(proposed_offset) = self.drag.inner.calculate_offset(position) else {
+        let Some(proposed_offset) = self.image_transform.drag.inner.calculate_offset(position)
+        else {
             return Task::none();
         };
 
@@ -2151,8 +2154,9 @@ impl State {
             return false;
         }
 
-        let new_zoom = self.zoom.zoom_percent + steps * self.zoom.zoom_step.value();
-        self.zoom.apply_manual_zoom(new_zoom);
+        let new_zoom = self.image_transform.zoom.zoom_percent
+            + steps * self.image_transform.zoom.zoom_step.value();
+        self.image_transform.zoom.apply_manual_zoom(new_zoom);
 
         // Also disable video fit-to-window when zooming on a video
         if self.is_video() {
@@ -2173,9 +2177,9 @@ impl State {
         let effective_fit_to_window = self.fit_to_window();
         if effective_fit_to_window {
             if let Some(fit_zoom) = self.compute_fit_zoom_percent() {
-                self.zoom.update_zoom_display(fit_zoom);
-                self.zoom.zoom_input_dirty = false;
-                self.zoom.zoom_input_error_key = None;
+                self.image_transform.zoom.update_zoom_display(fit_zoom);
+                self.image_transform.zoom.zoom_input_dirty = false;
+                self.image_transform.zoom.zoom_input_error_key = None;
                 // No need to sync shader scale - pane calculates display size at render time
             }
         }
@@ -2217,7 +2221,7 @@ impl State {
         geometry::ViewerState::new(
             self.media.as_ref(),
             &self.viewport,
-            self.zoom.zoom_percent,
+            self.image_transform.zoom.zoom_percent,
             self.cursor_position(),
         )
     }
