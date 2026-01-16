@@ -13,101 +13,10 @@ pub use crate::config::{
     MIN_ZOOM_PERCENT, MIN_ZOOM_STEP_PERCENT,
 };
 
-/// Zoom percentage, guaranteed to be within valid range (10%–800%).
-///
-/// This type ensures that zoom values are always valid, eliminating
-/// the need for manual clamping at usage sites.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ZoomPercent(f32);
-
-impl ZoomPercent {
-    /// Creates a new zoom percentage, clamping the value to the valid range.
-    #[must_use]
-    pub fn new(percent: f32) -> Self {
-        Self(percent.clamp(MIN_ZOOM_PERCENT, MAX_ZOOM_PERCENT))
-    }
-
-    /// Returns the raw percentage value.
-    #[must_use]
-    pub fn value(self) -> f32 {
-        self.0
-    }
-
-    /// Returns the zoom as a multiplier (e.g., 100% → 1.0).
-    #[must_use]
-    pub fn as_factor(self) -> f32 {
-        self.0 / 100.0
-    }
-
-    /// Returns whether the zoom is at the minimum value.
-    #[must_use]
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_ZOOM_PERCENT
-    }
-
-    /// Returns whether the zoom is at the maximum value.
-    #[must_use]
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_ZOOM_PERCENT
-    }
-
-    /// Increases zoom by the given step.
-    #[must_use]
-    pub fn zoom_in(self, step: f32) -> Self {
-        Self::new(self.0 + step)
-    }
-
-    /// Decreases zoom by the given step.
-    #[must_use]
-    pub fn zoom_out(self, step: f32) -> Self {
-        Self::new(self.0 - step)
-    }
-}
-
-impl Default for ZoomPercent {
-    fn default() -> Self {
-        Self(DEFAULT_ZOOM_PERCENT)
-    }
-}
-
-/// Zoom step percentage, guaranteed to be within valid range (1%–200%).
-///
-/// This type ensures that zoom step values are always valid, eliminating
-/// the need for manual clamping at usage sites.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ZoomStep(f32);
-
-impl ZoomStep {
-    /// Creates a new zoom step, clamping the value to the valid range.
-    #[must_use]
-    pub fn new(percent: f32) -> Self {
-        Self(percent.clamp(MIN_ZOOM_STEP_PERCENT, MAX_ZOOM_STEP_PERCENT))
-    }
-
-    /// Returns the raw percentage value.
-    #[must_use]
-    pub fn value(self) -> f32 {
-        self.0
-    }
-
-    /// Returns whether the step is at the minimum value.
-    #[must_use]
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_ZOOM_STEP_PERCENT
-    }
-
-    /// Returns whether the step is at the maximum value.
-    #[must_use]
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_ZOOM_STEP_PERCENT
-    }
-}
-
-impl Default for ZoomStep {
-    fn default() -> Self {
-        Self(DEFAULT_ZOOM_STEP_PERCENT)
-    }
-}
+// Re-export domain types
+#[allow(unused_imports)] // Used by tests and may be used by external consumers
+pub use crate::domain::ui::newtypes::zoom_bounds;
+pub use crate::domain::ui::newtypes::{ZoomPercent, ZoomStep};
 
 pub const ZOOM_INPUT_INVALID_KEY: &str = "viewer-zoom-input-error-invalid";
 pub const ZOOM_STEP_INVALID_KEY: &str = "viewer-zoom-step-error-invalid";

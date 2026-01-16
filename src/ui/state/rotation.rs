@@ -1,90 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Rotation angle domain type for temporary media rotation.
 //!
-//! This module provides a type-safe wrapper for rotation angles,
-//! ensuring only valid 90° increments (0°, 90°, 180°, 270°).
+//! This module re-exports the domain type and provides backward compatibility.
 
-/// Rotation angle in 90° increments.
-///
-/// This newtype enforces validity at the type level, ensuring the value
-/// is always one of: 0°, 90°, 180°, or 270°.
-///
-/// # Example
-///
-/// ```
-/// use iced_lens::ui::state::RotationAngle;
-///
-/// let angle = RotationAngle::default();
-/// assert_eq!(angle.degrees(), 0);
-///
-/// let rotated = angle.rotate_clockwise();
-/// assert_eq!(rotated.degrees(), 90);
-///
-/// // Full rotation cycle
-/// let full = rotated.rotate_clockwise().rotate_clockwise().rotate_clockwise();
-/// assert_eq!(full.degrees(), 0);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RotationAngle(u16);
-
-impl RotationAngle {
-    /// No rotation (0°).
-    pub const ZERO: Self = Self(0);
-
-    /// Creates a new rotation angle, normalizing to valid 90° increments.
-    ///
-    /// Any value is normalized to the nearest lower 90° increment,
-    /// then wrapped to 0-270° range.
-    #[must_use]
-    pub fn new(degrees: u16) -> Self {
-        // Round down to nearest 90° and wrap
-        Self(((degrees / 90) * 90) % 360)
-    }
-
-    /// Returns the angle in degrees.
-    #[must_use]
-    pub fn degrees(self) -> u16 {
-        self.0
-    }
-
-    /// Returns the angle in radians.
-    #[must_use]
-    pub fn radians(self) -> f32 {
-        f32::from(self.0) * std::f32::consts::PI / 180.0
-    }
-
-    /// Rotates 90° clockwise.
-    #[must_use]
-    pub fn rotate_clockwise(self) -> Self {
-        Self((self.0 + 90) % 360)
-    }
-
-    /// Rotates 90° counter-clockwise.
-    #[must_use]
-    pub fn rotate_counterclockwise(self) -> Self {
-        Self((self.0 + 270) % 360)
-    }
-
-    /// Returns true if the angle is not zero (media is rotated).
-    #[must_use]
-    pub fn is_rotated(self) -> bool {
-        self.0 != 0
-    }
-
-    /// Returns true if width and height should be swapped when rendering.
-    ///
-    /// This is true for 90° and 270° rotations.
-    #[must_use]
-    pub fn swaps_dimensions(self) -> bool {
-        self.0 == 90 || self.0 == 270
-    }
-}
-
-impl Default for RotationAngle {
-    fn default() -> Self {
-        Self::ZERO
-    }
-}
+// Re-export domain type
+pub use crate::domain::ui::newtypes::RotationAngle;
 
 #[cfg(test)]
 mod tests {

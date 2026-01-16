@@ -96,9 +96,34 @@ src/
 - **Scalability**: Adding video editor = new bounded context, no existing code touched
 - **Parallelization**: Teams can work on separate domains independently
 
-#### Next Step
+#### Progress
 
-- [ ] Establish a progressive migration plan (identify migration order, define intermediate milestones, keep the app functional at each step)
+**Phase 1: Domain Layer** (completed - commit 45d863b)
+- [x] Pure domain types in `src/domain/` (media, video, editing, metadata, diagnostics, ui, error)
+- [x] Zero external dependencies in domain layer
+
+**Phase 2: Application Layer** (completed - commit 76cdc0a)
+- [x] Traits (ports) in `src/application/port/`
+- [x] Query services in `src/application/query/`
+
+**Phase 3: Infrastructure Layer** (completed - commit 08b3e91)
+- [x] FFmpeg, ONNX, diagnostics adapters in `src/infrastructure/`
+
+**Phase 4: Presentation Layer** (completed)
+- [x] Epic 4.1: App handlers extraction - commit 12f1cd1 (-25% LOC: 2406→1805)
+- [x] Epic 4.2: Viewer sub-components (rotation, loading, overlay, error_state, drag) - commit 8be0225
+- [x] Epic 4.2b: Feature Clusters
+  - [x] `image_transform` cluster (zoom+pan+rotation) - 422 LOC
+  - [x] `media_lifecycle` cluster (loading+media+errors) - 456 LOC
+  - [x] `video_playback` cluster (player state) - 626 LOC - commit faff1a3
+  - **LOC reduction:** 2516 → 2344 (-172 LOC from clusters)
+- [~] Epic 4.3: App Nested TEA - Skipped (mod.rs at 1802 LOC is manageable)
+
+**Phase 5: Documentation** (completed)
+- [x] CONTRIBUTING.md updated with new structure
+- [x] CLAUDE.md updated with new newtypes locations
+
+**Migration Status: COMPLETE**
 
 ## Packaging / Distribution
 

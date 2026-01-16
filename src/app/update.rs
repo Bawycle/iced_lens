@@ -626,6 +626,16 @@ pub fn handle_viewer_message(
             trigger_prefetch(ctx)
         }
         component::Effect::FilterChanged(filter_msg) => handle_filter_changed(ctx, filter_msg),
+        component::Effect::LoadingTimedOut => {
+            // Show loading timeout notification
+            ctx.notifications.push(
+                crate::ui::notifications::Notification::warning(
+                    ctx.i18n.tr("media-loading-timeout"),
+                )
+                .auto_dismiss(std::time::Duration::from_secs(5)),
+            );
+            Task::none()
+        }
         component::Effect::None => Task::none(),
     };
     Task::batch([viewer_task, side_effect])

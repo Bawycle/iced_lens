@@ -1,74 +1,29 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Overlay timeout domain type for fullscreen UI.
 //!
-//! This module provides a type-safe wrapper for the fullscreen overlay
-//! auto-hide timeout duration in seconds.
+//! This module re-exports the domain type and provides backward compatibility.
 
+#[cfg(test)]
 use crate::config::{
     DEFAULT_OVERLAY_TIMEOUT_SECS, MAX_OVERLAY_TIMEOUT_SECS, MIN_OVERLAY_TIMEOUT_SECS,
 };
 
-/// Overlay timeout in seconds for fullscreen mode.
-///
-/// This newtype enforces validity at the type level, ensuring the value
-/// is always within the valid range (1–30 seconds).
-///
-/// # Example
-///
-/// ```
-/// use iced_lens::ui::state::OverlayTimeout;
-///
-/// let timeout = OverlayTimeout::new(5);
-/// assert_eq!(timeout.value(), 5);
-///
-/// // Values outside range are clamped
-/// let too_high = OverlayTimeout::new(100);
-/// assert_eq!(too_high.value(), 30); // Clamped to max
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct OverlayTimeout(u32);
-
-impl OverlayTimeout {
-    /// Creates a new overlay timeout value, clamping to valid range.
-    #[must_use]
-    pub fn new(value: u32) -> Self {
-        Self(value.clamp(MIN_OVERLAY_TIMEOUT_SECS, MAX_OVERLAY_TIMEOUT_SECS))
-    }
-
-    /// Returns the value as u32.
-    #[must_use]
-    pub fn value(self) -> u32 {
-        self.0
-    }
-
-    /// Returns the timeout as a Duration.
-    #[must_use]
-    pub fn as_duration(self) -> std::time::Duration {
-        std::time::Duration::from_secs(u64::from(self.0))
-    }
-
-    /// Returns true if this is the minimum value.
-    #[must_use]
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_OVERLAY_TIMEOUT_SECS
-    }
-
-    /// Returns true if this is the maximum value.
-    #[must_use]
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_OVERLAY_TIMEOUT_SECS
-    }
-}
-
-impl Default for OverlayTimeout {
-    fn default() -> Self {
-        Self(DEFAULT_OVERLAY_TIMEOUT_SECS)
-    }
-}
+// Re-export domain type
+#[allow(unused_imports)] // Used by tests and may be used by external consumers
+pub use crate::domain::ui::newtypes::overlay_bounds;
+pub use crate::domain::ui::newtypes::OverlayTimeout;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Verify domain bounds match config constants
+    #[test]
+    fn domain_bounds_match_config() {
+        assert_eq!(overlay_bounds::MIN, MIN_OVERLAY_TIMEOUT_SECS);
+        assert_eq!(overlay_bounds::MAX, MAX_OVERLAY_TIMEOUT_SECS);
+        assert_eq!(overlay_bounds::DEFAULT, DEFAULT_OVERLAY_TIMEOUT_SECS);
+    }
 
     #[test]
     fn new_clamps_to_valid_range() {

@@ -1,115 +1,14 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Image transformation functions for rotate, crop, and resize operations.
 
-use crate::app::config::{
-    DEFAULT_RESIZE_SCALE_PERCENT, MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT,
-};
 use crate::error::Result;
 use crate::media::ImageData;
 use image_rs::{imageops::FilterType, DynamicImage, GenericImageView};
 
-// ==========================================================================
-// Resize Scale Value Object
-// ==========================================================================
-
-/// Resize scale percentage, guaranteed to be within valid range (10%–400%).
-///
-/// This value object encapsulates the business rules for resize scaling:
-/// - Valid range is defined by configuration constants
-/// - Values are automatically clamped to the valid range
-/// - Provides conversion to dimensions based on original image size
-///
-/// # Example
-///
-/// ```ignore
-/// let scale = ResizeScale::new(200.0); // 200% = 2x enlargement
-/// let (new_width, new_height) = scale.apply_to_dimensions(800, 600);
-/// assert_eq!((new_width, new_height), (1600, 1200));
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ResizeScale(f32);
-
-impl ResizeScale {
-    /// Creates a new resize scale, clamping the value to the valid range.
-    #[must_use]
-    pub fn new(percent: f32) -> Self {
-        Self(percent.clamp(MIN_RESIZE_SCALE_PERCENT, MAX_RESIZE_SCALE_PERCENT))
-    }
-
-    /// Returns the raw percentage value.
-    #[must_use]
-    pub fn value(self) -> f32 {
-        self.0
-    }
-
-    /// Returns the scale as a multiplier (e.g., 100% → 1.0, 200% → 2.0).
-    #[must_use]
-    pub fn as_factor(self) -> f32 {
-        self.0 / 100.0
-    }
-
-    /// Applies the scale to the given dimensions, returning the new dimensions.
-    ///
-    /// Both dimensions are guaranteed to be at least 1 pixel.
-    #[must_use]
-    pub fn apply_to_dimensions(self, width: u32, height: u32) -> (u32, u32) {
-        let factor = f64::from(self.as_factor());
-        // Use f64 for intermediate calculation to avoid precision loss with large dimensions
-        let new_width = (f64::from(width) * factor).round().max(1.0);
-        let new_height = (f64::from(height) * factor).round().max(1.0);
-        // Saturate to u32::MAX for safety (though images this large are impractical)
-        // The conditional guarantees value is <= u32::MAX, so cast is safe
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let new_width = if new_width > f64::from(u32::MAX) {
-            u32::MAX
-        } else {
-            new_width as u32
-        };
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let new_height = if new_height > f64::from(u32::MAX) {
-            u32::MAX
-        } else {
-            new_height as u32
-        };
-        (new_width, new_height)
-    }
-
-    /// Returns whether the scale is at the minimum value.
-    #[must_use]
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_RESIZE_SCALE_PERCENT
-    }
-
-    /// Returns whether the scale is at the maximum value.
-    #[must_use]
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_RESIZE_SCALE_PERCENT
-    }
-
-    /// Returns whether the scale represents 100% (no resize).
-    #[must_use]
-    pub fn is_original(self) -> bool {
-        (self.0 - DEFAULT_RESIZE_SCALE_PERCENT).abs() < f32::EPSILON
-    }
-
-    /// Returns whether this scale represents an enlargement (> 100%).
-    #[must_use]
-    pub fn is_enlargement(self) -> bool {
-        self.0 > DEFAULT_RESIZE_SCALE_PERCENT
-    }
-
-    /// Returns whether this scale represents a reduction (< 100%).
-    #[must_use]
-    pub fn is_reduction(self) -> bool {
-        self.0 < DEFAULT_RESIZE_SCALE_PERCENT
-    }
-}
-
-impl Default for ResizeScale {
-    fn default() -> Self {
-        Self(DEFAULT_RESIZE_SCALE_PERCENT)
-    }
-}
+// Re-export domain type
+#[allow(unused_imports)] // Used by tests and may be used by external consumers
+pub use crate::domain::editing::newtypes::resize_bounds;
+pub use crate::domain::editing::ResizeScale;
 
 // ==========================================================================
 // Image Transformation Functions
@@ -441,18 +340,30 @@ mod tests {
     // ResizeScale Tests
     // =========================================================================
 
+    // Verify domain bounds match config constants
+    #[test]
+    fn domain_bounds_match_config() {
+        use crate::app::config::{
+            DEFAULT_RESIZE_SCALE_PERCENT, MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT,
+        };
+        use crate::test_utils::assert_abs_diff_eq;
+
+        assert_abs_diff_eq!(resize_bounds::MIN, MIN_RESIZE_SCALE_PERCENT);
+        assert_abs_diff_eq!(resize_bounds::MAX, MAX_RESIZE_SCALE_PERCENT);
+        assert_abs_diff_eq!(resize_bounds::DEFAULT, DEFAULT_RESIZE_SCALE_PERCENT);
+    }
+
     #[test]
     fn resize_scale_clamps_to_valid_range() {
-        use crate::app::config::{MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT};
         use crate::test_utils::assert_abs_diff_eq;
 
         // Below minimum
         let too_small = ResizeScale::new(5.0);
-        assert_abs_diff_eq!(too_small.value(), MIN_RESIZE_SCALE_PERCENT);
+        assert_abs_diff_eq!(too_small.value(), resize_bounds::MIN);
 
         // Above maximum
         let too_large = ResizeScale::new(1000.0);
-        assert_abs_diff_eq!(too_large.value(), MAX_RESIZE_SCALE_PERCENT);
+        assert_abs_diff_eq!(too_large.value(), resize_bounds::MAX);
 
         // Valid value
         let valid = ResizeScale::new(150.0);
@@ -509,13 +420,11 @@ mod tests {
 
     #[test]
     fn resize_scale_boundary_checks() {
-        use crate::app::config::{MAX_RESIZE_SCALE_PERCENT, MIN_RESIZE_SCALE_PERCENT};
-
-        let min_scale = ResizeScale::new(MIN_RESIZE_SCALE_PERCENT);
+        let min_scale = ResizeScale::new(resize_bounds::MIN);
         assert!(min_scale.is_min());
         assert!(!min_scale.is_max());
 
-        let max_scale = ResizeScale::new(MAX_RESIZE_SCALE_PERCENT);
+        let max_scale = ResizeScale::new(resize_bounds::MAX);
         assert!(max_scale.is_max());
         assert!(!max_scale.is_min());
     }

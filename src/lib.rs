@@ -7,10 +7,13 @@
 #![doc(html_root_url = "https://docs.rs/iced_lens/0.1.0")]
 
 pub mod app;
+pub mod application;
 pub mod diagnostics;
 pub mod directory_scanner;
+pub mod domain;
 pub mod error;
 pub mod icon;
+pub mod infrastructure;
 pub mod media;
 pub mod ui;
 pub mod video_player;

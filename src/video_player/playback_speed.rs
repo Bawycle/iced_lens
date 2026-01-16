@@ -1,99 +1,28 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Playback speed domain type for video playback.
 //!
-//! This module provides a type-safe wrapper for playback speed values,
-//! ensuring they are always within the valid range (0.1x - 8.0x).
+//! This module re-exports the domain type and provides backward compatibility.
 
-use crate::config::{
-    MAX_PLAYBACK_SPEED, MIN_PLAYBACK_SPEED, PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD,
-    PLAYBACK_SPEED_PRESETS,
-};
-
-/// Playback speed value, guaranteed to be within valid range (0.1x - 8.0x).
-///
-/// This newtype enforces validity at the type level, making it impossible
-/// to create an invalid playback speed value.
-///
-/// # Example
-///
-/// ```
-/// use iced_lens::video_player::PlaybackSpeed;
-///
-/// let speed = PlaybackSpeed::new(2.0);
-/// assert_eq!(speed.value(), 2.0);
-///
-/// // Values outside range are clamped
-/// let too_fast = PlaybackSpeed::new(100.0);
-/// assert_eq!(too_fast.value(), 8.0);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PlaybackSpeed(f64);
-
-impl PlaybackSpeed {
-    /// Creates a new playback speed, clamping to valid range.
-    #[must_use]
-    pub fn new(speed: f64) -> Self {
-        Self(speed.clamp(MIN_PLAYBACK_SPEED, MAX_PLAYBACK_SPEED))
-    }
-
-    /// Returns the speed value as f64.
-    #[must_use]
-    pub fn value(self) -> f64 {
-        self.0
-    }
-
-    /// Returns true if audio should be auto-muted at this speed.
-    #[must_use]
-    pub fn should_auto_mute(self) -> bool {
-        self.0 > PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD
-    }
-
-    /// Returns the next higher preset speed, or self if at maximum.
-    #[must_use]
-    pub fn increase(self) -> Self {
-        let next = PLAYBACK_SPEED_PRESETS
-            .iter()
-            .find(|&&s| s > self.0 + 0.001)
-            .copied()
-            .unwrap_or(self.0);
-        Self(next)
-    }
-
-    /// Returns the next lower preset speed, or self if at minimum.
-    #[must_use]
-    pub fn decrease(self) -> Self {
-        let prev = PLAYBACK_SPEED_PRESETS
-            .iter()
-            .rev()
-            .find(|&&s| s < self.0 - 0.001)
-            .copied()
-            .unwrap_or(self.0);
-        Self(prev)
-    }
-
-    /// Returns true if this is the minimum speed.
-    #[must_use]
-    pub fn is_min(self) -> bool {
-        (self.0 - MIN_PLAYBACK_SPEED).abs() < 0.001
-    }
-
-    /// Returns true if this is the maximum speed.
-    #[must_use]
-    pub fn is_max(self) -> bool {
-        (self.0 - MAX_PLAYBACK_SPEED).abs() < 0.001
-    }
-}
-
-impl Default for PlaybackSpeed {
-    fn default() -> Self {
-        Self(1.0)
-    }
-}
+// Re-export domain type
+#[allow(unused_imports)] // Used by tests and may be used by external consumers
+pub use crate::domain::video::newtypes::speed_bounds;
+pub use crate::domain::video::newtypes::PlaybackSpeed;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{
+        MAX_PLAYBACK_SPEED, MIN_PLAYBACK_SPEED, PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD,
+    };
     use crate::test_utils::assert_abs_diff_eq;
+
+    // Verify domain bounds match config constants
+    #[test]
+    fn domain_bounds_match_config() {
+        assert_abs_diff_eq!(speed_bounds::MIN, MIN_PLAYBACK_SPEED);
+        assert_abs_diff_eq!(speed_bounds::MAX, MAX_PLAYBACK_SPEED);
+        assert_abs_diff_eq!(speed_bounds::AUTO_MUTE_THRESHOLD, PLAYBACK_SPEED_AUTO_MUTE_THRESHOLD);
+    }
 
     #[test]
     fn new_clamps_to_valid_range() {

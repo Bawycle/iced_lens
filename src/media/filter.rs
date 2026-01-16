@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Media filtering for navigation.
 //!
-//! This module provides filter types for filtering media files during navigation.
-//! Filters are combined with AND logic - all active filters must match for a file
-//! to be included in navigation.
+//! This module re-exports domain filter types and adds:
+//! - Serde serialization/deserialization
+//! - Path-based matching methods (with filesystem I/O)
 //!
 //! # Available Filters
 //!
@@ -33,8 +33,11 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::time::SystemTime;
 
+// Re-export domain types (they don't have serde)
+pub use crate::domain::media::filter::DateFilterField;
+
 // =============================================================================
-// Media Type Filter
+// Media Type Filter (with Serde + Path matching)
 // =============================================================================
 
 /// Filter by media type.
@@ -71,22 +74,21 @@ impl MediaTypeFilter {
     pub fn is_active(&self) -> bool {
         !matches!(self, Self::All)
     }
+
+    /// Converts to domain type for pure logic operations.
+    #[must_use]
+    pub fn to_domain(&self) -> crate::domain::media::filter::MediaTypeFilter {
+        match self {
+            Self::All => crate::domain::media::filter::MediaTypeFilter::All,
+            Self::ImagesOnly => crate::domain::media::filter::MediaTypeFilter::ImagesOnly,
+            Self::VideosOnly => crate::domain::media::filter::MediaTypeFilter::VideosOnly,
+        }
+    }
 }
 
 // =============================================================================
-// Date Range Filter
+// Date Range Filter (with Serde + Path matching)
 // =============================================================================
-
-/// Which date field to use for filtering.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "kebab-case")]
-pub enum DateFilterField {
-    /// Filter by file modification date.
-    #[default]
-    Modified,
-    /// Filter by file creation date.
-    Created,
-}
 
 /// Filter by date range.
 ///
@@ -130,21 +132,8 @@ impl DateRangeFilter {
             return false;
         };
 
-        // Check lower bound
-        if let Some(start) = self.start {
-            if file_time < start {
-                return false;
-            }
-        }
-
-        // Check upper bound
-        if let Some(end) = self.end {
-            if file_time > end {
-                return false;
-            }
-        }
-
-        true
+        // Use domain logic for the actual time comparison
+        self.to_domain().matches_time(file_time)
     }
 
     /// Returns `true` if this filter has any active bounds.
@@ -152,10 +141,20 @@ impl DateRangeFilter {
     pub fn is_active(&self) -> bool {
         self.start.is_some() || self.end.is_some()
     }
+
+    /// Converts to domain type for pure logic operations.
+    #[must_use]
+    pub fn to_domain(&self) -> crate::domain::media::filter::DateRangeFilter {
+        crate::domain::media::filter::DateRangeFilter {
+            field: self.field,
+            start: self.start,
+            end: self.end,
+        }
+    }
 }
 
 // =============================================================================
-// Composite Media Filter
+// Composite Media Filter (with Serde + Path matching)
 // =============================================================================
 
 /// Combined media filter with AND logic.
@@ -232,6 +231,39 @@ impl MediaFilter {
     pub fn clear(&mut self) {
         self.media_type = MediaTypeFilter::default();
         self.date_range = None;
+    }
+}
+
+// =============================================================================
+// Serde implementations for DateFilterField
+// =============================================================================
+
+impl Serialize for DateFilterField {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            DateFilterField::Modified => serializer.serialize_str("modified"),
+            DateFilterField::Created => serializer.serialize_str("created"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for DateFilterField {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "modified" => Ok(DateFilterField::Modified),
+            "created" => Ok(DateFilterField::Created),
+            other => Err(serde::de::Error::unknown_variant(
+                other,
+                &["modified", "created"],
+            )),
+        }
     }
 }
 

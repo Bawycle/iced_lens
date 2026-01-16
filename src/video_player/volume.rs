@@ -1,86 +1,27 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Volume domain type for audio playback.
 //!
-//! This module provides a type-safe wrapper for volume values,
-//! ensuring they are always within the valid range (0.0–1.5, where 1.0 = 100%).
+//! This module re-exports the domain type and provides backward compatibility.
 
-use crate::config::{DEFAULT_VOLUME, MAX_VOLUME, MIN_VOLUME, VOLUME_STEP};
-
-/// Volume level, guaranteed to be within valid range (0.0–1.5).
-///
-/// Values above 1.0 represent amplification (up to 150%).
-/// This newtype enforces validity at the type level, making it impossible
-/// to create an invalid volume value.
-///
-/// # Example
-///
-/// ```
-/// use iced_lens::video_player::Volume;
-///
-/// let vol = Volume::new(0.5);
-/// assert_eq!(vol.value(), 0.5);
-///
-/// // Values outside range are clamped
-/// let too_loud = Volume::new(2.0);
-/// assert_eq!(too_loud.value(), 1.5); // Clamped to max (150%)
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Volume(f32);
-
-impl Volume {
-    /// Creates a new volume level, clamping to valid range.
-    #[must_use]
-    pub fn new(volume: f32) -> Self {
-        Self(volume.clamp(MIN_VOLUME, MAX_VOLUME))
-    }
-
-    /// Returns the volume value as f32.
-    #[must_use]
-    pub fn value(self) -> f32 {
-        self.0
-    }
-
-    /// Returns true if volume is effectively muted (below audible threshold).
-    #[must_use]
-    pub fn is_muted(self) -> bool {
-        self.0 < 0.001
-    }
-
-    /// Increases volume by one step, clamping to maximum.
-    #[must_use]
-    pub fn increase(self) -> Self {
-        Self::new(self.0 + VOLUME_STEP)
-    }
-
-    /// Decreases volume by one step, clamping to minimum.
-    #[must_use]
-    pub fn decrease(self) -> Self {
-        Self::new(self.0 - VOLUME_STEP)
-    }
-
-    /// Returns true if this is the minimum volume.
-    #[must_use]
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_VOLUME
-    }
-
-    /// Returns true if this is the maximum volume.
-    #[must_use]
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_VOLUME
-    }
-}
-
-impl Default for Volume {
-    fn default() -> Self {
-        Self(DEFAULT_VOLUME)
-    }
-}
+// Re-export domain type
+#[allow(unused_imports)] // Used by tests and may be used by external consumers
+pub use crate::domain::video::newtypes::volume_bounds;
+pub use crate::domain::video::newtypes::Volume;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{DEFAULT_VOLUME, MAX_VOLUME, MIN_VOLUME, VOLUME_STEP};
     use crate::test_utils::assert_abs_diff_eq;
+
+    // Verify domain bounds match config constants
+    #[test]
+    fn domain_bounds_match_config() {
+        assert_abs_diff_eq!(volume_bounds::MIN, MIN_VOLUME);
+        assert_abs_diff_eq!(volume_bounds::MAX, MAX_VOLUME);
+        assert_abs_diff_eq!(volume_bounds::DEFAULT, DEFAULT_VOLUME);
+        assert_abs_diff_eq!(volume_bounds::STEP, VOLUME_STEP);
+    }
 
     #[test]
     fn new_clamps_to_valid_range() {

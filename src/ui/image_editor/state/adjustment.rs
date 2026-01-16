@@ -4,46 +4,10 @@
 use crate::media::image_transform;
 use crate::ui::image_editor::{State, Transformation};
 
-/// Minimum adjustment value.
-const MIN_ADJUSTMENT: i32 = -100;
-/// Maximum adjustment value.
-const MAX_ADJUSTMENT: i32 = 100;
-/// Default (neutral) adjustment value.
-const DEFAULT_ADJUSTMENT: i32 = 0;
-
-/// Adjustment percentage for brightness/contrast, guaranteed to be within valid range (-100 to +100).
-///
-/// This type ensures that adjustment values are always valid, eliminating
-/// the need for manual clamping at usage sites. A value of 0 means no adjustment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct AdjustmentPercent(i32);
-
-impl AdjustmentPercent {
-    /// Creates a new adjustment value, clamping to the valid range.
-    pub fn new(value: i32) -> Self {
-        Self(value.clamp(MIN_ADJUSTMENT, MAX_ADJUSTMENT))
-    }
-
-    /// Returns the raw value.
-    pub fn value(self) -> i32 {
-        self.0
-    }
-
-    /// Returns whether this represents no adjustment (value is 0).
-    pub fn is_neutral(self) -> bool {
-        self.0 == DEFAULT_ADJUSTMENT
-    }
-
-    /// Returns whether the adjustment is at the minimum value.
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_ADJUSTMENT
-    }
-
-    /// Returns whether the adjustment is at the maximum value.
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_ADJUSTMENT
-    }
-}
+// Re-export domain type
+#[allow(unused_imports)] // Used by tests and may be used by external consumers
+pub use crate::domain::editing::newtypes::adjustment_bounds;
+pub use crate::domain::editing::AdjustmentPercent;
 
 /// Brightness and contrast adjustment state.
 #[derive(Debug, Clone, PartialEq, Default)]
