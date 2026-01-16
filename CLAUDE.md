@@ -39,18 +39,18 @@ Always use newtypes for constrained values instead of primitives with `.clamp()`
 
 | Type | Range | Module |
 |------|-------|--------|
-| `Volume` | 0.0–1.5 | `video_player/volume.rs` |
-| `PlaybackSpeed` | 0.1–8.0 | `video_player/playback_speed.rs` |
-| `KeyboardSeekStep` | 0.5–30.0 sec | `video_player/seek_step.rs` |
+| `Volume` | 0.0–1.5 | `domain/video/newtypes.rs` |
+| `PlaybackSpeed` | 0.1–8.0 | `domain/video/newtypes.rs` |
+| `KeyboardSeekStep` | 0.5–30.0 sec | `domain/video/newtypes.rs` |
 | `FrameCacheMb` | 16–512 MB | `video_player/frame_cache_size.rs` |
 | `FrameHistoryMb` | 32–512 MB | `video_player/frame_history_size.rs` |
-| `ZoomPercent` | 10%–800% | `ui/state/zoom.rs` |
-| `ZoomStep` | 1%–200% | `ui/state/zoom.rs` |
-| `OverlayTimeout` | 1–30 sec | `ui/state/overlay_timeout.rs` |
-| `ResizeScale` | 10%–400% | `media/image_transform.rs` |
-| `MaxSkipAttempts` | 1–20 | `media/skip_attempts.rs` |
-| `AdjustmentPercent` | -100–+100 | `ui/image_editor/state/adjustment.rs` |
-| `RotationAngle` | 0–359° | `ui/state/rotation.rs` |
+| `ZoomPercent` | 10%–800% | `domain/ui/newtypes.rs` |
+| `ZoomStep` | 1%–200% | `domain/ui/newtypes.rs` |
+| `OverlayTimeout` | 1–30 sec | `domain/ui/newtypes.rs` |
+| `RotationAngle` | 0–359° | `domain/ui/newtypes.rs` |
+| `ResizeScale` | 10%–400% | `domain/editing/newtypes.rs` |
+| `MaxSkipAttempts` | 1–20 | `domain/editing/newtypes.rs` |
+| `AdjustmentPercent` | -100–+100 | `domain/editing/newtypes.rs` |
 
 ### User Feedback Strategy
 
@@ -103,10 +103,15 @@ cargo audit                                   # Security audit
 
 | Location | Purpose |
 |----------|---------|
+| `src/domain/` | Pure domain types, newtypes, value objects (ZERO external deps) |
+| `src/application/` | Traits (ports), query services |
+| `src/infrastructure/` | FFmpeg, ONNX, diagnostics adapters |
 | `src/app/` | Application core, message handling, config, i18n |
 | `src/media/` | Media loading, transforms, navigation |
 | `src/video_player/` | Video playback engine (FFmpeg, audio sync) |
 | `src/ui/` | UI components, styles, design system |
+| `src/ui/viewer/clusters/` | Feature clusters (zoom+pan+rotation, loading+media+errors, video) |
+| `src/ui/viewer/subcomponents/` | Reusable state units (State + Message + Effect) |
 | `src/ui/image_editor/` | Image editing tools (crop, resize, deblur) |
 | `assets/i18n/` | Translation files (Fluent `.ftl`) |
 

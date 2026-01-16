@@ -331,17 +331,18 @@ impl Default for Volume {
 **Existing newtypes:**
 | Type | Range | Location |
 |------|-------|----------|
-| `Volume` | 0.0–1.5 | `video_player/volume.rs` |
-| `PlaybackSpeed` | 0.1–8.0 | `video_player/playback_speed.rs` |
-| `KeyboardSeekStep` | 0.5–30.0 sec | `video_player/seek_step.rs` |
+| `Volume` | 0.0–1.5 | `domain/video/newtypes.rs` |
+| `PlaybackSpeed` | 0.1–8.0 | `domain/video/newtypes.rs` |
+| `KeyboardSeekStep` | 0.5–30.0 sec | `domain/video/newtypes.rs` |
 | `FrameCacheMb` | 16–512 MB | `video_player/frame_cache_size.rs` |
 | `FrameHistoryMb` | 32–512 MB | `video_player/frame_history_size.rs` |
-| `ZoomPercent` | 10%–800% | `ui/state/zoom.rs` |
-| `ZoomStep` | 1%–200% | `ui/state/zoom.rs` |
-| `OverlayTimeout` | 1–30 sec | `ui/state/overlay_timeout.rs` |
-| `ResizeScale` | 10%–400% | `media/image_transform.rs` |
-| `MaxSkipAttempts` | 1–20 | `media/skip_attempts.rs` |
-| `AdjustmentPercent` | -100–+100 | `ui/image_editor/state/adjustment.rs` |
+| `ZoomPercent` | 10%–800% | `domain/ui/newtypes.rs` |
+| `ZoomStep` | 1%–200% | `domain/ui/newtypes.rs` |
+| `OverlayTimeout` | 1–30 sec | `domain/ui/newtypes.rs` |
+| `RotationAngle` | 0–359° | `domain/ui/newtypes.rs` |
+| `ResizeScale` | 10%–400% | `domain/editing/newtypes.rs` |
+| `MaxSkipAttempts` | 1–20 | `domain/editing/newtypes.rs` |
+| `AdjustmentPercent` | -100–+100 | `domain/editing/newtypes.rs` |
 
 **Location rule:** Domain types live in their domain module (not in `config/`). Constants stay in `config/defaults.rs`, types go where they're used.
 
@@ -541,9 +542,25 @@ Key files and directories:
 iced_lens/
 ├── src/
 │   ├── main.rs                 # Entry point
+│   ├── domain/                 # Pure domain types (ZERO external dependencies)
+│   │   ├── media/              # MediaType, ImageMetrics, newtypes (Volume, etc.)
+│   │   ├── video/              # VideoMetrics, video-related newtypes
+│   │   ├── editing/            # ResizeScale, AdjustmentPercent
+│   │   ├── metadata/           # DateTime, MetadataField value objects
+│   │   ├── diagnostics/        # Dimensions, MediaType (diagnostics context)
+│   │   ├── ui/                 # ZoomPercent, ZoomStep, OverlayTimeout, RotationAngle
+│   │   └── error/              # Pure error types (no std::io dependency)
+│   ├── application/            # Use cases and ports (trait definitions)
+│   │   ├── port/               # MediaLoader, MetadataReader, VideoDecoder traits
+│   │   └── query/              # MediaNavigator (navigation use cases)
+│   ├── infrastructure/         # External system adapters
+│   │   ├── ffmpeg/             # FFmpeg-based video decoding
+│   │   ├── onnx/               # ONNX Runtime AI model adapters
+│   │   └── diagnostics/        # System resource collection
 │   ├── app/                    # Main application logic and orchestration
 │   │   ├── mod.rs              # App struct and Message enum
 │   │   ├── config/             # Configuration persistence (settings.toml)
+│   │   ├── handlers.rs         # Async result handlers (AI models, etc.)
 │   │   ├── i18n/               # Internationalization system (Fluent)
 │   │   ├── paths.rs            # Application directory paths (data dir, config dir)
 │   │   ├── persisted_state.rs  # Persisted application state (CBOR format)
@@ -570,9 +587,19 @@ iced_lens/
 │   │   └── resource_collector.rs # System metrics collection
 │   ├── ui/                     # UI components
 │   │   ├── viewer/             # Image/video viewer component
-│   │   │   ├── component.rs    # Main viewer widget
+│   │   │   ├── component.rs    # Main viewer orchestrator
+│   │   │   ├── clusters/       # Feature clusters (Nested TEA pattern)
+│   │   │   │   ├── image_transform/  # Zoom, pan, rotation cluster
+│   │   │   │   ├── media_lifecycle/  # Loading, media holder, errors cluster
+│   │   │   │   └── video_playback/   # Video player state cluster
+│   │   │   ├── subcomponents/  # Reusable state units (State + Message + Effect)
+│   │   │   │   ├── rotation.rs # Temporary rotation state
+│   │   │   │   ├── loading.rs  # Loading spinner and timeout
+│   │   │   │   ├── overlay.rs  # Fullscreen overlay auto-hide
+│   │   │   │   ├── drag.rs     # Drag/pan with double-click detection
+│   │   │   │   └── ...         # Other subcomponents
 │   │   │   ├── video_controls.rs # Playback controls toolbar
-│   │   │   └── overlays.rs     # Loading, error, info overlays
+│   │   │   └── pane.rs         # Viewer pane rendering
 │   │   ├── image_editor/       # Image editing (crop, resize, rotate)
 │   │   ├── notifications/      # Toast notification system
 │   │   ├── components/         # Reusable components (ErrorDisplay, Checkerboard)
