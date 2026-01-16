@@ -6,65 +6,10 @@
 
 use std::collections::VecDeque;
 
-use crate::config::{
-    DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY, MAX_DIAGNOSTICS_BUFFER_CAPACITY,
-    MIN_DIAGNOSTICS_BUFFER_CAPACITY,
-};
-
-/// Buffer capacity for diagnostic events.
-///
-/// This newtype enforces validity at the type level, ensuring the value
-/// is always within the valid range (100–10000 events).
-///
-/// # Example
-///
-/// ```
-/// use iced_lens::diagnostics::BufferCapacity;
-///
-/// let capacity = BufferCapacity::new(1000);
-/// assert_eq!(capacity.value(), 1000);
-///
-/// // Values outside range are clamped
-/// let too_high = BufferCapacity::new(50000);
-/// assert_eq!(too_high.value(), 10000); // Clamped to max
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BufferCapacity(usize);
-
-impl BufferCapacity {
-    /// Creates a new buffer capacity, clamping to valid range.
-    #[must_use]
-    pub fn new(value: usize) -> Self {
-        Self(value.clamp(
-            MIN_DIAGNOSTICS_BUFFER_CAPACITY,
-            MAX_DIAGNOSTICS_BUFFER_CAPACITY,
-        ))
-    }
-
-    /// Returns the value as usize.
-    #[must_use]
-    pub fn value(self) -> usize {
-        self.0
-    }
-
-    /// Returns true if this is the minimum value.
-    #[must_use]
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_DIAGNOSTICS_BUFFER_CAPACITY
-    }
-
-    /// Returns true if this is the maximum value.
-    #[must_use]
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_DIAGNOSTICS_BUFFER_CAPACITY
-    }
-}
-
-impl Default for BufferCapacity {
-    fn default() -> Self {
-        Self(DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY)
-    }
-}
+// Re-export domain type
+#[allow(unused_imports)] // Used by tests and may be used by external consumers
+pub use crate::domain::diagnostics::buffer_capacity_bounds;
+pub use crate::domain::diagnostics::BufferCapacity;
 
 /// A generic circular buffer with fixed capacity.
 ///
@@ -154,18 +99,33 @@ impl<T> CircularBuffer<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{
+        DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY, MAX_DIAGNOSTICS_BUFFER_CAPACITY,
+        MIN_DIAGNOSTICS_BUFFER_CAPACITY,
+    };
 
     // BufferCapacity tests
+
+    // Verify domain bounds match config constants
+    #[test]
+    fn domain_bounds_match_config() {
+        assert_eq!(buffer_capacity_bounds::MIN, MIN_DIAGNOSTICS_BUFFER_CAPACITY);
+        assert_eq!(buffer_capacity_bounds::MAX, MAX_DIAGNOSTICS_BUFFER_CAPACITY);
+        assert_eq!(
+            buffer_capacity_bounds::DEFAULT,
+            DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY
+        );
+    }
 
     #[test]
     fn buffer_capacity_clamps_to_valid_range() {
         assert_eq!(
             BufferCapacity::new(0).value(),
-            MIN_DIAGNOSTICS_BUFFER_CAPACITY
+            buffer_capacity_bounds::MIN
         );
         assert_eq!(
             BufferCapacity::new(100_000).value(),
-            MAX_DIAGNOSTICS_BUFFER_CAPACITY
+            buffer_capacity_bounds::MAX
         );
     }
 
@@ -180,19 +140,19 @@ mod tests {
     fn buffer_capacity_default_returns_expected_value() {
         assert_eq!(
             BufferCapacity::default().value(),
-            DEFAULT_DIAGNOSTICS_BUFFER_CAPACITY
+            buffer_capacity_bounds::DEFAULT
         );
     }
 
     #[test]
     fn buffer_capacity_is_min_detects_minimum() {
-        assert!(BufferCapacity::new(MIN_DIAGNOSTICS_BUFFER_CAPACITY).is_min());
+        assert!(BufferCapacity::new(buffer_capacity_bounds::MIN).is_min());
         assert!(!BufferCapacity::new(1000).is_min());
     }
 
     #[test]
     fn buffer_capacity_is_max_detects_maximum() {
-        assert!(BufferCapacity::new(MAX_DIAGNOSTICS_BUFFER_CAPACITY).is_max());
+        assert!(BufferCapacity::new(buffer_capacity_bounds::MAX).is_max());
         assert!(!BufferCapacity::new(1000).is_max());
     }
 

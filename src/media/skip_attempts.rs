@@ -1,71 +1,30 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Maximum skip attempts domain type for navigation.
 //!
-//! This module provides a type-safe wrapper for the maximum number of
-//! consecutive corrupted files to skip during navigation.
+//! This module re-exports the domain type and provides backward compatibility.
 
-use crate::config::{DEFAULT_MAX_SKIP_ATTEMPTS, MAX_MAX_SKIP_ATTEMPTS, MIN_MAX_SKIP_ATTEMPTS};
-
-/// Maximum number of consecutive corrupted files to skip during navigation.
-///
-/// This newtype enforces validity at the type level, ensuring the value
-/// is always within the valid range (1–20).
-///
-/// # Example
-///
-/// ```
-/// use iced_lens::media::MaxSkipAttempts;
-///
-/// let attempts = MaxSkipAttempts::new(5);
-/// assert_eq!(attempts.value(), 5);
-///
-/// // Values outside range are clamped
-/// let too_high = MaxSkipAttempts::new(100);
-/// assert_eq!(too_high.value(), 20); // Clamped to max
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MaxSkipAttempts(u32);
-
-impl MaxSkipAttempts {
-    /// Creates a new max skip attempts value, clamping to valid range.
-    #[must_use]
-    pub fn new(value: u32) -> Self {
-        Self(value.clamp(MIN_MAX_SKIP_ATTEMPTS, MAX_MAX_SKIP_ATTEMPTS))
-    }
-
-    /// Returns the value as u32.
-    #[must_use]
-    pub fn value(self) -> u32 {
-        self.0
-    }
-
-    /// Returns true if this is the minimum value.
-    #[must_use]
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_MAX_SKIP_ATTEMPTS
-    }
-
-    /// Returns true if this is the maximum value.
-    #[must_use]
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_MAX_SKIP_ATTEMPTS
-    }
-}
-
-impl Default for MaxSkipAttempts {
-    fn default() -> Self {
-        Self(DEFAULT_MAX_SKIP_ATTEMPTS)
-    }
-}
+// Re-export domain type
+#[allow(unused_imports)] // Used by tests and may be used by external consumers
+pub use crate::domain::editing::newtypes::skip_bounds;
+pub use crate::domain::editing::MaxSkipAttempts;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{DEFAULT_MAX_SKIP_ATTEMPTS, MAX_MAX_SKIP_ATTEMPTS, MIN_MAX_SKIP_ATTEMPTS};
+
+    // Verify domain bounds match config constants
+    #[test]
+    fn domain_bounds_match_config() {
+        assert_eq!(skip_bounds::MIN, MIN_MAX_SKIP_ATTEMPTS);
+        assert_eq!(skip_bounds::MAX, MAX_MAX_SKIP_ATTEMPTS);
+        assert_eq!(skip_bounds::DEFAULT, DEFAULT_MAX_SKIP_ATTEMPTS);
+    }
 
     #[test]
     fn new_clamps_to_valid_range() {
-        assert_eq!(MaxSkipAttempts::new(0).value(), MIN_MAX_SKIP_ATTEMPTS);
-        assert_eq!(MaxSkipAttempts::new(100).value(), MAX_MAX_SKIP_ATTEMPTS);
+        assert_eq!(MaxSkipAttempts::new(0).value(), skip_bounds::MIN);
+        assert_eq!(MaxSkipAttempts::new(100).value(), skip_bounds::MAX);
     }
 
     #[test]
@@ -77,10 +36,7 @@ mod tests {
 
     #[test]
     fn default_returns_expected_value() {
-        assert_eq!(
-            MaxSkipAttempts::default().value(),
-            DEFAULT_MAX_SKIP_ATTEMPTS
-        );
+        assert_eq!(MaxSkipAttempts::default().value(), skip_bounds::DEFAULT);
     }
 
     #[test]

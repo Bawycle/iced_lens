@@ -9,6 +9,7 @@
 pub mod app;
 pub mod diagnostics;
 pub mod directory_scanner;
+pub mod domain;
 pub mod error;
 pub mod icon;
 pub mod media;

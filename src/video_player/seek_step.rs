@@ -1,75 +1,28 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Keyboard seek step domain type for video playback.
 //!
-//! This module provides a type-safe wrapper for the keyboard seek step
-//! duration in seconds.
+//! This module re-exports the domain type and provides backward compatibility.
 
-use crate::config::{
-    DEFAULT_KEYBOARD_SEEK_STEP_SECS, MAX_KEYBOARD_SEEK_STEP_SECS, MIN_KEYBOARD_SEEK_STEP_SECS,
-};
-
-/// Keyboard seek step in seconds for video navigation.
-///
-/// This newtype enforces validity at the type level, ensuring the value
-/// is always within the valid range (0.5–30.0 seconds).
-///
-/// # Example
-///
-/// ```
-/// use iced_lens::video_player::KeyboardSeekStep;
-///
-/// let step = KeyboardSeekStep::new(5.0);
-/// assert_eq!(step.value(), 5.0);
-///
-/// // Values outside range are clamped
-/// let too_high = KeyboardSeekStep::new(100.0);
-/// assert_eq!(too_high.value(), 30.0); // Clamped to max
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeyboardSeekStep(f64);
-
-impl KeyboardSeekStep {
-    /// Creates a new keyboard seek step value, clamping to valid range.
-    #[must_use]
-    pub fn new(value: f64) -> Self {
-        Self(value.clamp(MIN_KEYBOARD_SEEK_STEP_SECS, MAX_KEYBOARD_SEEK_STEP_SECS))
-    }
-
-    /// Returns the value as f64.
-    #[must_use]
-    pub fn value(self) -> f64 {
-        self.0
-    }
-
-    /// Returns the step as a Duration.
-    #[must_use]
-    pub fn as_duration(self) -> std::time::Duration {
-        std::time::Duration::from_secs_f64(self.0)
-    }
-
-    /// Returns true if this is the minimum value.
-    #[must_use]
-    pub fn is_min(self) -> bool {
-        self.0 <= MIN_KEYBOARD_SEEK_STEP_SECS
-    }
-
-    /// Returns true if this is the maximum value.
-    #[must_use]
-    pub fn is_max(self) -> bool {
-        self.0 >= MAX_KEYBOARD_SEEK_STEP_SECS
-    }
-}
-
-impl Default for KeyboardSeekStep {
-    fn default() -> Self {
-        Self(DEFAULT_KEYBOARD_SEEK_STEP_SECS)
-    }
-}
+// Re-export domain type
+#[allow(unused_imports)] // Used by tests and may be used by external consumers
+pub use crate::domain::video::newtypes::seek_step_bounds;
+pub use crate::domain::video::newtypes::KeyboardSeekStep;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{
+        DEFAULT_KEYBOARD_SEEK_STEP_SECS, MAX_KEYBOARD_SEEK_STEP_SECS, MIN_KEYBOARD_SEEK_STEP_SECS,
+    };
     use crate::test_utils::assert_abs_diff_eq;
+
+    // Verify domain bounds match config constants
+    #[test]
+    fn domain_bounds_match_config() {
+        assert_abs_diff_eq!(seek_step_bounds::MIN, MIN_KEYBOARD_SEEK_STEP_SECS);
+        assert_abs_diff_eq!(seek_step_bounds::MAX, MAX_KEYBOARD_SEEK_STEP_SECS);
+        assert_abs_diff_eq!(seek_step_bounds::DEFAULT, DEFAULT_KEYBOARD_SEEK_STEP_SECS);
+    }
 
     #[test]
     fn new_clamps_to_valid_range() {
